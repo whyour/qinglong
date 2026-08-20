@@ -1,6 +1,8 @@
 import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
 
 import { runLegacyCrontabAdoptionCommandFile } from './adoption';
+import { isLocalDataDirectoryAdoptionOperation } from './data-directory-adoption/contract';
+import type { LocalDataDirectoryAdoptionInspectResult } from './data-directory-adoption/inventory';
 import {
   isLocalSqliteAdoptionProductOperation,
   type LocalSqliteAdoptionProductOperation,
@@ -9,7 +11,8 @@ import type { LocalSqliteAdoptionProductCommandResult } from './sqlite-adoption/
 
 export type LocalAdoptionProductCommandResult =
   | Awaited<ReturnType<typeof runLegacyCrontabAdoptionCommandFile>>
-  | LocalSqliteAdoptionProductCommandResult;
+  | LocalSqliteAdoptionProductCommandResult
+  | LocalDataDirectoryAdoptionInspectResult;
 
 function operation(value: unknown): unknown {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -28,6 +31,12 @@ export async function runLocalAdoptionProductCommandFile(
     return runLegacyCrontabAdoptionCommandFile(commandFilePath);
   }
   const selected = operation(candidate);
+  if (isLocalDataDirectoryAdoptionOperation(selected)) {
+    const { inspectLocalDataDirectoryAdoption } = await import(
+      './data-directory-adoption/inventory.js'
+    );
+    return inspectLocalDataDirectoryAdoption(candidate);
+  }
   if (!isLocalSqliteAdoptionProductOperation(selected)) {
     return runLegacyCrontabAdoptionCommandFile(commandFilePath);
   }

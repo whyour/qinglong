@@ -11,6 +11,21 @@
 
 最新增量证据（2026-08-21）：
 
+- D-384/ADR-0477（已接受）：完整 2.x data directory 接管先落地为一次性、只读、有界 inventory，而不是直接复用 legacy shell `tar`
+  或盲拷整个目录。既有 `ql3-adoption` 新增 exact 私有命令 `local-data-directory.adoption.inspect`，固定分类
+  `config/db/ssh.d→transform`、`scripts/upload→copy_reviewed`、`log/syslog/bak→retain_external(root-only)`、
+  `repo/raw/dep_cache/deps→regenerate(root-only)`；未知顶层条目只返回数量/摘要并转 `manual_review`。递归类别按 UTF-8 字节序、
+  `lstat`/no-follow 和 stable descriptor 流式哈希；symlink、硬链接、特殊文件、错误 owner 与 group/world writable 条目不读取且计为
+  unsafe，底层错误统一脱敏。Edge 限制 8192 项、512 MiB 总哈希、64 MiB 单文件、32 层，Standalone 为 65536 项、4 GiB、
+  512 MiB、64 层；目录用增量 `opendir` 在保存超预算名称前失败，文件只用 64 KiB 缓冲。该 operation 不复制、转换、归档或写源目录，
+  也尚未绑定 D-383 SQLite activation；D-385 才设计双 digest fence 的 stage/verify。没有新增 package、dependency、binary、daemon、
+  listener、timer、数据库连接或部署对象；Local Owner 新代码内聚在 `lifecycle/data-directory-adoption/`，workspace 保持 18 packages、
+  `singleSourcePackages=[]`、`shallowSourcePackages=[]`、`118 source / 117 nested / 1 root binary entry`。D-384 focused `5/5`，
+  Local Owner `195 total / 190 pass / 5 conditional skip / 0 fail`；backend `1,535 total / 1,533 pass / 2 conditional skip /
+  0 fail`，`pnpm build:back` 与 18-package clean build/逐包测试通过；八项架构审计与 14 档 artifact audit 全 compatible，基础
+  Edge/Standalone、Adopted、Application+AI 和 MCP 制品体积/模块数均保持 D-383 基线，证明盘点 authority 未进入低配常驻闭包。
+  本切片不改变 PostgreSQL 语义，故不重跑且不重新占有 HA 证明。固定物理 Edge 的盘点/staging RSS、I/O、磁盘峰值、断电恢复，
+  以及 config/Keyv/SSH 转换和 systemd/OpenRC/Compose lineage 仍待后续完成。
 - D-383/ADR-0476（已接受）：把单个 2.x SQLite 主库接管从分散 API/合成 fixture 推进为产品级真实双态演练。既有一次性
   `ql3-adoption` 新增 exact、私有 command-file 的 `inspect → stage → verify → activation`，从生产形态 Sequelize schema
   （Cron、Dependency、App、Auth、Env、Subscription、View、Stats、RunningInstance 与未知 Plugin-owned table）生成独立 recovery
