@@ -474,6 +474,7 @@
 | [ADR-0468](./ADR-0468-optional-console-worker-observation.md)                                                    | 可选 Console Worker 只读观察                                                                                                                                                              | Accepted |
 | [ADR-0469](./ADR-0469-optional-console-package-installation-observation.md)                                      | 可选 Console Package Installation 只读观察                                                                                                                                                 | Accepted |
 | [ADR-0470](./ADR-0470-session-scoped-console-capability-discovery.md)                                            | Console 会话级能力发现与服务端操作围栏                                                                                                                                                     | Accepted |
+| [ADR-0471](./ADR-0471-legacy-core-api-compatibility-baseline.md)                                                 | Legacy 核心执行 API 兼容基线                                                                                                                                                                | Accepted |
 
 ## 规则
 
