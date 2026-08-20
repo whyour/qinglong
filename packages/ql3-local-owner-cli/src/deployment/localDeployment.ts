@@ -79,6 +79,10 @@ import {
   consumeLocalServiceManagerCutoverOutcome,
   consumeLocalServiceManagerCutoverOutcomeCommandFile,
 } from './service-manager/serviceCutoverConsumer';
+import {
+  prepareLocalServiceManagerLegacyRollback,
+  prepareLocalServiceManagerLegacyRollbackCommandFile,
+} from './service-manager/serviceLegacyRollback';
 
 export {
   LocalDeploymentConfigurationError,
@@ -181,6 +185,8 @@ export {
   consumeLocalServiceManagerCutoverOutcomeCommandFile,
   prepareLocalServiceManagerIntent,
   prepareLocalServiceManagerIntentCommandFile,
+  prepareLocalServiceManagerLegacyRollback,
+  prepareLocalServiceManagerLegacyRollbackCommandFile,
 };
 export {
   localServiceManagerIntentDigest,
@@ -209,6 +215,13 @@ export {
   type LocalServiceManagerCutoverRecord,
   type LocalServiceManagerCutoverState,
 } from './service-manager/serviceCutoverJournal';
+export {
+  localServiceManagerLegacyRollbackPreparationPath,
+  normalizeLocalServiceManagerLegacyRollbackPreparation,
+  type LocalServiceManagerLegacyRollbackPreparation,
+  type LocalServiceManagerLegacyRollbackPrepareCommand,
+  type LocalServiceManagerLegacyRollbackPrepareResult,
+} from './service-manager/serviceLegacyRollback';
 
 export async function prepareLocalDeployment(
   input: unknown,

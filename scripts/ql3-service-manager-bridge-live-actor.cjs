@@ -368,7 +368,12 @@ function adoptedFixture(root, kind, uid, gid) {
     uid,
     gid,
   );
-  return { cutoverId, activationDigest, commitmentDigest };
+  return {
+    cutoverId,
+    instanceId: commitmentPayload.instanceId,
+    activationDigest,
+    commitmentDigest,
+  };
 }
 
 async function consumeCutover(root, prepared, uid, gid) {
@@ -399,6 +404,36 @@ async function consumeCutover(root, prepared, uid, gid) {
     gid,
   );
   return ownerCli(uid, gid, 'service-cutover-consume', commandPath);
+}
+
+function prepareAdoptedRollback(root, adopted, stopped, uid, gid) {
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.service-manager.legacy-rollback.prepare',
+    options: { deploymentRoot: root, allowRootService: uid === 0 },
+    request: {
+      cutoverId: adopted.cutoverId,
+      profile: 'edge',
+      instanceId: adopted.instanceId,
+      generation: 1,
+      expectedActivationDigest: adopted.activationDigest,
+      expectedStoppedRecordDigest: stopped.recordDigest,
+      expectedInstanceHeadDigest: stopped.instanceHeadDigest,
+      requestedAtMs: Date.now(),
+    },
+  };
+  const commandPath = path.join(root, 'owner-legacy-rollback-prepare.json');
+  writePrivate(
+    commandPath,
+    `${JSON.stringify(command, null, 2)}\n`,
+    0o600,
+    uid,
+    gid,
+  );
+  return {
+    commandPath,
+    result: ownerCli(uid, gid, 'service-legacy-rollback-prepare', commandPath),
+  };
 }
 
 function execute(root, controllerRoot, managerOptions, prepared, uid, gid) {
@@ -670,6 +705,29 @@ async function main(argv) {
     ) {
       fail('adopted service did not commit target_stopped');
     }
+    const adoptedRollback = prepareAdoptedRollback(
+      root,
+      adopted,
+      adoptedStopped,
+      uid,
+      gid,
+    );
+    const adoptedRollbackReplay = ownerCli(
+      uid,
+      gid,
+      'service-legacy-rollback-prepare',
+      adoptedRollback.commandPath,
+    );
+    if (
+      adoptedRollback.result.status !== 'prepared' ||
+      adoptedRollback.result.state !== 'rollback_prepared' ||
+      adoptedRollback.result.rollbackDisposition !== 'rollback_candidate' ||
+      adoptedRollbackReplay.status !== 'existing' ||
+      adoptedRollbackReplay.preparationDigest !==
+        adoptedRollback.result.preparationDigest
+    ) {
+      fail('adopted rollback preparation did not converge exactly');
+    }
     const payload = {
       schemaVersion: 1,
       evidenceClass: 'qinglong3_service_manager_bridge_live_actor',
@@ -686,6 +744,8 @@ async function main(argv) {
       adoptedCutover: {
         active: adoptedActive,
         stopped: adoptedStopped,
+        rollbackPrepared: adoptedRollback.result,
+        rollbackReplay: adoptedRollbackReplay,
       },
       gates: {
         rootCommandFile: true,
@@ -699,6 +759,9 @@ async function main(argv) {
         serviceProcessIdentity: true,
         adoptedCutoverActive: true,
         adoptedCutoverStopped: true,
+        adoptedRollbackPrepared: true,
+        adoptedRollbackReplay: true,
+        adoptedRollbackCandidate: true,
       },
     };
     process.stdout.write(

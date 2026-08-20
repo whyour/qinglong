@@ -9,6 +9,10 @@ const {
   consumeLocalServiceManagerCutoverOutcome,
 } = require('../dist/deployment/service-manager/serviceCutoverConsumer.js');
 const {
+  localServiceManagerLegacyRollbackPreparationPath,
+  prepareLocalServiceManagerLegacyRollback,
+} = require('../dist/deployment/service-manager/serviceLegacyRollback.js');
+const {
   prepareLocalServiceManagerIntent,
 } = require('../dist/deployment/service-manager/serviceManagerIntent.js');
 const {
@@ -163,8 +167,10 @@ function fixture(t) {
     cutoverId,
     activationDigest,
     commitmentDigest,
+    commitmentPath,
     applicationPath,
     sourcePath,
+    targetPath,
     identity,
     procRoot,
   };
@@ -311,6 +317,69 @@ function consumeCommand(state, prepared) {
     request: {
       actionId: prepared.actionId,
       expectedIntentDigest: prepared.intentDigest,
+    },
+  };
+}
+
+async function stopAdoptedTarget(state, suffix = '031') {
+  const active = prepare(
+    state,
+    1,
+    'install-enable-start',
+    state.commitmentDigest,
+    `123e4567-e89b-42d3-a456-426614174${suffix}`,
+  );
+  publishOutcome(active, 'install-enable-start', 'active', 4723, 1786416000200);
+  const startupReceiptDigest = publishReceipt(state, 4723, '100007');
+  const activeResult = await consumeLocalServiceManagerCutoverOutcome(
+    consumeCommand(state, active),
+    { procRoot: state.procRoot },
+  );
+  const stopped = prepare(
+    state,
+    1,
+    'stop',
+    activeResult.recordDigest,
+    `123e4567-e89b-42d3-a456-426614174${String(Number(suffix) + 1).padStart(
+      3,
+      '0',
+    )}`,
+  );
+  publishOutcome(stopped, 'stop', 'stopped', 0, 1786416000300);
+  publishShutdownReceipt(state, 4723, '100007', startupReceiptDigest);
+  fs.rmSync(path.join(state.procRoot, '4723'), {
+    recursive: true,
+    force: true,
+  });
+  const stoppedResult = await consumeLocalServiceManagerCutoverOutcome(
+    consumeCommand(state, stopped),
+    { procRoot: state.procRoot },
+  );
+  const head = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  return { stoppedResult, head };
+}
+
+function rollbackPrepareCommand(state, stoppedResult, head) {
+  return {
+    schemaVersion: 1,
+    operation: 'local.deployment.service-manager.legacy-rollback.prepare',
+    options: {
+      deploymentRoot: state.root,
+      allowRootService: process.getuid() === 0,
+    },
+    request: {
+      cutoverId: state.cutoverId,
+      profile: 'edge',
+      instanceId: 'edge-router-1',
+      generation: 1,
+      expectedActivationDigest: state.activationDigest,
+      expectedStoppedRecordDigest: stoppedResult.recordDigest,
+      expectedInstanceHeadDigest: head.headDigest,
+      requestedAtMs: 1786416000400,
     },
   };
 }
@@ -466,6 +535,117 @@ test('stop advances only after the exact receipted process identity disappears',
     ),
   );
   assert.equal(record.evidence.shutdownReceiptDigest, shutdownReceiptDigest);
+});
+
+test('prepares and exactly replays lossless service-manager legacy rollback evidence', async (t) => {
+  const state = fixture(t);
+  const { stoppedResult, head } = await stopAdoptedTarget(state);
+  const command = rollbackPrepareCommand(state, stoppedResult, head);
+  const prepared = prepareLocalServiceManagerLegacyRollback(command);
+  assert.equal(prepared.status, 'prepared');
+  assert.equal(prepared.state, 'rollback_prepared');
+  assert.equal(prepared.rollbackDisposition, 'rollback_candidate');
+  assert.match(prepared.preparationDigest, /^[0-9a-f]{64}$/);
+  const preparedHead = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(preparedHead.state, 'rollback_prepared');
+  assert.equal(preparedHead.sourceRecordDigest, prepared.preparationDigest);
+  const record = JSON.parse(
+    fs.readFileSync(
+      localServiceManagerLegacyRollbackPreparationPath(
+        state.root,
+        state.cutoverId,
+        1,
+      ),
+      'utf8',
+    ),
+  );
+  assert.equal(record.stoppedRecordDigest, stoppedResult.recordDigest);
+  assert.equal(record.reconciliation.targetMatchesActivation, true);
+  assert.equal(record.reconciliation.sourceMatchesRecovery, true);
+  assert.equal(record.reconciliation.targetSidecarsClear, true);
+  assert.equal(record.reconciliation.sourceSidecarsClear, true);
+  const replay = prepareLocalServiceManagerLegacyRollback(command);
+  assert.equal(replay.status, 'existing');
+  assert.equal(replay.preparationDigest, prepared.preparationDigest);
+  assert.equal(replay.instanceHeadDigest, prepared.instanceHeadDigest);
+});
+
+test('keeps target_stopped when service-manager rollback would discard target writes', async (t) => {
+  const state = fixture(t);
+  const { stoppedResult, head } = await stopAdoptedTarget(state, '033');
+  fs.writeFileSync(state.targetPath, 'target-written-by-qinglong3\n', {
+    mode: 0o600,
+  });
+  const result = prepareLocalServiceManagerLegacyRollback(
+    rollbackPrepareCommand(state, stoppedResult, head),
+  );
+  assert.equal(result.status, 'not-prepared');
+  assert.equal(result.state, 'target_stopped');
+  assert.equal(result.rollbackDisposition, 'reconciliation_required');
+  assert.equal(result.preparationDigest, '0'.repeat(64));
+  const unchanged = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(unchanged.state, 'target_stopped');
+  assert.equal(unchanged.headDigest, head.headDigest);
+  assert.equal(
+    fs.existsSync(
+      localServiceManagerLegacyRollbackPreparationPath(
+        state.root,
+        state.cutoverId,
+        1,
+      ),
+    ),
+    false,
+  );
+});
+
+test('rejects application configuration drift before service-manager rollback preparation', async (t) => {
+  const state = fixture(t);
+  const { stoppedResult, head } = await stopAdoptedTarget(state, '035');
+  fs.appendFileSync(state.applicationPath, ' ');
+  assert.throws(
+    () =>
+      prepareLocalServiceManagerLegacyRollback(
+        rollbackPrepareCommand(state, stoppedResult, head),
+      ),
+    /application configuration digest drifted/,
+  );
+  const unchanged = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(unchanged.state, 'target_stopped');
+  assert.equal(unchanged.headDigest, head.headDigest);
+});
+
+test('rejects legacy silence commitment drift before service-manager rollback preparation', async (t) => {
+  const state = fixture(t);
+  const { stoppedResult, head } = await stopAdoptedTarget(state, '037');
+  const commitment = JSON.parse(fs.readFileSync(state.commitmentPath, 'utf8'));
+  commitment.observedAtMs += 1;
+  writePrivate(state.commitmentPath, commitment);
+  assert.throws(
+    () =>
+      prepareLocalServiceManagerLegacyRollback(
+        rollbackPrepareCommand(state, stoppedResult, head),
+      ),
+    /application rollback binding drifted/,
+  );
+  const unchanged = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(unchanged.state, 'target_stopped');
+  assert.equal(unchanged.headDigest, head.headDigest);
 });
 
 test('stop without an exact shutdown receipt requires manual resolution', async (t) => {

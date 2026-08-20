@@ -11,6 +11,25 @@
 
 最新增量证据（2026-08-20）：
 
+- D-379/ADR-0472（已接受；OpenRC live actor 待镜像基础设施恢复后补跑）：为 systemd/OpenRC adopted cutover 增加 Owner-side
+  `service-legacy-rollback-prepare`。命令绑定 exact `target_stopped` record 与 instance head，重读 stop intent、Application v3、
+  activation 和 legacy-silence commitment，并复用 Docker 路径相同的 stable-fd SHA-256/inode/sidecar reconciliation。
+  只有 target 等于 activation、source 等于 recovery 且双方 SQLite sidecar clear 的 `rollback_candidate` 才 no-replace 发布
+  digest-bound preparation 并 CAS 到 `rollback_prepared`；target 写后或证据不确定返回结构化 `not-prepared`，保持
+  `target_stopped`，不错误进入 terminal `manual_required`。本切片位于现有 Local Owner 包，不新增 workspace package、
+  production dependency、数据库连接、daemon、watcher、timer 或 root mutation；root-only systemd/OpenRC legacy start、
+  inspect-only crash convergence、最终 `legacy_running` 消费与 2.x health proof 留给下一阶段。定向 prepare 门 `10/10`，Local
+  Owner 全量 `175 total / 170 pass / 5 conditional skip / 0 fail`，完整 backend 为
+  `1,507 total / 1,505 pass / 2 conditional skip / 0 fail`，18-package clean build/逐包测试单次退出 0。package boundary、
+  Service Bridge import、Edge import、Cluster dependency、Cluster/Worker deployment、Console 与 Console distribution 八项审计
+  全部 compatible/passed；workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为
+  `108 source / 107 nested / 1 root binary entry`。14 档 Local artifact audit 全部 compatible；基础 Edge/Standalone 保持
+  `2,598,669 / 2,598,747` bytes、316 files、57 loaded modules，Adopted 为 `2,817,964 / 2,818,087` bytes、58 loaded modules，
+  Application+AI 为 `4,501,822 / 4,501,954` bytes，MCP 为 `7,324,601 / 7,324,709` bytes。Docker live gate 已完成 systemd
+  root/non-root 两个 actor 的真实 stop、prepare 与 exact replay；OpenRC 两个 actor 因 `node:24-alpine` registry mirror EOF 与
+  credential helper 挂起未执行，不能宣称四组合门已闭合，镜像基础设施恢复后须补跑。本切片不改变 PostgreSQL schema、ACL、
+  repository、role、Pool、连接或 failover 语义，因此不重跑且不重新占有 HA 证明；D-373/D-374 PostgreSQL 18.6 arm64 HA
+  `146/146`、timeline `1→2` 仅作为相邻既有基线。
 - D-378/ADR-0471（已接受）：把孵化重点从连续 Cluster Console 增量转回 3.0 首发兼容闭环，新增直接运行生产 Cron/Subscription
   Express Router 与 Celebrate validator 的 2.x 核心执行 API 基线。Cron 覆盖 list/create/update/disable/enable/run/stop、单日志、日志列表和
   单实例 stop；Subscription 覆盖 list/create/update/disable/enable/run/stop/log。确定性 TypeDI spy 同时锁定服务参数与现行 JSON envelope，尤其

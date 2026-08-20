@@ -22,6 +22,14 @@ export interface TargetDataReconciliationEvidence {
   readonly evidenceDigest: string;
 }
 
+export interface TargetDataReconciliationInput {
+  readonly profile: 'edge' | 'standalone';
+  readonly activationPath: string;
+  readonly legacySourcePath: string;
+  readonly targetDatabasePath: string;
+  readonly expectedActivationDigest: string;
+}
+
 interface FileEvidence {
   readonly sha256: string;
   readonly identityDigest: string;
@@ -151,21 +159,35 @@ export function readTargetDataReconciliationEvidence(
   command: Readonly<LocalDeploymentTargetRunCommand>,
   uid: number,
 ): Readonly<TargetDataReconciliationEvidence> {
+  return readTargetDataReconciliationEvidenceForPaths(
+    {
+      profile: command.request.profile,
+      activationPath: command.request.activationPath,
+      legacySourcePath: command.request.legacySourcePath,
+      targetDatabasePath: command.request.targetDatabasePath,
+      expectedActivationDigest: command.request.expectedActivationDigest,
+    },
+    uid,
+  );
+}
+
+export function readTargetDataReconciliationEvidenceForPaths(
+  input: Readonly<TargetDataReconciliationInput>,
+  uid: number,
+): Readonly<TargetDataReconciliationEvidence> {
   try {
     const activation = object(
-      readPrivateLocalCommandFile(command.request.activationPath),
+      readPrivateLocalCommandFile(input.activationPath),
     );
     const { activationDigest, ...payload } = activation;
     if (
       activation.schemaVersion !== 1 ||
       activation.kind !== 'qinglong3-local-sqlite-activation' ||
       activation.state !== 'prepared' ||
-      activation.profile !== command.request.profile ||
-      activation.sourcePathDigest !==
-        textDigest(command.request.legacySourcePath) ||
-      activation.targetPathDigest !==
-        textDigest(command.request.targetDatabasePath) ||
-      activationDigest !== command.request.expectedActivationDigest ||
+      activation.profile !== input.profile ||
+      activation.sourcePathDigest !== textDigest(input.legacySourcePath) ||
+      activation.targetPathDigest !== textDigest(input.targetDatabasePath) ||
+      activationDigest !== input.expectedActivationDigest ||
       typeof activationDigest !== 'string' ||
       !DIGEST_PATTERN.test(activationDigest) ||
       typeof activation.targetSha256 !== 'string' ||
@@ -179,12 +201,12 @@ export function readTargetDataReconciliationEvidence(
       throw new Error('activation identity drifted');
     }
     const target = fileEvidence(
-      command.request.targetDatabasePath,
+      input.targetDatabasePath,
       uid,
       'target database',
     );
     const source = fileEvidence(
-      command.request.legacySourcePath,
+      input.legacySourcePath,
       uid,
       'legacy source database',
     );

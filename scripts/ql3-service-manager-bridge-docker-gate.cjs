@@ -81,6 +81,9 @@ function actorReport(name, kind, identityMode) {
     'serviceProcessIdentity',
     'adoptedCutoverActive',
     'adoptedCutoverStopped',
+    'adoptedRollbackPrepared',
+    'adoptedRollbackReplay',
+    'adoptedRollbackCandidate',
   ];
   if (
     report.managerKind !== kind ||
@@ -191,6 +194,15 @@ function main() {
         ),
         adoptedCutoverStopped: reports.every(
           (report) => report.gates.adoptedCutoverStopped,
+        ),
+        adoptedRollbackPrepared: reports.every(
+          (report) => report.gates.adoptedRollbackPrepared,
+        ),
+        adoptedRollbackReplay: reports.every(
+          (report) => report.gates.adoptedRollbackReplay,
+        ),
+        adoptedRollbackCandidate: reports.every(
+          (report) => report.gates.adoptedRollbackCandidate,
         ),
         systemdRestart: reports.some(
           (report) =>
