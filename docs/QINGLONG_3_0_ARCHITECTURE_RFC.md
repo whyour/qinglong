@@ -22,7 +22,7 @@
   `physicalErasureGuaranteed=false`，不把闪存/CoW overwrite 冒充介质擦除，也不激活配置、SSH、Task 或 service cutover。实现内聚在既有
   Local Owner/Admin/SQLite 的 data-directory 子目录，不新增 package、依赖、binary、daemon、listener、timer、watcher、网络或常驻资源；
   Edge/Standalone 继续使用 128/512 Secret 上限。focused data-directory `13/13`、Local SQLite `236/236`、Local Owner
-  `208 total / 203 pass / 5 conditional skip / 0 fail` 与 backend `1,535 total / 1,533 pass / 2 conditional skip / 0 fail` 已通过，覆盖解密一致、
+  `208 total / 203 pass / 5 conditional skip / 0 fail` 与 backend `1,536 total / 1,534 pass / 2 conditional skip / 0 fail` 已通过，覆盖解密一致、
   stdout 脱敏、exact replay/verify、renamed-model 崩溃恢复、第二个 Secret 冲突的整批回滚和 viewer 拒绝零发布。18-package clean build/逐包测试、
   schema readiness v50/100 migrations/83 tables、八项架构审计、本地镜像审计和十四档 artifact audit 全 compatible；workspace 仍为 18 packages，
   `singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为 `131 source / 130 nested / 1 root binary entry`。基础 Edge/Standalone

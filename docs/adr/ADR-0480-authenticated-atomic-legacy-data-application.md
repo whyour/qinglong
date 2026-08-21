@@ -133,7 +133,7 @@ prepared-model/receipt 语义，但必须以 PostgreSQL、separation-of-duty 和
 - Local SQLite `236/236`，覆盖 v50 migration manifest、typed schema、readiness、unknown table drift 和既有 repository 回归；schema readiness
   以 mode-0600 Edge 数据库实测为 contract v50、100 migrations、83 tables、SQLite 3.53.3、DELETE journal；
 - Local Owner 为 `208 total / 203 pass / 5 conditional skip / 0 fail`；backend 为
-  `1,535 total / 1,533 pass / 2 conditional skip / 0 fail`；`pnpm build:back` 和 18-package clean build/逐包测试退出 0；
+  `1,536 total / 1,534 pass / 2 conditional skip / 0 fail`；`pnpm build:back` 和 18-package clean build/逐包测试退出 0；
 - package boundary 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Admin、Local Owner、Local SQLite 新源码均进入
   既有领域子目录，Local Owner 为 `131 source / 130 nested / 1 root binary entry`；
 - 八项架构审计、本地镜像审计和十四档 artifact audit 全 compatible；基础 Edge/Standalone 为 319 files/58 modules，最小 artifact
