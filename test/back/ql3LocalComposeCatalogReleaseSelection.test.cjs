@@ -13,6 +13,7 @@ const {
   writeSyntheticLocalReleaseSelection,
 } = require('../../scripts/lib/ql3-local-release-selection-test-fixture.cjs');
 
+const ROOT = path.resolve(__dirname, '../..');
 const IMAGE = `ghcr.io/example/qinglong3-local-application@sha256:${'a'.repeat(
   64,
 )}`;
@@ -177,4 +178,21 @@ test('marks an ordinary PR rollout as a synthetic fixture', (t) => {
   );
   assert.deepEqual(result.authority, { mode: 'synthetic_live_fixture' });
   assert.equal(fs.existsSync(result.releaseSelection.path), true);
+});
+
+test('live Compose gates consume the built SQLite contract version', () => {
+  const preflight = fs.readFileSync(
+    path.join(ROOT, 'scripts/ql3-local-compose-preflight-live-contract.cjs'),
+    'utf8',
+  );
+  const rollout = fs.readFileSync(
+    path.join(ROOT, 'scripts/ql3-local-compose-rollout-live-contract.cjs'),
+    'utf8',
+  );
+  for (const source of [preflight, rollout]) {
+    assert.match(source, /LOCAL_SQLITE_CONTRACT_VERSION/);
+    assert.doesNotMatch(source, /contractVersion !== [0-9]+/);
+  }
+  assert.match(rollout, /LOCAL_SQLITE_WRITE_CONTRACT_VERSION/);
+  assert.doesNotMatch(rollout, /sqliteWriteContract: [0-9]+/);
 });

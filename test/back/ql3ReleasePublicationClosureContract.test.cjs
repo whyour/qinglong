@@ -137,7 +137,7 @@ function localReport(profile, consumption, marker) {
       composeMerge: true,
       rolloutActive: true,
       durableReceipt: true,
-      sqliteWriteContract: 37,
+      sqliteWriteContract: 50,
       sqliteBackup: true,
       sqliteWriteObservation: { rows: 1 },
       sqliteRestorePrepared: true,

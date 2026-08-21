@@ -11,15 +11,22 @@
 
 最新增量证据（2026-08-21）：
 
-- D-388/ADR-0481（契约已冻结，实施中）：D-387 的 committed data receipt 只作为启动前置事实，不获得 activation 或
-  rollback authority。新增 adopted-only Application v4，精确绑定 `commitPath/expectedCommitDigest/expectedReceiptDigest`，
-  并要求 Application 在 signal、SQLite、Secret、Plugin、AI 之前以 no-follow、stable-stat 和 canonical digest 验证。
-  既有 `ql3-local-deploy` 将增加独立 `local.deployment.adopted.prepare|verify`，不复用 fresh setup、不安装或启动服务；
-  systemd/OpenRC 保持 Owner intent → 最小 root bridge → Owner consumer，root 不解析 receipt，最终 cutover journal 显式携带
-  commit/receipt digest。adopted Compose 不再错误复用 fresh `/var/lib/qinglong3` path mapping，而使用宿主与容器路径字节相同的
-  identity-preserving deployment/source bind，保证 SQLite activation path digest 在真实容器内仍成立；preflight/apply/restore/
-  evidence lineage 必须继承同一 receipt。v2 fresh 与 v3 SQLite-only adoption 保持兼容，不新增 package、dependency 或常驻对象。
-  本条只记录 Proposed contract，不能在实现、故障重放、完整测试、架构与 artifact 门完成前宣称 Accepted。
+- D-388/ADR-0481（已接受）：D-387 committed data receipt 只作为启动前置事实，不获得 activation/rollback authority。
+  adopted-only Application v4 在 signal、SQLite、Secret、Plugin、AI 前以 no-follow stable descriptor 验证
+  `commitPath/expectedCommitDigest/expectedReceiptDigest`；独立 `local.deployment.adopted.prepare|verify` 已覆盖 systemd、OpenRC、
+  Compose，既不复用 fresh setup 也不产生 service intent。systemd/OpenRC 继续使用 Owner → 最小 root bridge → Owner consumer，
+  root 不解析 receipt，Owner journal 显式保留 commit/receipt。adopted Compose 使用 path-byte 相同的 deployment/source 双 bind、
+  `restart: no`、read-only rootfs、无网络与 Profile 资源上限；preflight、rollout v3、restore/evidence v2 继承相同 lineage。
+  restore 保持 activation target device/inode，ENOSPC/部分写以 exact recovery evidence 重放；bundle 发布覆盖 stage-before-link 与
+  link-before-cleanup 两个崩溃窗口，Docker response loss 只 inspect。聚焦 adopted `12/12`、SQLite rollout `8/8`、完整 Local
+  SQLite `239/239`、Local Owner `222 total / 217 pass / 5 conditional skip / 0 fail`、tracked backend
+  `1540 total / 1538 pass / 2 conditional skip / 0 fail`；18-package clean build/逐包测试、架构/distribution 门与十四档 artifact
+  audit 全通过。workspace 仍为 18 packages，`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner
+  `135 source / 134 nested / 1 root binary entry`。基础 Edge/Standalone artifact 为
+  `2,611,978 / 2,612,056` bytes，Adopted 为 `2,831,713 / 2,831,836` bytes，未新增 production dependency 或常驻对象。
+  release live gate 已移除过期 v44/v37 硬编码：live preflight/rollout 读取已构建 v50，最终 readiness 要求有界版本且两 Profile
+  完全一致。独立 PostgreSQL 18.6 arm64 HA timeline `1→2`/146 gates 继续通过，但本地 receipt 不获得 Cluster authority。固定物理
+  Edge/NAS 的断电、FTL 写放大和加密卷销毁仍按本 ADR“未包含”保留，不被单元故障注入冒充。
 - D-387/ADR-0480（已接受）：把 D-386 prepared model 推进为受认证、Project-scoped、可审计且可恢复的原子 application。
   既有 `ql3-adoption` 增加 exact `local-data-directory.adoption.apply|apply.verify`；Owner credential 通过独立短生命周期 SQLite handle 建立
   `local_data_adoption` 强认证并要求目标 Project 的 `secret.manage`，publisher 在 `BEGIN IMMEDIATE` 内再次复验 credential、Project 与

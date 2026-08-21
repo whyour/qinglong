@@ -70,6 +70,10 @@ async function main() {
     root,
     'packages/ql3-local-owner-cli/dist/deployment/localDeployment.js',
   ));
+  const { LOCAL_SQLITE_CONTRACT_VERSION } = require(path.join(
+    root,
+    'packages/ql3-local-sqlite/dist/readiness/readinessInspection.js',
+  ));
   const temporaryRoot = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-compose-preflight-')),
   );
@@ -157,7 +161,7 @@ async function main() {
       report.status !== 'ready' ||
       report.generation !== 1 ||
       report.profile !== input.profile ||
-      report.sqlite?.contractVersion !== 44 ||
+      report.sqlite?.contractVersion !== LOCAL_SQLITE_CONTRACT_VERSION ||
       (report.image?.architecture !== 'amd64' &&
         report.image?.architecture !== 'arm64') ||
       report.service?.kind !== 'compose'

@@ -75,7 +75,7 @@ function localReport(scope, catalog, profile) {
     composeMerge: true,
     rolloutActive: true,
     durableReceipt: true,
-    sqliteWriteContract: 37,
+    sqliteWriteContract: 50,
     sqliteBackup: true,
     sqliteWriteObservation: { committed: true },
     sqliteRestorePrepared: true,
@@ -260,6 +260,9 @@ test('rejects synthetic, incomplete and unclean deployment reports', () => {
       input.local.standalone.value.gracefulCleanup = false;
     },
     (input) => {
+      input.local.edge.value.sqliteWriteContract = 0;
+    },
+    (input) => {
       input.cluster.report.value.receiptAuditCompatible = false;
     },
     (input) => {
@@ -273,6 +276,15 @@ test('rejects synthetic, incomplete and unclean deployment reports', () => {
       /deployment evidence is invalid/,
     );
   }
+});
+
+test('requires one bounded SQLite write contract across Local profiles', () => {
+  const input = structuredClone(fixture('local').input);
+  input.local.standalone.value.sqliteWriteContract = 49;
+  assert.throws(
+    () => createDeploymentReadinessReceipt(input),
+    /different SQLite write contracts/,
+  );
 });
 
 test('rejects tampered, recomputed or authority-detached receipts', () => {

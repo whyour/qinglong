@@ -206,7 +206,9 @@ function validateLocalReport(entry, profile, consumption, identity) {
     report.composeMerge !== true ||
     report.rolloutActive !== true ||
     report.durableReceipt !== true ||
-    report.sqliteWriteContract !== 37 ||
+    !Number.isSafeInteger(report.sqliteWriteContract) ||
+    report.sqliteWriteContract < 1 ||
+    report.sqliteWriteContract > 65_535 ||
     report.sqliteBackup !== true ||
     report.sqliteRestorePrepared !== true ||
     report.sqliteRestoreCommitted !== true ||
@@ -324,6 +326,9 @@ function createDeploymentReadinessReceipt(input) {
       standalone.releaseAuthority.selectionDigest
     ) {
       fail('local profiles used different release selections');
+    }
+    if (edge.sqliteWriteContract !== standalone.sqliteWriteContract) {
+      fail('local profiles used different SQLite write contracts');
     }
     evidence.push({
       family: 'local',

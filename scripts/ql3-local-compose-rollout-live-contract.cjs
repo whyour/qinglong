@@ -289,9 +289,16 @@ async function main() {
     root,
     'packages/ql3-local-owner-cli/dist/deployment/localDeployment.js',
   ));
-  const { inspectLocalSqliteRolloutBackup } = require(path.join(
+  const {
+    inspectLocalSqliteRolloutBackup,
+    LOCAL_SQLITE_WRITE_CONTRACT_VERSION,
+  } = require(path.join(
     root,
     'packages/ql3-local-sqlite/dist/readiness/rolloutSafety.js',
+  ));
+  const { LOCAL_SQLITE_CONTRACT_VERSION } = require(path.join(
+    root,
+    'packages/ql3-local-sqlite/dist/readiness/readinessInspection.js',
   ));
   const temporaryRoot = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-compose-rollout-')),
@@ -487,8 +494,9 @@ async function main() {
           (fs.statSync(path.join(rolloutRoot, name)).mode & 0o777) !== 0o600,
       ) ||
       (fs.statSync(backupPath).mode & 0o777) !== 0o600 ||
-      receipt.sqlite?.contractVersion !== 44 ||
-      receipt.sqlite?.writeContractVersion !== 44 ||
+      receipt.sqlite?.contractVersion !== LOCAL_SQLITE_CONTRACT_VERSION ||
+      receipt.sqlite?.writeContractVersion !==
+        LOCAL_SQLITE_WRITE_CONTRACT_VERSION ||
       (receipt.sqlite?.writeObservation !== 'unchanged' &&
         receipt.sqlite?.writeObservation !== 'changed') ||
       receipt.sqlite?.backup?.sha256 !== backup.sha256 ||
@@ -959,7 +967,7 @@ async function main() {
         composeMerge: true,
         rolloutActive: true,
         durableReceipt: true,
-        sqliteWriteContract: 37,
+        sqliteWriteContract: LOCAL_SQLITE_WRITE_CONTRACT_VERSION,
         sqliteBackup: true,
         sqliteWriteObservation: receipt.sqlite.writeObservation,
         sqliteRestorePrepared: true,

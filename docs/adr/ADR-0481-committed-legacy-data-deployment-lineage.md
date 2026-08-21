@@ -1,6 +1,6 @@
 # ADR-0481：Committed Legacy Data Receipt 的本机部署 Lineage
 
-- 状态：Proposed（D-388 契约冻结）
+- 状态：Accepted
 - 日期：2026-08-21
 - 关联 RFC：QL-RFC-0001 D-05、D-06、D-17、D-64、D-87、D-184、D-259、D-388
 - 关联 ADR：ADR-0194、ADR-0309、ADR-0310、ADR-0313、ADR-0314、ADR-0362、ADR-0476、ADR-0477、ADR-0478、ADR-0479、ADR-0480
@@ -180,6 +180,41 @@ Edge 保持 128 MiB/64 PID 描述符预算，Standalone 保持 256 MiB/256 PID�
 5. activation 与 rollback 仍需既有独立命令；D-387 apply 或 bundle prepare 单独成功不会改变服务状态。
 6. 覆盖成功、exact replay、commit/config/mount 漂移、发布崩溃、manager/Docker 响应丢失、ENOSPC 与低配资源边界。
 7. 完整 package/backend、架构、distribution、artifact 门通过；workspace package 数、浅包审计和常驻依赖闭包不退化。
+
+## 实现与验收证据
+
+- Application v4、canonical data application commit codec、adopted bundle、systemd/OpenRC Owner consumer 与 Compose
+  lineage 均已落地。Compose rollout receipt 为 v3，restore/evidence collection receipt 为 v2，三者携带相同
+  `applicationConfigDigest/activationDigest/commitmentDigest/legacyDataApplicationCommitDigest/
+  legacyDataApplicationReceiptDigest`，fresh receipt 使用同一 schema 但 adopted 字段为 `null`。
+- adopted bundle 聚焦套件 `12/12` 通过：systemd、OpenRC、Compose prepare/verify exact replay，不产生 service intent；
+  commit/config/mount 漂移失败关闭；真实 `docker compose config --format json` 证明 identity-preserving 双 bind；Docker
+  `up` response loss 只 inspect；restore 保持 activation 已绑定的 target device/inode；evidence collection 继承同一
+  lineage。新增发布故障矩阵覆盖“stage 已 fsync、target 尚未 link”与“target 已 link、stage 尚未清理”，原命令均以
+  no-replace bytes 收敛且不激活服务。
+- SQLite rollout safety 聚焦套件 `8/8`、完整 Local SQLite `239/239` 通过。adopted restore 在同一 inode 内有界改写，
+  ENOSPC/部分写保留 exact source stage 与 old-snapshot recovery evidence，重放后恢复原字节并清理中间材料；fresh restore
+  继续使用原 replace 语义。
+- 完整 Local Owner 为 `222 total / 217 pass / 5 root-service conditional skip / 0 fail`。tracked backend 在新增
+  release contract 回归后为 `1540 total / 1538 pass / 2 conditional skip / 0 fail`；loopback/TLS 用例在允许本机
+  listener 的环境运行。18 个 QL3 workspace package 均完成 clean build 与逐包测试。
+- package boundary schema v6 保持 `workspacePackageCount=18`、`singleSourcePackages=[]`、
+  `shallowSourcePackages=[]`；Local Owner 为 `135 source / 134 nested / 1 root binary entry`。没有新增 workspace
+  package、production dependency、daemon、timer、watcher、listener 或数据库连接。
+- 十四档 Edge/Standalone artifact audit 全 compatible。基础 Edge/Standalone 为
+  `2,611,978 / 2,612,056` bytes、319 files、58 loaded modules；Adopted 为
+  `2,831,713 / 2,831,836` bytes、339 files、59 modules；Application 为
+  `3,669,436 / 3,669,556` bytes；Application+AI 为 `4,529,710 / 4,529,842` bytes；MCP 为
+  `7,337,910 / 7,338,018` bytes，均保留预算 headroom。Edge/Standalone Compose 继续分别固定
+  `128 MiB/64 PID` 与 `256 MiB/256 PID`。
+- release live preflight/rollout 不再硬编码过期 SQLite v44/v37，而从已构建 Local SQLite contract 读取 v50；最终
+  deployment-readiness 不复制实现版本号，只要求有界正整数并要求 Edge/Standalone 对同一 selection 完全一致。catalog
+  selection、deployment readiness、publication closure 与 tag finalizer 相关回归 `28/28` 通过，image release、local
+  image、package boundary、cluster dependency、Edge import、service bridge、deployment lock 与 cluster deployment 审计均
+  compatible。
+- PostgreSQL/Cluster 语义未由本 ADR 修改，也不由本地 receipt 重新声明。独立 PostgreSQL 18.6 arm64 HA Docker 门仍以
+  timeline `1 → 2`、`146` gates 和无 finding 的 evidence audit 通过，用于证明本切片没有破坏既有集群基线，而不是把
+  Local lineage 当作 Cluster authority。
 
 ## 未包含
 

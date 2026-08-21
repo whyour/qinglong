@@ -719,6 +719,54 @@ for (const kind of ['systemd', 'openrc', 'compose']) {
   });
 }
 
+test('converges adopted bundle publication crash windows without activation', (t) => {
+  const state = fixture(t, 'compose');
+  prepareLocalDeploymentAdoptedBundle(state.command);
+
+  const applicationPath = path.join(state.root, 'local-application.json');
+  const applicationStagePath = path.join(
+    state.root,
+    '.local-application.json.ql3-deploy-stage',
+  );
+  const applicationContents = fs.readFileSync(applicationPath);
+  fs.unlinkSync(applicationPath);
+  fs.writeFileSync(applicationStagePath, applicationContents, {
+    mode: 0o600,
+    flag: 'wx',
+  });
+
+  const recoveredStage = prepareLocalDeploymentAdoptedBundle(state.command);
+  assert.equal(recoveredStage.status, 'prepared');
+  assert.equal(recoveredStage.applicationConfiguration.status, 'prepared');
+  assert.equal(fs.existsSync(applicationStagePath), false);
+  assert.deepEqual(fs.readFileSync(applicationPath), applicationContents);
+
+  const receiptPath = path.join(state.root, 'service', 'adopted-bundle.json');
+  const receiptStagePath = path.join(
+    state.root,
+    'service',
+    '.adopted-bundle.json.ql3-deploy-stage',
+  );
+  fs.linkSync(receiptPath, receiptStagePath);
+  assert.equal(fs.statSync(receiptPath).nlink, 2);
+
+  const recoveredLink = prepareLocalDeploymentAdoptedBundle(state.command);
+  assert.equal(recoveredLink.status, 'existing');
+  assert.equal(fs.existsSync(receiptStagePath), false);
+  assert.equal(fs.statSync(receiptPath).nlink, 1);
+  assert.equal(
+    verifyLocalDeploymentAdoptedBundle({
+      ...state.command,
+      operation: 'local.deployment.adopted.verify',
+    }).status,
+    'verified',
+  );
+  assert.equal(
+    fs.existsSync(path.join(state.root, 'service', 'intents')),
+    false,
+  );
+});
+
 test('rejects commit drift before publishing any bundle material', (t) => {
   const state = fixture(t, 'systemd');
   const commit = JSON.parse(fs.readFileSync(state.commitPath, 'utf8'));
