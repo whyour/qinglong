@@ -81,6 +81,13 @@ interface TerminalApplication {
   readonly receipt: Readonly<LocalReconciliationApplicationPlanReceipt>;
 }
 
+export interface LocalReconciliationApplicationTerminal
+  extends TerminalApplication {
+  readonly intent: Readonly<LocalReconciliationApplicationIntent>;
+  readonly review: Readonly<LocalReconciliationReviewTerminal>;
+  readonly head: Readonly<LocalCutoverInstanceHead>;
+}
+
 function configurationError(message: string, cause?: unknown): never {
   throw new LocalDeploymentConfigurationError(message, { cause });
 }
@@ -660,6 +667,61 @@ function readTerminalApplication(
   const terminal = Object.freeze({ plan, receipt });
   validateTerminalBinding(intent, review, terminal);
   return terminal;
+}
+
+/**
+ * Re-opens a sealed application terminal for a domain adapter. The adapter is
+ * given the exact signed review and current instance head rather than a loose
+ * plan file, so no downstream DML authority can be inferred from copied JSON.
+ */
+export async function readLocalReconciliationApplicationTerminal(
+  applicationRoot: string,
+  applicationId: string,
+  uid: number,
+): Promise<Readonly<LocalReconciliationApplicationTerminal>> {
+  const intent = readLocalReconciliationApplicationIntent(
+    applicationRoot,
+    applicationId,
+  );
+  if (
+    intent.command.options.applicationRoot !== applicationRoot ||
+    intent.command.request.applicationId !== applicationId
+  ) {
+    configurationError('terminal reconciliation application path drifted');
+  }
+  const selected = applicationPaths(applicationRoot, applicationId);
+  validateDirectory(
+    selected.root,
+    uid,
+    [0o500],
+    'reconciliationApplicationDirectory',
+  );
+  validateDirectory(
+    selected.staging,
+    uid,
+    [0o500],
+    'reconciliationApplicationStaging',
+  );
+  validateCatalog(selected, true);
+  const review = await readReview(
+    intent.command,
+    intent.command.request.reviewId,
+    uid,
+  );
+  const terminal = readTerminalApplication(
+    selected,
+    intent,
+    review,
+    uid,
+    [0o400],
+  );
+  const head = readLocalCutoverInstanceHead(
+    intent.command.options.deploymentRoot,
+    intent.instanceId,
+    uid,
+  );
+  validateHeadIdentity(head, intent);
+  return Object.freeze({ intent, review, ...terminal, head });
 }
 
 function sealFile(filePath: string, uid: number): void {

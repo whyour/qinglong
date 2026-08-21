@@ -40,6 +40,11 @@
       "require": "./dist/legacy-adoption/legacyCrontabDecisionIssuer.js",
       "default": "./dist/legacy-adoption/legacyCrontabDecisionIssuer.js"
     },
+    "./adoption-inspection": {
+      "types": "./dist/legacy-adoption/legacyCrontabInspection.d.ts",
+      "require": "./dist/legacy-adoption/legacyCrontabInspection.js",
+      "default": "./dist/legacy-adoption/legacyCrontabInspection.js"
+    },
     "./package-staging": {
       "types": "./dist/plugin-package/pluginPackageStaging.d.ts",
       "require": "./dist/plugin-package/pluginPackageStaging.js",

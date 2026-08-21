@@ -14,10 +14,12 @@ const {
   commitLocalReconciliationReview,
   prepareLocalReconciliationCapture,
   prepareLocalReconciliationApplication,
+  planLocalReconciliationAutomation,
   prepareLocalReconciliationPlan,
   prepareLocalReconciliationReview,
   verifyLocalReconciliationCapture,
   verifyLocalReconciliationApplication,
+  verifyLocalReconciliationAutomationPlan,
   verifyLocalReconciliationPlan,
   verifyLocalReconciliationReview,
   writeLocalReconciliationReviewDiagnostics,
@@ -25,6 +27,9 @@ const {
 const {
   normalizeLocalReconciliationCaptureManifest,
 } = require('../dist/deployment/reconciliation/bundle.js');
+const {
+  writeLocalReconciliationAutomationPlan,
+} = require('../dist/deployment/reconciliation/application/automation/rowPlan.js');
 const {
   createLocalDataDirectoryApplicationCommit,
 } = require('@qinglong/local-sqlite/data-directory-application-commit');
@@ -640,6 +645,75 @@ function planningDatabaseInitializer({ unknownTargetTable = false } = {}) {
     target.close();
     fs.chmodSync(targetDatabasePath, 0o600);
   };
+}
+
+function automationDatabaseInitializer() {
+  return ({ legacySourcePath, recoveryPath, targetDatabasePath }) => {
+    const legacy = new DatabaseSync(legacySourcePath);
+    legacy.exec(`
+      CREATE TABLE "Crontabs" (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        command TEXT,
+        schedule TEXT,
+        saved INTEGER,
+        isSystem INTEGER,
+        isDisabled INTEGER,
+        isPinned INTEGER,
+        labels TEXT,
+        sub_id INTEGER,
+        extra_schedules TEXT,
+        task_before TEXT,
+        task_after TEXT,
+        log_name TEXT,
+        allow_multiple_instances INTEGER,
+        work_dir TEXT
+      );
+      INSERT INTO "Crontabs" (
+        id, name, command, schedule, saved, isSystem, isDisabled, isPinned
+      ) VALUES (1, 'nightly', 'task nightly.js', '0 0 * * *', 1, 0, 0, 0);
+    `);
+    legacy.close();
+    fs.chmodSync(legacySourcePath, 0o600);
+    fs.copyFileSync(legacySourcePath, recoveryPath);
+    fs.chmodSync(recoveryPath, 0o600);
+
+    const target = new DatabaseSync(targetDatabasePath);
+    target.exec(`
+      CREATE TABLE "QingLong3SchemaCapabilities" (id INTEGER PRIMARY KEY);
+      CREATE TABLE "QingLong3TaskDefinitions" (
+        project_id TEXT NOT NULL,
+        task_id TEXT NOT NULL,
+        current_revision INTEGER NOT NULL,
+        PRIMARY KEY (project_id, task_id)
+      );
+      CREATE TABLE "QingLong3TaskDefinitionRevisions" (
+        project_id TEXT NOT NULL,
+        task_id TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        content_digest TEXT NOT NULL,
+        PRIMARY KEY (project_id, task_id, revision)
+      );
+    `);
+    target.close();
+    fs.chmodSync(targetDatabasePath, 0o600);
+  };
+}
+
+function mutateAutomationTarget({ targetDatabasePath }, occupied = false) {
+  const target = new DatabaseSync(targetDatabasePath);
+  if (occupied) {
+    target.exec(`
+      INSERT INTO "QingLong3TaskDefinitions" VALUES ('default', 'legacy-cron:1', 1);
+      INSERT INTO "QingLong3TaskDefinitionRevisions" VALUES (
+        'default', 'legacy-cron:1', 1, '${'a'.repeat(64)}'
+      );
+    `);
+  } else {
+    target.exec('INSERT INTO "QingLong3SchemaCapabilities" (id) VALUES (1)');
+  }
+  target.close();
+  return Object.freeze({});
 }
 
 function mutatePlanningTarget({ targetDatabasePath }) {
@@ -2545,6 +2619,523 @@ test('application coordinator plans eight content-free domains and verifies with
   assert.equal(cli.stdout.includes(state.applicationRoot), false);
   assert.equal(cli.stdout.includes('review-owner'), false);
   assert.equal(cli.stdout.includes('Crontabs'), false);
+});
+
+test('automation adapter builds a sealed row plan with bounded conflict evidence', async (t) => {
+  const state = await reviewedApplicationFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000431',
+    reviewId: '00000000-0000-4000-8000-000000000432',
+    applicationId: '00000000-0000-4000-8000-000000000433',
+    reviewSuffix: 'automation-row-plan',
+    createDefaultSidecars: false,
+    initializeDatabases: automationDatabaseInitializer(),
+    mutateTarget(paths) {
+      return mutateAutomationTarget(paths);
+    },
+    mutateDecisions(records) {
+      const selected = records.find(
+        (record) =>
+          record.kind === 'qinglong3-local-reconciliation-review-decision' &&
+          record.database === 'legacy' &&
+          record.domain === 'automation' &&
+          record.factKind === 'table' &&
+          record.disposition === 'exclude_legacy',
+      );
+      assert.ok(selected);
+      selected.disposition = 'adopt_legacy';
+      selected.reason = 'prefer_legacy';
+    },
+  });
+  const prepared = await prepareLocalReconciliationApplication(
+    state.prepareApplicationCommand,
+  );
+  const application = await commitLocalReconciliationApplication(
+    applicationCommitCommand(state, prepared),
+  );
+  const automationRoot = path.join(path.dirname(state.captureRoot), 'automation-root');
+  fs.mkdirSync(automationRoot, { mode: 0o700 });
+  const targetBefore = fs.readFileSync(state.targetDatabasePath);
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.plan',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      automationRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      automationId: '00000000-0000-4000-8000-000000000434',
+      applicationId: state.prepareApplicationCommand.request.applicationId,
+      expectedApplicationPlanDigest: application.applicationPlanDigest,
+      expectedHeadDigest: application.instanceHeadDigest,
+      decisionFilePath: state.reviewFile.filePath,
+      projectId: 'default',
+      legacyTimezone: 'Asia/Shanghai',
+      preparedAtMs: state.prepareApplicationCommand.request.preparedAtMs + 2,
+    },
+  };
+  const planned = await planLocalReconciliationAutomation(command);
+  assert.equal(planned.status, 'prepared');
+  assert.equal(planned.state, 'reconciliation_automation_planned');
+  assert.equal(planned.outcome, 'ready');
+  assert.equal(planned.rowCount, 1);
+  assert.equal(planned.eligibleCount, 1);
+  assert.equal(planned.conflictCount, 0);
+  const automationDirectory = path.join(
+    automationRoot,
+    command.request.automationId,
+  );
+  assert.deepEqual(fs.readdirSync(automationDirectory).sort(), [
+    'plan.ndjson',
+    'receipt.json',
+    'staging',
+  ]);
+  assert.equal(fs.statSync(automationDirectory).mode & 0o777, 0o500);
+  assert.equal(
+    fs.statSync(path.join(automationDirectory, 'staging')).mode & 0o777,
+    0o500,
+  );
+  for (const name of ['plan.ndjson', 'receipt.json']) {
+    assert.equal(
+      fs.statSync(path.join(automationDirectory, name)).mode & 0o777,
+      0o400,
+    );
+  }
+  const planText = fs.readFileSync(
+    path.join(automationDirectory, 'plan.ndjson'),
+    'utf8',
+  );
+  assert.equal(planText.includes('task nightly.js'), false);
+  assert.equal(planText.includes('nightly'), false);
+  assert.equal(planText.includes('legacy-cron:1'), true);
+  assert.equal(planText.includes('review-owner'), false);
+  assert.equal(planText.includes('"requirement":"review_adopt"'), true);
+  assert.equal(fs.readFileSync(state.targetDatabasePath).equals(targetBefore), true);
+
+  const replay = await planLocalReconciliationAutomation(command);
+  assert.equal(replay.status, 'existing');
+  assert.equal(replay.automationPlanDigest, planned.automationPlanDigest);
+  const verifyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.verify',
+    options: command.options,
+    request: {
+      automationId: command.request.automationId,
+      expectedAutomationPlanDigest: planned.automationPlanDigest,
+    },
+  };
+  const verified = await verifyLocalReconciliationAutomationPlan(verifyCommand);
+  assert.equal(verified.status, 'verified');
+  const head = readLocalCutoverInstanceHead(
+    state.deploymentRoot,
+    state.captureCommand.request.instanceId,
+    state.uid,
+  );
+  assert.equal(head.state, 'reconciliation_automation_planned');
+  assert.equal(head.sourceRecordDigest, planned.automationPlanDigest);
+
+  const commandPath = path.join(state.deploymentRoot, 'automation-verify.json');
+  fs.writeFileSync(commandPath, `${JSON.stringify(verifyCommand)}\n`, {
+    mode: 0o600,
+  });
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-automation-verify',
+      '--command-file',
+      commandPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).status, 'verified');
+  assert.equal(cli.stdout.includes('legacy-cron:1'), false);
+});
+
+test('automation row plan fails closed to manual review on a target task collision', async (t) => {
+  const state = await reviewedApplicationFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000435',
+    reviewId: '00000000-0000-4000-8000-000000000436',
+    applicationId: '00000000-0000-4000-8000-000000000437',
+    reviewSuffix: 'automation-row-conflict',
+    createDefaultSidecars: false,
+    initializeDatabases: automationDatabaseInitializer(),
+    mutateTarget(paths) {
+      return mutateAutomationTarget(paths, true);
+    },
+    mutateDecisions(records) {
+      const selected = records.find(
+        (record) =>
+          record.kind === 'qinglong3-local-reconciliation-review-decision' &&
+          record.database === 'legacy' &&
+          record.domain === 'automation' &&
+          record.factKind === 'table' &&
+          record.disposition === 'exclude_legacy',
+      );
+      assert.ok(selected);
+      selected.disposition = 'retain_both';
+      selected.reason = 'preserve_both';
+    },
+  });
+  const prepared = await prepareLocalReconciliationApplication(
+    state.prepareApplicationCommand,
+  );
+  const application = await commitLocalReconciliationApplication(
+    applicationCommitCommand(state, prepared),
+  );
+  const automationRoot = path.join(
+    path.dirname(state.captureRoot),
+    'automation-conflict-root',
+  );
+  fs.mkdirSync(automationRoot, { mode: 0o700 });
+  const planned = await planLocalReconciliationAutomation({
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.plan',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      automationRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      automationId: '00000000-0000-4000-8000-000000000438',
+      applicationId: state.prepareApplicationCommand.request.applicationId,
+      expectedApplicationPlanDigest: application.applicationPlanDigest,
+      expectedHeadDigest: application.instanceHeadDigest,
+      decisionFilePath: state.reviewFile.filePath,
+      projectId: 'default',
+      legacyTimezone: 'Asia/Shanghai',
+      preparedAtMs: state.prepareApplicationCommand.request.preparedAtMs + 2,
+    },
+  });
+  assert.equal(planned.outcome, 'manual_required');
+  assert.equal(planned.eligibleCount, 0);
+  assert.equal(planned.conflictCount, 1);
+  const planText = fs.readFileSync(
+    path.join(
+      automationRoot,
+      '00000000-0000-4000-8000-000000000438',
+      'plan.ndjson',
+    ),
+    'utf8',
+  );
+  assert.equal(planText.includes('"state":"occupied"'), true);
+  assert.equal(planText.includes('"requirement":"review_skip_conflict"'), true);
+  assert.equal(planText.includes('task nightly.js'), false);
+});
+
+test('automation row planner makes an empty table no-effect and a missing timezone manual', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-automation-row-unit-'));
+  t.after(() => removeFixtureRoot(root));
+  const legacySourcePath = path.join(root, 'legacy.sqlite');
+  const recoveryPath = path.join(root, 'recovery.sqlite');
+  const targetDatabasePath = path.join(root, 'target.sqlite');
+  automationDatabaseInitializer()({
+    legacySourcePath,
+    recoveryPath,
+    targetDatabasePath,
+  });
+  const legacy = new DatabaseSync(legacySourcePath);
+  const target = new DatabaseSync(targetDatabasePath);
+  t.after(() => {
+    legacy.close();
+    target.close();
+  });
+  legacy.exec('DELETE FROM "Crontabs"');
+  const header = {
+    schemaVersion: 1,
+    kind: 'qinglong3-local-reconciliation-automation-plan-header',
+    automationId: '00000000-0000-4000-8000-000000000439',
+    applicationId: '00000000-0000-4000-8000-00000000043a',
+    applicationPlanDigest: '1'.repeat(64),
+    reviewDigest: '2'.repeat(64),
+    reviewAuthorizationDigest: '3'.repeat(64),
+    reviewDecisionSetDigest: '4'.repeat(64),
+    reviewDecisionFileDigest: '5'.repeat(64),
+    bundleDigest: '6'.repeat(64),
+    bundleFingerprintDigest: '7'.repeat(64),
+    profile: 'edge',
+    projectId: 'default',
+    legacyTimezone: null,
+    tableDisposition: 'adopt_legacy',
+    preparedHeadDigest: '8'.repeat(64),
+    preparedAtMs: 1,
+  };
+  const emptyPath = path.join(root, 'empty.ndjson');
+  const emptyDescriptor = fs.openSync(emptyPath, 'wx', 0o600);
+  let empty;
+  try {
+    empty = writeLocalReconciliationAutomationPlan({
+      descriptor: emptyDescriptor,
+      maxBytes: 64 * 1024,
+      header,
+      legacy,
+      target,
+    });
+  } finally {
+    fs.closeSync(emptyDescriptor);
+  }
+  assert.equal(empty.footer.outcome, 'no_effect');
+  assert.equal(empty.footer.rowCount, 0);
+
+  legacy.exec(`
+    INSERT INTO "Crontabs" (
+      id, name, command, schedule, saved, isSystem, isDisabled, isPinned
+    ) VALUES (2, 'timezone-required', 'task timezone.js', '0 0 * * *', 1, 0, 0, 0)
+  `);
+  const manualPath = path.join(root, 'manual.ndjson');
+  const manualDescriptor = fs.openSync(manualPath, 'wx', 0o600);
+  let manual;
+  try {
+    manual = writeLocalReconciliationAutomationPlan({
+      descriptor: manualDescriptor,
+      maxBytes: 64 * 1024,
+      header: { ...header, automationId: '00000000-0000-4000-8000-00000000043b' },
+      legacy,
+      target,
+    });
+  } finally {
+    fs.closeSync(manualDescriptor);
+  }
+  assert.equal(manual.footer.outcome, 'manual_required');
+  assert.equal(manual.footer.manualCount, 1);
+  const manualText = fs.readFileSync(manualPath, 'utf8');
+  assert.equal(manualText.includes('timezone_required'), true);
+  assert.equal(manualText.includes('task timezone.js'), false);
+});
+
+test('automation row planner fails closed at its byte budget', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-automation-budget-'));
+  t.after(() => removeFixtureRoot(root));
+  const legacySourcePath = path.join(root, 'legacy.sqlite');
+  const recoveryPath = path.join(root, 'recovery.sqlite');
+  const targetDatabasePath = path.join(root, 'target.sqlite');
+  automationDatabaseInitializer()({
+    legacySourcePath,
+    recoveryPath,
+    targetDatabasePath,
+  });
+  const legacy = new DatabaseSync(legacySourcePath);
+  const target = new DatabaseSync(targetDatabasePath);
+  t.after(() => {
+    legacy.close();
+    target.close();
+  });
+  const insert = legacy.prepare(`
+    INSERT INTO "Crontabs" (
+      id, name, command, schedule, saved, isSystem, isDisabled, isPinned
+    ) VALUES (?, ?, ?, '0 0 * * *', 1, 0, 0, 0)
+  `);
+  legacy.exec('BEGIN IMMEDIATE');
+  try {
+    for (let id = 2; id <= 400; id += 1) {
+      insert.run(id, `task-${id}`, `task workload-${id}.js`);
+    }
+    legacy.exec('COMMIT');
+  } catch (error) {
+    legacy.exec('ROLLBACK');
+    throw error;
+  }
+  const outputPath = path.join(root, 'bounded.ndjson');
+  const descriptor = fs.openSync(outputPath, 'wx', 0o600);
+  try {
+    assert.throws(
+      () =>
+        writeLocalReconciliationAutomationPlan({
+          descriptor,
+          maxBytes: 64 * 1024,
+          header: {
+            schemaVersion: 1,
+            kind: 'qinglong3-local-reconciliation-automation-plan-header',
+            automationId: '00000000-0000-4000-8000-00000000043c',
+            applicationId: '00000000-0000-4000-8000-00000000043d',
+            applicationPlanDigest: '1'.repeat(64),
+            reviewDigest: '2'.repeat(64),
+            reviewAuthorizationDigest: '3'.repeat(64),
+            reviewDecisionSetDigest: '4'.repeat(64),
+            reviewDecisionFileDigest: '5'.repeat(64),
+            bundleDigest: '6'.repeat(64),
+            bundleFingerprintDigest: '7'.repeat(64),
+            profile: 'edge',
+            projectId: 'default',
+            legacyTimezone: 'UTC',
+            tableDisposition: 'adopt_legacy',
+            preparedHeadDigest: '8'.repeat(64),
+            preparedAtMs: 1,
+          },
+          legacy,
+          target,
+        }),
+      /exceeds profile byte budget/,
+    );
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  assert.equal(fs.statSync(outputPath).size <= 64 * 1024, true);
+});
+
+test('automation row planning replays every publication boundary and rejects drift', async (t) => {
+  const windows = [
+    ['plan', '000000000441', '000000000442', '000000000443', '000000000444'],
+    ['receipt', '000000000445', '000000000446', '000000000447', '000000000448'],
+    ['seal', '000000000449', '00000000044a', '00000000044b', '00000000044c'],
+    ['head', '00000000044d', '00000000044e', '00000000044f', '000000000450'],
+  ];
+  for (const [window, planTail, reviewTail, applicationTail, automationTail] of windows) {
+    const state = await reviewedApplicationFixture(t, {
+      planId: `00000000-0000-4000-8000-${planTail}`,
+      reviewId: `00000000-0000-4000-8000-${reviewTail}`,
+      applicationId: `00000000-0000-4000-8000-${applicationTail}`,
+      reviewSuffix: `automation-${window}-replay`,
+      createDefaultSidecars: false,
+      initializeDatabases: automationDatabaseInitializer(),
+      mutateTarget(paths) {
+        return mutateAutomationTarget(paths);
+      },
+      mutateDecisions(records) {
+        const selected = records.find(
+          (record) =>
+            record.kind === 'qinglong3-local-reconciliation-review-decision' &&
+            record.database === 'legacy' &&
+            record.domain === 'automation' &&
+            record.factKind === 'table' &&
+            record.disposition === 'exclude_legacy',
+        );
+        assert.ok(selected);
+        selected.disposition = 'adopt_legacy';
+        selected.reason = 'prefer_legacy';
+      },
+    });
+    const prepared = await prepareLocalReconciliationApplication(
+      state.prepareApplicationCommand,
+    );
+    const application = await commitLocalReconciliationApplication(
+      applicationCommitCommand(state, prepared),
+    );
+    const automationRoot = path.join(
+      path.dirname(state.captureRoot),
+      `automation-${window}-root`,
+    );
+    fs.mkdirSync(automationRoot, { mode: 0o700 });
+    const command = {
+      schemaVersion: 1,
+      operation: 'local.deployment.reconciliation.automation.plan',
+      options: {
+        deploymentRoot: state.deploymentRoot,
+        applicationRoot: state.applicationRoot,
+        automationRoot,
+        allowRootService: rootAcknowledgement(),
+      },
+      request: {
+        automationId: `00000000-0000-4000-8000-${automationTail}`,
+        applicationId: state.prepareApplicationCommand.request.applicationId,
+        expectedApplicationPlanDigest: application.applicationPlanDigest,
+        expectedHeadDigest: application.instanceHeadDigest,
+        decisionFilePath: state.reviewFile.filePath,
+        projectId: 'default',
+        legacyTimezone: 'Asia/Shanghai',
+        preparedAtMs: state.prepareApplicationCommand.request.preparedAtMs + 2,
+      },
+    };
+    const callback =
+      window === 'plan'
+        ? 'afterPlanPublished'
+        : window === 'receipt'
+        ? 'afterReceiptPublished'
+        : window === 'seal'
+        ? 'afterTerminalSealed'
+        : 'afterHeadAdvanced';
+    await assert.rejects(
+      planLocalReconciliationAutomation(command, {
+        [callback]() {
+          throw new Error(`automation ${window} response loss`);
+        },
+      }),
+      new RegExp(`automation ${window} response loss`),
+    );
+    const replay = await planLocalReconciliationAutomation(command);
+    assert.equal(replay.state, 'reconciliation_automation_planned');
+    if (window === 'head') assert.equal(replay.status, 'existing');
+  }
+
+  const drift = await reviewedApplicationFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000451',
+    reviewId: '00000000-0000-4000-8000-000000000452',
+    applicationId: '00000000-0000-4000-8000-000000000453',
+    reviewSuffix: 'automation-drift',
+    createDefaultSidecars: false,
+    initializeDatabases: automationDatabaseInitializer(),
+    mutateTarget(paths) {
+      return mutateAutomationTarget(paths);
+    },
+    mutateDecisions(records) {
+      const selected = records.find(
+        (record) =>
+          record.kind === 'qinglong3-local-reconciliation-review-decision' &&
+          record.database === 'legacy' &&
+          record.domain === 'automation' &&
+          record.factKind === 'table' &&
+          record.disposition === 'exclude_legacy',
+      );
+      assert.ok(selected);
+      selected.disposition = 'adopt_legacy';
+      selected.reason = 'prefer_legacy';
+    },
+  });
+  const prepared = await prepareLocalReconciliationApplication(
+    drift.prepareApplicationCommand,
+  );
+  const application = await commitLocalReconciliationApplication(
+    applicationCommitCommand(drift, prepared),
+  );
+  const automationRoot = path.join(
+    path.dirname(drift.captureRoot),
+    'automation-drift-root',
+  );
+  fs.mkdirSync(automationRoot, { mode: 0o700 });
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.plan',
+    options: {
+      deploymentRoot: drift.deploymentRoot,
+      applicationRoot: drift.applicationRoot,
+      automationRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      automationId: '00000000-0000-4000-8000-000000000454',
+      applicationId: drift.prepareApplicationCommand.request.applicationId,
+      expectedApplicationPlanDigest: application.applicationPlanDigest,
+      expectedHeadDigest: application.instanceHeadDigest,
+      decisionFilePath: drift.reviewFile.filePath,
+      projectId: 'default',
+      legacyTimezone: 'Asia/Shanghai',
+      preparedAtMs: drift.prepareApplicationCommand.request.preparedAtMs + 2,
+    },
+  };
+  const planned = await planLocalReconciliationAutomation(command);
+  const planPath = path.join(
+    automationRoot,
+    command.request.automationId,
+    'plan.ndjson',
+  );
+  fs.chmodSync(planPath, 0o600);
+  fs.appendFileSync(planPath, '{}\n');
+  fs.chmodSync(planPath, 0o400);
+  await assert.rejects(
+    verifyLocalReconciliationAutomationPlan({
+      schemaVersion: 1,
+      operation: 'local.deployment.reconciliation.automation.verify',
+      options: command.options,
+      request: {
+        automationId: command.request.automationId,
+        expectedAutomationPlanDigest: planned.automationPlanDigest,
+      },
+    }),
+    /plan file identity is invalid|plan file content drifted/,
+  );
 });
 
 test('application coordinator resumes every publication window and fences competitors', async (t) => {

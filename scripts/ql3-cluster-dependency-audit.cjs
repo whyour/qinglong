@@ -2019,6 +2019,11 @@ function auditSourceImports(root, packagePath, findings) {
           ].includes(specifier)
         ) &&
         !(
+          path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/automation/rowPlan.ts' &&
+          specifier === '@qinglong/local-admin/adoption-inspection'
+        ) &&
+        !(
           [
             'src/deployment/compose/composeApply.ts',
             'src/deployment/compose/composeEvidenceCollection.ts',

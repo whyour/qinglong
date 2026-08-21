@@ -131,6 +131,12 @@ import {
   verifyLocalReconciliationApplication,
   verifyLocalReconciliationApplicationCommandFile,
 } from './reconciliation/application/coordinator';
+import {
+  planLocalReconciliationAutomation,
+  planLocalReconciliationAutomationCommandFile,
+  verifyLocalReconciliationAutomationPlan,
+  verifyLocalReconciliationAutomationPlanCommandFile,
+} from './reconciliation/application/automation/coordinator';
 
 export {
   commitLocalReconciliationPlan,
@@ -153,6 +159,10 @@ export {
   commitLocalReconciliationApplicationCommandFile,
   verifyLocalReconciliationApplication,
   verifyLocalReconciliationApplicationCommandFile,
+  planLocalReconciliationAutomation,
+  planLocalReconciliationAutomationCommandFile,
+  verifyLocalReconciliationAutomationPlan,
+  verifyLocalReconciliationAutomationPlanCommandFile,
 };
 
 export {
@@ -182,6 +192,28 @@ export {
   type LocalReconciliationApplicationPlan,
   type LocalReconciliationApplicationPlanReceipt,
 } from './reconciliation/application/plan';
+export {
+  normalizeLocalReconciliationAutomationPlanCommand,
+  normalizeLocalReconciliationAutomationVerifyCommand,
+  type LocalReconciliationAutomationOptions,
+  type LocalReconciliationAutomationPlanCommand,
+  type LocalReconciliationAutomationPlanResult,
+  type LocalReconciliationAutomationVerifyCommand,
+} from './reconciliation/application/automation/contract';
+export {
+  type LocalReconciliationAutomationPlanDependencies,
+} from './reconciliation/application/automation/coordinator';
+export {
+  MAX_EDGE_LOCAL_RECONCILIATION_AUTOMATION_PLAN_BYTES,
+  MAX_STANDALONE_LOCAL_RECONCILIATION_AUTOMATION_PLAN_BYTES,
+  normalizeLocalReconciliationAutomationPlanReceipt,
+  type LocalReconciliationAutomationPlanFooter,
+  type LocalReconciliationAutomationPlanHeader,
+  type LocalReconciliationAutomationPlanReceipt,
+  type LocalReconciliationAutomationPlanRow,
+  type LocalReconciliationAutomationPlanSummary,
+  type LocalReconciliationAutomationRowRequirement,
+} from './reconciliation/application/automation/rowPlan';
 
 export {
   LocalDeploymentConfigurationError,

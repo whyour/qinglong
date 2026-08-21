@@ -6,11 +6,29 @@
 - 目标版本：QingLong 3.x
 - 作者：QingLong Maintainers
 - 创建日期：2026-07-17
-- 最后更新：2026-08-21
+- 最后更新：2026-08-22
 - 讨论范围：架构与演进路线，不包含最终 UI 视觉方案
 
-最新增量证据（2026-08-21）：
+最新增量证据（2026-08-22）：
 
+- D-393/ADR-0486（进行中）：首个 Automation adapter 已先建立独立的有界逐行 plan fence，而没有提前取得 DML authority。既有
+  Legacy Crontab classifier 被复用于 exact sealed Legacy source；每行只记录 source/candidate digest、classification/reasons、proposed
+  Task ID、trigger count，以及 captured target 当前 Task revision/content digest 的 `absent|occupied` 冲突证据，不保存 command/spec、Task
+  name、reviewer、credential、Secret、路径或 target row body。planner 重新验证 D-392 application terminal、D-391 signed review 所绑定的原始
+  decision file、canonical fact stream 和 Legacy `Crontabs` table 的 `adopt_legacy|retain_both`；表级选择不能覆盖 target，也不能自动改名。
+  `local.deployment.reconciliation.automation.plan|verify` 以
+  `reconciliation_application_planned → reconciliation_automation_planned` CAS 发布 NDJSON/receipt/seal，Edge/Standalone 上限分别为 8/32 MiB，
+  双 readonly handle 的 SQLite cache 总计约 4/16 MiB，不建立随 target 规模增长的内存 Set。复用只经过 Local Admin 的窄化只读
+  `adoption-inspection` 子路径，包根仍隐藏 candidate，依赖审计只对 D-393 `rowPlan.ts` 精确许可该入口。plan/receipt/seal/head 四个 response-loss
+  窗口、collision→manual、空表、timezone/manual、字节预算、plan tamper 和 CLI content-free 均已覆盖；聚焦套件
+  `40 total / 38 pass / 2 conditional Docker skip / 0 fail`，完整 Local Owner `262 total / 255 pass / 7 conditional skip / 0 fail`，tracked
+  backend `1541 total / 1539 pass / 2 conditional skip / 0 fail`，18-package clean build/逐包测试、六项相关架构/readiness 门、真实 Docker `2/2`
+  与十四档 artifact audit 全通过。workspace 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Admin/Owner 分别为
+  `46/45/1` 与 `161/160/1`（source/nested/root entry）。基础 Edge/Standalone 精确保持 `2,611,978 / 2,612,056 bytes`、319 files、58 modules，
+  GitNexus staged audit 为 `15 files / 56 symbols / 0 flows / LOW`；`next` 相对 `develop` 的 269-flow CRITICAL 差异继续作为 3.0 累计风险保留。因此
+  ADR-0486 的行级计划切片已接受。D-393 整体仍在进行；下一切片必须继续完成 row-plan-bound signed decision、再次强认证、同 write fence
+  写前 backup、幂等 transaction/replay、post-apply evidence 与 rollback，当前状态不代表 applied、restart-ready 或 reconciliation-complete。本切片无
+  SQL/Cluster 变更，未重复占有 PostgreSQL HA 证明；进入 apply 写语义时必须重新选择数据库门禁。
 - D-392/ADR-0485（已接受）：D-391 的 signed review 不能直接获得通用 DML authority；表级 `adopt_legacy/retain_both` 也不能证明
   Automation 行级 command/trigger 兼容，更不能覆盖 Secret custody、append-only history、Plugin/AI 外部资产与 Identity/Policy 语义。
   因此既有 Local Owner 新增 `reconciliation.application.prepare|commit|verify`，以
