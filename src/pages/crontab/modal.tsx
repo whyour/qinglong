@@ -28,6 +28,7 @@ const CronModal = ({
       const method = cron?.id ? 'put' : 'post';
       const payload = {
         ...values,
+        labels: values.labels || [],
         schedule:
           scheduleType !== ScheduleType.Normal
             ? scheduleTypeMap[scheduleType]
