@@ -11,21 +11,25 @@
 
 最新增量证据（2026-08-21）：
 
-- D-391/ADR-0484（第一切片已实现，commit/verify 待实现）：`reconciliation_planned` 仍是内容无关 summary，不能为人工裁决泄漏明细或
-  获得 import authority。既有 Local Owner 已在 `deployment/reconciliation/review/` 增加
-  `reconciliation.review.prepare|diagnostics`，并为后续 commit/verify 冻结
-  `reconciliation_planned → reconciliation_review_prepared → reconciliation_reviewed` CAS 建立唯一 review fence。diagnostics 每次只把
-  一个 database/domain/fact-kind 的最多 64 条私有记录 no-replace 写入 caller 指定的 owner-only 文件；stdout 只返回 page digest、计数和
-  offset，不含路径、名称或 fact digest。commit 不信任 page，而是从 exact sealed bundle 重新流式派生 canonical facts，与 Edge ≤8 MiB、
-  Standalone ≤32 MiB 的 private NDJSON decision file 逐条匹配。unknown、Secret/credential/pepper、active Run 与 custody 缺口固定 blocked，
-  人工选择也不能提升为自动可导入。authorization 必须来自 target Owner credential 建立的近期强认证 User，并以独立 issuer keyring、
-  exact review file/plan/bundle/head fence 签名；terminal review 只保存签名 authorization、compact counts/digest 和 content-free receipt。
-  verify 不打开 SQLite。实现不新增 package/dependency/binary/daemon，不把文件平铺回 `src/` 根，也不调用 DML、Secret 解密、Docker/init/
-  network。后续领域 adapter 必须消费 exact `reviewDigest` 后重新认证和授权，分别定义 backup、prepare/commit、幂等与 rollback，不能把
-  review completion 当作 reconciliation completion。当前聚焦套件 `28 total / 26 pass / 2 conditional Docker skip / 0 fail`，Local Owner
-  `250 total / 243 pass / 7 conditional skip / 0 fail`，tracked backend `1540 total / 1538 pass / 2 conditional skip / 0 fail`，
-  18-package clean build/逐包测试、八项架构/发布审计、十四档 artifact 和真实 Docker readonly `2/2` 全通过。workspace 仍为 18
-  packages，Local Owner `149 source / 148 nested / 1 root binary entry`；新增 3 个源码全部位于 review 子目录，基础常驻 closure 不增长。
+- D-391/ADR-0484（已接受）：既有 Local Owner 已完整实现
+  `reconciliation.review.prepare|diagnostics|commit|verify`，以
+  `reconciliation_planned → reconciliation_review_prepared → reconciliation_reviewed` CAS 建立唯一 review fence。diagnostics 每次只把一个
+  database/domain/fact-kind 的最多 64 条私有记录 no-replace 写入 caller 指定的 owner-only 文件；stdout 不含路径、名称或 fact digest。
+  commit 不信任 page，而是从 exact sealed bundle 重新流式派生 canonical facts，与 Edge ≤8 MiB、Standalone ≤32 MiB 的稳定 descriptor
+  NDJSON decision file 逐条匹配。unknown、Secret/credential/pepper、active Run 与 custody 缺口固定 blocked，人工选择不能提升为自动可导入。
+  生产 composition 只用新的 Local SQLite authentication-read projection 加载 credential/pepper，通过既有 Owner authentication 建立最多
+  5 分钟的强 User principal；独立最多八代 issuer keyring 签发最长 30 分钟的 domain-separated authorization，并在签名前后重验 decision
+  file、credential、keyring、plan、bundle fingerprint 与 prepared head。authorization/review/receipt/seal/head 的 crash/response-loss 窗口均
+  exact replay，terminal evidence 为 `0400/0500`；verify 只验证签名和 exact binding，不打开 SQLite、不写文件。实现不新增 package、dependency、
+  binary 或 daemon，不平铺 `src/`，也不调用 DML、Secret 解密、Docker/init/network。后续领域 adapter 必须以独立 ADR 消费 exact
+  `reviewDigest` 后重新认证授权，不能把 review completion 当作 reconciliation completion。聚焦套件
+  `32 total / 30 pass / 2 conditional Docker skip / 0 fail`，Local Owner `254 total / 247 pass / 7 conditional skip / 0 fail`，tracked
+  backend `1541 total / 1539 pass / 2 conditional skip / 0 fail`；18-package clean build/逐包测试、八项架构/部署/发布审计、十四档 artifact 与
+  真实 Docker readonly `2/2` 全通过。workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Owner
+  `155 source / 154 nested / 1 root binary entry`，Local SQLite `203 source / 202 nested / 1 root public export`，新增 7 个生产源码全部位于既有
+  领域目录。基础 Edge/Standalone closure 精确保持 `2,611,978 / 2,612,056` bytes、319 files、58 modules。PostgreSQL 18.6 arm64 physical HA
+  以 146 gates、timeline `1 → 2` 通过，private evidence SHA-256 为
+  `3d6623465913d43e6f1a8838896d6deb6664dafd0c26970bddb4d6165fb60c00`，离线审计无 finding。
 - D-390/ADR-0483（已接受）：既有 Local Owner 已实现密封 capture 的严格只读消费与独立
   `reconciliation.plan.prepare|commit|verify`。capture v2 使用 SQLite 可识别的固定 `target.sqlite* / legacy.sqlite* /
   recovery.sqlite` 物理名和 `0400/0500` terminal seal；main-only 走 immutable readonly，WAL+SHM 完整配对走普通 readonly，hot
@@ -38,8 +42,8 @@
   `246 total / 239 pass / 7 conditional skip / 0 fail`，tracked backend `1540 total / 1538 pass / 2 conditional skip / 0 fail`，
   18-package clean build/逐包测试、八项架构/发布审计和十四档 artifact audit 全通过。workspace 仍为 18 packages，Local Owner
   `146 source / 145 nested / 1 root binary entry`；基础 Edge/Standalone closure 仍为 319 files、58 modules，不含一次性 plan authority。
-  D-391/ADR-0484 已冻结消费 exact plan digest 的私有逐对象诊断、人工裁决与审批协议；它仍不能借 plan 获得自动 import 或 rollback
-  authority，完成实现与完整门禁前保持 Proposed。
+  D-391/ADR-0484 已完成私有逐对象诊断、受认证人工裁决、签名 terminal review 与只读 verify；它仍不能借 plan 或 review 获得自动 import、
+  rollback 或 restart authority，下一阶段领域 adapter 继续使用独立 ADR 和门禁。
 - D-389/ADR-0482（已接受）：target stopped 后的 `reconciliation_required` 不能直接逆迁移或覆盖 2.x source；既有 Local Owner
   已实现独立 `reconciliation.capture.prepare|commit|verify`，只允许 exact stopped reconciliation head，以 instance CAS 建立唯一
   capture fence，并把 target main/sidecars、Legacy source main/sidecars、activation recovery 与内容无关 lineage 以固定 64 KiB

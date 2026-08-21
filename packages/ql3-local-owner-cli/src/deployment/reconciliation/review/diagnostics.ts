@@ -89,9 +89,7 @@ function quotedIdentifier(name: string): string {
   return `"${name.replaceAll('"', '""')}"`;
 }
 
-function requirement(
-  domain: LocalReconciliationPlanDomain,
-): Readonly<{
+function requirement(domain: LocalReconciliationPlanDomain): Readonly<{
   decisionRequirement: LocalReconciliationDiagnosticDecisionRequirement;
   reason: LocalReconciliationDiagnosticReason;
 }> {
@@ -188,7 +186,10 @@ function schemaFacts(
   domain: LocalReconciliationPlanDomain,
   offset: number,
   limit: number,
-): Readonly<{ records: readonly Readonly<LocalReconciliationDiagnosticFact>[]; complete: boolean }> {
+): Readonly<{
+  records: readonly Readonly<LocalReconciliationDiagnosticFact>[];
+  complete: boolean;
+}> {
   const rows = client
     .prepare(
       `SELECT type, name, tbl_name AS tableName
@@ -208,7 +209,8 @@ function schemaFacts(
   let complete = true;
   for (const row of rows) {
     catalog += 1;
-    if (catalog > 4_096) configurationError('diagnostic schema budget is exceeded');
+    if (catalog > 4_096)
+      configurationError('diagnostic schema budget is exceeded');
     if (
       typeof row.type !== 'string' ||
       typeof row.name !== 'string' ||
@@ -250,7 +252,10 @@ function tableFacts(
   domain: LocalReconciliationPlanDomain,
   offset: number,
   limit: number,
-): Readonly<{ records: readonly Readonly<LocalReconciliationDiagnosticFact>[]; complete: boolean }> {
+): Readonly<{
+  records: readonly Readonly<LocalReconciliationDiagnosticFact>[];
+  complete: boolean;
+}> {
   const rows = client
     .prepare(
       `SELECT name, type
@@ -269,7 +274,8 @@ function tableFacts(
   let complete = true;
   for (const row of rows) {
     catalog += 1;
-    if (catalog > 512) configurationError('diagnostic table budget is exceeded');
+    if (catalog > 512)
+      configurationError('diagnostic table budget is exceeded');
     if (
       typeof row.name !== 'string' ||
       typeof row.type !== 'string' ||
@@ -277,7 +283,8 @@ function tableFacts(
     ) {
       configurationError('diagnostic table catalog drifted');
     }
-    if (classifyLocalReconciliationFact(database, row.name) !== domain) continue;
+    if (classifyLocalReconciliationFact(database, row.name) !== domain)
+      continue;
     const ordinal = seen + 1;
     seen += 1;
     if (seen <= offset) continue;
@@ -345,11 +352,55 @@ export function buildLocalReconciliationDiagnosticPage(
     nextOffset,
     records: selected.records,
   });
-  const page = Object.freeze({ ...payload, pageDigest: cutoverDigest(payload) });
-  if (Buffer.byteLength(`${JSON.stringify(page, null, 2)}\n`, 'utf8') > MAX_PAGE_BYTES) {
+  const page = Object.freeze({
+    ...payload,
+    pageDigest: cutoverDigest(payload),
+  });
+  if (
+    Buffer.byteLength(`${JSON.stringify(page, null, 2)}\n`, 'utf8') >
+    MAX_PAGE_BYTES
+  ) {
     configurationError('diagnostic page exceeds its 256 KiB budget');
   }
   return page;
+}
+
+/**
+ * Re-derives the complete bounded fact sequence without trusting diagnostic
+ * page files. One database descriptor is held by the caller and each query is
+ * bounded by the same catalog ceilings as diagnostics.
+ */
+export function visitLocalReconciliationDiagnosticFacts(
+  client: DatabaseSync,
+  database: LocalReconciliationSealedDatabaseKind,
+  visitor: (fact: Readonly<LocalReconciliationDiagnosticFact>) => void,
+): void {
+  for (const domain of [
+    'schema_lineage',
+    'automation',
+    'secret_and_config',
+    'run_history',
+    'plugin_package',
+    'ai_and_tool',
+    'identity_policy_audit',
+    'unknown',
+  ] as const satisfies readonly LocalReconciliationPlanDomain[]) {
+    for (const factKind of ['schema_object', 'table'] as const) {
+      let offset = 0;
+      while (true) {
+        const selected =
+          factKind === 'schema_object'
+            ? schemaFacts(client, database, domain, offset, 64)
+            : tableFacts(client, database, domain, offset, 64);
+        for (const record of selected.records) visitor(record);
+        if (selected.complete) break;
+        if (selected.records.length < 1) {
+          configurationError('diagnostic canonical sequence did not advance');
+        }
+        offset += selected.records.length;
+      }
+    }
+  }
 }
 
 function pageBytes(page: Readonly<LocalReconciliationDiagnosticPage>): Buffer {
@@ -396,11 +447,7 @@ function syncDirectory(directory: string): void {
   }
 }
 
-function writeStage(
-  stagePath: string,
-  bytes: Buffer,
-  uid: number,
-): void {
+function writeStage(stagePath: string, bytes: Buffer, uid: number): void {
   let descriptor: number | undefined;
   let created = false;
   try {

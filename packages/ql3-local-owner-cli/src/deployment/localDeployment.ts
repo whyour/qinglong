@@ -117,6 +117,12 @@ import {
   writeLocalReconciliationReviewDiagnostics,
   writeLocalReconciliationReviewDiagnosticsCommandFile,
 } from './reconciliation/review/preparation';
+import {
+  commitLocalReconciliationReview,
+  commitLocalReconciliationReviewCommandFile,
+  verifyLocalReconciliationReview,
+  verifyLocalReconciliationReviewCommandFile,
+} from './reconciliation/review/completion';
 
 export {
   commitLocalReconciliationPlan,
@@ -129,6 +135,10 @@ export {
   prepareLocalReconciliationReviewCommandFile,
   writeLocalReconciliationReviewDiagnostics,
   writeLocalReconciliationReviewDiagnosticsCommandFile,
+  commitLocalReconciliationReview,
+  commitLocalReconciliationReviewCommandFile,
+  verifyLocalReconciliationReview,
+  verifyLocalReconciliationReviewCommandFile,
 };
 
 export {
@@ -181,6 +191,38 @@ export {
   type LocalReconciliationReviewPrepareCommand,
   type LocalReconciliationReviewPrepareResult,
 } from './reconciliation/review/contract';
+export {
+  MAX_LOCAL_RECONCILIATION_REVIEW_AUTHORIZATION_LIFETIME_MS,
+  normalizeLocalReconciliationReviewCommitCommand,
+  normalizeLocalReconciliationReviewVerifyCommand,
+  type LocalReconciliationReviewCommitCommand,
+  type LocalReconciliationReviewCommitOptions,
+  type LocalReconciliationReviewTerminalResult,
+  type LocalReconciliationReviewVerifyCommand,
+} from './reconciliation/review/completionContract';
+export { type LocalReconciliationReviewCompletionDependencies } from './reconciliation/review/completion';
+export {
+  LOCAL_RECONCILIATION_REVIEW_DISPOSITIONS,
+  LOCAL_RECONCILIATION_REVIEW_REASONS,
+  MAX_EDGE_LOCAL_RECONCILIATION_REVIEW_DECISION_BYTES,
+  MAX_STANDALONE_LOCAL_RECONCILIATION_REVIEW_DECISION_BYTES,
+  type LocalReconciliationReviewDecision,
+  type LocalReconciliationReviewDecisionHeader,
+  type LocalReconciliationReviewDisposition,
+  type LocalReconciliationReviewReason,
+} from './reconciliation/review/decisionFile';
+export {
+  MAX_LOCAL_RECONCILIATION_REVIEW_ISSUER_KEYS,
+  LocalReconciliationReviewIssuerKeyringFileProvider,
+  ensureLocalReconciliationReviewIssuerKeyring,
+  type LocalReconciliationReviewIssuerKeyringSummary,
+} from './reconciliation/review/issuerKeyring';
+export {
+  normalizeLocalReconciliationReview,
+  normalizeLocalReconciliationReviewReceipt,
+  type LocalReconciliationReview,
+  type LocalReconciliationReviewReceipt,
+} from './reconciliation/review/terminalEvidence';
 export {
   localReconciliationReviewDirectory,
   normalizeLocalReconciliationReviewIntent,

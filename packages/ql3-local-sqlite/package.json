@@ -315,6 +315,11 @@
       "require": "./dist/security/securityAuditQuery.js",
       "default": "./dist/security/securityAuditQuery.js"
     },
+    "./authentication-read": {
+      "types": "./dist/security/authenticationRead.d.ts",
+      "require": "./dist/security/authenticationRead.js",
+      "default": "./dist/security/authenticationRead.js"
+    },
     "./security-audit-retention": {
       "types": "./dist/security/securityAuditRetention.d.ts",
       "require": "./dist/security/securityAuditRetention.js",

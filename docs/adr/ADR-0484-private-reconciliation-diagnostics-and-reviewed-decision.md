@@ -1,6 +1,6 @@
 # ADR-0484：私有 Reconciliation 诊断与受认证人工裁决
 
-- 状态：Proposed（D-391 契约冻结）
+- 状态：Accepted（D-391 已实现并完成门禁）
 - 日期：2026-08-21
 - 关联 RFC：QL-RFC-0001 D-05、D-06、D-17、D-64、D-87、D-184、D-259、D-383、D-389、D-390、D-391
 - 关联 ADR：ADR-0064、ADR-0094、ADR-0095、ADR-0194、ADR-0201、ADR-0314、ADR-0315、ADR-0482、ADR-0483
@@ -121,20 +121,25 @@ output 不进入基础 Edge/Standalone artifact；Cluster/PostgreSQL/Kubernetes 
 
 ## 当前实现进度
 
-D-391 第一切片已实现 `review.prepare` 与 `review.diagnostics`。prepare 读取并重验 exact terminal plan/bundle，以 instance CAS 建立
-`reconciliation_review_prepared` 唯一 fence，覆盖 head response loss、第二 review、rollback 和 restart 拒绝。diagnostics 在每次
-SQLite open 前后重验密封资产，只为一个 database/domain/fact-kind 发布最多 64 条 owner-only page；Secret、identity、history 和 unknown
-facts 固定 blocked，未知表不读取 row，terminal result 不返回路径、名称或 fact digest。page 使用 256 KiB 固定上限、deterministic
-stage、hard-link no-replace 与 fsync，重复请求只能得到 byte-exact existing page。
+D-391 已完整实现 `review.prepare`、`review.diagnostics`、`review.commit` 与 `review.verify`。prepare/diagnostics 保持第一切片的 exact
+plan/bundle/head fence、64 条私有分页、blocked fact 与 byte-exact replay；commit 新增 Edge 8 MiB、Standalone 32 MiB 的稳定 descriptor
+NDJSON 流，逐条重新派生密封 bundle facts，不读取 diagnostics page。生产 composition 只通过新的 Local SQLite authentication-read
+projection 读取 credential/pepper，并使用既有 `establishAuthenticatedLocalCommand` 建立最多 5 分钟的强 User principal。独立 issuer
+keyring 最多八代 key，authorization 生命周期最多 30 分钟，签名前后重验 decision file、credential、keyring、plan、bundle fingerprint 和
+prepared head。
 
-验证结果：聚焦套件 `28 total / 26 pass / 2 conditional Docker skip / 0 fail`；完整 Local Owner
-`250 total / 243 pass / 7 conditional skip / 0 fail`；tracked backend `1540 total / 1538 pass / 2 conditional skip / 0 fail`；
-18-package clean build/逐包测试、八项架构/发布审计、十四档 artifact audit 与真实 Docker readonly `2/2` 均通过。workspace 仍为 18
-packages，`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Owner 为 `149 source / 148 nested / 1 root binary entry`，新增
-3 个源码全部位于 `deployment/reconciliation/review/`，没有新增 dependency 或常驻对象，基础 Edge/Standalone closure 未增长。
+authorization、review、receipt、seal 与 head 的每个 crash/response-loss 窗口均已覆盖；terminal evidence 收敛为 `0400/0500`，verify
+复验签名与全部 exact binding，不打开 SQLite、不写文件。CLI 只返回 content-free digest/count/replay facts。`reconciliation_reviewed`
+仍不授予 import、rollback、restart、SQL、Secret 解密或外部副作用 authority；任何领域 adapter 必须由下一份独立 ADR 定义。
 
-`review.commit`、强认证 User/issuer keyring authorization、terminal seal、`reconciliation_reviewed` 推进和 `review.verify` 尚未实现，因此本
-ADR 继续保持 Proposed；当前 prepared review 不授予任何 import、rollback 或 restart authority。
+验证结果：聚焦套件 `32 total / 30 pass / 2 conditional Docker skip / 0 fail`；完整 Local Owner
+`254 total / 247 pass / 7 conditional skip / 0 fail`；tracked backend `1541 total / 1539 pass / 2 conditional skip / 0 fail`；
+18-package clean build/逐包测试、八项架构/部署/发布审计、十四档 artifact audit 与真实 Docker readonly `2/2` 均通过。PostgreSQL 18.6
+arm64 physical HA 以 146 gates、timeline `1 → 2` 通过，private report SHA-256 为
+`3d6623465913d43e6f1a8838896d6deb6664dafd0c26970bddb4d6165fb60c00`，独立 evidence audit 无 finding。workspace 仍为 18 packages，
+`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Owner 为 `155 source / 154 nested / 1 root binary entry`，Local SQLite 为
+`203 source / 202 nested / 1 root public export`。新增 7 个生产源码全部进入既有领域目录，没有新增 package、dependency、binary 或常驻
+对象；基础 Edge/Standalone closure 精确保持 `2,611,978 / 2,612,056` bytes、319 files、58 modules。
 
 ## 被拒绝的替代方案
 

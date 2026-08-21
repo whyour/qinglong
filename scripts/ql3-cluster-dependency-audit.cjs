@@ -2011,6 +2011,14 @@ function auditSourceImports(root, packagePath, findings) {
           specifier === '@qinglong/local-sqlite/readiness-inspection'
         ) &&
         !(
+          path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/review/completion.ts' &&
+          [
+            '@qinglong/local-owner-console/authenticated-command',
+            '@qinglong/local-sqlite/authentication-read',
+          ].includes(specifier)
+        ) &&
+        !(
           [
             'src/deployment/compose/composeApply.ts',
             'src/deployment/compose/composeEvidenceCollection.ts',
@@ -2640,6 +2648,28 @@ function auditSourceImports(root, packagePath, findings) {
         path.relative(packageDirectory, filePath) ===
           'src/deployment/adopted-bundle/material.ts' &&
         specifier === '@qinglong/local-sqlite/data-directory-application-commit'
+      ) {
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-owner-cli' &&
+        [
+          {
+            file: 'src/deployment/reconciliation/review/authorization.ts',
+            specifiers: [
+              '@qinglong/runtime-core/local-secret',
+              '@qinglong/runtime-core/security',
+            ],
+          },
+          {
+            file: 'src/deployment/reconciliation/review/issuerKeyring.ts',
+            specifiers: ['@qinglong/runtime-core/local-secret'],
+          },
+        ].some(
+          ({ file, specifiers }) =>
+            path.relative(packageDirectory, filePath) === file &&
+            specifiers.includes(specifier),
+        )
       ) {
         continue;
       }

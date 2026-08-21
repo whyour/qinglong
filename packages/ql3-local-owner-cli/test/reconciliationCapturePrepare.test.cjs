@@ -10,11 +10,13 @@ const { test } = require('node:test');
 const {
   commitLocalReconciliationCapture,
   commitLocalReconciliationPlan,
+  commitLocalReconciliationReview,
   prepareLocalReconciliationCapture,
   prepareLocalReconciliationPlan,
   prepareLocalReconciliationReview,
   verifyLocalReconciliationCapture,
   verifyLocalReconciliationPlan,
+  verifyLocalReconciliationReview,
   writeLocalReconciliationReviewDiagnostics,
 } = require('../dist/deployment/localDeployment.js');
 const {
@@ -193,9 +195,13 @@ function fixture(
       fs.writeFileSync(`${targetDatabasePath}-wal`, 'target-wal-facts\n', {
         mode: 0o600,
       });
-      fs.writeFileSync(`${legacySourcePath}-journal`, 'legacy-journal-state\n', {
-        mode: 0o600,
-      });
+      fs.writeFileSync(
+        `${legacySourcePath}-journal`,
+        'legacy-journal-state\n',
+        {
+          mode: 0o600,
+        },
+      );
     }
   }
   const commitmentPayload = {
@@ -682,6 +688,7 @@ function preparedPlan(t, options = {}) {
   };
   return {
     ...state,
+    captureCommand: state.command,
     captured,
     planRoot,
     prepareCommand,
@@ -694,7 +701,10 @@ function preparedReview(t, options = {}) {
   const state = preparedPlan(t, options);
   const planned = commitLocalReconciliationPlan(state.planCommitCommand);
   const root = path.dirname(state.captureRoot);
-  const reviewRoot = path.join(root, `review-root-${options.reviewSuffix ?? '1'}`);
+  const reviewRoot = path.join(
+    root,
+    `review-root-${options.reviewSuffix ?? '1'}`,
+  );
   const diagnosticRoot = path.join(
     root,
     `diagnostic-root-${options.reviewSuffix ?? '1'}`,
@@ -712,8 +722,7 @@ function preparedReview(t, options = {}) {
       allowRootService: rootAcknowledgement(),
     },
     request: {
-      reviewId:
-        options.reviewId ?? '00000000-0000-4000-8000-000000000301',
+      reviewId: options.reviewId ?? '00000000-0000-4000-8000-000000000301',
       planId: state.prepareCommand.request.planId,
       expectedPlanDigest: planned.planDigest,
       expectedHeadDigest: planned.instanceHeadDigest,
@@ -758,6 +767,163 @@ function diagnosticCommand(
   };
 }
 
+function writeReviewDecisionFile(state, prepared, fileName = 'review.ndjson') {
+  const decisions = [];
+  const domains = [
+    'schema_lineage',
+    'automation',
+    'secret_and_config',
+    'run_history',
+    'plugin_package',
+    'ai_and_tool',
+    'identity_policy_audit',
+    'unknown',
+  ];
+  for (const database of ['legacy', 'target']) {
+    for (const domain of domains) {
+      for (const factKind of ['schema_object', 'table']) {
+        let offset = 0;
+        let pageNumber = 0;
+        while (true) {
+          const command = diagnosticCommand(state, prepared, {
+            database,
+            domain,
+            factKind,
+            offset,
+            outputName: `decision-${database}-${domain}-${factKind}-${pageNumber}.json`,
+          });
+          const result = writeLocalReconciliationReviewDiagnostics(command);
+          const page = JSON.parse(
+            fs.readFileSync(command.request.outputPath, 'utf8'),
+          );
+          for (const fact of page.records) {
+            if (fact.decisionRequirement === 'informational') continue;
+            const blocked = fact.decisionRequirement === 'blocked';
+            decisions.push({
+              schemaVersion: 1,
+              kind: 'qinglong3-local-reconciliation-review-decision',
+              database: fact.database,
+              domain: fact.domain,
+              factKind: fact.factKind,
+              ordinal: fact.ordinal,
+              factDigest: fact.factDigest,
+              disposition: blocked ? 'manual_external' : 'retain_target',
+              reason: blocked
+                ? 'external_recovery_required'
+                : 'preserve_target',
+            });
+          }
+          if (result.complete) break;
+          offset = result.nextOffset;
+          pageNumber += 1;
+        }
+      }
+    }
+  }
+  const records = [
+    {
+      schemaVersion: 1,
+      kind: 'qinglong3-local-reconciliation-review-decision-header',
+      diagnosticsContractVersion: 1,
+      reviewId: state.reviewCommand.request.reviewId,
+      profile: state.command.request.profile,
+      planDigest: state.planned.planDigest,
+      preparationDigest: prepared.preparationDigest,
+    },
+    ...decisions,
+  ];
+  const filePath = path.join(state.diagnosticRoot, fileName);
+  fs.writeFileSync(
+    filePath,
+    `${records.map((record) => JSON.stringify(record)).join('\n')}\n`,
+    { mode: 0o600 },
+  );
+  return { filePath, records, decisions };
+}
+
+function reviewCommitFixture(t, options = {}) {
+  const state = preparedReview(t, options);
+  const prepared = prepareLocalReconciliationReview(state.reviewCommand);
+  const reviewFile = writeReviewDecisionFile(state, prepared);
+  const ownerPepperKeyringDirectory = path.join(
+    state.deploymentRoot,
+    'review-owner-peppers',
+  );
+  fs.mkdirSync(ownerPepperKeyringDirectory, { mode: 0o700 });
+  const credentialFilePath = path.join(
+    state.deploymentRoot,
+    'review-credential.json',
+  );
+  fs.writeFileSync(credentialFilePath, '{}\n', { mode: 0o600 });
+  const issuerKeyringPath = path.join(
+    state.deploymentRoot,
+    'review-issuer.keyring',
+  );
+  const committedAtMs = Date.now();
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.review.commit',
+    options: {
+      ...state.reviewCommand.options,
+      targetDatabasePath: state.targetDatabasePath,
+      ownerPepperKeyringDirectory,
+      credentialFilePath,
+      issuerKeyringPath,
+    },
+    request: {
+      reviewId: state.reviewCommand.request.reviewId,
+      expectedPreparationDigest: prepared.preparationDigest,
+      expectedHeadDigest: prepared.instanceHeadDigest,
+      decisionFilePath: reviewFile.filePath,
+      committedAtMs,
+      authorizationLifetimeMs: 30 * 60 * 1_000,
+    },
+  };
+  let authentications = 0;
+  let confirmations = 0;
+  const dependencies = {
+    now: () => committedAtMs,
+    async openAuthenticationDatabase() {
+      return { async close() {} };
+    },
+    async authenticate(_database, authenticateOptions) {
+      authentications += 1;
+      assert.equal(
+        authenticateOptions.authenticationNamespace,
+        'local_reconciliation_review',
+      );
+      return {
+        principal: {
+          subject: { type: 'user', id: 'review-owner' },
+          authenticationId: 'local_reconciliation_review:test',
+          authenticatedAtMs: committedAtMs,
+          expiresAtMs: committedAtMs + 60_000,
+          assurance: 'local_console',
+        },
+        databaseFence: {
+          credentialId: 'review-owner',
+          credentialVersion: 1,
+          pepperKeyId: 'review-owner-v1',
+          pepperVersion: 1,
+        },
+        async confirm() {
+          confirmations += 1;
+        },
+      };
+    },
+  };
+  return {
+    ...state,
+    prepared,
+    reviewFile,
+    command,
+    dependencies,
+    issuerKeyringPath,
+    authenticationCount: () => authentications,
+    confirmationCount: () => confirmations,
+  };
+}
+
 function dockerReadSealedSqlite(assetsDirectory, mode) {
   const source =
     mode === 'main_only_immutable'
@@ -770,7 +936,9 @@ function dockerReadSealedSqlite(assetsDirectory, mode) {
     const files = fs.readdirSync('/bundle').sort();
     const snapshot = () => Object.fromEntries(files.map((name) => [name, crypto.createHash('sha256').update(fs.readFileSync('/bundle/' + name)).digest('hex')]));
     const before = snapshot();
-    const client = new DatabaseSync(${JSON.stringify(source)}, { allowExtension: false, defensive: true, readOnly: true, timeout: 0 });
+    const client = new DatabaseSync(${JSON.stringify(
+      source,
+    )}, { allowExtension: false, defensive: true, readOnly: true, timeout: 0 });
     client.enableDefensive(true);
     client.exec('PRAGMA trusted_schema = OFF; PRAGMA query_only = ON; PRAGMA temp_store = MEMORY; PRAGMA mmap_size = 0; PRAGMA cache_size = -2048');
     const row = client.prepare('SELECT COUNT(*) AS count FROM "QingLong3TaskDefinitions"').get();
@@ -851,10 +1019,7 @@ test('commit captures main, sidecars and recovery then verifies without sources'
     fs.readFileSync(captureAssetPath(state, 'target-wal'), 'utf8'),
     'target-wal-facts\n',
   );
-  assert.equal(
-    fs.statSync(capturePath(state, 'assets')).mode & 0o777,
-    0o500,
-  );
+  assert.equal(fs.statSync(capturePath(state, 'assets')).mode & 0o777, 0o500);
   for (const asset of manifest.assets) {
     assert.equal(
       fs.statSync(captureAssetPath(state, asset.logicalName)).mode & 0o777,
@@ -1002,19 +1167,13 @@ test('commit converges a partially sealed terminal bundle without sources', (t) 
     fs.statSync(captureAssetPath(state, 'target-wal')).mode & 0o777,
     0o600,
   );
-  assert.equal(
-    fs.statSync(capturePath(state, 'assets')).mode & 0o777,
-    0o700,
-  );
+  assert.equal(fs.statSync(capturePath(state, 'assets')).mode & 0o777, 0o700);
   fs.unlinkSync(state.targetDatabasePath);
   fs.unlinkSync(state.legacySourcePath);
   fs.unlinkSync(state.recoveryPath);
   const resumed = commitLocalReconciliationCapture(state.commitCommand);
   assert.equal(resumed.state, 'reconciliation_captured');
-  assert.equal(
-    fs.statSync(capturePath(state, 'assets')).mode & 0o777,
-    0o500,
-  );
+  assert.equal(fs.statSync(capturePath(state, 'assets')).mode & 0o777, 0o500);
   const manifest = JSON.parse(
     fs.readFileSync(capturePath(state, 'manifest.json'), 'utf8'),
   );
@@ -1206,13 +1365,13 @@ test('capture manifest schema v1 is rejected instead of silently upgraded', (t) 
 
 test('plan reads sealed main-only SQLite with fixed budgets and verifies without opening', (t) => {
   const state = preparedPlan(t);
-  const beforeAssets = fs.readdirSync(
-    capturePath(state, 'assets'),
-  ).map((name) => ({
-    name,
-    bytes: fs.readFileSync(capturePath(state, `assets/${name}`)),
-    stat: fs.statSync(capturePath(state, `assets/${name}`), { bigint: true }),
-  }));
+  const beforeAssets = fs
+    .readdirSync(capturePath(state, 'assets'))
+    .map((name) => ({
+      name,
+      bytes: fs.readFileSync(capturePath(state, `assets/${name}`)),
+      stat: fs.statSync(capturePath(state, `assets/${name}`), { bigint: true }),
+    }));
   const opens = [];
   const committed = commitLocalReconciliationPlan(state.planCommitCommand, {
     beforeDatabaseOpen(kind, mode, cacheKiB) {
@@ -1467,9 +1626,7 @@ test('hot journal and unpaired sidecars become manual without SQLite open', (t) 
     ],
   );
   assert.equal(
-    plan.domains.every(
-      (domain) => domain.disposition === 'manual_required',
-    ),
+    plan.domains.every((domain) => domain.disposition === 'manual_required'),
     true,
   );
 });
@@ -1481,11 +1638,7 @@ test('unknown target schema is summarized only by digest and requires manual rev
   });
   commitLocalReconciliationPlan(state.planCommitCommand);
   const planText = fs.readFileSync(
-    path.join(
-      state.planRoot,
-      state.prepareCommand.request.planId,
-      'plan.json',
-    ),
+    path.join(state.planRoot, state.prepareCommand.request.planId, 'plan.json'),
     'utf8',
   );
   const plan = JSON.parse(planText);
@@ -1706,7 +1859,10 @@ test('review diagnostics publish one private exact page without changing assets'
   assert.equal(result.recordCount, 1);
   assert.equal(result.complete, true);
   assert.equal(result.nextOffset, null);
-  assert.equal(JSON.stringify(result).includes(command.request.outputPath), false);
+  assert.equal(
+    JSON.stringify(result).includes(command.request.outputPath),
+    false,
+  );
   assert.equal(JSON.stringify(result).includes('Crontabs'), false);
   const pageText = fs.readFileSync(command.request.outputPath, 'utf8');
   const page = JSON.parse(pageText);
@@ -1843,6 +1999,334 @@ test('review diagnostics page at sixty-four and CLI output stays content-free', 
   assert.equal(cli.stdout.includes(state.diagnosticRoot), false);
   assert.equal(cli.stdout.includes('QingLong3TaskDefinitions'), false);
   assert.equal(cli.stderr, '');
+});
+
+test('review commit signs the exact decision stream, seals terminal evidence and verifies read-only', async (t) => {
+  const state = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000351',
+    reviewId: '00000000-0000-4000-8000-000000000352',
+  });
+  const targetBefore = fs.statSync(state.targetDatabasePath, { bigint: true });
+  const targetBytes = fs.readFileSync(state.targetDatabasePath);
+  const committed = await commitLocalReconciliationReview(
+    state.command,
+    state.dependencies,
+  );
+  assert.equal(committed.status, 'prepared');
+  assert.equal(committed.state, 'reconciliation_reviewed');
+  assert.equal(committed.decisionCount, state.reviewFile.decisions.length);
+  assert.equal(state.authenticationCount(), 1);
+  assert.equal(state.confirmationCount(), 3);
+  const reviewDirectory = path.join(
+    state.reviewRoot,
+    state.reviewCommand.request.reviewId,
+  );
+  assert.deepEqual(fs.readdirSync(reviewDirectory).sort(), [
+    'authorization.ndjson',
+    'intent.json',
+    'receipt.json',
+    'review.json',
+    'staging',
+  ]);
+  assert.equal(fs.statSync(reviewDirectory).mode & 0o777, 0o500);
+  assert.equal(
+    fs.statSync(path.join(reviewDirectory, 'staging')).mode & 0o777,
+    0o500,
+  );
+  for (const fileName of [
+    'authorization.ndjson',
+    'intent.json',
+    'receipt.json',
+    'review.json',
+  ]) {
+    assert.equal(
+      fs.statSync(path.join(reviewDirectory, fileName)).mode & 0o777,
+      0o400,
+    );
+  }
+  const authorizationText = fs.readFileSync(
+    path.join(reviewDirectory, 'authorization.ndjson'),
+    'utf8',
+  );
+  assert.equal(authorizationText.includes('Crontabs'), false);
+  assert.equal(authorizationText.includes('private-value'), false);
+  assert.equal(authorizationText.includes('0 0 * * *'), false);
+  const head = readLocalCutoverInstanceHead(
+    state.deploymentRoot,
+    state.captureCommand.request.instanceId,
+    state.uid,
+  );
+  assert.equal(head.state, 'reconciliation_reviewed');
+  assert.equal(head.sourceRecordDigest, committed.reviewDigest);
+  const verifyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.review.verify',
+    options: {
+      ...state.reviewCommand.options,
+      issuerKeyringPath: state.issuerKeyringPath,
+    },
+    request: {
+      reviewId: state.reviewCommand.request.reviewId,
+      expectedReviewDigest: committed.reviewDigest,
+    },
+  };
+  const verified = await verifyLocalReconciliationReview(verifyCommand);
+  assert.equal(verified.status, 'verified');
+  assert.equal(verified.reviewDigest, committed.reviewDigest);
+  const targetAfter = fs.statSync(state.targetDatabasePath, { bigint: true });
+  assert.equal(
+    fs.readFileSync(state.targetDatabasePath).equals(targetBytes),
+    true,
+  );
+  assert.equal(targetAfter.mtimeNs, targetBefore.mtimeNs);
+  assert.equal(targetAfter.ctimeNs, targetBefore.ctimeNs);
+
+  const commandPath = path.join(state.deploymentRoot, 'review-verify.json');
+  fs.writeFileSync(commandPath, `${JSON.stringify(verifyCommand)}\n`, {
+    mode: 0o600,
+  });
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-review-verify',
+      '--command-file',
+      commandPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).status, 'verified');
+  assert.equal(cli.stdout.includes(state.reviewRoot), false);
+  assert.equal(cli.stdout.includes('review-owner'), false);
+  assert.equal(cli.stdout.includes('Crontabs'), false);
+});
+
+test('review commit rejects missing and policy-invalid decisions before terminal publication', async (t) => {
+  const missing = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000361',
+    reviewId: '00000000-0000-4000-8000-000000000362',
+    reviewSuffix: 'missing',
+  });
+  const missingRecords = missing.reviewFile.records.slice(0, -1);
+  fs.writeFileSync(
+    missing.reviewFile.filePath,
+    `${missingRecords.map((record) => JSON.stringify(record)).join('\n')}\n`,
+    { mode: 0o600 },
+  );
+  await assert.rejects(
+    commitLocalReconciliationReview(missing.command, missing.dependencies),
+    /omitted a canonical fact/,
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(
+        missing.reviewRoot,
+        missing.reviewCommand.request.reviewId,
+        'authorization.ndjson',
+      ),
+    ),
+    false,
+  );
+
+  const blocked = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000363',
+    reviewId: '00000000-0000-4000-8000-000000000364',
+    reviewSuffix: 'blocked',
+  });
+  const blockedRecord = blocked.reviewFile.records.find(
+    (record) =>
+      record.kind === 'qinglong3-local-reconciliation-review-decision' &&
+      [
+        'secret_and_config',
+        'run_history',
+        'identity_policy_audit',
+        'unknown',
+      ].includes(record.domain),
+  );
+  blockedRecord.disposition = 'adopt_legacy';
+  blockedRecord.reason = 'prefer_legacy';
+  fs.writeFileSync(
+    blocked.reviewFile.filePath,
+    `${blocked.reviewFile.records
+      .map((record) => JSON.stringify(record))
+      .join('\n')}\n`,
+    { mode: 0o600 },
+  );
+  await assert.rejects(
+    commitLocalReconciliationReview(blocked.command, blocked.dependencies),
+    /not allowed for canonical fact/,
+  );
+});
+
+test('review commit rejects weak principals, oversized Edge streams and decision-file drift around signing', async (t) => {
+  const weak = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000365',
+    reviewId: '00000000-0000-4000-8000-000000000366',
+    reviewSuffix: 'weak',
+  });
+  await assert.rejects(
+    commitLocalReconciliationReview(weak.command, {
+      ...weak.dependencies,
+      async authenticate() {
+        return {
+          principal: {
+            subject: { type: 'user', id: 'weak-user' },
+            authenticationId: 'local_reconciliation_review:weak',
+            authenticatedAtMs: weak.command.request.committedAtMs,
+            expiresAtMs: weak.command.request.committedAtMs + 60_000,
+            assurance: 'single_factor',
+          },
+          databaseFence: {},
+          async confirm() {},
+        };
+      },
+    }),
+    /recent strongly authenticated User/,
+  );
+
+  const oversized = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000367',
+    reviewId: '00000000-0000-4000-8000-000000000368',
+    reviewSuffix: 'oversized',
+  });
+  fs.truncateSync(oversized.reviewFile.filePath, 8 * 1024 * 1024 + 1);
+  await assert.rejects(
+    commitLocalReconciliationReview(oversized.command, oversized.dependencies),
+    /identity or size is invalid/,
+  );
+
+  const drift = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000369',
+    reviewId: '00000000-0000-4000-8000-00000000036a',
+    reviewSuffix: 'drift',
+  });
+  let confirmations = 0;
+  await assert.rejects(
+    commitLocalReconciliationReview(drift.command, {
+      ...drift.dependencies,
+      async authenticate() {
+        return {
+          principal: {
+            subject: { type: 'user', id: 'review-owner' },
+            authenticationId: 'local_reconciliation_review:drift',
+            authenticatedAtMs: drift.command.request.committedAtMs,
+            expiresAtMs: drift.command.request.committedAtMs + 60_000,
+            assurance: 'hardware',
+          },
+          databaseFence: {},
+          async confirm() {
+            confirmations += 1;
+            if (confirmations === 3) {
+              fs.appendFileSync(drift.reviewFile.filePath, '{}\n');
+            }
+          },
+        };
+      },
+    }),
+    /identity changed after reading/,
+  );
+});
+
+test('review commit resumes authorization, receipt, seal and head response-loss windows without re-authentication', async (t) => {
+  const authorizationState = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000371',
+    reviewId: '00000000-0000-4000-8000-000000000372',
+    reviewSuffix: 'authorization-crash',
+  });
+  await assert.rejects(
+    commitLocalReconciliationReview(authorizationState.command, {
+      ...authorizationState.dependencies,
+      afterAuthorizationPublished() {
+        throw new Error('authorization crash');
+      },
+    }),
+    /authorization crash/,
+  );
+  const authorizationDirectory = path.join(
+    authorizationState.reviewRoot,
+    authorizationState.reviewCommand.request.reviewId,
+  );
+  fs.linkSync(
+    path.join(authorizationDirectory, 'authorization.ndjson'),
+    path.join(authorizationDirectory, 'staging', 'authorization.ndjson.stage'),
+  );
+  const authorizationReplay = await commitLocalReconciliationReview(
+    authorizationState.command,
+    {
+      ...authorizationState.dependencies,
+      async authenticate() {
+        throw new Error('must not re-authenticate signed response-loss replay');
+      },
+    },
+  );
+  assert.equal(authorizationReplay.state, 'reconciliation_reviewed');
+
+  const receiptState = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000373',
+    reviewId: '00000000-0000-4000-8000-000000000374',
+    reviewSuffix: 'receipt-crash',
+  });
+  await assert.rejects(
+    commitLocalReconciliationReview(receiptState.command, {
+      ...receiptState.dependencies,
+      afterReceiptPublished() {
+        throw new Error('receipt crash');
+      },
+    }),
+    /receipt crash/,
+  );
+  const receiptReplay = await commitLocalReconciliationReview(
+    receiptState.command,
+    receiptState.dependencies,
+  );
+  assert.equal(receiptReplay.state, 'reconciliation_reviewed');
+
+  const sealState = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000375',
+    reviewId: '00000000-0000-4000-8000-000000000376',
+    reviewSuffix: 'seal-crash',
+  });
+  await assert.rejects(
+    commitLocalReconciliationReview(sealState.command, {
+      ...sealState.dependencies,
+      afterTerminalSealed() {
+        throw new Error('seal crash');
+      },
+    }),
+    /seal crash/,
+  );
+  assert.equal(
+    fs.statSync(
+      path.join(sealState.reviewRoot, sealState.reviewCommand.request.reviewId),
+    ).mode & 0o777,
+    0o500,
+  );
+  const sealReplay = await commitLocalReconciliationReview(
+    sealState.command,
+    sealState.dependencies,
+  );
+  assert.equal(sealReplay.state, 'reconciliation_reviewed');
+
+  const headState = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000377',
+    reviewId: '00000000-0000-4000-8000-000000000378',
+    reviewSuffix: 'head-crash',
+  });
+  await assert.rejects(
+    commitLocalReconciliationReview(headState.command, {
+      ...headState.dependencies,
+      afterHeadAdvanced() {
+        throw new Error('head response loss');
+      },
+    }),
+    /head response loss/,
+  );
+  const headReplay = await commitLocalReconciliationReview(
+    headState.command,
+    headState.dependencies,
+  );
+  assert.equal(headReplay.status, 'existing');
 });
 
 test(

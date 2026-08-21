@@ -207,10 +207,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: localOwnerCli.rootSourceFileRoles,
     },
     {
-      sourceFiles: 149,
+      sourceFiles: 155,
       rootSourceFiles: 1,
       rootSourceLines: 50,
-      nestedSourceFiles: 148,
+      nestedSourceFiles: 154,
       rootSourceFileRoles: { 'cli.ts': 'binary_entry' },
     },
   );
@@ -540,10 +540,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: localSqlite.rootSourceFileRoles,
     },
     {
-      sourceFiles: 202,
+      sourceFiles: 203,
       rootSourceFiles: 1,
       rootSourceLines: 31,
-      nestedSourceFiles: 201,
+      nestedSourceFiles: 202,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );

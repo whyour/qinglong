@@ -107,7 +107,10 @@ function contents(value: unknown): string {
 
 function overlaps(left: string, right: string): boolean {
   const relative = path.relative(left, right);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  return (
+    relative === '' ||
+    (!relative.startsWith('..') && !path.isAbsolute(relative))
+  );
 }
 
 export function localReconciliationReviewDirectory(
@@ -149,19 +152,34 @@ function ensureReviewDirectory(
   return paths;
 }
 
-function validateCatalog(paths: Readonly<LocalReconciliationReviewPaths>): void {
+function validateCatalog(
+  paths: Readonly<LocalReconciliationReviewPaths>,
+): void {
   const allowed = new Set([
+    'authorization.ndjson',
     'intent.json',
+    'receipt.json',
+    'review.json',
     'staging',
+    '.receipt.json.ql3-deploy-stage',
+    '.review.json.ql3-deploy-stage',
     '.intent.json.ql3-deploy-stage',
   ]);
   for (const entry of fs.readdirSync(paths.root, { withFileTypes: true })) {
     if (!allowed.has(entry.name) || entry.isSymbolicLink()) {
-      configurationError('reconciliation review root contains unknown material');
+      configurationError(
+        'reconciliation review root contains unknown material',
+      );
     }
   }
-  if (fs.readdirSync(paths.staging).length !== 0) {
-    configurationError('reconciliation review staging contains unknown material');
+  if (
+    fs
+      .readdirSync(paths.staging)
+      .some((entry) => entry !== 'authorization.ndjson.stage')
+  ) {
+    configurationError(
+      'reconciliation review staging contains unknown material',
+    );
   }
 }
 
@@ -172,7 +190,8 @@ function buildIntent(
   if (
     terminal.intent.command.options.deploymentRoot !==
       command.options.deploymentRoot ||
-    terminal.intent.command.options.captureRoot !== command.options.captureRoot ||
+    terminal.intent.command.options.captureRoot !==
+      command.options.captureRoot ||
     terminal.intent.command.options.planRoot !== command.options.planRoot ||
     terminal.intent.command.options.allowRootService !==
       command.options.allowRootService ||
@@ -197,7 +216,10 @@ function buildIntent(
     planReceiptDigest: terminal.receipt.receiptDigest,
     plannedHeadDigest: command.request.expectedHeadDigest,
   });
-  return Object.freeze({ ...payload, preparationDigest: cutoverDigest(payload) });
+  return Object.freeze({
+    ...payload,
+    preparationDigest: cutoverDigest(payload),
+  });
 }
 
 export function normalizeLocalReconciliationReviewIntent(
@@ -224,7 +246,9 @@ export function normalizeLocalReconciliationReviewIntent(
     ],
     'reconciliation review intent',
   );
-  const command = normalizeLocalReconciliationReviewPrepareCommand(intent.command);
+  const command = normalizeLocalReconciliationReviewPrepareCommand(
+    intent.command,
+  );
   const { preparationDigest, ...payload } = intent;
   if (
     intent.schema !== INTENT_SCHEMA ||
@@ -311,10 +335,22 @@ export function prepareLocalReconciliationReview(
 ): Readonly<LocalReconciliationReviewPrepareResult> {
   const command = normalizeLocalReconciliationReviewPrepareCommand(input);
   const identity = currentIdentity();
-  validatePrivateDirectory(command.options.deploymentRoot, identity.uid, 'deploymentRoot');
-  validatePrivateDirectory(command.options.captureRoot, identity.uid, 'captureRoot');
+  validatePrivateDirectory(
+    command.options.deploymentRoot,
+    identity.uid,
+    'deploymentRoot',
+  );
+  validatePrivateDirectory(
+    command.options.captureRoot,
+    identity.uid,
+    'captureRoot',
+  );
   validatePrivateDirectory(command.options.planRoot, identity.uid, 'planRoot');
-  validatePrivateDirectory(command.options.reviewRoot, identity.uid, 'reviewRoot');
+  validatePrivateDirectory(
+    command.options.reviewRoot,
+    identity.uid,
+    'reviewRoot',
+  );
   const terminal = readLocalReconciliationPlanTerminal(
     command.options.planRoot,
     command.request.planId,
@@ -336,7 +372,9 @@ export function prepareLocalReconciliationReview(
     (head.state !== 'reconciliation_planned' &&
       head.state !== 'reconciliation_review_prepared')
   ) {
-    configurationError('review prepare lost the planned instance head compare-and-swap');
+    configurationError(
+      'review prepare lost the planned instance head compare-and-swap',
+    );
   }
   const paths = ensureReviewDirectory(
     command.options.reviewRoot,
@@ -384,7 +422,8 @@ function validateDiagnosticsBinding(
     intent.command.options.captureRoot !== command.options.captureRoot ||
     intent.command.options.planRoot !== command.options.planRoot ||
     intent.command.options.reviewRoot !== command.options.reviewRoot ||
-    intent.command.options.allowRootService !== command.options.allowRootService ||
+    intent.command.options.allowRootService !==
+      command.options.allowRootService ||
     intent.command.request.reviewId !== command.request.reviewId ||
     intent.preparationDigest !== command.request.expectedPreparationDigest
   ) {
@@ -413,13 +452,36 @@ export function writeLocalReconciliationReviewDiagnostics(
 ): Readonly<LocalReconciliationReviewDiagnosticsResult> {
   const command = normalizeLocalReconciliationReviewDiagnosticsCommand(input);
   const identity = currentIdentity();
-  validatePrivateDirectory(command.options.deploymentRoot, identity.uid, 'deploymentRoot');
-  validatePrivateDirectory(command.options.captureRoot, identity.uid, 'captureRoot');
+  validatePrivateDirectory(
+    command.options.deploymentRoot,
+    identity.uid,
+    'deploymentRoot',
+  );
+  validatePrivateDirectory(
+    command.options.captureRoot,
+    identity.uid,
+    'captureRoot',
+  );
   validatePrivateDirectory(command.options.planRoot, identity.uid, 'planRoot');
-  validatePrivateDirectory(command.options.reviewRoot, identity.uid, 'reviewRoot');
-  const paths = reviewPaths(command.options.reviewRoot, command.request.reviewId);
-  validatePrivateDirectory(paths.root, identity.uid, 'reconciliationReviewDirectory');
-  validatePrivateDirectory(paths.staging, identity.uid, 'reconciliationReviewStaging');
+  validatePrivateDirectory(
+    command.options.reviewRoot,
+    identity.uid,
+    'reviewRoot',
+  );
+  const paths = reviewPaths(
+    command.options.reviewRoot,
+    command.request.reviewId,
+  );
+  validatePrivateDirectory(
+    paths.root,
+    identity.uid,
+    'reconciliationReviewDirectory',
+  );
+  validatePrivateDirectory(
+    paths.staging,
+    identity.uid,
+    'reconciliationReviewStaging',
+  );
   const intent = readLocalReconciliationReviewIntent(
     command.options.reviewRoot,
     command.request.reviewId,
@@ -466,7 +528,9 @@ export function writeLocalReconciliationReviewDiagnostics(
       }),
   );
   if (page === null) {
-    configurationError('manual-required SQLite topology has no diagnostic page');
+    configurationError(
+      'manual-required SQLite topology has no diagnostic page',
+    );
   }
   const currentHead = readLocalCutoverInstanceHead(
     command.options.deploymentRoot,
@@ -478,7 +542,9 @@ export function writeLocalReconciliationReviewDiagnostics(
     currentHead.state !== 'reconciliation_review_prepared' ||
     currentHead.sourceRecordDigest !== intent.preparationDigest
   ) {
-    configurationError('review diagnostics instance head changed while reading');
+    configurationError(
+      'review diagnostics instance head changed while reading',
+    );
   }
   dependencies.beforeDiagnosticPublish?.();
   const status = publishLocalReconciliationDiagnosticPage(
@@ -505,7 +571,9 @@ export function writeLocalReconciliationReviewDiagnostics(
 export function prepareLocalReconciliationReviewCommandFile(
   filePath: string,
 ): Readonly<LocalReconciliationReviewPrepareResult> {
-  return prepareLocalReconciliationReview(readPrivateLocalCommandFile(filePath));
+  return prepareLocalReconciliationReview(
+    readPrivateLocalCommandFile(filePath),
+  );
 }
 
 export function writeLocalReconciliationReviewDiagnosticsCommandFile(
