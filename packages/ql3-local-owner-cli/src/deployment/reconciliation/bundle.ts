@@ -8,6 +8,7 @@ import { LocalDeploymentConfigurationError } from '../foundation/error';
 import {
   ensurePrivateDirectory,
   publishExactFile,
+  syncPublishedDirectory,
   validatePrivateDirectory,
 } from '../foundation/files';
 import {
@@ -31,6 +32,7 @@ import { proveLocalReconciliationLineage } from './lineageProof';
 import { proveLocalReconciliationStoppedState } from './stoppedProof';
 import {
   copyLocalReconciliationAsset,
+  localReconciliationCaptureAssetFileName,
   localReconciliationCaptureAssetPlan,
   verifyLocalReconciliationPublishedAsset,
   verifyLocalReconciliationSidecarPlan,
@@ -56,7 +58,7 @@ const LOGICAL_NAMES = [
 
 export interface LocalReconciliationCaptureManifest {
   readonly schema: typeof MANIFEST_SCHEMA;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly state: 'reconciliation_captured';
   readonly captureId: string;
   readonly profile: 'edge' | 'standalone';
@@ -65,6 +67,8 @@ export interface LocalReconciliationCaptureManifest {
   readonly stoppedProofDigest: string;
   readonly reconciliationEvidenceDigest: string;
   readonly lineageProjectionDigest: string;
+  readonly legacyBaselineSha256: string;
+  readonly targetBaselineSha256: string;
   readonly preparedHeadDigest: string;
   readonly committedAtMs: number;
   readonly assets: readonly Readonly<LocalReconciliationCapturedAsset>[];
@@ -74,7 +78,7 @@ export interface LocalReconciliationCaptureManifest {
 
 export interface LocalReconciliationCaptureReceipt {
   readonly schema: typeof RECEIPT_SCHEMA;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly state: 'reconciliation_captured';
   readonly captureId: string;
   readonly profile: 'edge' | 'standalone';
@@ -93,6 +97,10 @@ export interface LocalReconciliationCaptureDependencies {
   ) => void;
   readonly afterManifestPublished?: () => void;
   readonly afterReceiptPublished?: () => void;
+  readonly afterAssetSealed?: (
+    logicalName: LocalReconciliationCapturedAsset['logicalName'],
+  ) => void;
+  readonly afterAssetsSealed?: () => void;
 }
 
 function configurationError(message: string, cause?: unknown): never {
@@ -220,6 +228,7 @@ export function normalizeLocalReconciliationCaptureManifest(
       'assets',
       'captureId',
       'committedAtMs',
+      'legacyBaselineSha256',
       'lineageProjectionDigest',
       'manifestDigest',
       'preparationDigest',
@@ -231,6 +240,7 @@ export function normalizeLocalReconciliationCaptureManifest(
       'state',
       'stoppedProofDigest',
       'stoppedRecordDigest',
+      'targetBaselineSha256',
       'totalBytes',
     ],
     'reconciliation capture manifest',
@@ -244,7 +254,7 @@ export function normalizeLocalReconciliationCaptureManifest(
   const { manifestDigest, ...payload } = manifest;
   if (
     manifest.schema !== MANIFEST_SCHEMA ||
-    manifest.schemaVersion !== 1 ||
+    manifest.schemaVersion !== 2 ||
     manifest.state !== 'reconciliation_captured' ||
     typeof manifest.captureId !== 'string' ||
     (manifest.profile !== 'edge' && manifest.profile !== 'standalone') ||
@@ -269,6 +279,8 @@ export function normalizeLocalReconciliationCaptureManifest(
       manifest.stoppedProofDigest,
       manifest.reconciliationEvidenceDigest,
       manifest.lineageProjectionDigest,
+      manifest.legacyBaselineSha256,
+      manifest.targetBaselineSha256,
       manifest.preparedHeadDigest,
       manifestDigest,
     ].some(
@@ -309,7 +321,7 @@ export function normalizeLocalReconciliationCaptureReceipt(
   const { bundleDigest, ...payload } = receipt;
   if (
     receipt.schema !== RECEIPT_SCHEMA ||
-    receipt.schemaVersion !== 1 ||
+    receipt.schemaVersion !== 2 ||
     receipt.state !== 'reconciliation_captured' ||
     typeof receipt.captureId !== 'string' ||
     (receipt.profile !== 'edge' && receipt.profile !== 'standalone') ||
@@ -348,7 +360,7 @@ function captureReceipt(
 ): Readonly<LocalReconciliationCaptureReceipt> {
   const payload = Object.freeze({
     schema: RECEIPT_SCHEMA,
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     state: 'reconciliation_captured' as const,
     captureId: manifest.captureId,
     profile: manifest.profile,
@@ -386,10 +398,16 @@ function validateTerminalCatalog(
   if (fs.readdirSync(paths.staging).length !== 0) {
     configurationError('capture staging root contains unknown material');
   }
-  const allowedAssets = new Set<string>(LOGICAL_NAMES);
+  const allowedAssets = new Set<string>(
+    LOGICAL_NAMES.map(localReconciliationCaptureAssetFileName),
+  );
   if (!terminal) {
     for (const name of LOGICAL_NAMES) {
-      allowedAssets.add(`.${name}.ql3-capture-stage`);
+      allowedAssets.add(
+        `.${localReconciliationCaptureAssetFileName(
+          name,
+        )}.ql3-capture-stage`,
+      );
     }
   }
   for (const entry of fs.readdirSync(paths.assets, { withFileTypes: true })) {
@@ -403,6 +421,105 @@ function validateTerminalCatalog(
   }
 }
 
+function validateSealedAssetsDirectory(directory: string, uid: number): void {
+  let stat: fs.Stats;
+  try {
+    stat = fs.lstatSync(directory);
+  } catch (error) {
+    return configurationError('sealed capture assets are unavailable', error);
+  }
+  if (
+    !stat.isDirectory() ||
+    stat.isSymbolicLink() ||
+    stat.uid !== uid ||
+    (stat.mode & 0o777) !== 0o500 ||
+    fs.realpathSync(directory) !== directory
+  ) {
+    configurationError(
+      'sealed capture assets must be a canonical current-UID 0500 directory',
+    );
+  }
+}
+
+function sealTerminalAssets(
+  paths: ReturnType<typeof capturePaths>,
+  manifest: Readonly<LocalReconciliationCaptureManifest>,
+  uid: number,
+  afterAssetSealed?: (
+    logicalName: LocalReconciliationCapturedAsset['logicalName'],
+  ) => void,
+): void {
+  const directory = fs.lstatSync(paths.assets);
+  if (
+    !directory.isDirectory() ||
+    directory.isSymbolicLink() ||
+    directory.uid !== uid ||
+    ![0o700, 0o500].includes(directory.mode & 0o777) ||
+    fs.realpathSync(paths.assets) !== paths.assets
+  ) {
+    configurationError('capture assets cannot be sealed');
+  }
+  if ((directory.mode & 0o777) === 0o500) {
+    for (const asset of manifest.assets) {
+      verifyLocalReconciliationPublishedAsset(asset, paths.assets, uid, [
+        0o400n,
+      ]);
+    }
+    return;
+  }
+  for (const asset of manifest.assets) {
+    verifyLocalReconciliationPublishedAsset(asset, paths.assets, uid, [
+      0o600n,
+      0o400n,
+    ]);
+    const assetPath = path.join(
+      paths.assets,
+      localReconciliationCaptureAssetFileName(asset.logicalName),
+    );
+    let descriptor: number | undefined;
+    try {
+      descriptor = fs.openSync(
+        assetPath,
+        fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0),
+      );
+      const opened = fs.fstatSync(descriptor);
+      if (
+        !opened.isFile() ||
+        opened.uid !== uid ||
+        opened.nlink !== 1 ||
+        ![0o600, 0o400].includes(opened.mode & 0o777)
+      ) {
+        configurationError('capture asset seal identity drifted');
+      }
+      if ((opened.mode & 0o777) === 0o600) {
+        fs.fchmodSync(descriptor, 0o400);
+        fs.fsyncSync(descriptor);
+      }
+    } catch (error) {
+      if (error instanceof LocalDeploymentConfigurationError) throw error;
+      configurationError('capture asset cannot be sealed', error);
+    } finally {
+      if (descriptor !== undefined) fs.closeSync(descriptor);
+    }
+    verifyLocalReconciliationPublishedAsset(asset, paths.assets, uid, [
+      0o400n,
+    ]);
+    afterAssetSealed?.(asset.logicalName);
+  }
+  let directoryDescriptor: number | undefined;
+  try {
+    directoryDescriptor = fs.openSync(paths.assets, fs.constants.O_RDONLY);
+    fs.fchmodSync(directoryDescriptor, 0o500);
+    fs.fsyncSync(directoryDescriptor);
+  } catch (error) {
+    configurationError('capture assets directory cannot be sealed', error);
+  } finally {
+    if (directoryDescriptor !== undefined) fs.closeSync(directoryDescriptor);
+  }
+  syncPublishedDirectory(paths.root);
+  validateSealedAssetsDirectory(paths.assets, uid);
+}
+
 function readTerminal(
   paths: ReturnType<typeof capturePaths>,
   uid: number,
@@ -412,7 +529,7 @@ function readTerminal(
 }> {
   validatePrivateDirectory(paths.root, uid, 'captureDirectory');
   validatePrivateDirectory(paths.staging, uid, 'captureStagingDirectory');
-  validatePrivateDirectory(paths.assets, uid, 'captureAssetsDirectory');
+  validateSealedAssetsDirectory(paths.assets, uid);
   const manifest = normalizeLocalReconciliationCaptureManifest(
     readPrivateLocalCommandFile(paths.manifest),
   );
@@ -430,7 +547,9 @@ function readTerminal(
     configurationError('capture terminal receipt is detached from manifest');
   }
   for (const asset of manifest.assets) {
-    verifyLocalReconciliationPublishedAsset(asset, paths.assets, uid);
+    verifyLocalReconciliationPublishedAsset(asset, paths.assets, uid, [
+      0o400n,
+    ]);
   }
   validateTerminalCatalog(paths, true);
   return Object.freeze({ manifest, receipt });
@@ -538,6 +657,16 @@ export function commitLocalReconciliationCapture(
   );
   validateHeadIdentity(head, intent);
   if (fs.existsSync(paths.receipt)) {
+    const manifest = normalizeLocalReconciliationCaptureManifest(
+      readPrivateLocalCommandFile(paths.manifest),
+    );
+    sealTerminalAssets(
+      paths,
+      manifest,
+      identity.uid,
+      dependencies.afterAssetSealed,
+    );
+    dependencies.afterAssetsSealed?.();
     const terminal = readTerminal(paths, identity.uid);
     if (
       terminal.receipt.preparationDigest !== intent.preparationDigest ||
@@ -585,6 +714,8 @@ export function commitLocalReconciliationCapture(
       manifest.reconciliationEvidenceDigest !==
         intent.reconciliationEvidenceDigest ||
       manifest.lineageProjectionDigest !== intent.lineage.projectionDigest ||
+      manifest.legacyBaselineSha256 !== intent.lineage.sourceSha256 ||
+      manifest.targetBaselineSha256 !== intent.lineage.targetSha256 ||
       manifest.preparedHeadDigest !== head.headDigest ||
       manifest.committedAtMs !== command.request.committedAtMs
     ) {
@@ -599,6 +730,13 @@ export function commitLocalReconciliationCapture(
       'reconciliation capture receipt',
     );
     dependencies.afterReceiptPublished?.();
+    sealTerminalAssets(
+      paths,
+      manifest,
+      identity.uid,
+      dependencies.afterAssetSealed,
+    );
+    dependencies.afterAssetsSealed?.();
     const terminal = readTerminal(paths, identity.uid);
     const terminalHead = advanceCapturedHead(
       intent,
@@ -677,7 +815,7 @@ export function commitLocalReconciliationCapture(
   const totalBytes = assets.reduce((total, asset) => total + asset.bytes, 0);
   const manifestPayload = Object.freeze({
     schema: MANIFEST_SCHEMA,
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     state: 'reconciliation_captured' as const,
     captureId: command.request.captureId,
     profile: intent.command.request.profile,
@@ -686,6 +824,8 @@ export function commitLocalReconciliationCapture(
     stoppedProofDigest: intent.stoppedProofDigest,
     reconciliationEvidenceDigest: intent.reconciliationEvidenceDigest,
     lineageProjectionDigest: intent.lineage.projectionDigest,
+    legacyBaselineSha256: intent.lineage.sourceSha256,
+    targetBaselineSha256: intent.lineage.targetSha256,
     preparedHeadDigest: head.headDigest,
     committedAtMs: command.request.committedAtMs,
     assets,
@@ -712,6 +852,13 @@ export function commitLocalReconciliationCapture(
     'reconciliation capture receipt',
   );
   dependencies.afterReceiptPublished?.();
+  sealTerminalAssets(
+    paths,
+    manifest,
+    identity.uid,
+    dependencies.afterAssetSealed,
+  );
+  dependencies.afterAssetsSealed?.();
   const terminal = readTerminal(paths, identity.uid);
   const terminalHead = advanceCapturedHead(
     intent,

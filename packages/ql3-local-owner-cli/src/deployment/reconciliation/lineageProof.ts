@@ -19,6 +19,8 @@ export interface LocalReconciliationLineageProjection {
   readonly legacyDataApplicationCommitDigest: string;
   readonly legacyDataApplicationReceiptDigest: string;
   readonly adoptedBundleDigest: string;
+  readonly sourceSha256: string;
+  readonly targetSha256: string;
   readonly recoverySha256: string;
   readonly projectionDigest: string;
 }
@@ -360,6 +362,10 @@ export function proveLocalReconciliationLineage(
       textDigest(command.request.targetDatabasePath) ||
     typeof activation.document.adoptionManifestDigest !== 'string' ||
     !DIGEST_PATTERN.test(activation.document.adoptionManifestDigest) ||
+    typeof activation.document.sourceSha256 !== 'string' ||
+    !DIGEST_PATTERN.test(activation.document.sourceSha256) ||
+    typeof activation.document.targetSha256 !== 'string' ||
+    !DIGEST_PATTERN.test(activation.document.targetSha256) ||
     typeof activation.document.recoverySha256 !== 'string' ||
     !DIGEST_PATTERN.test(activation.document.recoverySha256)
   ) {
@@ -444,6 +450,7 @@ export function proveLocalReconciliationLineage(
     adoptedBundle.document.manifestDigest !== manifest.digest ||
     adoptedBundle.document.sourcePathDigest !==
       textDigest(command.request.legacySourcePath) ||
+    adoptedBundle.document.sourceSha256 !== activation.document.sourceSha256 ||
     adoptedBundle.document.recoverySha256 !== activation.document.recoverySha256
   ) {
     configurationError('adopted bundle lineage drifted');
@@ -457,6 +464,8 @@ export function proveLocalReconciliationLineage(
     legacyDataApplicationCommitDigest: dataCommit.commitDigest,
     legacyDataApplicationReceiptDigest: dataCommit.receiptDigest,
     adoptedBundleDigest: adoptedBundle.digest,
+    sourceSha256: activation.document.sourceSha256 as string,
+    targetSha256: activation.document.targetSha256 as string,
     recoverySha256: activation.document.recoverySha256 as string,
   });
   return Object.freeze({

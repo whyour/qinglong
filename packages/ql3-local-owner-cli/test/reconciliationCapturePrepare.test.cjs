@@ -12,6 +12,9 @@ const {
   verifyLocalReconciliationCapture,
 } = require('../dist/deployment/localDeployment.js');
 const {
+  normalizeLocalReconciliationCaptureManifest,
+} = require('../dist/deployment/reconciliation/bundle.js');
+const {
   createLocalDataDirectoryApplicationCommit,
 } = require('@qinglong/local-sqlite/data-directory-application-commit');
 const {
@@ -42,6 +45,35 @@ function rootAcknowledgement() {
   return typeof process.getuid === 'function' && process.getuid() === 0;
 }
 
+const CAPTURE_ASSET_NAMES = Object.freeze({
+  'target-main': 'target.sqlite',
+  'target-wal': 'target.sqlite-wal',
+  'target-shm': 'target.sqlite-shm',
+  'target-journal': 'target.sqlite-journal',
+  'legacy-main': 'legacy.sqlite',
+  'legacy-wal': 'legacy.sqlite-wal',
+  'legacy-shm': 'legacy.sqlite-shm',
+  'legacy-journal': 'legacy.sqlite-journal',
+  'recovery-main': 'recovery.sqlite',
+});
+
+function removeFixtureRoot(root) {
+  if (!fs.existsSync(root)) return;
+  const unlock = (candidate) => {
+    const stat = fs.lstatSync(candidate);
+    if (stat.isDirectory() && !stat.isSymbolicLink()) {
+      fs.chmodSync(candidate, 0o700);
+      for (const name of fs.readdirSync(candidate)) {
+        unlock(path.join(candidate, name));
+      }
+    } else if (!stat.isSymbolicLink()) {
+      fs.chmodSync(candidate, 0o600);
+    }
+  };
+  unlock(root);
+  fs.rmSync(root, { recursive: true, force: true });
+}
+
 function fixture(
   t,
   {
@@ -54,7 +86,7 @@ function fixture(
     fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-reconciliation-capture-')),
   );
   fs.chmodSync(root, 0o700);
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  t.after(() => removeFixtureRoot(root));
   const deploymentRoot = path.join(root, 'runtime');
   const serviceRoot = path.join(deploymentRoot, 'service');
   const cutoverId = 'capture-cutover-1';
@@ -416,6 +448,7 @@ function fixture(
   };
   return {
     command,
+    activation: Object.freeze({ ...activationPayload, activationDigest }),
     deploymentRoot,
     captureRoot,
     identity,
@@ -555,6 +588,17 @@ function capturePath(state, name) {
   return path.join(state.captureRoot, state.command.request.captureId, name);
 }
 
+function captureAssetPath(state, logicalName) {
+  return capturePath(state, `assets/${CAPTURE_ASSET_NAMES[logicalName]}`);
+}
+
+function captureAssetStagePath(state, logicalName) {
+  return capturePath(
+    state,
+    `assets/.${CAPTURE_ASSET_NAMES[logicalName]}.ql3-capture-stage`,
+  );
+}
+
 test('commit captures main, sidecars and recovery then verifies without sources', (t) => {
   const state = preparedCapture(t);
   fs.writeFileSync(`${state.targetDatabasePath}.unrelated`, 'ignored\n', {
@@ -567,6 +611,9 @@ test('commit captures main, sidecars and recovery then verifies without sources'
   const manifest = JSON.parse(
     fs.readFileSync(capturePath(state, 'manifest.json'), 'utf8'),
   );
+  assert.equal(manifest.schemaVersion, 2);
+  assert.equal(manifest.legacyBaselineSha256, state.activation.sourceSha256);
+  assert.equal(manifest.targetBaselineSha256, state.activation.targetSha256);
   assert.deepEqual(
     manifest.assets.map((asset) => asset.logicalName),
     [
@@ -585,13 +632,23 @@ test('commit captures main, sidecars and recovery then verifies without sources'
   assert.equal(manifestText.includes(state.targetDatabasePath), false);
   assert.equal(manifestText.includes(state.legacySourcePath), false);
   assert.equal(
-    fs.readFileSync(capturePath(state, 'assets/target-main'), 'utf8'),
+    fs.readFileSync(captureAssetPath(state, 'target-main'), 'utf8'),
     'target-mutated\n',
   );
   assert.equal(
-    fs.readFileSync(capturePath(state, 'assets/target-wal'), 'utf8'),
+    fs.readFileSync(captureAssetPath(state, 'target-wal'), 'utf8'),
     'target-wal-facts\n',
   );
+  assert.equal(
+    fs.statSync(capturePath(state, 'assets')).mode & 0o777,
+    0o500,
+  );
+  for (const asset of manifest.assets) {
+    assert.equal(
+      fs.statSync(captureAssetPath(state, asset.logicalName)).mode & 0o777,
+      0o400,
+    );
+  }
   const head = readLocalCutoverInstanceHead(
     state.deploymentRoot,
     state.command.request.instanceId,
@@ -647,7 +704,7 @@ test('commit resumes after an asset publication crash without replacement', (t) 
       }),
     /asset crash/,
   );
-  const targetAsset = capturePath(state, 'assets/target-main');
+  const targetAsset = captureAssetPath(state, 'target-main');
   const before = fs.statSync(targetAsset, { bigint: true });
   assert.equal(fs.existsSync(capturePath(state, 'manifest.json')), false);
   const committed = commitLocalReconciliationCapture(state.commitCommand);
@@ -709,6 +766,54 @@ test('commit resumes after manifest and receipt crash windows', (t) => {
   assert.equal(resumed.state, 'reconciliation_captured');
 });
 
+test('commit converges a partially sealed terminal bundle without sources', (t) => {
+  const state = preparedCapture(t);
+  let failed = false;
+  assert.throws(
+    () =>
+      commitLocalReconciliationCapture(state.commitCommand, {
+        afterAssetSealed(logicalName) {
+          if (!failed && logicalName === 'target-main') {
+            failed = true;
+            throw new Error('seal crash');
+          }
+        },
+      }),
+    /seal crash/,
+  );
+  assert.equal(fs.existsSync(capturePath(state, 'receipt.json')), true);
+  assert.equal(
+    fs.statSync(captureAssetPath(state, 'target-main')).mode & 0o777,
+    0o400,
+  );
+  assert.equal(
+    fs.statSync(captureAssetPath(state, 'target-wal')).mode & 0o777,
+    0o600,
+  );
+  assert.equal(
+    fs.statSync(capturePath(state, 'assets')).mode & 0o777,
+    0o700,
+  );
+  fs.unlinkSync(state.targetDatabasePath);
+  fs.unlinkSync(state.legacySourcePath);
+  fs.unlinkSync(state.recoveryPath);
+  const resumed = commitLocalReconciliationCapture(state.commitCommand);
+  assert.equal(resumed.state, 'reconciliation_captured');
+  assert.equal(
+    fs.statSync(capturePath(state, 'assets')).mode & 0o777,
+    0o500,
+  );
+  const manifest = JSON.parse(
+    fs.readFileSync(capturePath(state, 'manifest.json'), 'utf8'),
+  );
+  for (const asset of manifest.assets) {
+    assert.equal(
+      fs.statSync(captureAssetPath(state, asset.logicalName)).mode & 0o777,
+      0o400,
+    );
+  }
+});
+
 test('hard-link publication replay removes only the exact retained stage', (t) => {
   const state = preparedCapture(t);
   const cleanupError = Object.assign(new Error('stage cleanup unavailable'), {
@@ -725,8 +830,8 @@ test('hard-link publication replay removes only the exact retained stage', (t) =
       }),
     /capture asset cannot be published/,
   );
-  const target = capturePath(state, 'assets/target-main');
-  const stage = capturePath(state, 'assets/.target-main.ql3-capture-stage');
+  const target = captureAssetPath(state, 'target-main');
+  const stage = captureAssetStagePath(state, 'target-main');
   const targetBefore = fs.statSync(target, { bigint: true });
   const stageBefore = fs.statSync(stage, { bigint: true });
   assert.equal(targetBefore.ino, stageBefore.ino);
@@ -794,7 +899,7 @@ test('a cleanup-resistant partial stage resumes only from its exact prefix', (t)
       }),
     /capture asset cannot be published/,
   );
-  const stage = capturePath(state, 'assets/.target-main.ql3-capture-stage');
+  const stage = captureAssetStagePath(state, 'target-main');
   assert.equal(fs.statSync(stage).size, 4);
   assert.equal(
     fs
@@ -864,10 +969,26 @@ test('terminal verify rejects asset drift and CLI output remains content-free', 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.includes(state.captureRoot), false);
   assert.equal(result.stdout.includes(state.targetDatabasePath), false);
-  fs.writeFileSync(capturePath(state, 'assets/target-main'), 'drift\n');
+  const targetAsset = captureAssetPath(state, 'target-main');
+  fs.chmodSync(targetAsset, 0o600);
+  fs.writeFileSync(targetAsset, 'drift\n');
+  fs.chmodSync(targetAsset, 0o400);
   assert.throws(
     () => verifyLocalReconciliationCapture(verifyCommand),
     /asset drifted/,
+  );
+});
+
+test('capture manifest schema v1 is rejected instead of silently upgraded', (t) => {
+  const state = preparedCapture(t);
+  commitLocalReconciliationCapture(state.commitCommand);
+  const manifest = JSON.parse(
+    fs.readFileSync(capturePath(state, 'manifest.json'), 'utf8'),
+  );
+  manifest.schemaVersion = 1;
+  assert.throws(
+    () => normalizeLocalReconciliationCaptureManifest(manifest),
+    /reconciliation capture manifest (?:drifted|schemaVersion must be 2)/,
   );
 });
 
@@ -931,7 +1052,7 @@ test(
     });
     const committed = commitLocalReconciliationCapture(state.commitCommand);
     assert.equal(
-      fs.readFileSync(capturePath(state, 'assets/target-main'), 'utf8'),
+      fs.readFileSync(captureAssetPath(state, 'target-main'), 'utf8'),
       'target-docker-mutated\n',
     );
     const verified = verifyLocalReconciliationCapture({

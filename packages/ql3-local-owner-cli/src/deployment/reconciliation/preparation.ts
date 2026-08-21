@@ -123,6 +123,8 @@ export function normalizeLocalReconciliationCaptureIntent(
       'legacyDataApplicationReceiptDigest',
       'projectionDigest',
       'recoverySha256',
+      'sourceSha256',
+      'targetSha256',
     ],
     'reconciliation lineage projection',
   );

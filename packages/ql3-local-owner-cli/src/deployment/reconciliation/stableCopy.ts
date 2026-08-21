@@ -59,6 +59,26 @@ export interface LocalReconciliationStableCopyDependencies {
   readonly unlink?: (filePath: string) => void;
 }
 
+const CAPTURE_ASSET_FILE_NAMES: Readonly<
+  Record<LocalReconciliationCaptureSourceAsset['logicalName'], string>
+> = Object.freeze({
+  'target-main': 'target.sqlite',
+  'target-wal': 'target.sqlite-wal',
+  'target-shm': 'target.sqlite-shm',
+  'target-journal': 'target.sqlite-journal',
+  'legacy-main': 'legacy.sqlite',
+  'legacy-wal': 'legacy.sqlite-wal',
+  'legacy-shm': 'legacy.sqlite-shm',
+  'legacy-journal': 'legacy.sqlite-journal',
+  'recovery-main': 'recovery.sqlite',
+});
+
+export function localReconciliationCaptureAssetFileName(
+  logicalName: LocalReconciliationCaptureSourceAsset['logicalName'],
+): string {
+  return CAPTURE_ASSET_FILE_NAMES[logicalName];
+}
+
 function configurationError(message: string, cause?: unknown): never {
   throw new LocalDeploymentConfigurationError(message, { cause });
 }
@@ -226,12 +246,13 @@ function validateOutputDescriptor(
   descriptor: number,
   uid: number,
   allowedLinks: readonly bigint[],
+  allowedModes: readonly bigint[] = [0o600n],
 ): fs.BigIntStats {
   const stat = fs.fstatSync(descriptor, { bigint: true });
   if (
     !stat.isFile() ||
     stat.uid !== BigInt(uid) ||
-    (stat.mode & 0o777n) !== 0o600n ||
+    !allowedModes.includes(stat.mode & 0o777n) ||
     !allowedLinks.includes(stat.nlink) ||
     stat.size > BigInt(Number.MAX_SAFE_INTEGER)
   ) {
@@ -247,6 +268,7 @@ function verifyPublishedAsset(
   expectedSha256: string,
   buffer: Buffer,
   allowedLinks: readonly bigint[] = [1n],
+  allowedModes: readonly bigint[] = [0o600n],
 ): void {
   let descriptor: number | undefined;
   try {
@@ -255,7 +277,12 @@ function verifyPublishedAsset(
       targetPath,
       fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0),
     );
-    const opened = validateOutputDescriptor(descriptor, uid, allowedLinks);
+    const opened = validateOutputDescriptor(
+      descriptor,
+      uid,
+      allowedLinks,
+      allowedModes,
+    );
     if (
       pathStat.isSymbolicLink() ||
       !sameStat(pathStat, opened) ||
@@ -314,10 +341,13 @@ export function copyLocalReconciliationAsset(
   uid: number,
   dependencies: LocalReconciliationStableCopyDependencies = {},
 ): Readonly<LocalReconciliationStableCopyResult> {
-  const targetPath = path.join(assetsDirectory, asset.logicalName);
+  const publishedName = localReconciliationCaptureAssetFileName(
+    asset.logicalName,
+  );
+  const targetPath = path.join(assetsDirectory, publishedName);
   const stagePath = path.join(
     assetsDirectory,
-    `.${asset.logicalName}.ql3-capture-stage`,
+    `.${publishedName}.ql3-capture-stage`,
   );
   const buffer = Buffer.allocUnsafe(COPY_BUFFER_BYTES);
   const unlink = dependencies.unlink ?? fs.unlinkSync;
@@ -535,15 +565,21 @@ export function verifyLocalReconciliationPublishedAsset(
   asset: Readonly<LocalReconciliationCapturedAsset>,
   assetsDirectory: string,
   uid: number,
+  allowedModes: readonly bigint[] = [0o600n],
 ): void {
   const buffer = Buffer.allocUnsafe(COPY_BUFFER_BYTES);
   try {
     verifyPublishedAsset(
-      path.join(assetsDirectory, asset.logicalName),
+      path.join(
+        assetsDirectory,
+        localReconciliationCaptureAssetFileName(asset.logicalName),
+      ),
       uid,
       asset.bytes,
       asset.sha256,
       buffer,
+      [1n],
+      allowedModes,
     );
   } finally {
     buffer.fill(0);
