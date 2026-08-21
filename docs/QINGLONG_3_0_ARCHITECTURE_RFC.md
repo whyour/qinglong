@@ -11,6 +11,17 @@
 
 最新增量证据（2026-08-21）：
 
+- D-390/ADR-0483（契约已冻结，待实现）：`reconciliation_captured` 只证明原始字节可恢复，不授予自动回灌。下一切片先把 capture
+  manifest/receipt 升为 v2：逻辑名保持内容无关，payload 改用 SQLite 可识别的固定 `target.sqlite* / legacy.sqlite* /
+  recovery.sqlite` 名称，terminal asset/directory 收敛为 `0400/0500`，并把 activation source/target baseline SHA-256 纳入 lineage。
+  main-only 使用 immutable readonly；只有 WAL+SHM 完整配对且无 journal 时使用普通 readonly，打开前后必须重验全部 asset；hot
+  journal、不完整 sidecar 或漂移不执行 SQLite recovery，直接 `manual_required`。既有 Local Owner 增加独立
+  `reconciliation.plan.prepare|commit|verify`，以 `reconciliation_captured → reconciliation_plan_prepared → reconciliation_planned`
+  CAS fence 发布固定八领域的 bounded count/digest/disposition plan。plan 不保存 row value、command、Secret、credential、日志或业务
+  标识，不产生 `import_ready/rollback_ready/legacy_ready`；unknown schema、不可逆 Run/history、Secret custody、target-only Package/AI 与
+  未映射 Legacy facts 必须保守。实现继续进入 `deployment/reconciliation/sealed-bundle|planning/`，单 handle、64 KiB builder、Edge/
+  Standalone 2/8 MiB cache，不新增 package/dependency/binary/daemon 或 Local SQLite mutation authority import。本条在 Linux/Docker
+  readonly hash-stability、crash replay、完整 package/backend、架构/release 与十四档 artifact 门完成前保持 Proposed。
 - D-389/ADR-0482（已接受）：target stopped 后的 `reconciliation_required` 不能直接逆迁移或覆盖 2.x source；既有 Local Owner
   已实现独立 `reconciliation.capture.prepare|commit|verify`，只允许 exact stopped reconciliation head，以 instance CAS 建立唯一
   capture fence，并把 target main/sidecars、Legacy source main/sidecars、activation recovery 与内容无关 lineage 以固定 64 KiB
