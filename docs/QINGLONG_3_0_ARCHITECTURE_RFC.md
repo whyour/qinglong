@@ -11,6 +11,16 @@
 
 最新增量证据（2026-08-21）：
 
+- D-389/ADR-0482（契约已冻结，待实现）：target stopped 后的 `reconciliation_required` 不能直接逆迁移或覆盖 2.x source；
+  3.0 Run/TaskDefinition/Trigger/Secret/Plugin Package/AI facts 没有通用无损 Legacy 映射。下一切片先提供独立
+  `reconciliation.capture.prepare|commit|verify`，只允许 exact stopped reconciliation head，以 instance CAS 建立唯一 capture
+  fence，并把 target main/sidecars、Legacy source main/sidecars、activation recovery 与内容无关 lineage 以 64 KiB buffer
+  字节精确复制到 operator 显式提供的私有 capture root。payload、manifest、receipt 逐级 no-replace/fsync 发布，ENOSPC、partial
+  write、stage/link/manifest/receipt/head 和 commit-response-loss 均由同命令 exact replay；verify 完全只读。bundle 不复制 keyring/
+  pepper，不打开 SQLite/checkpoint，不调用 Docker/init/socket/network，也不授予 import、rollback、Legacy start 或 target restart。
+  实现必须进入既有 Local Owner `deployment/reconciliation/`，不新增 package、dependency、binary 或常驻对象。后续数据域 diff、冲突
+  裁决和受审回灌必须消费 exact bundle/head 并另立 ADR；本条在实现、Linux/Docker rehearsal、完整 package/backend、架构、release 与
+  十四档 artifact 门完成前保持 Proposed。
 - D-388/ADR-0481（已接受）：D-387 committed data receipt 只作为启动前置事实，不获得 activation/rollback authority。
   adopted-only Application v4 在 signal、SQLite、Secret、Plugin、AI 前以 no-follow stable descriptor 验证
   `commitPath/expectedCommitDigest/expectedReceiptDigest`；独立 `local.deployment.adopted.prepare|verify` 已覆盖 systemd、OpenRC、
@@ -46,7 +56,8 @@
   `4,515,571 / 4,515,703` bytes、514 files、142 modules，MCP `7,337,910 / 7,338,018` bytes、805 files、228 modules，均未放宽预算。
   GitNexus staged change audit 只允许本切片的预期存储/readiness/application 影响；`next` 相对 `develop` 的全分支 CRITICAL 差异另作为 3.0
   孵化累计风险保留，不能归因于 D-387。本切片不改变 PostgreSQL schema、ACL、role、Pool、连接或 HA 拓扑，因此不重新占有 PostgreSQL HA
-  证明。D-388 应把 committed receipt 接入 systemd/OpenRC/Compose deployment lineage。
+  证明。D-388 已把 committed receipt 接入 systemd/OpenRC/Compose deployment lineage；target 产生 3.0 写入后的停止态保全由
+  D-389 继续处理。
 - D-386/ADR-0479（已接受）：把 D-385 的 `config/db/ssh.d` 私有 snapshot 转成 no-replace、版本化、Project-bound 的 prepared model，
   新增 exact `local-data-directory.adoption.transform|transform.verify`。`config.sh` 永不执行，只把简单非空 export 写入独立
   `qinglong3-local-secret-value` 文件，非 export setting 退役，复杂/重复行转人工复核；Keyv 以 read-only defensive SQLite 和 reviewed
