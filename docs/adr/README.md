@@ -487,6 +487,7 @@
 | [ADR-0481](./ADR-0481-committed-legacy-data-deployment-lineage.md)                                        | Committed Legacy Data Receipt 的本机部署 Lineage                                                                                                                                                    | Accepted |
 | [ADR-0482](./ADR-0482-stopped-local-sqlite-reconciliation-recovery-bundle.md)                             | 停止态 Local SQLite Reconciliation Recovery Bundle                                                                                                                                                   | Accepted |
 | [ADR-0483](./ADR-0483-sealed-reconciliation-bundle-domain-plan.md)                                    | 密封 Reconciliation Bundle 的有界数据域计划                                                                                                                                                           | Accepted |
+| [ADR-0484](./ADR-0484-private-reconciliation-diagnostics-and-reviewed-decision.md)                  | 私有 Reconciliation 诊断与受认证人工裁决                                                                                                                                                                  | Proposed（D-391 契约冻结） |
 
 ## 规则
 
