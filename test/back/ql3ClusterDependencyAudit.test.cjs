@@ -1914,6 +1914,110 @@ test('confines adoption and Package command authorities to owner CLI subpaths', 
   );
 });
 
+test('confines data-directory application authority to exact reviewed owners', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-data-directory-application-boundary-'),
+  );
+  const ownerApplicationDirectory = path.join(
+    root,
+    'packages/ql3-local-owner-cli/src/lifecycle/data-directory-adoption/application',
+  );
+  const adminAdoptionDirectory = path.join(
+    root,
+    'packages/ql3-local-admin/src/data-directory-adoption',
+  );
+  fs.mkdirSync(ownerApplicationDirectory, { recursive: true });
+  fs.mkdirSync(adminAdoptionDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(ownerApplicationDirectory, 'application.ts'),
+    [
+      "import { application } from '@qinglong/local-admin/data-directory-adoption';",
+      "import { secrets } from '@qinglong/local-secret';",
+      "import { authenticated } from '@qinglong/local-owner-console/authenticated-command';",
+      "import { bootstrap } from '@qinglong/local-sqlite/bootstrap';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(ownerApplicationDirectory, 'cleanup.ts'),
+    "import { cleanup } from '@qinglong/local-sqlite/data-directory-adoption';",
+  );
+  fs.writeFileSync(
+    path.join(ownerApplicationDirectory, 'neighbor.ts'),
+    [
+      "import { application } from '@qinglong/local-admin/data-directory-adoption';",
+      "import { secrets } from '@qinglong/local-secret';",
+      "import { cleanup } from '@qinglong/local-sqlite/data-directory-adoption';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(adminAdoptionDirectory, 'dataDirectoryAdoption.ts'),
+    [
+      "import { database } from '@qinglong/local-sqlite/data-directory-adoption';",
+      "import type { secret } from '@qinglong/runtime-core/local-secret';",
+      "import { policy } from '@qinglong/runtime-core/project-policy';",
+      "import type { decision } from '@qinglong/runtime-core/security';",
+      "import type { audit } from '@qinglong/runtime-core/security-audit';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(adminAdoptionDirectory, 'neighbor.ts'),
+    [
+      "import { database } from '@qinglong/local-sqlite/data-directory-adoption';",
+      "import type { secret } from '@qinglong/runtime-core/local-secret';",
+    ].join('\n'),
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const ownerFindings = [];
+  auditSourceImports(root, 'packages/ql3-local-owner-cli', ownerFindings);
+  assert.deepEqual(
+    ownerFindings.map(({ code, file, specifier }) => ({
+      code,
+      file,
+      specifier,
+    })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/lifecycle/data-directory-adoption/application/neighbor.ts',
+        specifier: '@qinglong/local-admin/data-directory-adoption',
+      },
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/lifecycle/data-directory-adoption/application/neighbor.ts',
+        specifier: '@qinglong/local-secret',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/lifecycle/data-directory-adoption/application/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/data-directory-adoption',
+      },
+    ],
+  );
+
+  const adminFindings = [];
+  auditSourceImports(root, 'packages/ql3-local-admin', adminFindings);
+  assert.deepEqual(
+    adminFindings.map(({ code, file, specifier }) => ({
+      code,
+      file,
+      specifier,
+    })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADMIN_SQLITE_ENTRYPOINT',
+        file: 'packages/ql3-local-admin/src/data-directory-adoption/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/data-directory-adoption',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADMIN_RUNTIME_CORE_ENTRYPOINT',
+        file: 'packages/ql3-local-admin/src/data-directory-adoption/neighbor.ts',
+        specifier: '@qinglong/runtime-core/local-secret',
+      },
+    ],
+  );
+});
+
 test('confines fresh setup authority to the reviewed owner CLI subpath', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-setup-boundary-'));
   const sourceDirectory = path.join(root, 'packages/ql3-local-owner-cli/src');

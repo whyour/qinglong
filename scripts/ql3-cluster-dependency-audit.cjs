@@ -1769,6 +1769,20 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/lifecycle/data-directory-adoption/application/application.ts' &&
+          [
+            '@qinglong/local-admin/data-directory-adoption',
+            '@qinglong/local-owner-console/authenticated-command',
+            '@qinglong/local-sqlite/bootstrap',
+          ].includes(specifier)
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
+            'src/lifecycle/data-directory-adoption/application/cleanup.ts' &&
+          specifier === '@qinglong/local-sqlite/data-directory-adoption'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/plugin-package/pluginPackageCommand.ts' &&
           [
             '@qinglong/local-admin/package-lifecycle',
@@ -2094,6 +2108,9 @@ function auditSourceImports(root, packagePath, findings) {
             'src/legacy-adoption/legacyCrontabPublisher.ts' &&
             specifier === '@qinglong/local-sqlite/adoption') ||
           (path.relative(packageDirectory, filePath) ===
+            'src/data-directory-adoption/dataDirectoryAdoption.ts' &&
+            specifier === '@qinglong/local-sqlite/data-directory-adoption') ||
+          (path.relative(packageDirectory, filePath) ===
             'src/adopted-profile/localAdoptedProfile.ts' &&
             specifier === '@qinglong/local-sqlite/profile') ||
           (path.relative(packageDirectory, filePath) ===
@@ -2223,6 +2240,14 @@ function auditSourceImports(root, packagePath, findings) {
             ].includes(specifier)) ||
           (path.relative(packageDirectory, filePath) ===
             'src/legacy-adoption/legacyCrontabPublisher.ts' &&
+            [
+              '@qinglong/runtime-core/local-secret',
+              '@qinglong/runtime-core/project-policy',
+              '@qinglong/runtime-core/security',
+              '@qinglong/runtime-core/security-audit',
+            ].includes(specifier)) ||
+          (path.relative(packageDirectory, filePath) ===
+            'src/data-directory-adoption/dataDirectoryAdoption.ts' &&
             [
               '@qinglong/runtime-core/local-secret',
               '@qinglong/runtime-core/project-policy',
@@ -2809,6 +2834,14 @@ function auditSourceImports(root, packagePath, findings) {
           '@qinglong/runtime-core/security',
           '@qinglong/runtime-core/security-audit',
         ].includes(specifier)
+      ) {
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-owner-cli' &&
+        path.relative(packageDirectory, filePath) ===
+          'src/lifecycle/data-directory-adoption/application/application.ts' &&
+        specifier === '@qinglong/local-secret'
       ) {
         continue;
       }

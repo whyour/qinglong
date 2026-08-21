@@ -58,6 +58,22 @@ interface SecretImportEntry {
   readonly valueDigest: string;
 }
 
+export interface VerifiedTransformationSecret extends SecretImportEntry {
+  readonly plaintext: string;
+}
+
+export interface VerifiedTransformationModel {
+  readonly model: Readonly<{
+    schema: 'qinglong/legacy-data-directory-applied-model@v1';
+    activation: 'disabled';
+    config: Readonly<Record<string, unknown>>;
+    keyv: Readonly<Record<string, unknown>>;
+    ssh: Readonly<Record<string, unknown>>;
+    manualReview: Readonly<Record<string, unknown>>;
+  }>;
+  readonly secrets: readonly Readonly<VerifiedTransformationSecret>[];
+}
+
 function exactKeys(value: object, expected: readonly string[]): boolean {
   const actual = Object.keys(value).sort();
   const canonical = [...expected].sort();
@@ -252,7 +268,7 @@ export function verifyTransformationModel(options: {
   readonly projectId: string;
   readonly profile: 'edge' | 'standalone';
   readonly expected: Readonly<TransformationModelEvidence>;
-}): void {
+}): Readonly<VerifiedTransformationModel> {
   if (
     JSON.stringify(sortedNames(options.modelRoot)) !==
     JSON.stringify(
@@ -270,17 +286,17 @@ export function verifyTransformationModel(options: {
       'transformation model root contains unexpected entries',
     );
   }
-  assertSchemaFile(
+  const config = assertSchemaFile(
     path.join(options.modelRoot, 'config.json'),
     options.uid,
     'qinglong/legacy-config-transformation@v1',
   );
-  assertSchemaFile(
+  const keyv = assertSchemaFile(
     path.join(options.modelRoot, 'keyv.json'),
     options.uid,
     'qinglong/legacy-keyv-transformation@v1',
   );
-  assertSchemaFile(
+  const ssh = assertSchemaFile(
     path.join(options.modelRoot, 'ssh.json'),
     options.uid,
     'qinglong/legacy-ssh-transformation@v1',
@@ -329,6 +345,7 @@ export function verifyTransformationModel(options: {
   }
   const expectedFiles: string[] = [];
   const targets = new Set<string>();
+  const secrets: VerifiedTransformationSecret[] = [];
   let environmentSecrets = 0;
   let sshSecrets = 0;
   for (const value of candidate.imports) {
@@ -353,7 +370,13 @@ export function verifyTransformationModel(options: {
     if (
       (entry.kind !== 'environment' && entry.kind !== 'ssh_private_key') ||
       typeof entry.sourceName !== 'string' ||
+      entry.sourceName.length < 1 ||
+      Buffer.byteLength(entry.sourceName, 'utf8') > 255 ||
+      /[\u0000-\u001f\u007f]/.test(entry.sourceName) ||
       typeof entry.targetName !== 'string' ||
+      entry.targetName.length < 1 ||
+      Buffer.byteLength(entry.targetName, 'utf8') > 128 ||
+      /[\u0000-\u001f\u007f]/.test(entry.targetName) ||
       entry.expectedCurrentVersion !== 0 ||
       typeof entry.valueFile !== 'string' ||
       !SECRET_FILE_PATTERN.test(entry.valueFile) ||
@@ -396,6 +419,17 @@ export function verifyTransformationModel(options: {
     }
     if (entry.kind === 'environment') environmentSecrets += 1;
     else sshSecrets += 1;
+    secrets.push(
+      Object.freeze({
+        kind: entry.kind,
+        sourceName: entry.sourceName,
+        targetName: entry.targetName,
+        expectedCurrentVersion: 0,
+        valueFile: entry.valueFile,
+        valueDigest: entry.valueDigest,
+        plaintext: secretValue.value,
+      }) as Readonly<VerifiedTransformationSecret>,
+    );
   }
   expectedFiles.sort();
   if (
@@ -427,4 +461,15 @@ export function verifyTransformationModel(options: {
       'transformation model no longer matches the manifest',
     );
   }
+  return Object.freeze({
+    model: Object.freeze({
+      schema: 'qinglong/legacy-data-directory-applied-model@v1' as const,
+      activation: 'disabled' as const,
+      config: Object.freeze(config),
+      keyv: Object.freeze(keyv),
+      ssh: Object.freeze(ssh),
+      manualReview: Object.freeze(manual),
+    }),
+    secrets: Object.freeze(secrets),
+  });
 }

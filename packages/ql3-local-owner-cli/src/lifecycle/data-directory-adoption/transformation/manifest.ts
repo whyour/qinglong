@@ -13,6 +13,7 @@ import {
   type LocalDataDirectoryTransformationManifest,
   type TransformationModelEvidence,
   type TransformationSourceEvidence,
+  type VerifiedTransformationModel,
 } from './model';
 
 export const TRANSFORMATION_MANIFEST_NAME = 'manifest.json';
@@ -210,6 +211,54 @@ export function verifyStaticTransformation(options: {
   readonly sourceStageManifestDigest: string;
   readonly expectedTransformationDigest: string;
 }): Readonly<LocalDataDirectoryTransformationManifest> {
+  return loadStaticTransformation(options).manifest;
+}
+
+export function verifyTransformationManifestBinding(options: {
+  readonly authority: Readonly<TransformationAuthority>;
+  readonly profile: 'edge' | 'standalone';
+  readonly projectId: string;
+  readonly sourceStageManifestDigest: string;
+  readonly expectedTransformationDigest: string;
+}): Readonly<LocalDataDirectoryTransformationManifest> {
+  const before = assertPrivateDirectory(
+    options.authority.transformationRoot,
+    options.authority.uid,
+    'transformationRoot',
+  );
+  const manifest = readManifest(
+    options.authority.transformationRoot,
+    options.authority.uid,
+  );
+  if (
+    manifest.transformationDigest !== options.expectedTransformationDigest ||
+    manifest.profile !== options.profile ||
+    manifest.projectIdDigest !== sha256Text(options.projectId) ||
+    manifest.sourceStageManifestDigest !== options.sourceStageManifestDigest ||
+    manifest.transformationRootPathDigest !==
+      sha256Text(options.authority.transformationRoot) ||
+    !sameStat(
+      before,
+      fs.lstatSync(options.authority.transformationRoot, { bigint: true }),
+    )
+  ) {
+    throw new LocalDataDirectoryAdoptionConfigurationError(
+      'transformation manifest authority binding is invalid',
+    );
+  }
+  return manifest;
+}
+
+export function loadStaticTransformation(options: {
+  readonly authority: Readonly<TransformationAuthority>;
+  readonly profile: 'edge' | 'standalone';
+  readonly projectId: string;
+  readonly sourceStageManifestDigest: string;
+  readonly expectedTransformationDigest: string;
+}): Readonly<{
+  manifest: Readonly<LocalDataDirectoryTransformationManifest>;
+  prepared: Readonly<VerifiedTransformationModel>;
+}> {
   const before = assertPrivateDirectory(
     options.authority.transformationRoot,
     options.authority.uid,
@@ -239,7 +288,7 @@ export function verifyStaticTransformation(options: {
       'transformation manifest authority binding is invalid',
     );
   }
-  verifyTransformationModel({
+  const prepared = verifyTransformationModel({
     modelRoot: path.join(options.authority.transformationRoot, 'model'),
     uid: options.authority.uid,
     projectId: options.projectId,
@@ -256,5 +305,5 @@ export function verifyStaticTransformation(options: {
       'transformation root changed during verification',
     );
   }
-  return manifest;
+  return Object.freeze({ manifest, prepared });
 }

@@ -222,17 +222,90 @@ Secret 明文，必须按高敏迁移材料保护，不能写入日志、提交 
 成功返回 `status=verified`，evidence 应与 transform 完全相同。verify 会在目标校验前后重新验证 D-385 staging、当前 2.x source 和 SQLite
 activation，并检查目标 exact 文件集、私有 mode、Project/profile/path binding、Secret value digest 和完整模型树摘要。
 
-## 10. 崩溃残留与恢复
+## 10. 受认证提交 prepared model
+
+只有 transform 返回 `assessment=ready`、transform.verify 成功，且目标 Project 已存在 active Owner/Admin RoleBinding 时才能 apply。先准备：
+
+- deployment root 内 `0700` 的 Owner pepper keyring；
+- deployment root 内 `0600` 的 Owner credential presentation；
+- deployment root 内 `0600` 的 Local Secret keyring；
+- 两个不同的 UUID v4：`mutationId` 与失败审计 `failureAuditEventId`。
+
+credential token 和 Secret key material 不写入 command JSON。提交命令是在 transform.verify options 上增加以下 authority：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "local-data-directory.adoption.apply",
+  "options": {
+    "deploymentRoot": "/opt/qinglong3/adoption",
+    "dataRoot": "/opt/qinglong/data",
+    "stagingRoot": "/opt/qinglong3/adoption/staging/reviewed-data",
+    "transformationRoot": "/opt/qinglong3/adoption/transformations/reviewed-data-v1",
+    "projectId": "<target-project-id>",
+    "profile": "edge",
+    "expectedManifestDigest": "<64-hex-directory-manifest-digest>",
+    "expectedTransformationDigest": "<64-hex-transformation-digest>",
+    "ownerPepperKeyringDirectory": "/opt/qinglong3/adoption/owner-keys",
+    "credentialFilePath": "/opt/qinglong3/adoption/owner-credential.json",
+    "secretKeyringPath": "/opt/qinglong3/adoption/local-secret-keyring.json",
+    "mutationId": "<uuid-v4>",
+    "failureAuditEventId": "<different-uuid-v4>",
+    "requestId": "legacy-data-apply-20260821",
+    "sqlite": {
+      "sourcePath": "/opt/qinglong/data/db/database.sqlite",
+      "targetPath": "/opt/qinglong3/adoption/sqlite/qinglong3.sqlite",
+      "recoveryPath": "/opt/qinglong3/adoption/sqlite/database.pre-ql3.sqlite",
+      "manifestPath": "/opt/qinglong3/adoption/sqlite/adoption.json",
+      "activationPath": "/opt/qinglong3/adoption/sqlite/activation.json",
+      "expectedActivationDigest": "<64-hex-sqlite-activation-digest>"
+    }
+  }
+}
+```
+
+apply 会以 Owner credential 建立强认证，要求目标 Project 的 `secret.manage`，并在一个 SQLite `BEGIN IMMEDIATE` 中提交所有加密 Secret、
+逐项 `secret.create` 审计、父 `legacy-data.apply` 审计、disabled model 和 canonical receipt。任何一个目标 Secret 已存在都会回滚整个批次。
+成功返回 `status=committed`、`databaseStatus=inserted` 和低敏 digest/count evidence，不返回 Secret 名称、Project ID 或明文。
+
+成功后 transformation root 只剩 `manifest.json` 与 `commit.json`；`model/` 和其中的明文文件已逻辑覆盖并删除。结果固定声明
+`physicalErasureGuaranteed=false`：闪存 FTL、CoW、快照或备份可能保留旧块。需要介质级保证时应使用加密卷并销毁卷密钥或执行设备级擦除。
+
+apply 只把模型持久化为 `activation=disabled`，不会启用 SSH、执行配置、启动任务或切换服务。
+
+## 11. 校验 committed application
+
+保存 apply 返回的 `receiptDigest`。将原命令 operation 改为 `local-data-directory.adoption.apply.verify`，并在 options 增加：
+
+```json
+{
+  "expectedReceiptDigest": "<64-hex-receipt-digest>"
+}
+```
+
+verify 使用相同强认证和 exact mutation，读取 durable receipt，验证 transformation manifest 与最终 `commit.json`，但不修复中间状态。成功返回
+`status=verified`、`databaseStatus=existing`。receipt、commit、Project/profile/transformation 或 root 文件集有任何漂移都会失败关闭。
+
+## 12. 崩溃残留与恢复
 
 stage 和 transform 都在创建目标根后立即写入 `.incomplete`。只有 payload/model 和 `manifest.json` 都持久化且静态校验通过后才删除。
-命令失败或进程崩溃后：
+这些阶段失败或进程崩溃后：
 
 - 不要直接把残留目录当作恢复资产；
 - 不要在原路径重试，stage/transform 会 no-replace 拒绝；
 - 先保存现场用于诊断，再由 operator 显式移走残留目录，并使用一个新的空路径重试；
 - verify 遇到 `.incomplete`、额外文件或缺失文件一律失败关闭。
 
-## 11. 常见失败
+apply 的数据库 COMMIT 是逻辑提交点。COMMIT 后清理使用 `.commit-incomplete` 和 `.reclaiming-model`。若 apply 失败且 transformation root 出现
+这些条目：
+
+- 不要重新 transform，也不要手工删除 marker/model；
+- 查询错误和目标数据库 readiness，保留完整诊断现场；
+- 使用完全相同的 command、mutation ID 和 digest 重放 `local-data-directory.adoption.apply`；
+- exact replay 从 durable receipt 继续回收 model 并重建同一 `commit.json`，不会再次创建 Secret；
+- 未知文件、marker 漂移、双 model 或 receipt 不一致必须人工调查，不能用 apply.verify 或手改文件绕过。
+
+## 13. 常见失败
 
 - 根目录或条目 group/world 可写：修正 ownership/permission 后重新盘点；
 - symlink、硬链接或特殊文件：保留现场，确认来源和目标后人工处置；盘点不会跟随或读取；
@@ -246,16 +319,22 @@ stage 和 transform 都在创建目标根后立即写入 `.incomplete`。只有 
 - Keyv schema、row 或字节超限：不要把数据库当 JSON dump 绕过，先确认版本和未知数据归属；
 - `manual_required`：从 D-385 staging 审核相应原始输入；不要执行旧 shell、复用 `authInfo` 或启用旧 SSH config；
 - transform verify drift：停止后续 apply，保留 D-385 staging 和 transformation root，重新建立新的版本化转换路径。
+- credential rejected：核对 credential presentation、pepper keyring、有效期和目标数据库绑定，不要把 token 填进 command JSON；
+- `APPLICATION_FORBIDDEN`：当前主体不是目标 Project 的 active owner/admin；通过正式 Policy 管理流程修复 RoleBinding 后使用新失败审计 ID重试；
+- `ADOPTION_CONFLICT`：目标 Secret、mutation 或 transformation 已存在不一致事实；批次已回滚，禁止删除现有 Secret 强行导入；
+- apply 在数据库 COMMIT 后清理失败：重放完全相同的 apply；不要生成新 mutation，否则会与 transformation 唯一约束冲突；
+- apply.verify 报终态不完整：它不会恢复；改为重放原 apply。
 
-## 12. 当前边界
+## 14. 当前边界
 
-本流程已经提供 inspect、私有 stage、版本化 transform 和两级稳定 verify。它仍不：
+本流程已经提供 inspect、私有 stage、版本化 transform、受认证原子 apply、崩溃恢复和三级稳定 verify。它仍不：
 
 - 删除或修改任何源资产；
-- 把 prepared Secret/settings/SSH binding 写入或激活到 3.0 目标数据库；
+- 激活已提交的 settings/SSH binding、启动任务或切换服务；
 - 把历史日志/备份复制到默认目标，或复用跨架构 repo/dependency cache；
 - 授权 service-manager/Compose cutover 或 Legacy rollback；
 - 证明固定物理路由器/NAS 上的耗时、RSS、I/O、磁盘峰值和断电恢复。
 
-即使 transform 返回 `status=prepared` 且 transform.verify 返回 `status=verified`，仍不是 apply 或 cutover 授权。继续保留原始 2.x
-data directory、SQLite recovery、D-385 staging 和两份 manifest，等待受认证 apply/commit 与部署 lineage 完成。
+apply 成功只证明目标数据库中的 encrypted Secret、disabled model、audit 和 receipt 原子一致，并且 prepared 明文文件已逻辑回收；它仍不是
+cutover 或 activation 授权。继续保留原始 2.x data directory、SQLite recovery、D-385 staging、manifest 和 `commit.json`，直到独立部署
+lineage 与回滚门完成。

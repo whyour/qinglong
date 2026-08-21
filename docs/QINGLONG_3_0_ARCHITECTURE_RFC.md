@@ -11,6 +11,26 @@
 
 最新增量证据（2026-08-21）：
 
+- D-387/ADR-0480（已接受）：把 D-386 prepared model 推进为受认证、Project-scoped、可审计且可恢复的原子 application。
+  既有 `ql3-adoption` 增加 exact `local-data-directory.adoption.apply|apply.verify`；Owner credential 通过独立短生命周期 SQLite handle 建立
+  `local_data_adoption` 强认证并要求目标 Project 的 `secret.manage`，publisher 在 `BEGIN IMMEDIATE` 内再次复验 credential、Project 与
+  RoleBinding fence。SQLite contract v50 的 `0099/0100` 增加父 adoption ledger、逐 Secret binding、trigger、typed schema、readiness
+  relation 和 `legacy_data_directory_adoption=1` capability；所有 AES-256-GCM Secret envelope、逐项 `secret.create` audit、父
+  `legacy-data.apply` audit、disabled model 与 canonical receipt 在一个事务提交，任一目标冲突整批回滚。DB COMMIT 是逻辑提交点；随后
+  `.commit-incomplete → model rename 为 .reclaiming-model → Secret 文件覆盖/fsync/unlink → content-free commit.json`，exact apply replay
+  可从 durable receipt 收敛 COMMIT-response-loss 和清理中断，`apply.verify` 只验证完整终态。最终明确
+  `physicalErasureGuaranteed=false`，不把闪存/CoW overwrite 冒充介质擦除，也不激活配置、SSH、Task 或 service cutover。实现内聚在既有
+  Local Owner/Admin/SQLite 的 data-directory 子目录，不新增 package、依赖、binary、daemon、listener、timer、watcher、网络或常驻资源；
+  Edge/Standalone 继续使用 128/512 Secret 上限。focused data-directory `13/13`、Local SQLite `236/236`、Local Owner
+  `208 total / 203 pass / 5 conditional skip / 0 fail` 与 backend `1,535 total / 1,533 pass / 2 conditional skip / 0 fail` 已通过，覆盖解密一致、
+  stdout 脱敏、exact replay/verify、renamed-model 崩溃恢复、第二个 Secret 冲突的整批回滚和 viewer 拒绝零发布。18-package clean build/逐包测试、
+  schema readiness v50/100 migrations/83 tables、八项架构审计、本地镜像审计和十四档 artifact audit 全 compatible；workspace 仍为 18 packages，
+  `singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为 `131 source / 130 nested / 1 root binary entry`。基础 Edge/Standalone
+  `2,611,978 / 2,612,056` bytes、319 files、58 modules，Adopted `2,831,713 / 2,831,836` bytes、339 files、59 modules，Application+AI
+  `4,515,571 / 4,515,703` bytes、514 files、142 modules，MCP `7,337,910 / 7,338,018` bytes、805 files、228 modules，均未放宽预算。
+  GitNexus staged change audit 只允许本切片的预期存储/readiness/application 影响；`next` 相对 `develop` 的全分支 CRITICAL 差异另作为 3.0
+  孵化累计风险保留，不能归因于 D-387。本切片不改变 PostgreSQL schema、ACL、role、Pool、连接或 HA 拓扑，因此不重新占有 PostgreSQL HA
+  证明。D-388 应把 committed receipt 接入 systemd/OpenRC/Compose deployment lineage。
 - D-386/ADR-0479（已接受）：把 D-385 的 `config/db/ssh.d` 私有 snapshot 转成 no-replace、版本化、Project-bound 的 prepared model，
   新增 exact `local-data-directory.adoption.transform|transform.verify`。`config.sh` 永不执行，只把简单非空 export 写入独立
   `qinglong3-local-secret-value` 文件，非 export setting 退役，复杂/重复行转人工复核；Keyv 以 read-only defensive SQLite 和 reviewed

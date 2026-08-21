@@ -3328,6 +3328,144 @@ export const legacyAdoptions = sqliteTable(
   ],
 );
 
+export const legacyDataDirectoryAdoptions = sqliteTable(
+  'QingLong3LegacyDataDirectoryAdoptions',
+  {
+    mutationId: text('mutation_id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => localProjects.id, {
+        onDelete: 'restrict',
+        onUpdate: 'restrict',
+      }),
+    profile: text('profile').notNull(),
+    sourceStageManifestDigest: text('source_stage_manifest_digest').notNull(),
+    transformationDigest: text('transformation_digest').notNull(),
+    modelDigest: text('model_digest').notNull(),
+    secretCount: integer('secret_count').notNull(),
+    environmentSecretCount: integer('environment_secret_count').notNull(),
+    sshSecretCount: integer('ssh_secret_count').notNull(),
+    modelJson: text('model_json', { mode: 'json' })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    publicationDigest: text('publication_digest').notNull(),
+    auditEventId: text('audit_event_id')
+      .notNull()
+      .references(() => localSecurityAuditEvents.eventId, {
+        onDelete: 'restrict',
+        onUpdate: 'restrict',
+      }),
+    committedAtMs: integer('committed_at_ms').notNull(),
+    receiptDigest: text('receipt_digest').notNull(),
+    receiptJson: text('receipt_json', { mode: 'json' })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      'ql3_legacy_data_directory_adoption_identity_check',
+      sql`length(${table.mutationId}) = 36 and substr(${table.mutationId}, 15, 1) = '4' and replace(${table.mutationId}, '-', '') not glob '*[^0-9a-f]*' and ${table.auditEventId} = ${table.mutationId} and length(${table.projectId}) between 1 and 128`,
+    ),
+    check(
+      'ql3_legacy_data_directory_adoption_profile_check',
+      sql`${table.profile} in ('edge', 'standalone')`,
+    ),
+    check(
+      'ql3_legacy_data_directory_adoption_digest_check',
+      sql`length(${table.sourceStageManifestDigest}) = 64 and ${table.sourceStageManifestDigest} not glob '*[^0-9a-f]*' and length(${table.transformationDigest}) = 64 and ${table.transformationDigest} not glob '*[^0-9a-f]*' and length(${table.modelDigest}) = 64 and ${table.modelDigest} not glob '*[^0-9a-f]*' and length(${table.publicationDigest}) = 64 and ${table.publicationDigest} not glob '*[^0-9a-f]*' and length(${table.receiptDigest}) = 64 and ${table.receiptDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    check(
+      'ql3_legacy_data_directory_adoption_count_check',
+      sql`${table.secretCount} between 0 and case ${table.profile} when 'edge' then 128 else 512 end and ${table.environmentSecretCount} between 0 and ${table.secretCount} and ${table.sshSecretCount} between 0 and ${table.secretCount} and ${table.environmentSecretCount} + ${table.sshSecretCount} = ${table.secretCount}`,
+    ),
+    check(
+      'ql3_legacy_data_directory_adoption_model_check',
+      sql`length(cast(${table.modelJson} as blob)) between 2 and 1048576 and json_valid(${table.modelJson}) and json_type(${table.modelJson}) = 'object' and json_extract(${table.modelJson}, '$.schema') = 'qinglong/legacy-data-directory-applied-model@v1' and json_extract(${table.modelJson}, '$.activation') = 'disabled' and json_extract(${table.modelJson}, '$.config.schema') = 'qinglong/legacy-config-transformation@v1' and json_extract(${table.modelJson}, '$.config.activation') = 'disabled' and json_extract(${table.modelJson}, '$.keyv.schema') = 'qinglong/legacy-keyv-transformation@v1' and json_extract(${table.modelJson}, '$.keyv.activation') = 'disabled' and json_extract(${table.modelJson}, '$.ssh.schema') = 'qinglong/legacy-ssh-transformation@v1' and json_extract(${table.modelJson}, '$.ssh.activation') = 'disabled' and json_extract(${table.modelJson}, '$.manualReview.schema') = 'qinglong/legacy-data-directory-manual-review@v1' and json_extract(${table.modelJson}, '$.manualReview.required') = 0 and json_extract(${table.modelJson}, '$.manualReview.activation') = 'disabled'`,
+    ),
+    check(
+      'ql3_legacy_data_directory_adoption_receipt_check',
+      sql`length(cast(${table.receiptJson} as blob)) between 2 and 1048576 and json_valid(${table.receiptJson}) and json_type(${table.receiptJson}) = 'object' and json_extract(${table.receiptJson}, '$.schema') = 'qinglong/legacy-data-directory-adoption-receipt@v1' and json_extract(${table.receiptJson}, '$.mutationId') = ${table.mutationId} and json_extract(${table.receiptJson}, '$.projectId') = ${table.projectId} and json_extract(${table.receiptJson}, '$.profile') = ${table.profile} and json_extract(${table.receiptJson}, '$.sourceStageManifestDigest') = ${table.sourceStageManifestDigest} and json_extract(${table.receiptJson}, '$.transformationDigest') = ${table.transformationDigest} and json_extract(${table.receiptJson}, '$.modelDigest') = ${table.modelDigest} and json_extract(${table.receiptJson}, '$.secretCount') = ${table.secretCount} and json_extract(${table.receiptJson}, '$.environmentSecretCount') = ${table.environmentSecretCount} and json_extract(${table.receiptJson}, '$.sshSecretCount') = ${table.sshSecretCount} and json_extract(${table.receiptJson}, '$.publicationDigest') = ${table.publicationDigest} and json_extract(${table.receiptJson}, '$.auditEventId') = ${table.auditEventId} and json_extract(${table.receiptJson}, '$.committedAtMs') = ${table.committedAtMs} and json_extract(${table.receiptJson}, '$.receiptDigest') = ${table.receiptDigest}`,
+    ),
+    check(
+      'ql3_legacy_data_directory_adoption_time_check',
+      sql`${table.committedAtMs} >= 0`,
+    ),
+    uniqueIndex('ql3_legacy_data_directory_adoption_transformation_uidx').on(
+      table.transformationDigest,
+    ),
+    uniqueIndex('ql3_legacy_data_directory_adoption_receipt_uidx').on(
+      table.receiptDigest,
+    ),
+    index('ql3_legacy_data_directory_adoption_project_time_idx').on(
+      table.projectId,
+      sql`${table.committedAtMs} desc`,
+      sql`${table.mutationId} desc`,
+    ),
+  ],
+);
+
+export const legacyDataDirectoryAdoptionSecrets = sqliteTable(
+  'QingLong3LegacyDataDirectoryAdoptionSecrets',
+  {
+    adoptionMutationId: text('adoption_mutation_id').notNull(),
+    ordinal: integer('ordinal').notNull(),
+    projectId: text('project_id').notNull(),
+    kind: text('kind').notNull(),
+    sourceNameDigest: text('source_name_digest').notNull(),
+    secretName: text('secret_name').notNull(),
+    secretVersion: integer('secret_version').notNull(),
+    secretMutationId: text('secret_mutation_id')
+      .notNull()
+      .references(() => localSecurityAuditEvents.eventId, {
+        onDelete: 'restrict',
+        onUpdate: 'restrict',
+      }),
+    valueFile: text('value_file').notNull(),
+    valueDigest: text('value_digest').notNull(),
+    secretRef: text('secret_ref').notNull(),
+    itemDigest: text('item_digest').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.adoptionMutationId, table.ordinal] }),
+    foreignKey({
+      columns: [table.adoptionMutationId],
+      foreignColumns: [legacyDataDirectoryAdoptions.mutationId],
+      name: 'ql3_legacy_data_directory_adoption_secret_parent_fk',
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [table.projectId, table.secretName, table.secretVersion],
+      foreignColumns: [
+        localSecretEnvelopes.projectId,
+        localSecretEnvelopes.name,
+        localSecretEnvelopes.version,
+      ],
+      name: 'ql3_legacy_data_directory_adoption_secret_envelope_fk',
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    check(
+      'ql3_legacy_data_directory_adoption_secret_identity_check',
+      sql`${table.ordinal} between 1 and 512 and length(${table.projectId}) between 1 and 128 and ${table.kind} in ('environment', 'ssh_private_key') and length(${table.secretName}) between 1 and 128 and ${table.secretVersion} = 1 and length(${table.secretMutationId}) = 36 and substr(${table.secretMutationId}, 15, 1) = '4' and replace(${table.secretMutationId}, '-', '') not glob '*[^0-9a-f]*' and length(${table.valueFile}) = 83 and ${table.valueFile} glob 'secret-values/[0-9a-f]*.json' and length(${table.secretRef}) between 1 and 512`,
+    ),
+    check(
+      'ql3_legacy_data_directory_adoption_secret_digest_check',
+      sql`length(${table.sourceNameDigest}) = 64 and ${table.sourceNameDigest} not glob '*[^0-9a-f]*' and length(${table.valueDigest}) = 64 and ${table.valueDigest} not glob '*[^0-9a-f]*' and length(${table.itemDigest}) = 64 and ${table.itemDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    uniqueIndex('ql3_legacy_data_directory_adoption_secret_name_uidx').on(
+      table.adoptionMutationId,
+      table.secretName,
+    ),
+    uniqueIndex('ql3_legacy_data_directory_adoption_secret_mutation_uidx').on(
+      table.secretMutationId,
+    ),
+    uniqueIndex('ql3_legacy_data_directory_adoption_secret_item_uidx').on(
+      table.itemDigest,
+    ),
+  ],
+);
+
 export const localIdentitySubjects = sqliteTable(
   'QingLong3IdentitySubjects',
   {
@@ -5042,6 +5180,8 @@ export const localSqliteSchema = Object.freeze({
   toolExecutionResultRekeyHeads,
   toolResultKeyRetirementReceipts,
   legacyAdoptions,
+  legacyDataDirectoryAdoptions,
+  legacyDataDirectoryAdoptionSecrets,
   localIdentitySubjects,
   localApiCredentials,
   localApiCredentialPepperBindings,

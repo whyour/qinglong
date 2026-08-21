@@ -3,6 +3,9 @@ import path from 'node:path';
 const MAX_PATH_BYTES = 4_096;
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 const PROJECT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export const LOCAL_DATA_DIRECTORY_ADOPTION_INSPECT_OPERATION =
   'local-data-directory.adoption.inspect' as const;
@@ -14,13 +17,19 @@ export const LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_OPERATION =
   'local-data-directory.adoption.transform' as const;
 export const LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION =
   'local-data-directory.adoption.transform.verify' as const;
+export const LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_OPERATION =
+  'local-data-directory.adoption.apply' as const;
+export const LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_VERIFY_OPERATION =
+  'local-data-directory.adoption.apply.verify' as const;
 
 export type LocalDataDirectoryAdoptionOperation =
   | typeof LOCAL_DATA_DIRECTORY_ADOPTION_INSPECT_OPERATION
   | typeof LOCAL_DATA_DIRECTORY_ADOPTION_STAGE_OPERATION
   | typeof LOCAL_DATA_DIRECTORY_ADOPTION_VERIFY_OPERATION
   | typeof LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_OPERATION
-  | typeof LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION;
+  | typeof LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION
+  | typeof LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_OPERATION
+  | typeof LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_VERIFY_OPERATION;
 
 export interface InspectLocalDataDirectoryAdoptionCommand {
   readonly schemaVersion: 1;
@@ -85,12 +94,40 @@ export interface VerifyLocalDataDirectoryAdoptionTransformationCommand {
   };
 }
 
+interface LocalDataDirectoryAdoptionApplicationOptions
+  extends LocalDataDirectoryAdoptionTransformationOptions {
+  readonly expectedTransformationDigest: string;
+  readonly ownerPepperKeyringDirectory: string;
+  readonly credentialFilePath: string;
+  readonly secretKeyringPath: string;
+  readonly mutationId: string;
+  readonly failureAuditEventId: string;
+  readonly requestId: string;
+  readonly busyTimeoutMs?: number;
+}
+
+export interface ApplyLocalDataDirectoryAdoptionCommand {
+  readonly schemaVersion: 1;
+  readonly operation: typeof LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_OPERATION;
+  readonly options: LocalDataDirectoryAdoptionApplicationOptions;
+}
+
+export interface VerifyLocalDataDirectoryAdoptionApplicationCommand {
+  readonly schemaVersion: 1;
+  readonly operation: typeof LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_VERIFY_OPERATION;
+  readonly options: LocalDataDirectoryAdoptionApplicationOptions & {
+    readonly expectedReceiptDigest: string;
+  };
+}
+
 export type LocalDataDirectoryAdoptionCommand =
   | InspectLocalDataDirectoryAdoptionCommand
   | StageLocalDataDirectoryAdoptionCommand
   | VerifyLocalDataDirectoryAdoptionCommand
   | TransformLocalDataDirectoryAdoptionCommand
-  | VerifyLocalDataDirectoryAdoptionTransformationCommand;
+  | VerifyLocalDataDirectoryAdoptionTransformationCommand
+  | ApplyLocalDataDirectoryAdoptionCommand
+  | VerifyLocalDataDirectoryAdoptionApplicationCommand;
 
 export class LocalDataDirectoryAdoptionConfigurationError extends TypeError {
   readonly code = 'LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID';
@@ -129,7 +166,19 @@ export function isLocalDataDirectoryAdoptionOperation(
     value === LOCAL_DATA_DIRECTORY_ADOPTION_STAGE_OPERATION ||
     value === LOCAL_DATA_DIRECTORY_ADOPTION_VERIFY_OPERATION ||
     value === LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_OPERATION ||
-    value === LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION
+    value === LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION ||
+    value === LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_OPERATION ||
+    value === LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_VERIFY_OPERATION
+  );
+}
+
+function descendant(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return (
+    relative.length > 0 &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
   );
 }
 
@@ -219,6 +268,10 @@ export function normalizeLocalDataDirectoryAdoptionCommand(
     );
   }
   const options = candidate.options as Record<string, unknown>;
+  const application =
+    candidate.operation === LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_OPERATION ||
+    candidate.operation ===
+      LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_VERIFY_OPERATION;
   let expectedKeys: readonly string[];
   if (candidate.operation === LOCAL_DATA_DIRECTORY_ADOPTION_INSPECT_OPERATION) {
     expectedKeys = ['dataRoot', 'profile'];
@@ -245,8 +298,23 @@ export function normalizeLocalDataDirectoryAdoptionCommand(
         ? []
         : ['projectId', 'transformationRoot']),
       ...(candidate.operation ===
-      LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION
+        LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION || application
         ? ['expectedTransformationDigest']
+        : []),
+      ...(application
+        ? [
+            'credentialFilePath',
+            'failureAuditEventId',
+            'mutationId',
+            'ownerPepperKeyringDirectory',
+            'requestId',
+            'secretKeyringPath',
+            ...(options.busyTimeoutMs === undefined ? [] : ['busyTimeoutMs']),
+          ]
+        : []),
+      ...(candidate.operation ===
+      LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_VERIFY_OPERATION
+        ? ['expectedReceiptDigest']
         : []),
     ];
   }
@@ -282,7 +350,8 @@ export function normalizeLocalDataDirectoryAdoptionCommand(
       candidate.operation ===
         LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_OPERATION ||
       candidate.operation ===
-        LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION
+        LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION ||
+      application
     ) {
       if (
         !normalizedAbsolutePath(options.transformationRoot) ||
@@ -294,14 +363,56 @@ export function normalizeLocalDataDirectoryAdoptionCommand(
         );
       }
       if (
-        candidate.operation ===
-          LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION &&
+        (candidate.operation ===
+          LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION ||
+          application) &&
         (typeof options.expectedTransformationDigest !== 'string' ||
           !DIGEST_PATTERN.test(options.expectedTransformationDigest))
       ) {
         throw new LocalDataDirectoryAdoptionConfigurationError(
           'transformation digest is invalid',
         );
+      }
+      if (application) {
+        for (const key of [
+          'ownerPepperKeyringDirectory',
+          'credentialFilePath',
+          'secretKeyringPath',
+        ]) {
+          if (
+            !normalizedAbsolutePath(options[key]) ||
+            !descendant(
+              options.deploymentRoot as string,
+              options[key] as string,
+            )
+          ) {
+            throw new LocalDataDirectoryAdoptionConfigurationError(
+              'application authority path is invalid',
+            );
+          }
+        }
+        if (
+          options.credentialFilePath === options.secretKeyringPath ||
+          typeof options.mutationId !== 'string' ||
+          !UUID_V4_PATTERN.test(options.mutationId) ||
+          typeof options.failureAuditEventId !== 'string' ||
+          !UUID_V4_PATTERN.test(options.failureAuditEventId) ||
+          options.failureAuditEventId === options.mutationId ||
+          typeof options.requestId !== 'string' ||
+          !REQUEST_ID_PATTERN.test(options.requestId) ||
+          (options.busyTimeoutMs !== undefined &&
+            (!Number.isSafeInteger(options.busyTimeoutMs) ||
+              (options.busyTimeoutMs as number) < 100 ||
+              (options.busyTimeoutMs as number) > 30_000)) ||
+          (candidate.operation ===
+            LOCAL_DATA_DIRECTORY_ADOPTION_APPLY_VERIFY_OPERATION &&
+            (typeof options.expectedReceiptDigest !== 'string' ||
+              !DIGEST_PATTERN.test(options.expectedReceiptDigest)))
+        ) {
+          throw new LocalDataDirectoryAdoptionConfigurationError(
+            'application authority binding is invalid',
+          );
+        }
       }
     }
   }

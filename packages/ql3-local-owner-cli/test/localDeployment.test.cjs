@@ -475,9 +475,9 @@ function composeDockerHarness(
               '/opt/qinglong/node_modules/@qinglong/local-application/dist/cli.js',
             ],
             Labels: {
-              'io.qinglong.local.sqlite-contract-min': '49',
-              'io.qinglong.local.sqlite-contract-max': '49',
-              'io.qinglong.local.sqlite-write-contract': '49',
+              'io.qinglong.local.sqlite-contract-min': '50',
+              'io.qinglong.local.sqlite-contract-max': '50',
+              'io.qinglong.local.sqlite-write-contract': '50',
               'io.qinglong.local.application-config': '2',
               'io.qinglong.local.compose-selection': '1',
               'io.qinglong.ai': 'excluded',
@@ -1172,9 +1172,9 @@ test('preflights exact local image, Compose merge and SQLite capability', async 
               '/opt/qinglong/node_modules/@qinglong/local-application/dist/cli.js',
             ],
             Labels: {
-              'io.qinglong.local.sqlite-contract-min': '49',
-              'io.qinglong.local.sqlite-contract-max': '49',
-              'io.qinglong.local.sqlite-write-contract': '49',
+              'io.qinglong.local.sqlite-contract-min': '50',
+              'io.qinglong.local.sqlite-contract-max': '50',
+              'io.qinglong.local.sqlite-write-contract': '50',
               'io.qinglong.local.application-config': '2',
               'io.qinglong.local.compose-selection': '1',
               'io.qinglong.ai': 'excluded',
@@ -1226,7 +1226,7 @@ test('preflights exact local image, Compose merge and SQLite capability', async 
   assert.equal(result.status, 'ready');
   assert.equal(result.generation, 1);
   assert.equal(result.profile, 'edge');
-  assert.equal(result.sqlite.contractVersion, 49);
+  assert.equal(result.sqlite.contractVersion, 50);
   assert.equal(result.image.architecture, 'arm64');
   assert.equal(calls.length, 2);
   assert.deepEqual(calls[0].slice(0, 2), ['image', 'inspect']);
@@ -1326,8 +1326,8 @@ test('applies one Compose generation and exactly replays its health receipt', as
   assert.equal(mode(receiptPath), 0o600);
   const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
   assert.deepEqual(receipt.sqlite, {
-    contractVersion: 49,
-    writeContractVersion: 49,
+    contractVersion: 50,
+    writeContractVersion: 50,
     writeObservation: 'unchanged',
     backup: null,
   });
@@ -1628,8 +1628,8 @@ test('rolls a failed Compose candidate forward to a healthy prior digest', async
     `${command.request.rolloutId}.sqlite`,
   );
   assert.equal(mode(backupPath), 0o600);
-  assert.equal(receipt.sqlite.contractVersion, 49);
-  assert.equal(receipt.sqlite.writeContractVersion, 49);
+  assert.equal(receipt.sqlite.contractVersion, 50);
+  assert.equal(receipt.sqlite.writeContractVersion, 50);
   assert.equal(receipt.sqlite.writeObservation, 'changed');
   assert.match(receipt.sqlite.backup.sha256, /^[0-9a-f]{64}$/);
   assert.equal(receipt.sqlite.backup.bytes > 0, true);

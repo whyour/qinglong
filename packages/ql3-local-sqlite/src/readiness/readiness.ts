@@ -2,6 +2,7 @@ import { auditMigrationStreamHistory } from '@qinglong/runtime-core/migration-st
 import type { DatabaseSync } from 'node:sqlite';
 import { localSqliteMigrationManifest } from '../migration/migrationManifest';
 import { LocalSqliteMigrationStreamStore } from '../migration/migrationStreamStore';
+import { LOCAL_DATA_DIRECTORY_ADOPTION_SECRET_GUARD_TRIGGER_SQL } from '../adoption/data-directory/dataDirectoryAdoptionSchemaContract';
 import { LOCAL_PLUGIN_PACKAGE_SECRET_MATERIALIZATION_TRIGGER_SQL } from '../plugin-package/pluginPackageSecretMaterializationSchemaContract';
 import { LOCAL_PLUGIN_PACKAGE_SECRET_BINDING_TARGET_TRIGGER_SQL } from '../plugin-package/secret-binding/pluginPackageSecretBindingTargetSchemaContract';
 import { LOCAL_PLUGIN_PACKAGE_SECRET_BINDING_TRANSITION_RECEIPT_TRIGGER_SQL } from '../plugin-package/secret-binding/transitionReceiptSchemaContract';
@@ -11,7 +12,15 @@ import {
 } from '../run/stepRunSchemaContract';
 
 export const LOCAL_SQLITE_CONTRACT_NAME = 'local-control-core';
-export const LOCAL_SQLITE_CONTRACT_VERSION = 49;
+export const LOCAL_SQLITE_CONTRACT_VERSION = 50;
+
+const LEGACY_DATA_DIRECTORY_ADOPTION_TRIGGERS = Object.freeze([
+  Object.freeze({
+    name: 'ql3_legacy_data_directory_adoption_secret_guard',
+    tableName: 'QingLong3LegacyDataDirectoryAdoptionSecrets',
+    sql: LOCAL_DATA_DIRECTORY_ADOPTION_SECRET_GUARD_TRIGGER_SQL,
+  }),
+]);
 
 const PLUGIN_PACKAGE_SECRET_BINDING_TARGET_TRIGGERS = Object.freeze([
   Object.freeze({
@@ -1389,6 +1398,51 @@ const REQUIRED_SCHEMA = Object.freeze({
       'ql3_legacy_adoptions_project_time_idx',
     ]),
   }),
+  QingLong3LegacyDataDirectoryAdoptions: Object.freeze({
+    columns: Object.freeze([
+      'mutation_id',
+      'project_id',
+      'profile',
+      'source_stage_manifest_digest',
+      'transformation_digest',
+      'model_digest',
+      'secret_count',
+      'environment_secret_count',
+      'ssh_secret_count',
+      'model_json',
+      'publication_digest',
+      'audit_event_id',
+      'committed_at_ms',
+      'receipt_digest',
+      'receipt_json',
+    ]),
+    indexes: Object.freeze([
+      'ql3_legacy_data_directory_adoption_transformation_uidx',
+      'ql3_legacy_data_directory_adoption_receipt_uidx',
+      'ql3_legacy_data_directory_adoption_project_time_idx',
+    ]),
+  }),
+  QingLong3LegacyDataDirectoryAdoptionSecrets: Object.freeze({
+    columns: Object.freeze([
+      'adoption_mutation_id',
+      'ordinal',
+      'project_id',
+      'kind',
+      'source_name_digest',
+      'secret_name',
+      'secret_version',
+      'secret_mutation_id',
+      'value_file',
+      'value_digest',
+      'secret_ref',
+      'item_digest',
+    ]),
+    indexes: Object.freeze([
+      'ql3_legacy_data_directory_adoption_secret_name_uidx',
+      'ql3_legacy_data_directory_adoption_secret_mutation_uidx',
+      'ql3_legacy_data_directory_adoption_secret_item_uidx',
+    ]),
+  }),
   QingLong3IdentitySubjects: Object.freeze({
     columns: Object.freeze([
       'subject_type',
@@ -1793,6 +1847,7 @@ function assertRequiredSchema(client: DatabaseSync): number {
     ...PLUGIN_PACKAGE_AUTOMATION_DISPOSITION_TRIGGERS,
     ...PLUGIN_PACKAGE_SECRET_BINDING_TARGET_TRIGGERS,
     ...PLUGIN_PACKAGE_SECRET_MATERIALIZATION_TRIGGERS,
+    ...LEGACY_DATA_DIRECTORY_ADOPTION_TRIGGERS,
   ].sort((left, right) => left.name.localeCompare(right.name));
   if (
     triggerRows.length !== expectedTriggers.length ||
@@ -2603,11 +2658,10 @@ export async function auditLocalSqliteReadiness(
       !capability ||
       capability.contract_name !== LOCAL_SQLITE_CONTRACT_NAME ||
       capability.contract_version !== LOCAL_SQLITE_CONTRACT_VERSION ||
-      capability.migration_id !==
-        '0097-plugin-package-secret-binding-transition-receipts' ||
+      capability.migration_id !== '0099-legacy-data-directory-adoptions' ||
       typeof capability.capabilities !== 'string' ||
       capability.capabilities !==
-        '{"run_core":1,"run_retry_policy":1,"completion_receipt_journal":1,"local_dispatch_plan":1,"local_secret_envelope":1,"local_project_policy":1,"local_project_administration":1,"local_security_audit":1,"local_security_audit_compaction":1,"local_secret_authorized_mutation":1,"local_identity":1,"local_api_credential":1,"local_identity_provisioning":1,"local_identity_credential_administration":1,"local_owner_bootstrap":1,"local_owner_delivery_acknowledgement":1,"api_credential_pepper_binding":1,"local_owner_pepper_catalog":1,"local_owner_credential_recovery":1,"local_owner_pepper_reference_inspection":1,"local_owner_pepper_material_gc":1,"local_owner_delivery_acknowledgement_gc":1,"task_definition":1,"local_execution_revision_digest":1,"trigger_definition":1,"legacy_adoption_ledger":1,"local_scheduler_admission":1,"plugin_package_install":1,"approved_action":1,"plugin_package_admission":1,"approved_action_execution":1,"plugin_package_proposal":1,"plugin_package_materialized_revision":1,"plugin_package_secret_binding":1,"plugin_package_secret_binding_transition":1,"plugin_package_secret_binding_transition_receipt":1,"plugin_package_secret_materialization":1,"plugin_package_task_reconciliation":1,"project_tool_definition_snapshot":1,"step_run":1,"tool_execution_evidence":1,"tool_execution_start_barrier":1,"tool_invocation_artifact":1,"tool_execution_artifact_binding":1,"tool_execution_completion":1,"tool_execution_failure_completion":1,"tool_result_key_catalog":1,"tool_result_rekey":1,"plugin_package_quarantine":1,"plugin_package_lifecycle":1,"plugin_package_automation_publication":1,"plugin_package_automation_security_withdrawal":1,"plugin_package_workflow_admission":1,"plugin_package_workflow_run_list":1,"run_attempt_log_retention":1,"plugin_package_workflow_task_attempt_admission":1}' ||
+        '{"run_core":1,"run_retry_policy":1,"completion_receipt_journal":1,"local_dispatch_plan":1,"local_secret_envelope":1,"local_project_policy":1,"local_project_administration":1,"local_security_audit":1,"local_security_audit_compaction":1,"local_secret_authorized_mutation":1,"local_identity":1,"local_api_credential":1,"local_identity_provisioning":1,"local_identity_credential_administration":1,"local_owner_bootstrap":1,"local_owner_delivery_acknowledgement":1,"api_credential_pepper_binding":1,"local_owner_pepper_catalog":1,"local_owner_credential_recovery":1,"local_owner_pepper_reference_inspection":1,"local_owner_pepper_material_gc":1,"local_owner_delivery_acknowledgement_gc":1,"task_definition":1,"local_execution_revision_digest":1,"trigger_definition":1,"legacy_adoption_ledger":1,"legacy_data_directory_adoption":1,"local_scheduler_admission":1,"plugin_package_install":1,"approved_action":1,"plugin_package_admission":1,"approved_action_execution":1,"plugin_package_proposal":1,"plugin_package_materialized_revision":1,"plugin_package_secret_binding":1,"plugin_package_secret_binding_transition":1,"plugin_package_secret_binding_transition_receipt":1,"plugin_package_secret_materialization":1,"plugin_package_task_reconciliation":1,"project_tool_definition_snapshot":1,"step_run":1,"tool_execution_evidence":1,"tool_execution_start_barrier":1,"tool_invocation_artifact":1,"tool_execution_artifact_binding":1,"tool_execution_completion":1,"tool_execution_failure_completion":1,"tool_result_key_catalog":1,"tool_result_rekey":1,"plugin_package_quarantine":1,"plugin_package_lifecycle":1,"plugin_package_automation_publication":1,"plugin_package_automation_security_withdrawal":1,"plugin_package_workflow_admission":1,"plugin_package_workflow_run_list":1,"run_attempt_log_retention":1,"plugin_package_workflow_task_attempt_admission":1}' ||
       typeof capability.updated_at_ms !== 'number' ||
       !Number.isSafeInteger(capability.updated_at_ms) ||
       capability.updated_at_ms < 0

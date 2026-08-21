@@ -115,6 +115,11 @@
       "require": "./dist/security-administration/secretAdministration.js",
       "default": "./dist/security-administration/secretAdministration.js"
     },
+    "./data-directory-adoption": {
+      "types": "./dist/data-directory-adoption/dataDirectoryAdoption.d.ts",
+      "require": "./dist/data-directory-adoption/dataDirectoryAdoption.js",
+      "default": "./dist/data-directory-adoption/dataDirectoryAdoption.js"
+    },
     "./task-definition-administration": {
       "types": "./dist/automation-administration/taskDefinitionAdministration.d.ts",
       "require": "./dist/automation-administration/taskDefinitionAdministration.js",

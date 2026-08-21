@@ -6,6 +6,19 @@ const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const { test } = require('node:test');
 
+const {
+  provisionLocalOwnerPepperKey,
+} = require('@qinglong/local-owner-console');
+const {
+  LocalSecretKeyringFileProvider,
+  decryptLocalSecretEnvelopeToBuffer,
+  provisionLocalSecretKeyring,
+} = require('@qinglong/local-secret');
+const {
+  apiCredentialSecretDigest,
+  formatApiCredentialToken,
+} = require('@qinglong/runtime-core/api-credential-token');
+
 const BINARY = path.join(__dirname, '../dist/lifecycle/adoptionCli.js');
 const DIRECTORY_INSPECT = 'local-data-directory.adoption.inspect';
 const DIRECTORY_STAGE = 'local-data-directory.adoption.stage';
@@ -13,6 +26,18 @@ const DIRECTORY_VERIFY = 'local-data-directory.adoption.verify';
 const DIRECTORY_TRANSFORM = 'local-data-directory.adoption.transform';
 const DIRECTORY_TRANSFORM_VERIFY =
   'local-data-directory.adoption.transform.verify';
+const DIRECTORY_APPLY = 'local-data-directory.adoption.apply';
+const DIRECTORY_APPLY_VERIFY = 'local-data-directory.adoption.apply.verify';
+const APPLICATION_CREDENTIAL_ID = 'data-adoption-owner';
+const APPLICATION_PEPPER_KEY_ID = 'data-adoption-owner-v1';
+const APPLICATION_PEPPER = Buffer.alloc(32, 121).toString('base64url');
+const APPLICATION_CREDENTIAL_SECRET = Buffer.alloc(32, 122).toString(
+  'base64url',
+);
+const APPLICATION_TOKEN = formatApiCredentialToken(
+  APPLICATION_CREDENTIAL_ID,
+  APPLICATION_CREDENTIAL_SECRET,
+);
 
 function privateDirectory(directoryPath) {
   fs.mkdirSync(directoryPath, { recursive: true, mode: 0o700 });
@@ -23,6 +48,15 @@ function privateFile(filePath, content) {
   privateDirectory(path.dirname(filePath));
   fs.writeFileSync(filePath, content, { mode: 0o600 });
   fs.chmodSync(filePath, 0o600);
+}
+
+function privatizeTree(root) {
+  fs.chmodSync(root, 0o700);
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    const entryPath = path.join(root, entry.name);
+    if (entry.isDirectory()) privatizeTree(entryPath);
+    else fs.chmodSync(entryPath, 0o600);
+  }
 }
 
 function createLegacyDatabase(sourcePath) {
@@ -369,6 +403,184 @@ function transformationOptions(value, prepared, staged, projectId) {
     expectedManifestDigest: staged.evidence.manifestDigest,
     sqlite: sqliteBinding(value, prepared.activationDigest),
   };
+}
+
+async function provisionApplicationAuthority(value, role = 'owner') {
+  const ownerPepperKeyringDirectory = path.join(
+    value.deploymentRoot,
+    'owner-keys',
+  );
+  const credentialFilePath = path.join(
+    value.deploymentRoot,
+    'owner-credential.json',
+  );
+  const secretKeyringPath = path.join(
+    value.deploymentRoot,
+    'local-secret-keyring.json',
+  );
+  privateDirectory(ownerPepperKeyringDirectory);
+  await provisionLocalSecretKeyring(secretKeyringPath);
+  const pepper = provisionLocalOwnerPepperKey({
+    keyringDirectory: ownerPepperKeyringDirectory,
+    pepperKeyId: APPLICATION_PEPPER_KEY_ID,
+    randomBytes: () => Buffer.alloc(32, 121),
+  });
+  const now = Date.now();
+  const database = new DatabaseSync(value.targetPath);
+  try {
+    database
+      .prepare(
+        `INSERT INTO "QingLong3LocalOwnerPepperKeys" (
+           "pepper_key_id", "material_digest", "backup_digest", "state",
+           "version", "register_mutation_id", "activate_mutation_id",
+           "registered_at_ms", "activated_at_ms"
+         ) VALUES (?, ?, ?, 'active', 2, ?, ?, ?, ?)`,
+      )
+      .run(
+        APPLICATION_PEPPER_KEY_ID,
+        pepper.digest,
+        'e'.repeat(64),
+        'd3870000-0000-4000-8000-000000000001',
+        'd3870000-0000-4000-8000-000000000002',
+        now - 2_000,
+        now - 1_500,
+      );
+    database
+      .prepare(
+        `INSERT INTO "QingLong3LocalOwnerPepperActivations" (
+           "generation", "mutation_id", "expected_generation",
+           "previous_pepper_key_id", "active_pepper_key_id",
+           "material_digest", "backup_digest", "activated_at_ms"
+         ) VALUES (1, ?, 0, NULL, ?, ?, ?, ?)`,
+      )
+      .run(
+        'd3870000-0000-4000-8000-000000000002',
+        APPLICATION_PEPPER_KEY_ID,
+        pepper.digest,
+        'e'.repeat(64),
+        now - 1_500,
+      );
+    database
+      .prepare(
+        `INSERT INTO "QingLong3IdentitySubjects" (
+           "subject_type", "subject_id", "status", "version",
+           "created_at_ms", "updated_at_ms"
+         ) VALUES ('user', 'data-adoption-owner', 'active', 1, ?, ?)`,
+      )
+      .run(now - 1_000, now - 1_000);
+    database
+      .prepare(
+        `INSERT INTO "QingLong3ApiCredentials" (
+           "credential_id", "version", "state", "subject_type",
+           "subject_id", "secret_digest", "created_at_ms",
+           "not_before_at_ms", "expires_at_ms"
+         ) VALUES (?, 1, 'active', 'user', 'data-adoption-owner', ?, ?, ?, ?)`,
+      )
+      .run(
+        APPLICATION_CREDENTIAL_ID,
+        apiCredentialSecretDigest(
+          APPLICATION_PEPPER,
+          APPLICATION_CREDENTIAL_ID,
+          APPLICATION_CREDENTIAL_SECRET,
+        ),
+        now - 1_000,
+        now - 1_000,
+        now + 10 * 60 * 1_000,
+      );
+    database
+      .prepare(
+        `INSERT INTO "QingLong3ApiCredentialPepperBindings" (
+           "credential_id", "credential_version", "pepper_key_id"
+         ) VALUES (?, 1, ?)`,
+      )
+      .run(APPLICATION_CREDENTIAL_ID, APPLICATION_PEPPER_KEY_ID);
+    database
+      .prepare(
+        `INSERT INTO "QingLong3ProjectRoleBindings" (
+           "project_id", "subject_type", "subject_id", "version", "state",
+           "role", "mutation_id", "changed_by_type", "changed_by_id",
+           "created_at_ms"
+         ) VALUES (
+           'default', 'user', 'data-adoption-owner', 1, 'active', ?,
+           'd387-owner-binding', 'user', 'data-adoption-owner', ?
+         )`,
+      )
+      .run(role, now - 500);
+  } finally {
+    database.close();
+  }
+  fs.chmodSync(value.targetPath, 0o600);
+  privateFile(
+    credentialFilePath,
+    `${JSON.stringify({
+      schemaVersion: 1,
+      kind: 'qinglong3-local-identity-credential-presentation',
+      token: APPLICATION_TOKEN,
+    })}\n`,
+  );
+  return {
+    ownerPepperKeyringDirectory,
+    credentialFilePath,
+    secretKeyringPath,
+  };
+}
+
+function applicationOptions(
+  value,
+  prepared,
+  staged,
+  authority,
+  transformationDigest,
+) {
+  return {
+    ...transformationOptions(value, prepared, staged, 'default'),
+    expectedTransformationDigest: transformationDigest,
+    ...authority,
+    mutationId: 'd3870000-0000-4000-8000-000000000010',
+    failureAuditEventId: 'd3870000-0000-4000-8000-000000000011',
+    requestId: 'd387-data-directory-apply',
+  };
+}
+
+function applicationDatabaseRows(databasePath) {
+  const database = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    return {
+      adoptions: database
+        .prepare(
+          `SELECT mutation_id AS "mutationId", model_json AS "modelJson",
+                  receipt_digest AS "receiptDigest"
+             FROM "QingLong3LegacyDataDirectoryAdoptions"`,
+        )
+        .all(),
+      items: database
+        .prepare(
+          `SELECT secret_name AS "secretName", value_digest AS "valueDigest"
+             FROM "QingLong3LegacyDataDirectoryAdoptionSecrets"
+            ORDER BY ordinal`,
+        )
+        .all(),
+      envelopes: database
+        .prepare(
+          `SELECT secret_name AS "secretName", version, mutation_id AS "mutationId",
+                  key_id AS "keyId", algorithm, nonce, ciphertext,
+                  auth_tag AS "authTag", created_at_ms AS "createdAtMs"
+             FROM "QingLong3LocalSecretEnvelopes"
+            ORDER BY secret_name`,
+        )
+        .all(),
+      audits: database
+        .prepare(
+          `SELECT operation_id AS "operationId", outcome
+             FROM "QingLong3SecurityAuditEvents"
+            WHERE operation_id IN ('legacy-data.apply', 'secret.create')
+            ORDER BY operation_id, event_id`,
+        )
+        .all(),
+    };
+  } finally {
+    database.close();
+  }
 }
 
 test('stages only reviewed payloads behind the real SQLite activation fence', (t) => {
@@ -925,5 +1137,287 @@ test('widened transformation commands fail closed before source access', (t) => 
   assert.equal(
     JSON.parse(invalidProject.stderr).code,
     'LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID',
+  );
+});
+
+test('atomically applies a ready transformation, reclaims plaintext and exactly replays', async (t) => {
+  const value = fixture(t);
+  const secrets = configureTransformationInput(value);
+  const { prepared, staged } = stageForTransformation(value);
+  const authority = await provisionApplicationAuthority(value);
+  const transformed = run(
+    value,
+    'directory-transform-before-apply',
+    DIRECTORY_TRANSFORM,
+    transformationOptions(value, prepared, staged, 'default'),
+  ).result;
+  const options = applicationOptions(
+    value,
+    prepared,
+    staged,
+    authority,
+    transformed.evidence.transformationDigest,
+  );
+  const recoveryModel = path.join(value.deploymentRoot, 'recovery-model');
+  fs.cpSync(path.join(value.transformationRoot, 'model'), recoveryModel, {
+    recursive: true,
+    preserveTimestamps: true,
+  });
+  privatizeTree(recoveryModel);
+
+  const applied = run(value, 'directory-apply', DIRECTORY_APPLY, options);
+  assert.equal(applied.result.status, 'committed');
+  assert.equal(applied.result.evidence.databaseStatus, 'inserted');
+  assert.equal(applied.result.evidence.secretCount, 2);
+  assert.equal(applied.result.evidence.environmentSecretCount, 1);
+  assert.equal(applied.result.evidence.sshSecretCount, 1);
+  assert.equal(applied.result.evidence.modelReclaimed, true);
+  assert.equal(applied.result.evidence.plaintextFilesRemoved, true);
+  assert.equal(applied.result.evidence.physicalErasureGuaranteed, false);
+  for (const sensitive of [
+    secrets.environmentValue,
+    secrets.sshValue,
+    secrets.authValue,
+    secrets.environmentName,
+    secrets.sshAlias,
+  ]) {
+    assert.equal(applied.child.stdout.includes(sensitive), false);
+  }
+  assert.deepEqual(fs.readdirSync(value.transformationRoot).sort(), [
+    'commit.json',
+    'manifest.json',
+  ]);
+  const commit = JSON.parse(
+    fs.readFileSync(path.join(value.transformationRoot, 'commit.json'), 'utf8'),
+  );
+  assert.equal(commit.reclamation.modelRemoved, true);
+  assert.equal(commit.reclamation.plaintextFilesRemoved, true);
+  assert.equal(commit.reclamation.physicalErasureGuaranteed, false);
+  assert.equal(commit.commitDigest, applied.result.evidence.commitDigest);
+
+  const rows = applicationDatabaseRows(value.targetPath);
+  assert.equal(rows.adoptions.length, 1);
+  assert.equal(rows.items.length, 2);
+  assert.equal(rows.envelopes.length, 2);
+  assert.deepEqual(
+    rows.audits.map(({ operationId, outcome }) => [operationId, outcome]),
+    [
+      ['legacy-data.apply', 'allowed'],
+      ['secret.create', 'allowed'],
+      ['secret.create', 'allowed'],
+    ],
+  );
+  const durableModel = JSON.parse(rows.adoptions[0].modelJson);
+  assert.equal(durableModel.activation, 'disabled');
+  assert.equal(durableModel.config.activation, 'disabled');
+  assert.equal(durableModel.keyv.activation, 'disabled');
+  assert.equal(durableModel.ssh.activation, 'disabled');
+
+  const provider = new LocalSecretKeyringFileProvider(
+    authority.secretKeyringPath,
+  );
+  const plaintexts = [];
+  for (const envelope of rows.envelopes) {
+    const material = await provider.resolve(envelope.keyId);
+    assert.ok(material);
+    const plaintext = decryptLocalSecretEnvelopeToBuffer(
+      {
+        projectId: 'default',
+        name: envelope.secretName,
+        version: envelope.version,
+        mutationId: envelope.mutationId,
+        keyId: envelope.keyId,
+        algorithm: envelope.algorithm,
+        nonce: Buffer.from(envelope.nonce).toString('base64url'),
+        ciphertext: Buffer.from(envelope.ciphertext).toString('base64url'),
+        authTag: Buffer.from(envelope.authTag).toString('base64url'),
+        createdAtMs: envelope.createdAtMs,
+      },
+      material.key,
+    );
+    try {
+      plaintexts.push(plaintext.toString('utf8'));
+    } finally {
+      plaintext.fill(0);
+      material.key.fill(0);
+    }
+  }
+  assert.deepEqual(
+    plaintexts.sort(),
+    [secrets.environmentValue, secrets.sshValue].sort(),
+  );
+
+  const replayed = run(
+    value,
+    'directory-apply-replay',
+    DIRECTORY_APPLY,
+    options,
+  ).result;
+  assert.equal(replayed.evidence.databaseStatus, 'existing');
+  assert.equal(
+    replayed.evidence.receiptDigest,
+    applied.result.evidence.receiptDigest,
+  );
+  assert.equal(
+    replayed.evidence.commitDigest,
+    applied.result.evidence.commitDigest,
+  );
+  const verified = run(
+    value,
+    'directory-apply-verify',
+    DIRECTORY_APPLY_VERIFY,
+    {
+      ...options,
+      expectedReceiptDigest: applied.result.evidence.receiptDigest,
+    },
+  ).result;
+  assert.equal(verified.status, 'verified');
+  assert.equal(verified.evidence.databaseStatus, 'existing');
+  assert.equal(
+    verified.evidence.commitDigest,
+    applied.result.evidence.commitDigest,
+  );
+
+  fs.unlinkSync(path.join(value.transformationRoot, 'commit.json'));
+  fs.renameSync(
+    recoveryModel,
+    path.join(value.transformationRoot, '.reclaiming-model'),
+  );
+  privateFile(
+    path.join(value.transformationRoot, '.commit-incomplete'),
+    `${JSON.stringify({
+      schemaVersion: 1,
+      kind: 'qinglong3-legacy-data-directory-application-incomplete',
+      mutationId: options.mutationId,
+      transformationDigest: options.expectedTransformationDigest,
+      receiptDigest: applied.result.evidence.receiptDigest,
+    })}\n`,
+  );
+  const recovered = run(
+    value,
+    'directory-apply-recover-renamed-model',
+    DIRECTORY_APPLY,
+    options,
+  ).result;
+  assert.equal(recovered.evidence.databaseStatus, 'existing');
+  assert.equal(
+    recovered.evidence.commitDigest,
+    applied.result.evidence.commitDigest,
+  );
+  assert.deepEqual(fs.readdirSync(value.transformationRoot).sort(), [
+    'commit.json',
+    'manifest.json',
+  ]);
+});
+
+test('rolls back every new Secret when one application target already exists', async (t) => {
+  const value = fixture(t);
+  configureTransformationInput(value);
+  const { prepared, staged } = stageForTransformation(value);
+  const authority = await provisionApplicationAuthority(value);
+  const transformed = run(
+    value,
+    'directory-transform-before-conflict',
+    DIRECTORY_TRANSFORM,
+    transformationOptions(value, prepared, staged, 'default'),
+  ).result;
+  const imports = JSON.parse(
+    fs.readFileSync(
+      path.join(value.transformationRoot, 'model', 'secret-imports.json'),
+      'utf8',
+    ),
+  ).imports;
+  assert.equal(imports.length, 2);
+  const conflictingName = imports[1].targetName;
+  const database = new DatabaseSync(value.targetPath);
+  try {
+    database
+      .prepare(
+        `INSERT INTO "QingLong3LocalSecretEnvelopes" (
+           "project_id", "secret_name", "version", "mutation_id", "key_id",
+           "algorithm", "nonce", "ciphertext", "auth_tag", "created_at_ms"
+         ) VALUES ('default', ?, 1, ?, 'preexisting-v1', 'aes-256-gcm', ?, ?, ?, ?)`,
+      )
+      .run(
+        conflictingName,
+        'd3870000-0000-4000-8000-000000000020',
+        Buffer.alloc(12, 1),
+        Buffer.alloc(0),
+        Buffer.alloc(16, 2),
+        Date.now(),
+      );
+  } finally {
+    database.close();
+  }
+
+  const conflict = runRaw(
+    value,
+    'directory-apply-conflict',
+    DIRECTORY_APPLY,
+    applicationOptions(
+      value,
+      prepared,
+      staged,
+      authority,
+      transformed.evidence.transformationDigest,
+    ),
+  );
+  assert.equal(conflict.status, 1);
+  assert.equal(conflict.stdout, '');
+  assert.equal(
+    JSON.parse(conflict.stderr).code,
+    'LOCAL_DATA_DIRECTORY_ADOPTION_CONFLICT',
+  );
+  const rows = applicationDatabaseRows(value.targetPath);
+  assert.equal(rows.adoptions.length, 0);
+  assert.equal(rows.items.length, 0);
+  assert.equal(rows.envelopes.length, 1);
+  assert.equal(rows.envelopes[0].secretName, conflictingName);
+  assert.equal(
+    fs.existsSync(path.join(value.transformationRoot, 'model')),
+    true,
+  );
+});
+
+test('rejects a non-admin application without publishing or reclaiming the model', async (t) => {
+  const value = fixture(t);
+  configureTransformationInput(value);
+  const { prepared, staged } = stageForTransformation(value);
+  const authority = await provisionApplicationAuthority(value, 'viewer');
+  const transformed = run(
+    value,
+    'directory-transform-before-denial',
+    DIRECTORY_TRANSFORM,
+    transformationOptions(value, prepared, staged, 'default'),
+  ).result;
+  const denied = runRaw(
+    value,
+    'directory-apply-denied',
+    DIRECTORY_APPLY,
+    applicationOptions(
+      value,
+      prepared,
+      staged,
+      authority,
+      transformed.evidence.transformationDigest,
+    ),
+  );
+  assert.equal(denied.status, 1);
+  assert.equal(denied.stdout, '');
+  assert.equal(
+    JSON.parse(denied.stderr).code,
+    'LOCAL_DATA_DIRECTORY_ADOPTION_APPLICATION_FORBIDDEN',
+  );
+  const rows = applicationDatabaseRows(value.targetPath);
+  assert.equal(rows.adoptions.length, 0);
+  assert.equal(rows.items.length, 0);
+  assert.equal(rows.envelopes.length, 0);
+  assert.deepEqual(
+    rows.audits.map(({ operationId, outcome }) => [operationId, outcome]),
+    [['legacy-data.apply', 'denied']],
+  );
+  assert.equal(
+    fs.existsSync(path.join(value.transformationRoot, 'model')),
+    true,
   );
 });
