@@ -123,6 +123,14 @@ import {
   verifyLocalReconciliationReview,
   verifyLocalReconciliationReviewCommandFile,
 } from './reconciliation/review/completion';
+import {
+  commitLocalReconciliationApplication,
+  commitLocalReconciliationApplicationCommandFile,
+  prepareLocalReconciliationApplication,
+  prepareLocalReconciliationApplicationCommandFile,
+  verifyLocalReconciliationApplication,
+  verifyLocalReconciliationApplicationCommandFile,
+} from './reconciliation/application/coordinator';
 
 export {
   commitLocalReconciliationPlan,
@@ -139,7 +147,41 @@ export {
   commitLocalReconciliationReviewCommandFile,
   verifyLocalReconciliationReview,
   verifyLocalReconciliationReviewCommandFile,
+  prepareLocalReconciliationApplication,
+  prepareLocalReconciliationApplicationCommandFile,
+  commitLocalReconciliationApplication,
+  commitLocalReconciliationApplicationCommandFile,
+  verifyLocalReconciliationApplication,
+  verifyLocalReconciliationApplicationCommandFile,
 };
+
+export {
+  normalizeLocalReconciliationApplicationCommitCommand,
+  normalizeLocalReconciliationApplicationPrepareCommand,
+  normalizeLocalReconciliationApplicationVerifyCommand,
+  type LocalReconciliationApplicationCommitCommand,
+  type LocalReconciliationApplicationOptions,
+  type LocalReconciliationApplicationPrepareCommand,
+  type LocalReconciliationApplicationPrepareResult,
+  type LocalReconciliationApplicationTerminalResult,
+  type LocalReconciliationApplicationVerifyCommand,
+} from './reconciliation/application/contract';
+export {
+  localReconciliationApplicationDirectory,
+  normalizeLocalReconciliationApplicationIntent,
+  readLocalReconciliationApplicationIntent,
+  type LocalReconciliationApplicationDependencies,
+  type LocalReconciliationApplicationIntent,
+} from './reconciliation/application/coordinator';
+export {
+  normalizeLocalReconciliationApplicationPlan,
+  normalizeLocalReconciliationApplicationPlanReceipt,
+  type LocalReconciliationApplicationDatabaseDecisionSummary,
+  type LocalReconciliationApplicationDomainAction,
+  type LocalReconciliationApplicationDomainSummary,
+  type LocalReconciliationApplicationPlan,
+  type LocalReconciliationApplicationPlanReceipt,
+} from './reconciliation/application/plan';
 
 export {
   LocalDeploymentConfigurationError,

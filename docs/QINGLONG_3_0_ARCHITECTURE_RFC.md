@@ -11,6 +11,25 @@
 
 最新增量证据（2026-08-21）：
 
+- D-392/ADR-0485（已接受）：D-391 的 signed review 不能直接获得通用 DML authority；表级 `adopt_legacy/retain_both` 也不能证明
+  Automation 行级 command/trigger 兼容，更不能覆盖 Secret custody、append-only history、Plugin/AI 外部资产与 Identity/Policy 语义。
+  因此既有 Local Owner 新增 `reconciliation.application.prepare|commit|verify`，以
+  `reconciliation_reviewed → reconciliation_application_prepared → reconciliation_application_planned` CAS 建立唯一领域执行根。coordinator
+  重新验证 sealed review、issuer HMAC、decision-set 与 instance head，只用固定 counters 生成八领域、Legacy/Target 双侧、content-free 的
+  disposition/action plan；plan 不包含名称、路径、fact digest、row value、command、Secret、reviewer identity，且上限 64 KiB。Legacy fact
+  现拒绝 `retain_target`，Target fact 拒绝 `adopt_legacy/exclude_legacy`，修复了 D-391 的数据库方向语义缺口。intent/plan/receipt/seal/head
+  全部 no-replace exact replay，terminal 收敛为 `0400/0500`，专用只读 reader 不放宽通用 `0600` command-file policy。prepare/commit/verify
+  均不打开 SQLite、不执行 SQL/DML、Secret 解密、service/Docker/network，也不授予 restart/completion。实现位于既有
+  `deployment/reconciliation/application/` 的 contract/plan/coordinator 三个职责文件，没有新增 package、dependency、binary、daemon 或
+  `src/` 根平铺。聚焦套件 `35 total / 33 pass / 2 conditional Docker skip / 0 fail`，完整 Local Owner
+  `257 total / 250 pass / 7 conditional skip / 0 fail`，Git 跟踪 backend
+  `1541 total / 1539 pass / 2 conditional skip / 0 fail`；包含用户未提交测试的工作区 backend 也以 `1542/1540/2/0` 通过。18-package clean
+  build/逐包测试、八项架构/部署审计、真实 Docker readonly reconciliation `2/2` 与十四档 artifact audit 全通过。workspace 仍为 18
+  packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Owner 为 `158 source / 157 nested / 1 root binary entry`。基础
+  Edge/Standalone 精确保持 `2,611,978 / 2,612,056 bytes`、319 files、58 modules。虽无 SQL/Cluster 变更，仍额外重跑 PostgreSQL 18.6
+  arm64 physical HA：146 gates、timeline `1 → 2`，private evidence SHA-256
+  `632d71f2a5b33cf657476fbe41702064b609b12cdf2382bcddaef06f4d08279f`，独立审计无 finding，Docker 资源已清理。D-393 才能以独立 ADR
+  定义首个 Automation 行级 adapter、写前 backup、重新认证、幂等冲突、commit/replay 与 rollback。
 - D-391/ADR-0484（已接受）：既有 Local Owner 已完整实现
   `reconciliation.review.prepare|diagnostics|commit|verify`，以
   `reconciliation_planned → reconciliation_review_prepared → reconciliation_reviewed` CAS 建立唯一 review fence。diagnostics 每次只把一个

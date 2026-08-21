@@ -504,6 +504,50 @@ async function readTerminal(
   return Object.freeze({ authorization, review, receipt });
 }
 
+export interface LocalReconciliationReviewTerminal {
+  readonly intent: Readonly<LocalReconciliationReviewIntent>;
+  readonly authorization: Readonly<LocalReconciliationReviewAuthorizationEvidence>;
+  readonly review: Readonly<LocalReconciliationReview>;
+  readonly receipt: Readonly<LocalReconciliationReviewReceipt>;
+}
+
+export async function readLocalReconciliationReviewTerminal(
+  reviewRoot: string,
+  reviewId: string,
+  issuerKeyringPath: string,
+  uid: number,
+): Promise<Readonly<LocalReconciliationReviewTerminal>> {
+  const selected = paths(reviewRoot, reviewId);
+  validateDirectory(
+    selected.root,
+    uid,
+    [0o500],
+    'reconciliationReviewDirectory',
+  );
+  validateDirectory(
+    selected.staging,
+    uid,
+    [0o500],
+    'reconciliationReviewStaging',
+  );
+  validateCatalog(selected, true);
+  const intent = readIntent(selected, uid);
+  if (
+    intent.command.options.reviewRoot !== reviewRoot ||
+    intent.command.request.reviewId !== reviewId
+  ) {
+    configurationError('terminal reconciliation review path binding drifted');
+  }
+  const terminal = await readTerminal(
+    selected,
+    intent,
+    issuerKeyringPath,
+    uid,
+    [0o400],
+  );
+  return Object.freeze({ intent, ...terminal });
+}
+
 function result(
   operation: LocalReconciliationReviewTerminalResult['operation'],
   status: LocalReconciliationReviewTerminalResult['status'],

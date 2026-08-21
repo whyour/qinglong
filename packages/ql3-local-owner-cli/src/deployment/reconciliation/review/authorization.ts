@@ -9,6 +9,10 @@ import {
 } from '@qinglong/runtime-core/security';
 
 import { LocalDeploymentConfigurationError } from '../../foundation/error';
+import {
+  LOCAL_RECONCILIATION_PLAN_DOMAINS,
+  type LocalReconciliationPlanDomain,
+} from '../planning/contract';
 import type {
   LocalReconciliationReviewDecision,
   LocalReconciliationReviewDisposition,
@@ -54,7 +58,18 @@ export interface LocalReconciliationReviewAuthorizationEvidence {
   readonly reasonCounts: Readonly<
     Record<LocalReconciliationReviewReason, number>
   >;
+  readonly domainDecisionCounts: readonly Readonly<LocalReconciliationReviewAuthorizationDomainDecisionCounts>[];
   readonly header: Readonly<LocalReconciliationReviewAuthorizationHeader>;
+}
+
+export interface LocalReconciliationReviewAuthorizationDomainDecisionCounts {
+  readonly domain: LocalReconciliationPlanDomain;
+  readonly legacy: Readonly<
+    Record<LocalReconciliationReviewDisposition, number>
+  >;
+  readonly target: Readonly<
+    Record<LocalReconciliationReviewDisposition, number>
+  >;
 }
 
 interface SignatureRecord {
@@ -95,6 +110,32 @@ const REASONS = [
 
 function zeroCounts<T extends string>(keys: readonly T[]): Record<T, number> {
   return Object.fromEntries(keys.map((key) => [key, 0])) as Record<T, number>;
+}
+
+function zeroDomainDecisionCounts(): Array<{
+  domain: LocalReconciliationPlanDomain;
+  legacy: Record<LocalReconciliationReviewDisposition, number>;
+  target: Record<LocalReconciliationReviewDisposition, number>;
+}> {
+  return LOCAL_RECONCILIATION_PLAN_DOMAINS.map((domain) => ({
+    domain,
+    legacy: zeroCounts(DISPOSITIONS),
+    target: zeroCounts(DISPOSITIONS),
+  }));
+}
+
+function freezeDomainDecisionCounts(
+  counts: ReturnType<typeof zeroDomainDecisionCounts>,
+): readonly Readonly<LocalReconciliationReviewAuthorizationDomainDecisionCounts>[] {
+  return Object.freeze(
+    counts.map((selected) =>
+      Object.freeze({
+        domain: selected.domain,
+        legacy: Object.freeze({ ...selected.legacy }),
+        target: Object.freeze({ ...selected.target }),
+      }),
+    ),
+  );
 }
 
 function configurationError(message: string, cause?: unknown): never {
@@ -429,6 +470,7 @@ export async function publishLocalReconciliationReviewAuthorization(
     let decisionCount = 0;
     const dispositionCounts = zeroCounts(DISPOSITIONS);
     const reasonCounts = zeroCounts(REASONS);
+    const domainDecisionCounts = zeroDomainDecisionCounts();
     const writeContent = (value: unknown, isDecision: boolean): void => {
       const line = canonicalLine(value);
       try {
@@ -452,6 +494,11 @@ export async function publishLocalReconciliationReviewAuthorization(
       decisionCount += 1;
       dispositionCounts[selected.disposition] += 1;
       reasonCounts[selected.reason] += 1;
+      const domain = domainDecisionCounts.find(
+        (candidate) => candidate.domain === selected.domain,
+      );
+      if (!domain) configurationError('decision domain is unavailable');
+      domain[selected.database][selected.disposition] += 1;
     });
     if (!DIGEST_PATTERN.test(decisionFile.decisionFileDigest)) {
       configurationError('decision file evidence is invalid');
@@ -532,6 +579,7 @@ export async function publishLocalReconciliationReviewAuthorization(
       keyId: material.keyId,
       dispositionCounts: Object.freeze(dispositionCounts),
       reasonCounts: Object.freeze(reasonCounts),
+      domainDecisionCounts: freezeDomainDecisionCounts(domainDecisionCounts),
       header: options.header,
     });
   } catch (error) {
@@ -668,6 +716,7 @@ export async function verifyLocalReconciliationReviewAuthorization(
     }
     const dispositionCounts = zeroCounts(DISPOSITIONS);
     const reasonCounts = zeroCounts(REASONS);
+    const domainDecisionCounts = zeroDomainDecisionCounts();
     let decisionCount = 0;
     let pending = nextLine();
     if (pending === null) configurationError('signature is absent');
@@ -679,6 +728,11 @@ export async function verifyLocalReconciliationReviewAuthorization(
       decisionCount += 1;
       dispositionCounts[selected.disposition] += 1;
       reasonCounts[selected.reason] += 1;
+      const domain = domainDecisionCounts.find(
+        (candidate) => candidate.domain === selected.domain,
+      );
+      if (!domain) configurationError('decision domain is unavailable');
+      domain[selected.database][selected.disposition] += 1;
       pending.fill(0);
       pending = following;
     }
@@ -740,6 +794,7 @@ export async function verifyLocalReconciliationReviewAuthorization(
       keyId: signature.keyId,
       dispositionCounts: Object.freeze(dispositionCounts),
       reasonCounts: Object.freeze(reasonCounts),
+      domainDecisionCounts: freezeDomainDecisionCounts(domainDecisionCounts),
       header: normalizedHeader,
     });
   } catch (error) {

@@ -286,6 +286,10 @@ export function assertLocalReconciliationReviewDecisionMatchesFact(
   }
   if (
     fact.decisionRequirement === 'informational' ||
+    (fact.database === 'legacy' && selected.disposition === 'retain_target') ||
+    (fact.database === 'target' &&
+      (selected.disposition === 'adopt_legacy' ||
+        selected.disposition === 'exclude_legacy')) ||
     (fact.decisionRequirement === 'blocked' &&
       selected.disposition !== 'defer' &&
       selected.disposition !== 'manual_external') ||
