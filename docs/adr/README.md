@@ -481,6 +481,7 @@
 | [ADR-0475](./ADR-0475-legacy-system-script-open-api-compatibility.md)                                           | Legacy System、Script 与 Open API 兼容基线                                                                                                                                                    | Accepted |
 | [ADR-0476](./ADR-0476-real-legacy-sqlite-upgrade-and-rollback-rehearsal.md)                                    | 真实 Legacy SQLite 升级与回滚演练                                                                                                                                                              | Accepted |
 | [ADR-0477](./ADR-0477-bounded-legacy-data-directory-inventory.md)                                             | 有界 Legacy Data Directory 盘点                                                                                                                                                               | Accepted |
+| [ADR-0478](./ADR-0478-private-legacy-data-directory-staging.md)                                               | 私有 Legacy Data Directory 暂存与稳定校验                                                                                                                                                       | Accepted |
 
 ## 规则
 

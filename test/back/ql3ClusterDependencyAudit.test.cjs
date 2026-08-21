@@ -1790,9 +1790,14 @@ test('confines adoption and Package command authorities to owner CLI subpaths', 
     lifecycleDirectory,
     'sqlite-adoption',
   );
+  const dataDirectoryAdoptionDirectory = path.join(
+    lifecycleDirectory,
+    'data-directory-adoption',
+  );
   const pluginPackageDirectory = path.join(sourceDirectory, 'plugin-package');
   fs.mkdirSync(lifecycleDirectory, { recursive: true });
   fs.mkdirSync(sqliteAdoptionDirectory, { recursive: true });
+  fs.mkdirSync(dataDirectoryAdoptionDirectory, { recursive: true });
   fs.mkdirSync(pluginPackageDirectory, { recursive: true });
   fs.writeFileSync(
     path.join(lifecycleDirectory, 'adoption.ts'),
@@ -1809,6 +1814,13 @@ test('confines adoption and Package command authorities to owner CLI subpaths', 
     [
       "import { inspectLegacySqlitePath } from '@qinglong/local-admin';",
       "import { forbidden } from '@qinglong/local-admin/runtime';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(dataDirectoryAdoptionDirectory, 'staging.ts'),
+    [
+      "import { activation } from '@qinglong/local-admin/runtime';",
+      "import { forbidden } from '@qinglong/local-admin';",
     ].join('\n'),
   );
   const applicationCommandDirectory = path.join(
@@ -1880,8 +1892,12 @@ test('confines adoption and Package command authorities to owner CLI subpaths', 
       },
       {
         code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
-        file:
-          'packages/ql3-local-owner-cli/src/lifecycle/sqlite-adoption/command.ts',
+        file: 'packages/ql3-local-owner-cli/src/lifecycle/data-directory-adoption/staging.ts',
+        specifier: '@qinglong/local-admin',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/lifecycle/sqlite-adoption/command.ts',
         specifier: '@qinglong/local-admin/runtime',
       },
       {

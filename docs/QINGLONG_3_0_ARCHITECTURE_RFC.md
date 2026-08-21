@@ -11,6 +11,25 @@
 
 最新增量证据（2026-08-21）：
 
+- D-385/ADR-0478（已接受）：把 D-384 只读 data directory plan 推进为产品级私有 stage/verify。既有一次性 `ql3-adoption`
+  新增 exact `local-data-directory.adoption.stage|verify`；`stagingRoot` 必须是私有 deployment root 内、legacy data root 外的
+  no-replace 路径。stage 只把 `scripts/upload` 放入 `copy-reviewed`，把 `config/db/ssh.d` 放入 `transform-input`，排除
+  `db/database.sqlite` 及 sidecar；日志/备份保持外部，repo/raw/dep_cache/deps 在目标重建。复制与 verify 均拒绝 link、特殊文件、
+  owner/mode 漂移和额外条目，目录/文件统一 `0700/0600`，使用 64 KiB 缓冲，并在复制循环再次执行 Edge/Standalone 条目、总字节、
+  单文件和深度预算。目录计划必须为 reviewable、恰有一个主库且无 active sidecar；SQLite source 精确绑定
+  `<dataRoot>/db/database.sqlite`，命令复用 D-383 activation acquisition，在复制/校验期间持有 source write fence，并把 activation
+  与 SQLite adoption manifest digest 写入内容无关目录清单。`.incomplete` 在创建根后先持久化，payload/manifest 完成后才移除；
+  crash residue、目标/源漂移和扩权 command 全部失败关闭。能力继续内聚在 `lifecycle/data-directory-adoption/`，按
+  `contract/command/staging/filesystem/manifest/inventory` 职责组织；最终 orchestration 为 319 行，安全文件系统原语与 manifest
+  验证分别为 430/437 行，没有再拆 workspace package。整体不新增 dependency、binary 或常驻对象；workspace 仍为 18 packages，
+  Local Owner 为 `122 source / 121 nested / 1 root binary entry`。D-385 focused inspect/stage/verify `10/10`，Local Owner
+  `200 total / 195 pass / 5 conditional skip / 0 fail`；backend `1,535 total / 1,533 pass / 2 conditional skip / 0 fail`，
+  `pnpm build:back` 与 18-package clean build/逐包测试通过。八项架构审计和按顺序执行的 14 档 artifact audit 全 compatible；基础
+  Edge/Standalone `2,598,669 / 2,598,747` bytes、316 files、57 modules，Adopted `2,818,404 / 2,818,527` bytes、336 files、
+  58 modules，Application+AI `4,502,262 / 4,502,394` bytes、511 files、141 modules，MCP
+  `7,324,601 / 7,324,709` bytes、802 files、227 modules，证明一次性 adoption authority 未进入常驻制品。本切片不改变
+  PostgreSQL 语义，因此不重新占有 HA 证明。config/Keyv/SSH 目标转换、固定物理 Edge 的 RSS/I/O/ENOSPC/断电门及
+  systemd/OpenRC/Compose lineage 留给 D-386 以后完成。
 - D-384/ADR-0477（已接受）：完整 2.x data directory 接管先落地为一次性、只读、有界 inventory，而不是直接复用 legacy shell `tar`
   或盲拷整个目录。既有 `ql3-adoption` 新增 exact 私有命令 `local-data-directory.adoption.inspect`，固定分类
   `config/db/ssh.d→transform`、`scripts/upload→copy_reviewed`、`log/syslog/bak→retain_external(root-only)`、

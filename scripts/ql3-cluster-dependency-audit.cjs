@@ -1764,6 +1764,11 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/lifecycle/data-directory-adoption/staging.ts' &&
+          specifier === '@qinglong/local-admin/runtime'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/plugin-package/pluginPackageCommand.ts' &&
           [
             '@qinglong/local-admin/package-lifecycle',

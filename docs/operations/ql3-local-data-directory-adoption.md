@@ -1,7 +1,7 @@
-# QingLong 2.x Data Directory 盘点
+# QingLong 2.x Data Directory 接管
 
-本流程为完整 QingLong 2.x `data` 目录生成一个只读、确定性、按 Profile 有界的 3.0 接管计划。它不会复制、压缩、删除或修改
-任何文件，也不替代 [SQLite 接管流程](./ql3-local-sqlite-adoption.md)。
+本流程先为完整 QingLong 2.x `data` 目录生成一个只读、确定性、按 Profile 有界的 3.0 接管计划，再把审核过的资产 no-replace
+暂存并稳定校验。它不会删除或修改源文件，也不替代 [SQLite 接管流程](./ql3-local-sqlite-adoption.md)。
 
 ## 1. 前置条件
 
@@ -10,6 +10,9 @@
 - `dataRoot` 必须由当前 UID 拥有，且 group/world 不可写；
 - command file 继续遵守 `ql3-adoption` 的当前 UID、canonical、单链接、`0600` 私有文件要求；
 - 生产盘点建议先停止 2.x writer。若文件或目录在盘点中变化，命令会失败关闭，不会给出部分成功计划。
+- stage 前必须已经完成 SQLite inspect、stage、verify 与 activation，并保留五个绝对路径和 `activationDigest`；
+- `deploymentRoot` 与 `stagingRoot` 的父目录必须是当前 UID 拥有的 canonical `0700` 目录；`stagingRoot` 必须尚不存在且位于
+  `deploymentRoot` 内、`dataRoot` 外。
 
 ## 2. 执行 inspect
 
@@ -82,22 +85,96 @@ ql3-adoption run --command-file /secure/operator/ql3-data-directory-inspect.json
 超过任一限制都会以 `LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID` 失败。不要为了通过门禁临时改名、删除或排除资产；先保留
 现场并决定它应拆分为外部恢复资产、在目标重新生成，还是进入后续人工迁移协议。
 
-## 6. 常见失败
+## 6. 执行私有 stage
+
+审核 `assessment=reviewable`、`primaryDatabaseFiles=1`、所有 `activeSqliteSidecars=0` 后，提交完整 plan 与 SQLite activation 双围栏：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "local-data-directory.adoption.stage",
+  "options": {
+    "deploymentRoot": "/opt/qinglong3/adoption",
+    "dataRoot": "/opt/qinglong/data",
+    "stagingRoot": "/opt/qinglong3/adoption/staging/reviewed-data",
+    "profile": "edge",
+    "expectedPlanDigest": "<64-hex-directory-plan-digest>",
+    "sqlite": {
+      "sourcePath": "/opt/qinglong/data/db/database.sqlite",
+      "targetPath": "/opt/qinglong3/adoption/sqlite/qinglong3.sqlite",
+      "recoveryPath": "/opt/qinglong3/adoption/sqlite/database.pre-ql3.sqlite",
+      "manifestPath": "/opt/qinglong3/adoption/sqlite/adoption.json",
+      "activationPath": "/opt/qinglong3/adoption/sqlite/activation.json",
+      "expectedActivationDigest": "<64-hex-sqlite-activation-digest>"
+    }
+  }
+}
+```
+
+成功结果为 `status=staged`。暂存区固定包含 `payload/copy-reviewed/{scripts,upload}`、
+`payload/transform-input/{config,db,ssh.d}` 与私有 `manifest.json`；不存在的类别不会被制造。`db/database.sqlite` 及其 sidecar 不复制，
+主库恢复继续以 SQLite adoption 的 recovery/target/activation 为权威。日志、备份和缓存也不会进入 payload。
+
+所有目录归一化为 `0700`，所有文件归一化为 `0600`。复制使用 64 KiB 缓冲，并再次执行当前 Profile 的条目、字节、单文件和深度预算。
+
+## 7. 执行稳定 verify
+
+保存 stage 返回的 `manifestDigest`，使用同一组路径和 SQLite activation 执行：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "local-data-directory.adoption.verify",
+  "options": {
+    "deploymentRoot": "/opt/qinglong3/adoption",
+    "dataRoot": "/opt/qinglong/data",
+    "stagingRoot": "/opt/qinglong3/adoption/staging/reviewed-data",
+    "profile": "edge",
+    "expectedManifestDigest": "<64-hex-directory-manifest-digest>",
+    "sqlite": {
+      "sourcePath": "/opt/qinglong/data/db/database.sqlite",
+      "targetPath": "/opt/qinglong3/adoption/sqlite/qinglong3.sqlite",
+      "recoveryPath": "/opt/qinglong3/adoption/sqlite/database.pre-ql3.sqlite",
+      "manifestPath": "/opt/qinglong3/adoption/sqlite/adoption.json",
+      "activationPath": "/opt/qinglong3/adoption/sqlite/activation.json",
+      "expectedActivationDigest": "<64-hex-sqlite-activation-digest>"
+    }
+  }
+}
+```
+
+verify 会重新验证目录计划、SQLite activation/source/target、清单 exact shape、私有权限和完整 payload 语义摘要。成功结果为
+`status=verified`，且 evidence 应与 stage 的低敏 evidence 一致。
+
+## 8. 崩溃残留
+
+stage 创建暂存根后立即写入 `.incomplete`。只有 payload 和 `manifest.json` 都持久化后才删除它。命令失败或进程崩溃后：
+
+- 不要直接把残留目录当作恢复资产；
+- 不要在原路径重试，stage 会 no-replace 拒绝；
+- 先保存现场用于诊断，再由 operator 显式移走残留目录，并使用一个新的空路径重试；
+- verify 遇到 `.incomplete`、额外文件或缺失文件一律失败关闭。
+
+## 9. 常见失败
 
 - 根目录或条目 group/world 可写：修正 ownership/permission 后重新盘点；
 - symlink、硬链接或特殊文件：保留现场，确认来源和目标后人工处置；盘点不会跟随或读取；
 - 目录在盘点中变化：停止 2.x writer、同步器、下载器和仓库更新后重试；
 - 单文件或总内容超过 Profile 预算：不要改用 `tar` 绕过；为该资产设计独立流式迁移/外部保留流程；
 - 未知顶层条目：根据插件或用户资产来源登记明确处置，再进入后续 staging 设计。
+- activation 不匹配：重新执行 SQLite verify/activation，不能只替换 digest；
+- `stagingRoot` 已存在：检查是否为崩溃残留，禁止覆盖或合并；
+- stage/verify 后源或目标 drift：停止所有 writer，回到 inspect，生成并重新审核新的 plan。
 
-## 7. 当前边界
+## 10. 当前边界
 
-本命令只生成只读计划。它尚不：
+本流程已经提供 inspect、私有 stage 和稳定 verify。它仍不：
 
-- 复制、压缩、删除或转换任何资产；
-- 创建 no-replace stage、verify manifest 或 recovery；
-- 把目录计划绑定到 SQLite `planDigest`、`manifestDigest` 或 `activationDigest`；
+- 删除或修改任何源资产；
+- 把 `config`、Keyv 或 `ssh.d` 自动转换为 3.0 目标模型；
+- 把历史日志/备份复制到默认目标，或复用跨架构 repo/dependency cache；
 - 授权 service-manager/Compose cutover 或 Legacy rollback；
 - 证明固定物理路由器/NAS 上的耗时、RSS、I/O、磁盘峰值和断电恢复。
 
-在后续 D-385 stage/verify 合同完成前，保留 inspect 输出和原始 2.x data directory，不要把目录计划当作自动迁移完成证明。
+只有 `status=verified` 仍不是 cutover 授权。继续保留原始 2.x data directory、SQLite recovery 和两份 manifest，等待后续转换与部署
+lineage 完成。
