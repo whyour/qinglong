@@ -10,6 +10,9 @@ const BINARY = path.join(__dirname, '../dist/lifecycle/adoptionCli.js');
 const DIRECTORY_INSPECT = 'local-data-directory.adoption.inspect';
 const DIRECTORY_STAGE = 'local-data-directory.adoption.stage';
 const DIRECTORY_VERIFY = 'local-data-directory.adoption.verify';
+const DIRECTORY_TRANSFORM = 'local-data-directory.adoption.transform';
+const DIRECTORY_TRANSFORM_VERIFY =
+  'local-data-directory.adoption.transform.verify';
 
 function privateDirectory(directoryPath) {
   fs.mkdirSync(directoryPath, { recursive: true, mode: 0o700 });
@@ -275,6 +278,99 @@ function verifyOptions(value, prepared, manifestDigest) {
   };
 }
 
+function createKeyvDatabase(databasePath, values = {}) {
+  fs.rmSync(databasePath, { force: true });
+  const database = new DatabaseSync(databasePath);
+  database.exec('CREATE TABLE keyv(key VARCHAR(255) PRIMARY KEY, value TEXT)');
+  const insert = database.prepare('INSERT INTO keyv(key, value) VALUES (?, ?)');
+  const entries = {
+    'keyv:authInfo': {
+      value: { token: values.authSecret ?? 'legacy-auth-token-never-carried' },
+      expires: null,
+    },
+    'keyv:apps': { value: [{ id: 'legacy-app' }], expires: null },
+    'keyv:lang': { value: 'en', expires: null },
+    ...(values.extra ?? {}),
+  };
+  for (const [key, value] of Object.entries(entries)) {
+    insert.run(key, JSON.stringify(value));
+  }
+  database.close();
+  fs.chmodSync(databasePath, 0o600);
+}
+
+function configureTransformationInput(value) {
+  const secrets = {
+    environmentName: 'D386_API_TOKEN',
+    environmentValue: 'd386-environment-secret',
+    projectId: 'project-d386',
+    sshAlias: 'repository-key',
+    sshValue:
+      '-----BEGIN OPENSSH PRIVATE KEY-----\nZDM4Ni1wcml2YXRlLWtleQ==\n-----END OPENSSH PRIVATE KEY-----\n',
+    authValue: 'legacy-auth-token-never-carried',
+  };
+  privateFile(
+    path.join(value.dataRoot, 'config', 'config.sh'),
+    [
+      `export ${secrets.environmentName}='${secrets.environmentValue}'`,
+      'AutoStartBot=false',
+      'export EMPTY_VALUE=',
+      '',
+    ].join('\n'),
+  );
+  createKeyvDatabase(path.join(value.dataRoot, 'db', 'keyv.sqlite'), {
+    authSecret: secrets.authValue,
+  });
+  privateFile(
+    path.join(value.dataRoot, 'ssh.d', secrets.sshAlias),
+    secrets.sshValue,
+  );
+  privateFile(
+    path.join(value.dataRoot, 'ssh.d', `${secrets.sshAlias}.config`),
+    [
+      `Host ${secrets.sshAlias}`,
+      `  IdentityFile /root/.ssh/${secrets.sshAlias}`,
+      '  StrictHostKeyChecking no',
+      '  ProxyCommand nc -x legacy-proxy:1080 %h %p',
+      '',
+    ].join('\n'),
+  );
+  value.transformationParent = path.join(
+    value.deploymentRoot,
+    'transformations',
+  );
+  value.transformationRoot = path.join(
+    value.transformationParent,
+    'reviewed-data-v1',
+  );
+  privateDirectory(value.transformationParent);
+  return secrets;
+}
+
+function stageForTransformation(value) {
+  const prepared = prepare(value);
+  const staged = run(
+    value,
+    'directory-stage-for-transformation',
+    DIRECTORY_STAGE,
+    stageOptions(value, prepared),
+  ).result;
+  return { prepared, staged };
+}
+
+function transformationOptions(value, prepared, staged, projectId) {
+  return {
+    deploymentRoot: value.deploymentRoot,
+    dataRoot: value.dataRoot,
+    stagingRoot: value.stagingRoot,
+    transformationRoot: value.transformationRoot,
+    projectId,
+    profile: 'edge',
+    expectedManifestDigest: staged.evidence.manifestDigest,
+    sqlite: sqliteBinding(value, prepared.activationDigest),
+  };
+}
+
 test('stages only reviewed payloads behind the real SQLite activation fence', (t) => {
   const value = fixture(t);
   const prepared = prepare(value);
@@ -476,6 +572,358 @@ test('widened directory staging commands fail closed before source access', (t) 
   assert.equal(child.stdout, '');
   assert.equal(
     JSON.parse(child.stderr).code,
+    'LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID',
+  );
+});
+
+test('prepares and exactly verifies a disabled versioned legacy transformation', (t) => {
+  const value = fixture(t);
+  const secrets = configureTransformationInput(value);
+  const { prepared, staged } = stageForTransformation(value);
+  const options = transformationOptions(
+    value,
+    prepared,
+    staged,
+    secrets.projectId,
+  );
+  const transformed = run(
+    value,
+    'directory-transform',
+    DIRECTORY_TRANSFORM,
+    options,
+  );
+
+  assert.equal(transformed.result.status, 'prepared');
+  assert.equal(transformed.result.evidence.assessment, 'ready');
+  assert.match(
+    transformed.result.evidence.transformationDigest,
+    /^[0-9a-f]{64}$/,
+  );
+  for (const sensitive of [
+    value.transformationRoot,
+    secrets.projectId,
+    secrets.environmentName,
+    secrets.environmentValue,
+    secrets.sshAlias,
+    secrets.sshValue,
+    secrets.authValue,
+  ]) {
+    assert.equal(transformed.child.stdout.includes(sensitive), false);
+  }
+  assert.deepEqual(fs.readdirSync(value.transformationRoot).sort(), [
+    'manifest.json',
+    'model',
+  ]);
+  const modelRoot = path.join(value.transformationRoot, 'model');
+  const manifestText = fs.readFileSync(
+    path.join(value.transformationRoot, 'manifest.json'),
+    'utf8',
+  );
+  for (const sensitive of [
+    secrets.projectId,
+    secrets.environmentName,
+    secrets.environmentValue,
+    secrets.sshAlias,
+    secrets.sshValue,
+    secrets.authValue,
+  ]) {
+    assert.equal(manifestText.includes(sensitive), false);
+  }
+  const config = JSON.parse(
+    fs.readFileSync(path.join(modelRoot, 'config.json'), 'utf8'),
+  );
+  assert.deepEqual(
+    config.exportedEnvironment.map((entry) => entry.environmentName),
+    [secrets.environmentName],
+  );
+  assert.equal(config.retiredSettings[0].name, 'AutoStartBot');
+  assert.equal(config.omittedEmptyExports, 1);
+  assert.equal(config.activation, 'disabled');
+
+  const keyv = JSON.parse(
+    fs.readFileSync(path.join(modelRoot, 'keyv.json'), 'utf8'),
+  );
+  assert.equal(keyv.integrity, 'ok');
+  assert.equal(keyv.cachedLocale, 'en');
+  assert.equal(
+    keyv.mappings.find((entry) => entry.legacyKey === 'keyv:authInfo').state,
+    'retired',
+  );
+  assert.equal(JSON.stringify(keyv).includes(secrets.authValue), false);
+
+  const ssh = JSON.parse(
+    fs.readFileSync(path.join(modelRoot, 'ssh.json'), 'utf8'),
+  );
+  assert.equal(ssh.bindings[0].activation, 'disabled');
+  assert.equal(ssh.bindings[0].hostKeyPolicy, 'operator_verification_required');
+  assert.equal(ssh.bindings[0].legacyProxyCommandPresent, true);
+  assert.equal(ssh.bindings[0].legacyHostKeyBypassPresent, true);
+  assert.equal(JSON.stringify(ssh).includes('legacy-proxy'), false);
+  assert.equal(JSON.stringify(ssh).includes('StrictHostKeyChecking'), false);
+
+  const importPlan = JSON.parse(
+    fs.readFileSync(path.join(modelRoot, 'secret-imports.json'), 'utf8'),
+  );
+  assert.equal(importPlan.state, 'prepared');
+  assert.equal(importPlan.projectId, secrets.projectId);
+  assert.equal(importPlan.imports.length, 2);
+  const secretValues = importPlan.imports.map((entry) => {
+    const secretPath = path.join(modelRoot, entry.valueFile);
+    assert.equal(fs.statSync(secretPath).mode & 0o777, 0o600);
+    return JSON.parse(fs.readFileSync(secretPath, 'utf8')).value;
+  });
+  assert.deepEqual(
+    secretValues.sort(),
+    [secrets.environmentValue, secrets.sshValue].sort(),
+  );
+  const fullTarget =
+    fs.readFileSync(path.join(modelRoot, 'secret-imports.json'), 'utf8') +
+    fs.readFileSync(path.join(modelRoot, 'keyv.json'), 'utf8');
+  assert.equal(fullTarget.includes(secrets.authValue), false);
+
+  const verified = run(
+    value,
+    'directory-transform-verify',
+    DIRECTORY_TRANSFORM_VERIFY,
+    {
+      ...options,
+      expectedTransformationDigest:
+        transformed.result.evidence.transformationDigest,
+    },
+  ).result;
+  assert.equal(verified.status, 'verified');
+  assert.deepEqual(verified.evidence, transformed.result.evidence);
+  const replayed = run(
+    value,
+    'directory-transform-verify-replay',
+    DIRECTORY_TRANSFORM_VERIFY,
+    {
+      ...options,
+      expectedTransformationDigest:
+        transformed.result.evidence.transformationDigest,
+    },
+  ).result;
+  assert.deepEqual(replayed, verified);
+});
+
+test('transformation verification rejects target and current source drift', (t) => {
+  const target = fixture(t);
+  const targetSecrets = configureTransformationInput(target);
+  const targetStage = stageForTransformation(target);
+  const targetOptions = transformationOptions(
+    target,
+    targetStage.prepared,
+    targetStage.staged,
+    targetSecrets.projectId,
+  );
+  const transformed = run(
+    target,
+    'directory-transform-before-target-drift',
+    DIRECTORY_TRANSFORM,
+    targetOptions,
+  ).result;
+  const secretFile = fs.readdirSync(
+    path.join(target.transformationRoot, 'model', 'secret-values'),
+  )[0];
+  privateFile(
+    path.join(target.transformationRoot, 'model', 'secret-values', secretFile),
+    '{"schemaVersion":1,"kind":"qinglong3-local-secret-value","value":"tampered"}\n',
+  );
+  const targetDrift = runRaw(
+    target,
+    'directory-transform-target-drift',
+    DIRECTORY_TRANSFORM_VERIFY,
+    {
+      ...targetOptions,
+      expectedTransformationDigest: transformed.evidence.transformationDigest,
+    },
+  );
+  assert.equal(targetDrift.status, 1);
+  assert.equal(
+    JSON.parse(targetDrift.stderr).code,
+    'LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID',
+  );
+
+  const source = fixture(t);
+  const sourceSecrets = configureTransformationInput(source);
+  const sourceStage = stageForTransformation(source);
+  const sourceOptions = transformationOptions(
+    source,
+    sourceStage.prepared,
+    sourceStage.staged,
+    sourceSecrets.projectId,
+  );
+  const sourceTransformed = run(
+    source,
+    'directory-transform-before-source-drift',
+    DIRECTORY_TRANSFORM,
+    sourceOptions,
+  ).result;
+  privateFile(
+    path.join(source.dataRoot, 'config', 'config.sh'),
+    'export D386_API_TOKEN=source-drift\n',
+  );
+  const sourceDrift = runRaw(
+    source,
+    'directory-transform-source-drift',
+    DIRECTORY_TRANSFORM_VERIFY,
+    {
+      ...sourceOptions,
+      expectedTransformationDigest:
+        sourceTransformed.evidence.transformationDigest,
+    },
+  );
+  assert.equal(sourceDrift.status, 1);
+  assert.equal(
+    JSON.parse(sourceDrift.stderr).code,
+    'LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID',
+  );
+});
+
+test('unknown legacy behavior is retained as disabled manual-review evidence', (t) => {
+  const value = fixture(t);
+  const secrets = configureTransformationInput(value);
+  privateFile(
+    path.join(value.dataRoot, 'config', 'config.sh'),
+    `export ${secrets.environmentName}=${secrets.environmentValue}\neval dangerous\n`,
+  );
+  const keyvPath = path.join(value.dataRoot, 'db', 'keyv.sqlite');
+  const keyv = new DatabaseSync(keyvPath);
+  keyv
+    .prepare('INSERT INTO keyv(key, value) VALUES (?, ?)')
+    .run('keyv:unknown', JSON.stringify({ value: 'retain', expires: null }));
+  keyv.close();
+  privateFile(path.join(value.dataRoot, 'ssh.d', 'unpaired-key'), 'manual');
+  const { prepared, staged } = stageForTransformation(value);
+  const transformed = run(
+    value,
+    'directory-transform-manual',
+    DIRECTORY_TRANSFORM,
+    transformationOptions(value, prepared, staged, secrets.projectId),
+  ).result;
+
+  assert.equal(transformed.evidence.assessment, 'manual_required');
+  assert.equal(transformed.evidence.model.manualCategories, 3);
+  const modelRoot = path.join(value.transformationRoot, 'model');
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(modelRoot, 'config.json'), 'utf8'))
+      .unsupportedLines,
+    1,
+  );
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(modelRoot, 'keyv.json'), 'utf8'))
+      .unknownEntries,
+    1,
+  );
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(modelRoot, 'ssh.json'), 'utf8'))
+      .manualEntries,
+    1,
+  );
+  const manual = JSON.parse(
+    fs.readFileSync(path.join(modelRoot, 'manual-review.json'), 'utf8'),
+  );
+  assert.equal(manual.required, true);
+  assert.equal(manual.activation, 'disabled');
+});
+
+test('edge Secret budget leaves no-replace recovery residue', (t) => {
+  const value = fixture(t);
+  const secrets = configureTransformationInput(value);
+  privateFile(
+    path.join(value.dataRoot, 'config', 'config.sh'),
+    `${Array.from(
+      { length: 129 },
+      (_, index) => `export D386_${index}=value`,
+    ).join('\n')}\n`,
+  );
+  const { prepared, staged } = stageForTransformation(value);
+  const options = transformationOptions(
+    value,
+    prepared,
+    staged,
+    secrets.projectId,
+  );
+  const overBudget = runRaw(
+    value,
+    'directory-transform-over-budget',
+    DIRECTORY_TRANSFORM,
+    options,
+  );
+  assert.equal(overBudget.status, 1);
+  assert.equal(
+    JSON.parse(overBudget.stderr).code,
+    'LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID',
+  );
+  const marker = path.join(value.transformationRoot, '.incomplete');
+  const residue = fs.readFileSync(marker, 'utf8');
+  const replay = runRaw(
+    value,
+    'directory-transform-over-budget-replay',
+    DIRECTORY_TRANSFORM,
+    options,
+  );
+  assert.equal(replay.status, 1);
+  assert.equal(fs.readFileSync(marker, 'utf8'), residue);
+});
+
+test('widened transformation commands fail closed before source access', (t) => {
+  const value = fixture(t);
+  const missingData = path.join(value.deploymentRoot, 'missing-source');
+  const child = runRaw(value, 'widened-transform', DIRECTORY_TRANSFORM, {
+    deploymentRoot: value.deploymentRoot,
+    dataRoot: missingData,
+    stagingRoot: path.join(value.deploymentRoot, 'missing-stage'),
+    transformationRoot: path.join(value.deploymentRoot, 'missing-transform'),
+    projectId: 'project-d386',
+    profile: 'edge',
+    expectedManifestDigest: '0'.repeat(64),
+    sqlite: {
+      sourcePath: path.join(missingData, 'db', 'database.sqlite'),
+      targetPath: path.join(value.artifactsDirectory, 'missing-target'),
+      recoveryPath: path.join(value.artifactsDirectory, 'missing-recovery'),
+      manifestPath: path.join(value.artifactsDirectory, 'missing-manifest'),
+      activationPath: path.join(value.artifactsDirectory, 'missing-activation'),
+      expectedActivationDigest: '0'.repeat(64),
+    },
+    extraAuthority: true,
+  });
+  assert.equal(child.status, 1);
+  assert.equal(child.stdout, '');
+  assert.equal(
+    JSON.parse(child.stderr).code,
+    'LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID',
+  );
+
+  const invalidProject = runRaw(
+    value,
+    'invalid-transform-project',
+    DIRECTORY_TRANSFORM,
+    {
+      deploymentRoot: value.deploymentRoot,
+      dataRoot: missingData,
+      stagingRoot: path.join(value.deploymentRoot, 'missing-stage'),
+      transformationRoot: path.join(value.deploymentRoot, 'missing-transform'),
+      projectId: 'project with spaces',
+      profile: 'edge',
+      expectedManifestDigest: '0'.repeat(64),
+      sqlite: {
+        sourcePath: path.join(missingData, 'db', 'database.sqlite'),
+        targetPath: path.join(value.artifactsDirectory, 'missing-target'),
+        recoveryPath: path.join(value.artifactsDirectory, 'missing-recovery'),
+        manifestPath: path.join(value.artifactsDirectory, 'missing-manifest'),
+        activationPath: path.join(
+          value.artifactsDirectory,
+          'missing-activation',
+        ),
+        expectedActivationDigest: '0'.repeat(64),
+      },
+    },
+  );
+  assert.equal(invalidProject.status, 1);
+  assert.equal(invalidProject.stdout, '');
+  assert.equal(
+    JSON.parse(invalidProject.stderr).code,
     'LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID',
   );
 });

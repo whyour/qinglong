@@ -1,7 +1,7 @@
 # QingLong 2.x Data Directory 接管
 
 本流程先为完整 QingLong 2.x `data` 目录生成一个只读、确定性、按 Profile 有界的 3.0 接管计划，再把审核过的资产 no-replace
-暂存并稳定校验。它不会删除或修改源文件，也不替代 [SQLite 接管流程](./ql3-local-sqlite-adoption.md)。
+暂存、转换并稳定校验。它不会删除或修改源文件，也不替代 [SQLite 接管流程](./ql3-local-sqlite-adoption.md)。
 
 ## 1. 前置条件
 
@@ -13,6 +13,8 @@
 - stage 前必须已经完成 SQLite inspect、stage、verify 与 activation，并保留五个绝对路径和 `activationDigest`；
 - `deploymentRoot` 与 `stagingRoot` 的父目录必须是当前 UID 拥有的 canonical `0700` 目录；`stagingRoot` 必须尚不存在且位于
   `deploymentRoot` 内、`dataRoot` 外。
+- transform 前创建私有 canonical `0700` transformation parent；`transformationRoot` 必须尚不存在，位于 `deploymentRoot` 内，且与
+  `dataRoot`、`stagingRoot` 互不包含。
 
 ## 2. 执行 inspect
 
@@ -146,16 +148,91 @@ ql3-adoption run --command-file /secure/operator/ql3-data-directory-inspect.json
 verify 会重新验证目录计划、SQLite activation/source/target、清单 exact shape、私有权限和完整 payload 语义摘要。成功结果为
 `status=verified`，且 evidence 应与 stage 的低敏 evidence 一致。
 
-## 8. 崩溃残留
+## 8. 准备版本化转换模型
 
-stage 创建暂存根后立即写入 `.incomplete`。只有 payload 和 `manifest.json` 都持久化后才删除它。命令失败或进程崩溃后：
+只有 stage verify 成功且 operator 已保存 `manifestDigest` 后才执行 transform。`projectId` 是后续 Secret 与 binding 的目标 Project，不能
+使用占位值或其他环境的 Project：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "local-data-directory.adoption.transform",
+  "options": {
+    "deploymentRoot": "/opt/qinglong3/adoption",
+    "dataRoot": "/opt/qinglong/data",
+    "stagingRoot": "/opt/qinglong3/adoption/staging/reviewed-data",
+    "transformationRoot": "/opt/qinglong3/adoption/transformations/reviewed-data-v1",
+    "projectId": "<target-project-id>",
+    "profile": "edge",
+    "expectedManifestDigest": "<64-hex-directory-manifest-digest>",
+    "sqlite": {
+      "sourcePath": "/opt/qinglong/data/db/database.sqlite",
+      "targetPath": "/opt/qinglong3/adoption/sqlite/qinglong3.sqlite",
+      "recoveryPath": "/opt/qinglong3/adoption/sqlite/database.pre-ql3.sqlite",
+      "manifestPath": "/opt/qinglong3/adoption/sqlite/adoption.json",
+      "activationPath": "/opt/qinglong3/adoption/sqlite/activation.json",
+      "expectedActivationDigest": "<64-hex-sqlite-activation-digest>"
+    }
+  }
+}
+```
+
+成功返回 `status=prepared`、`transformationDigest` 和低敏计数/摘要。私有 `model/` 包含 Project ID、环境变量名、SSH alias 和待导入
+Secret 明文，必须按高敏迁移材料保护，不能写入日志、提交 Git、上传 issue 或复制进普通备份。
+
+转换规则固定如下：
+
+- 不执行 `config.sh`；简单非空 export 生成 Secret input，非 export setting 退役，复杂/重复行要求人工复核；
+- `keyv:authInfo` 淘汰且必须重新签发 credential；`apps/lang` 只与主 SQLite authority reconciliation；未知 Keyv 内容人工复核；
+- SSH 私钥和 config 分离；历史 `ProxyCommand` 与 `StrictHostKeyChecking no` 不继承，所有 binding 保持 disabled，必须人工核验 host key；
+- Edge 最多 128 个 Secret draft、256 个 Keyv row/4 MiB；Standalone 为 512 个 Secret、2,048 row/16 MiB；单 Secret 16 KiB。
+
+`assessment=manual_required` 不表示数据丢失：原始内容仍在 D-385 staging 中。operator 应审核 `manual-review.json` 和对应原始 snapshot，
+不得手改 manifest 或把 disabled binding 直接启用。
+
+## 9. 校验转换模型
+
+保存 transform 返回的 `transformationDigest`，在相同 options 上增加该字段并执行：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "local-data-directory.adoption.transform.verify",
+  "options": {
+    "deploymentRoot": "/opt/qinglong3/adoption",
+    "dataRoot": "/opt/qinglong/data",
+    "stagingRoot": "/opt/qinglong3/adoption/staging/reviewed-data",
+    "transformationRoot": "/opt/qinglong3/adoption/transformations/reviewed-data-v1",
+    "projectId": "<target-project-id>",
+    "profile": "edge",
+    "expectedManifestDigest": "<64-hex-directory-manifest-digest>",
+    "expectedTransformationDigest": "<64-hex-transformation-digest>",
+    "sqlite": {
+      "sourcePath": "/opt/qinglong/data/db/database.sqlite",
+      "targetPath": "/opt/qinglong3/adoption/sqlite/qinglong3.sqlite",
+      "recoveryPath": "/opt/qinglong3/adoption/sqlite/database.pre-ql3.sqlite",
+      "manifestPath": "/opt/qinglong3/adoption/sqlite/adoption.json",
+      "activationPath": "/opt/qinglong3/adoption/sqlite/activation.json",
+      "expectedActivationDigest": "<64-hex-sqlite-activation-digest>"
+    }
+  }
+}
+```
+
+成功返回 `status=verified`，evidence 应与 transform 完全相同。verify 会在目标校验前后重新验证 D-385 staging、当前 2.x source 和 SQLite
+activation，并检查目标 exact 文件集、私有 mode、Project/profile/path binding、Secret value digest 和完整模型树摘要。
+
+## 10. 崩溃残留与恢复
+
+stage 和 transform 都在创建目标根后立即写入 `.incomplete`。只有 payload/model 和 `manifest.json` 都持久化且静态校验通过后才删除。
+命令失败或进程崩溃后：
 
 - 不要直接把残留目录当作恢复资产；
-- 不要在原路径重试，stage 会 no-replace 拒绝；
+- 不要在原路径重试，stage/transform 会 no-replace 拒绝；
 - 先保存现场用于诊断，再由 operator 显式移走残留目录，并使用一个新的空路径重试；
 - verify 遇到 `.incomplete`、额外文件或缺失文件一律失败关闭。
 
-## 9. 常见失败
+## 11. 常见失败
 
 - 根目录或条目 group/world 可写：修正 ownership/permission 后重新盘点；
 - symlink、硬链接或特殊文件：保留现场，确认来源和目标后人工处置；盘点不会跟随或读取；
@@ -165,16 +242,20 @@ stage 创建暂存根后立即写入 `.incomplete`。只有 payload 和 `manifes
 - activation 不匹配：重新执行 SQLite verify/activation，不能只替换 digest；
 - `stagingRoot` 已存在：检查是否为崩溃残留，禁止覆盖或合并；
 - stage/verify 后源或目标 drift：停止所有 writer，回到 inspect，生成并重新审核新的 plan。
+- `transformationRoot` 已存在或有 `.incomplete`：保留诊断现场，显式移走后选择新的空路径，禁止覆盖或续写；
+- Keyv schema、row 或字节超限：不要把数据库当 JSON dump 绕过，先确认版本和未知数据归属；
+- `manual_required`：从 D-385 staging 审核相应原始输入；不要执行旧 shell、复用 `authInfo` 或启用旧 SSH config；
+- transform verify drift：停止后续 apply，保留 D-385 staging 和 transformation root，重新建立新的版本化转换路径。
 
-## 10. 当前边界
+## 12. 当前边界
 
-本流程已经提供 inspect、私有 stage 和稳定 verify。它仍不：
+本流程已经提供 inspect、私有 stage、版本化 transform 和两级稳定 verify。它仍不：
 
 - 删除或修改任何源资产；
-- 把 `config`、Keyv 或 `ssh.d` 自动转换为 3.0 目标模型；
+- 把 prepared Secret/settings/SSH binding 写入或激活到 3.0 目标数据库；
 - 把历史日志/备份复制到默认目标，或复用跨架构 repo/dependency cache；
 - 授权 service-manager/Compose cutover 或 Legacy rollback；
 - 证明固定物理路由器/NAS 上的耗时、RSS、I/O、磁盘峰值和断电恢复。
 
-只有 `status=verified` 仍不是 cutover 授权。继续保留原始 2.x data directory、SQLite recovery 和两份 manifest，等待后续转换与部署
-lineage 完成。
+即使 transform 返回 `status=prepared` 且 transform.verify 返回 `status=verified`，仍不是 apply 或 cutover 授权。继续保留原始 2.x
+data directory、SQLite recovery、D-385 staging 和两份 manifest，等待受认证 apply/commit 与部署 lineage 完成。

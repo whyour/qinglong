@@ -2,6 +2,7 @@ import path from 'node:path';
 
 const MAX_PATH_BYTES = 4_096;
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
+const PROJECT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export const LOCAL_DATA_DIRECTORY_ADOPTION_INSPECT_OPERATION =
   'local-data-directory.adoption.inspect' as const;
@@ -9,11 +10,17 @@ export const LOCAL_DATA_DIRECTORY_ADOPTION_STAGE_OPERATION =
   'local-data-directory.adoption.stage' as const;
 export const LOCAL_DATA_DIRECTORY_ADOPTION_VERIFY_OPERATION =
   'local-data-directory.adoption.verify' as const;
+export const LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_OPERATION =
+  'local-data-directory.adoption.transform' as const;
+export const LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION =
+  'local-data-directory.adoption.transform.verify' as const;
 
 export type LocalDataDirectoryAdoptionOperation =
   | typeof LOCAL_DATA_DIRECTORY_ADOPTION_INSPECT_OPERATION
   | typeof LOCAL_DATA_DIRECTORY_ADOPTION_STAGE_OPERATION
-  | typeof LOCAL_DATA_DIRECTORY_ADOPTION_VERIFY_OPERATION;
+  | typeof LOCAL_DATA_DIRECTORY_ADOPTION_VERIFY_OPERATION
+  | typeof LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_OPERATION
+  | typeof LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION;
 
 export interface InspectLocalDataDirectoryAdoptionCommand {
   readonly schemaVersion: 1;
@@ -57,10 +64,33 @@ export interface VerifyLocalDataDirectoryAdoptionCommand {
   };
 }
 
+interface LocalDataDirectoryAdoptionTransformationOptions
+  extends LocalDataDirectoryAdoptionMutationOptions {
+  readonly transformationRoot: string;
+  readonly projectId: string;
+  readonly expectedManifestDigest: string;
+}
+
+export interface TransformLocalDataDirectoryAdoptionCommand {
+  readonly schemaVersion: 1;
+  readonly operation: typeof LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_OPERATION;
+  readonly options: LocalDataDirectoryAdoptionTransformationOptions;
+}
+
+export interface VerifyLocalDataDirectoryAdoptionTransformationCommand {
+  readonly schemaVersion: 1;
+  readonly operation: typeof LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION;
+  readonly options: LocalDataDirectoryAdoptionTransformationOptions & {
+    readonly expectedTransformationDigest: string;
+  };
+}
+
 export type LocalDataDirectoryAdoptionCommand =
   | InspectLocalDataDirectoryAdoptionCommand
   | StageLocalDataDirectoryAdoptionCommand
-  | VerifyLocalDataDirectoryAdoptionCommand;
+  | VerifyLocalDataDirectoryAdoptionCommand
+  | TransformLocalDataDirectoryAdoptionCommand
+  | VerifyLocalDataDirectoryAdoptionTransformationCommand;
 
 export class LocalDataDirectoryAdoptionConfigurationError extends TypeError {
   readonly code = 'LOCAL_DATA_DIRECTORY_ADOPTION_CONFIGURATION_INVALID';
@@ -97,7 +127,9 @@ export function isLocalDataDirectoryAdoptionOperation(
   return (
     value === LOCAL_DATA_DIRECTORY_ADOPTION_INSPECT_OPERATION ||
     value === LOCAL_DATA_DIRECTORY_ADOPTION_STAGE_OPERATION ||
-    value === LOCAL_DATA_DIRECTORY_ADOPTION_VERIFY_OPERATION
+    value === LOCAL_DATA_DIRECTORY_ADOPTION_VERIFY_OPERATION ||
+    value === LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_OPERATION ||
+    value === LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION
   );
 }
 
@@ -187,26 +219,37 @@ export function normalizeLocalDataDirectoryAdoptionCommand(
     );
   }
   const options = candidate.options as Record<string, unknown>;
-  const expectedKeys =
-    candidate.operation === LOCAL_DATA_DIRECTORY_ADOPTION_INSPECT_OPERATION
-      ? ['dataRoot', 'profile']
-      : candidate.operation === LOCAL_DATA_DIRECTORY_ADOPTION_STAGE_OPERATION
-      ? [
-          'dataRoot',
-          'deploymentRoot',
-          'expectedPlanDigest',
-          'profile',
-          'sqlite',
-          'stagingRoot',
-        ]
-      : [
-          'dataRoot',
-          'deploymentRoot',
-          'expectedManifestDigest',
-          'profile',
-          'sqlite',
-          'stagingRoot',
-        ];
+  let expectedKeys: readonly string[];
+  if (candidate.operation === LOCAL_DATA_DIRECTORY_ADOPTION_INSPECT_OPERATION) {
+    expectedKeys = ['dataRoot', 'profile'];
+  } else if (
+    candidate.operation === LOCAL_DATA_DIRECTORY_ADOPTION_STAGE_OPERATION
+  ) {
+    expectedKeys = [
+      'dataRoot',
+      'deploymentRoot',
+      'expectedPlanDigest',
+      'profile',
+      'sqlite',
+      'stagingRoot',
+    ];
+  } else {
+    expectedKeys = [
+      'dataRoot',
+      'deploymentRoot',
+      'expectedManifestDigest',
+      'profile',
+      'sqlite',
+      'stagingRoot',
+      ...(candidate.operation === LOCAL_DATA_DIRECTORY_ADOPTION_VERIFY_OPERATION
+        ? []
+        : ['projectId', 'transformationRoot']),
+      ...(candidate.operation ===
+      LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION
+        ? ['expectedTransformationDigest']
+        : []),
+    ];
+  }
   if (
     !exactKeys(options, expectedKeys) ||
     !normalizedAbsolutePath(options.dataRoot) ||
@@ -234,6 +277,32 @@ export function normalizeLocalDataDirectoryAdoptionCommand(
       throw new LocalDataDirectoryAdoptionConfigurationError(
         'reviewed adoption digest is invalid',
       );
+    }
+    if (
+      candidate.operation ===
+        LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_OPERATION ||
+      candidate.operation ===
+        LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION
+    ) {
+      if (
+        !normalizedAbsolutePath(options.transformationRoot) ||
+        typeof options.projectId !== 'string' ||
+        !PROJECT_ID_PATTERN.test(options.projectId)
+      ) {
+        throw new LocalDataDirectoryAdoptionConfigurationError(
+          'transformation target binding is invalid',
+        );
+      }
+      if (
+        candidate.operation ===
+          LOCAL_DATA_DIRECTORY_ADOPTION_TRANSFORM_VERIFY_OPERATION &&
+        (typeof options.expectedTransformationDigest !== 'string' ||
+          !DIGEST_PATTERN.test(options.expectedTransformationDigest))
+      ) {
+        throw new LocalDataDirectoryAdoptionConfigurationError(
+          'transformation digest is invalid',
+        );
+      }
     }
   }
   return Object.freeze(value as LocalDataDirectoryAdoptionCommand);

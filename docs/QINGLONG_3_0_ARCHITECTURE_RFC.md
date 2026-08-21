@@ -11,6 +11,23 @@
 
 最新增量证据（2026-08-21）：
 
+- D-386/ADR-0479（已接受）：把 D-385 的 `config/db/ssh.d` 私有 snapshot 转成 no-replace、版本化、Project-bound 的 prepared model，
+  新增 exact `local-data-directory.adoption.transform|transform.verify`。`config.sh` 永不执行，只把简单非空 export 写入独立
+  `qinglong3-local-secret-value` 文件，非 export setting 退役，复杂/重复行转人工复核；Keyv 以 read-only defensive SQLite 和 reviewed
+  v4 schema 有界读取，`authInfo` 固定淘汰并要求 credential reissue，`apps/lang` 只与主数据库 reconciliation，未知 row/schema 转人工；
+  SSH 只接受私钥/config 严格配对，私钥转 Secret，`ProxyCommand` 文本和 host-key bypass 永不继承，binding 固定 disabled 并要求 operator
+  验证 host key。私有 `model/` 含待认证导入材料，根 manifest/stdout 只含摘要；转换前后重复验证 D-385 source，目标 exact verify 绑定
+  stage、Project/path 摘要与 transformation digest。`.incomplete` 保留失败现场，成功只表示 `prepared`，不授权目标数据库写入或激活。
+  Edge/Standalone Secret 上限为 128/512，Keyv 上限为 256/2,048 rows 和 4/16 MiB；无网络、常驻资源、新 package、依赖、binary 或
+  部署对象。代码内聚在 `lifecycle/data-directory-adoption/transformation/` 的七个职责文件，workspace 仍为 18 packages、
+  `singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为 `129 source / 128 nested / 1 root binary entry`。D-386 data
+  directory 聚焦套件 `10/10`；Local Owner `205 total / 200 pass / 5 conditional skip / 0 fail`，backend
+  `1,535 total / 1,533 pass / 2 conditional skip / 0 fail`，`pnpm build:back` 与 18-package clean build/逐包测试通过。八项架构
+  审计和按顺序执行的 14 档 artifact audit 全 compatible；基础 Edge/Standalone `2,598,669 / 2,598,747` bytes、316 files、
+  57 modules，Adopted `2,818,404 / 2,818,527` bytes、336 files、58 modules，Application+AI
+  `4,502,262 / 4,502,394` bytes、511 files、141 modules，MCP `7,324,601 / 7,324,709` bytes、802 files、227 modules，均与
+  D-385 相同，证明转换 authority 未进入低配常驻闭包。本切片不改变 PostgreSQL 语义，因此不重新占有 HA 证明。D-387 应实现受认证、
+  可审计、可重放的 prepared-model apply/commit 与 Secret 回收，而不是在转换器中混入写 authority。
 - D-385/ADR-0478（已接受）：把 D-384 只读 data directory plan 推进为产品级私有 stage/verify。既有一次性 `ql3-adoption`
   新增 exact `local-data-directory.adoption.stage|verify`；`stagingRoot` 必须是私有 deployment root 内、legacy data root 外的
   no-replace 路径。stage 只把 `scripts/upload` 放入 `copy-reviewed`，把 `config/db/ssh.d` 放入 `transform-input`，排除
