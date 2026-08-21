@@ -484,6 +484,7 @@
 | [ADR-0478](./ADR-0478-private-legacy-data-directory-staging.md)                                               | 私有 Legacy Data Directory 暂存与稳定校验                                                                                                                                                       | Accepted |
 | [ADR-0479](./ADR-0479-private-versioned-legacy-config-keyv-ssh-transformation.md)                            | 私有、版本化的 Legacy Config、Keyv 与 SSH 转换                                                                                                                                                    | Accepted |
 | [ADR-0480](./ADR-0480-authenticated-atomic-legacy-data-application.md)                                      | 受认证、原子且可恢复的 Legacy Data Application                                                                                                                                                    | Accepted |
+| [ADR-0481](./ADR-0481-committed-legacy-data-deployment-lineage.md)                                        | Committed Legacy Data Receipt 的本机部署 Lineage                                                                                                                                                    | Proposed（D-388 契约冻结） |
 
 ## 规则
 

@@ -11,6 +11,15 @@
 
 最新增量证据（2026-08-21）：
 
+- D-388/ADR-0481（契约已冻结，实施中）：D-387 的 committed data receipt 只作为启动前置事实，不获得 activation 或
+  rollback authority。新增 adopted-only Application v4，精确绑定 `commitPath/expectedCommitDigest/expectedReceiptDigest`，
+  并要求 Application 在 signal、SQLite、Secret、Plugin、AI 之前以 no-follow、stable-stat 和 canonical digest 验证。
+  既有 `ql3-local-deploy` 将增加独立 `local.deployment.adopted.prepare|verify`，不复用 fresh setup、不安装或启动服务；
+  systemd/OpenRC 保持 Owner intent → 最小 root bridge → Owner consumer，root 不解析 receipt，最终 cutover journal 显式携带
+  commit/receipt digest。adopted Compose 不再错误复用 fresh `/var/lib/qinglong3` path mapping，而使用宿主与容器路径字节相同的
+  identity-preserving deployment/source bind，保证 SQLite activation path digest 在真实容器内仍成立；preflight/apply/restore/
+  evidence lineage 必须继承同一 receipt。v2 fresh 与 v3 SQLite-only adoption 保持兼容，不新增 package、dependency 或常驻对象。
+  本条只记录 Proposed contract，不能在实现、故障重放、完整测试、架构与 artifact 门完成前宣称 Accepted。
 - D-387/ADR-0480（已接受）：把 D-386 prepared model 推进为受认证、Project-scoped、可审计且可恢复的原子 application。
   既有 `ql3-adoption` 增加 exact `local-data-directory.adoption.apply|apply.verify`；Owner credential 通过独立短生命周期 SQLite handle 建立
   `local_data_adoption` 强认证并要求目标 Project 的 `secret.manage`，publisher 在 `BEGIN IMMEDIATE` 内再次复验 credential、Project 与
