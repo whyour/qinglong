@@ -19,6 +19,9 @@ const {
   advanceLocalCutoverInstanceHead,
   claimLocalCutoverInstance,
 } = require('../dist/deployment/cutover/instanceLineage.js');
+const {
+  createLocalDataDirectoryApplicationCommit,
+} = require('@qinglong/local-sqlite/data-directory-application-commit');
 
 const roots = [];
 
@@ -244,6 +247,68 @@ test('binds an adopted first start to the current legacy-stopped instance head',
   assert.throws(
     () => prepareLocalServiceManagerIntent(stale),
     /lost the instance lineage compare-and-swap/,
+  );
+});
+
+test('rejects v4 legacy data receipt drift before publishing a service intent', () => {
+  const { root } = fixture();
+  const { identity, previousRecordDigest } = adoptedHead(root);
+  adoptedApplication(root, identity, previousRecordDigest);
+  const applicationPath = path.join(root, 'local-application.json');
+  const application = JSON.parse(fs.readFileSync(applicationPath, 'utf8'));
+  const commit = createLocalDataDirectoryApplicationCommit({
+    mutationId: '00000000-0000-4000-8000-000000000001',
+    projectId: 'project-edge-router-1',
+    profile: 'edge',
+    sourceStageManifestDigest: '1'.repeat(64),
+    transformationDigest: '2'.repeat(64),
+    modelDigest: '3'.repeat(64),
+    publicationDigest: '4'.repeat(64),
+    receiptDigest: '5'.repeat(64),
+    committedAtMs: 1786416000001,
+    receipt: {
+      secretCount: 2,
+      environmentSecretCount: 1,
+      sshSecretCount: 1,
+    },
+  });
+  const commitPath = path.join(root, 'legacy-data-commit.json');
+  fs.writeFileSync(commitPath, `${JSON.stringify(commit)}\n`, { mode: 0o600 });
+  fs.writeFileSync(
+    applicationPath,
+    `${JSON.stringify({
+      ...application,
+      schema: 'qinglong/local-application-process@v4',
+      legacyDataApplication: {
+        commitPath,
+        expectedCommitDigest: commit.commitDigest,
+        expectedReceiptDigest: '0'.repeat(64),
+      },
+    })}\n`,
+    { mode: 0o600 },
+  );
+  const command = prepareCommand(root);
+  command.request.lineage = {
+    mode: 'adopted',
+    cutoverId: identity.request.cutoverId,
+    generation: 1,
+    expectedActivationDigest: identity.request.expectedActivationDigest,
+    previousRecordDigest,
+  };
+  assert.throws(
+    () => prepareLocalServiceManagerIntent(command),
+    /legacy data application commit does not match the application binding/,
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(
+        root,
+        'service',
+        'service-manager-intents',
+        `${command.request.actionId}.json`,
+      ),
+    ),
+    false,
   );
 });
 

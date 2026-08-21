@@ -6,6 +6,7 @@ import {
   readPrivateLocalCommandFile,
   readPrivateLocalJsonFile,
 } from '@qinglong/local-command-file';
+import { normalizeLocalDataDirectoryApplicationCommit } from '@qinglong/local-sqlite/data-directory-application-commit';
 
 import {
   advanceLocalCutoverInstanceHead,
@@ -283,6 +284,8 @@ function adoptedPaths(
   command: Readonly<LocalServiceManagerLegacyRollbackPrepareCommand>,
   expectedApplicationDigest: string,
   expectedCommitmentDigest: string,
+  expectedLegacyDataApplicationCommitDigest: string | null | undefined,
+  expectedLegacyDataApplicationReceiptDigest: string | null | undefined,
   uid: number,
   gid: number,
 ): Readonly<AdoptedPaths> {
@@ -302,6 +305,17 @@ function adoptedPaths(
   );
   const storage = object(application.storage, 'adopted storage');
   const cutover = object(application.cutover, 'adopted cutover');
+  const legacyDataApplication =
+    application.schema === 'qinglong/local-application-process@v4'
+      ? object(application.legacyDataApplication, 'legacy data application')
+      : undefined;
+  if (legacyDataApplication !== undefined) {
+    exact(
+      legacyDataApplication,
+      ['commitPath', 'expectedCommitDigest', 'expectedReceiptDigest'],
+      'legacy data application',
+    );
+  }
   const commitmentPath = safeAbsolutePath(
     cutover.commitmentPath,
     'commitmentPath',
@@ -319,7 +333,8 @@ function adoptedPaths(
   );
   const { commitmentDigest, ...commitmentPayload } = commitment;
   if (
-    application.schema !== 'qinglong/local-application-process@v3' ||
+    (application.schema !== 'qinglong/local-application-process@v3' &&
+      application.schema !== 'qinglong/local-application-process@v4') ||
     application.profile !== command.request.profile ||
     application.instanceId !== command.request.instanceId ||
     storage.mode !== 'adopted' ||
@@ -339,6 +354,44 @@ function adoptedPaths(
     cutoverDigest(commitmentPayload) !== commitmentDigest
   ) {
     configurationError('adopted application rollback binding drifted');
+  }
+  if (legacyDataApplication === undefined) {
+    if (
+      expectedLegacyDataApplicationCommitDigest != null ||
+      expectedLegacyDataApplicationReceiptDigest != null
+    ) {
+      configurationError('legacy data application rollback lineage drifted');
+    }
+  } else {
+    try {
+      const dataCommit = normalizeLocalDataDirectoryApplicationCommit(
+        readPrivateLocalCommandFile(
+          safeAbsolutePath(
+            legacyDataApplication.commitPath,
+            'legacyDataApplication.commitPath',
+          ),
+        ),
+      );
+      if (
+        typeof expectedLegacyDataApplicationCommitDigest !== 'string' ||
+        typeof expectedLegacyDataApplicationReceiptDigest !== 'string' ||
+        dataCommit.profile !== command.request.profile ||
+        dataCommit.commitDigest !==
+          legacyDataApplication.expectedCommitDigest ||
+        dataCommit.receiptDigest !==
+          legacyDataApplication.expectedReceiptDigest ||
+        dataCommit.commitDigest !== expectedLegacyDataApplicationCommitDigest ||
+        dataCommit.receiptDigest !== expectedLegacyDataApplicationReceiptDigest
+      ) {
+        configurationError('legacy data application rollback lineage drifted');
+      }
+    } catch (error) {
+      if (error instanceof LocalDeploymentConfigurationError) throw error;
+      configurationError(
+        'legacy data application rollback lineage is invalid',
+        error,
+      );
+    }
   }
   return Object.freeze({
     activationPath: safeAbsolutePath(storage.activationPath, 'activationPath'),
@@ -571,6 +624,8 @@ export function prepareLocalServiceManagerLegacyRollback(
     command,
     stopped.evidence.applicationConfigDigest,
     stopped.evidence.commitmentDigest,
+    stopped.evidence.legacyDataApplicationCommitDigest,
+    stopped.evidence.legacyDataApplicationReceiptDigest,
     identity.uid,
     identity.gid,
   );

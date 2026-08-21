@@ -27,6 +27,8 @@ export interface LocalServiceManagerCutoverEvidence {
   readonly activationDigest: string;
   readonly commitmentDigest: string;
   readonly targetDataIdentityDigest: string;
+  readonly legacyDataApplicationCommitDigest?: string | null;
+  readonly legacyDataApplicationReceiptDigest?: string | null;
   readonly startupReceiptDigest: string | null;
   readonly shutdownReceiptDigest: string | null;
   readonly processIdentityDigest: string | null;
@@ -35,7 +37,7 @@ export interface LocalServiceManagerCutoverEvidence {
 
 export interface LocalServiceManagerCutoverRecord {
   readonly schema: typeof SCHEMA;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly actionId: string;
   readonly action: LocalServiceManagerAction;
   readonly state: LocalServiceManagerCutoverState;
@@ -135,9 +137,25 @@ export function localServiceManagerCutoverRecord(
   if (intent.lineage.mode !== 'adopted') {
     configurationError('fresh service intent has no cutover lineage');
   }
+  const hasCommitDigest = Object.hasOwn(
+    evidence,
+    'legacyDataApplicationCommitDigest',
+  );
+  const hasReceiptDigest = Object.hasOwn(
+    evidence,
+    'legacyDataApplicationReceiptDigest',
+  );
+  if (
+    hasCommitDigest !== hasReceiptDigest ||
+    (hasCommitDigest &&
+      (evidence.legacyDataApplicationCommitDigest === null) !==
+        (evidence.legacyDataApplicationReceiptDigest === null))
+  ) {
+    configurationError('legacy data application evidence is incomplete');
+  }
   const payload = Object.freeze({
     schema: SCHEMA,
-    schemaVersion: 1 as const,
+    schemaVersion: hasCommitDigest ? (2 as const) : (1 as const),
     actionId: intent.actionId,
     action: intent.action,
     state,
@@ -190,6 +208,12 @@ export function normalizeLocalServiceManagerCutoverRecord(
       'commitmentDigest',
       'managerObservationDigest',
       'managerOutcomeDigest',
+      ...(record.schemaVersion === 2
+        ? [
+            'legacyDataApplicationCommitDigest',
+            'legacyDataApplicationReceiptDigest',
+          ]
+        : []),
       'manualReason',
       'processIdentityDigest',
       'shutdownReceiptDigest',
@@ -204,7 +228,7 @@ export function normalizeLocalServiceManagerCutoverRecord(
   const { recordDigest, ...payload } = record;
   if (
     record.schema !== SCHEMA ||
-    record.schemaVersion !== 1 ||
+    (record.schemaVersion !== 1 && record.schemaVersion !== 2) ||
     typeof record.actionId !== 'string' ||
     (record.action !== 'install-enable-start' &&
       record.action !== 'start' &&
@@ -240,6 +264,11 @@ export function normalizeLocalServiceManagerCutoverRecord(
     !DIGEST_PATTERN.test(evidence.commitmentDigest) ||
     typeof evidence.targetDataIdentityDigest !== 'string' ||
     !DIGEST_PATTERN.test(evidence.targetDataIdentityDigest) ||
+    (record.schemaVersion === 2 &&
+      (!nullableDigest(evidence.legacyDataApplicationCommitDigest) ||
+        !nullableDigest(evidence.legacyDataApplicationReceiptDigest) ||
+        (evidence.legacyDataApplicationCommitDigest === null) !==
+          (evidence.legacyDataApplicationReceiptDigest === null))) ||
     !nullableDigest(evidence.startupReceiptDigest) ||
     !nullableDigest(evidence.shutdownReceiptDigest) ||
     !nullableDigest(evidence.processIdentityDigest) ||

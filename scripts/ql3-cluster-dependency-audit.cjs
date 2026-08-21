@@ -1782,6 +1782,15 @@ function auditSourceImports(root, packagePath, findings) {
           specifier === '@qinglong/local-sqlite/data-directory-adoption'
         ) &&
         !(
+          [
+            'src/deployment/service-manager/serviceManagerIntent.ts',
+            'src/deployment/service-manager/serviceCutoverConsumer.ts',
+            'src/deployment/service-manager/legacy-rollback/preparation.ts',
+          ].includes(path.relative(packageDirectory, filePath)) &&
+          specifier ===
+            '@qinglong/local-sqlite/data-directory-application-commit'
+        ) &&
+        !(
           path.relative(packageDirectory, filePath) ===
             'src/plugin-package/pluginPackageCommand.ts' &&
           [

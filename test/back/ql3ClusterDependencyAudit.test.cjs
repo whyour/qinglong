@@ -2518,6 +2518,55 @@ test('local application receives only the pure data application commit codec', (
   );
 });
 
+test('service-manager Owner consumers receive only the pure data commit codec', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-service-data-commit-codec-boundary-'),
+  );
+  const managerDirectory = path.join(
+    root,
+    'packages/ql3-local-owner-cli/src/deployment/service-manager',
+  );
+  const rollbackDirectory = path.join(managerDirectory, 'legacy-rollback');
+  fs.mkdirSync(rollbackDirectory, { recursive: true });
+  for (const filePath of [
+    path.join(managerDirectory, 'serviceManagerIntent.ts'),
+    path.join(managerDirectory, 'serviceCutoverConsumer.ts'),
+    path.join(rollbackDirectory, 'preparation.ts'),
+  ]) {
+    fs.writeFileSync(
+      filePath,
+      "import { normalize } from '@qinglong/local-sqlite/data-directory-application-commit';",
+    );
+  }
+  fs.writeFileSync(
+    path.join(managerDirectory, 'neighbor.ts'),
+    "import { normalize } from '@qinglong/local-sqlite/data-directory-application-commit';",
+  );
+  fs.appendFileSync(
+    path.join(managerDirectory, 'serviceCutoverConsumer.ts'),
+    "\nimport { mutate } from '@qinglong/local-sqlite/data-directory-adoption';",
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-owner-cli', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/service-manager/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/data-directory-application-commit',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/service-manager/serviceCutoverConsumer.ts',
+        specifier: '@qinglong/local-sqlite/data-directory-adoption',
+      },
+    ],
+  );
+});
+
 test('local AI application imports only the reviewed dynamic composition subpaths', (t) => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), 'ql3-local-ai-application-boundary-'),

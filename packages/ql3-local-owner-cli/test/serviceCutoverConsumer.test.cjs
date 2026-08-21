@@ -36,6 +36,9 @@ const {
 const {
   cutoverDigest,
 } = require('../dist/deployment/cutover/targetEvidence.js');
+const {
+  createLocalDataDirectoryApplicationCommit,
+} = require('@qinglong/local-sqlite/data-directory-application-commit');
 
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -124,9 +127,29 @@ function fixture(t) {
     ...commitmentPayload,
     commitmentDigest,
   });
+  const dataCommit = createLocalDataDirectoryApplicationCommit({
+    mutationId: '00000000-0000-4000-8000-000000000001',
+    projectId: 'project-edge-router-1',
+    profile: 'edge',
+    sourceStageManifestDigest: '9'.repeat(64),
+    transformationDigest: 'a'.repeat(64),
+    modelDigest: 'b'.repeat(64),
+    publicationDigest: 'c'.repeat(64),
+    receiptDigest: 'd'.repeat(64),
+    committedAtMs: 1786416000025,
+    receipt: {
+      secretCount: 2,
+      environmentSecretCount: 1,
+      sshSecretCount: 1,
+    },
+  });
+  const transformationRoot = path.join(root, 'transformation');
+  fs.mkdirSync(transformationRoot, { mode: 0o700 });
+  const dataCommitPath = path.join(transformationRoot, 'commit.json');
+  writePrivate(dataCommitPath, dataCommit);
   const applicationPath = path.join(root, 'local-application.json');
   writePrivate(applicationPath, {
-    schema: 'qinglong/local-application-process@v3',
+    schema: 'qinglong/local-application-process@v4',
     instanceId: 'edge-router-1',
     profile: 'edge',
     storage: {
@@ -145,6 +168,11 @@ function fixture(t) {
       cutoverId,
       commitmentPath,
       expectedCommitmentDigest: commitmentDigest,
+    },
+    legacyDataApplication: {
+      commitPath: dataCommitPath,
+      expectedCommitDigest: dataCommit.commitDigest,
+      expectedReceiptDigest: dataCommit.receiptDigest,
     },
   });
   writePrivate(
@@ -178,6 +206,8 @@ function fixture(t) {
     activationDigest,
     commitmentDigest,
     commitmentPath,
+    dataCommit,
+    dataCommitPath,
     applicationPath,
     sourcePath,
     targetPath,
@@ -554,6 +584,15 @@ test('commits adopted service active evidence and replays from the instance head
   const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
   assert.equal(record.evidence.startupReceiptDigest, receiptDigest);
   assert.match(record.evidence.processIdentityDigest, /^[0-9a-f]{64}$/);
+  assert.equal(record.schemaVersion, 2);
+  assert.equal(
+    record.evidence.legacyDataApplicationCommitDigest,
+    state.dataCommit.commitDigest,
+  );
+  assert.equal(
+    record.evidence.legacyDataApplicationReceiptDigest,
+    state.dataCommit.receiptDigest,
+  );
   assert.equal(
     (
       await consumeLocalServiceManagerCutoverOutcome(command, {
@@ -921,6 +960,40 @@ test('rejects legacy source content drift before committing service active', asy
       procRoot: state.procRoot,
     }),
     /adopted data evidence drifted/,
+  );
+  const head = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(head.state, 'legacy_stopped');
+});
+
+test('rejects legacy data receipt drift after manager outcome without advancing lineage', async (t) => {
+  const state = fixture(t);
+  const prepared = prepare(
+    state,
+    1,
+    'install-enable-start',
+    state.commitmentDigest,
+    '123e4567-e89b-42d3-a456-426614174040',
+  );
+  publishOutcome(
+    prepared,
+    'install-enable-start',
+    'active',
+    4823,
+    1786416000200,
+  );
+  publishReceipt(state, 4823, '100008');
+  const drifted = JSON.parse(fs.readFileSync(state.dataCommitPath, 'utf8'));
+  drifted.receiptDigest = '0'.repeat(64);
+  writePrivate(state.dataCommitPath, drifted);
+  await assert.rejects(
+    consumeLocalServiceManagerCutoverOutcome(consumeCommand(state, prepared), {
+      procRoot: state.procRoot,
+    }),
+    /legacy data application commitment is invalid/,
   );
   const head = readLocalCutoverInstanceHead(
     state.root,

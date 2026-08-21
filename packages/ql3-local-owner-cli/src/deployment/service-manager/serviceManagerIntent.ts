@@ -6,6 +6,7 @@ import {
   MAX_PRIVATE_LOCAL_JSON_FILE_BYTES,
   readPrivateLocalJsonFile,
 } from '@qinglong/local-command-file';
+import { normalizeLocalDataDirectoryApplicationCommit } from '@qinglong/local-sqlite/data-directory-application-commit';
 
 import { currentIdentity } from '../foundation/contract';
 import { LocalDeploymentConfigurationError } from '../foundation/error';
@@ -249,6 +250,11 @@ function parseApplicationIdentity(bytes: Buffer): Readonly<{
         targetDatabasePath: string;
         recoveryPath: string;
         manifestPath: string;
+        legacyDataApplication?: Readonly<{
+          commitPath: string;
+          expectedCommitDigest: string;
+          expectedReceiptDigest: string;
+        }>;
       }>;
 }> {
   let value: unknown;
@@ -262,7 +268,8 @@ function parseApplicationIdentity(bytes: Buffer): Readonly<{
   const application = object(value, 'application configuration');
   if (
     (application.schema !== 'qinglong/local-application-process@v2' &&
-      application.schema !== 'qinglong/local-application-process@v3') ||
+      application.schema !== 'qinglong/local-application-process@v3' &&
+      application.schema !== 'qinglong/local-application-process@v4') ||
     (application.profile !== 'edge' && application.profile !== 'standalone') ||
     typeof application.instanceId !== 'string'
   ) {
@@ -280,13 +287,32 @@ function parseApplicationIdentity(bytes: Buffer): Readonly<{
     });
   }
   const cutover = object(application.cutover, 'application cutover');
+  const legacyDataApplication =
+    application.schema === 'qinglong/local-application-process@v4'
+      ? object(
+          application.legacyDataApplication,
+          'legacy data application binding',
+        )
+      : undefined;
+  if (legacyDataApplication !== undefined) {
+    exact(
+      legacyDataApplication,
+      ['commitPath', 'expectedCommitDigest', 'expectedReceiptDigest'],
+      'legacy data application binding',
+    );
+  }
   if (
     storage.mode !== 'adopted' ||
     typeof cutover.cutoverId !== 'string' ||
     typeof storage.expectedActivationDigest !== 'string' ||
     !DIGEST_PATTERN.test(storage.expectedActivationDigest) ||
     typeof cutover.expectedCommitmentDigest !== 'string' ||
-    !DIGEST_PATTERN.test(cutover.expectedCommitmentDigest)
+    !DIGEST_PATTERN.test(cutover.expectedCommitmentDigest) ||
+    (legacyDataApplication !== undefined &&
+      (typeof legacyDataApplication.expectedCommitDigest !== 'string' ||
+        !DIGEST_PATTERN.test(legacyDataApplication.expectedCommitDigest) ||
+        typeof legacyDataApplication.expectedReceiptDigest !== 'string' ||
+        !DIGEST_PATTERN.test(legacyDataApplication.expectedReceiptDigest)))
   ) {
     configurationError('adopted application binding is invalid');
   }
@@ -316,8 +342,53 @@ function parseApplicationIdentity(bytes: Buffer): Readonly<{
       ),
       recoveryPath: safeAbsolutePath(storage.recoveryPath, 'recoveryPath'),
       manifestPath: safeAbsolutePath(storage.manifestPath, 'manifestPath'),
+      ...(legacyDataApplication === undefined
+        ? {}
+        : {
+            legacyDataApplication: Object.freeze({
+              commitPath: safeAbsolutePath(
+                legacyDataApplication.commitPath,
+                'legacyDataApplication.commitPath',
+              ),
+              expectedCommitDigest:
+                legacyDataApplication.expectedCommitDigest as string,
+              expectedReceiptDigest:
+                legacyDataApplication.expectedReceiptDigest as string,
+            }),
+          }),
     }),
   });
+}
+
+function verifyApplicationDataCommitment(
+  application: ReturnType<typeof parseApplicationIdentity>,
+): void {
+  if (
+    application.deployment.mode !== 'adopted' ||
+    application.deployment.legacyDataApplication === undefined
+  ) {
+    return;
+  }
+  try {
+    const binding = application.deployment.legacyDataApplication;
+    const commit = normalizeLocalDataDirectoryApplicationCommit(
+      readPrivateLocalJsonFile(binding.commitPath, {
+        maxBytes: 64 * 1024,
+      }),
+    );
+    if (
+      commit.profile !== application.profile ||
+      commit.commitDigest !== binding.expectedCommitDigest ||
+      commit.receiptDigest !== binding.expectedReceiptDigest
+    ) {
+      configurationError(
+        'legacy data application commit does not match the application binding',
+      );
+    }
+  } catch (error) {
+    if (error instanceof LocalDeploymentConfigurationError) throw error;
+    configurationError('legacy data application commitment is invalid', error);
+  }
 }
 
 function assertApplicationLineageBinding(
@@ -546,6 +617,7 @@ export function prepareLocalServiceManagerIntent(
       intentDigest: localServiceManagerIntentDigest(payload),
     });
     assertApplicationLineageBinding(application, intent);
+    verifyApplicationDataCommitment(application);
     assertIntentLineageHead(intent, identity.uid);
     const intentPath = localServiceManagerIntentPath(root, intent.actionId);
     const contents = `${JSON.stringify(intent, null, 2)}\n`;
@@ -700,12 +772,15 @@ export function consumeLocalServiceManagerOutcome(
     'service descriptor',
   );
   try {
+    const application = parseApplicationIdentity(applicationBytes);
     if (
       sha256(applicationBytes) !== intent.deployment.applicationConfigSha256 ||
       sha256(descriptorBytes) !== intent.descriptor.sha256
     ) {
       configurationError('service manager source material drifted');
     }
+    assertApplicationLineageBinding(application, intent);
+    verifyApplicationDataCommitment(application);
   } finally {
     applicationBytes.fill(0);
     descriptorBytes.fill(0);

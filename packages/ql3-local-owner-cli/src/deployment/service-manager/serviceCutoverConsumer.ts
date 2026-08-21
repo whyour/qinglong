@@ -7,6 +7,7 @@ import {
   readPrivateLocalCommandFile,
   readPrivateLocalJsonFile,
 } from '@qinglong/local-command-file';
+import { normalizeLocalDataDirectoryApplicationCommit } from '@qinglong/local-sqlite/data-directory-application-commit';
 
 import { currentIdentity } from '../foundation/contract';
 import { LocalDeploymentConfigurationError } from '../foundation/error';
@@ -96,6 +97,17 @@ interface AdoptedBinding {
   readonly recoveryPath: string;
   readonly manifestPath: string;
   readonly applicationConfigDigest: string;
+  readonly legacyDataApplication?: Readonly<{
+    commitPath: string;
+    commitDigest: string;
+    receiptDigest: string;
+  }>;
+}
+
+interface VerifiedAdoptedEvidence {
+  readonly targetDataIdentityDigest: string;
+  readonly legacyDataApplicationCommitDigest: string | null;
+  readonly legacyDataApplicationReceiptDigest: string | null;
 }
 
 function configurationError(message: string, cause?: unknown): never {
@@ -249,6 +261,17 @@ function adoptedBinding(
   );
   const storage = object(config.storage, 'adopted storage');
   const cutover = object(config.cutover, 'adopted cutover');
+  const legacyDataApplication =
+    config.schema === 'qinglong/local-application-process@v4'
+      ? object(config.legacyDataApplication, 'legacy data application binding')
+      : undefined;
+  if (legacyDataApplication !== undefined) {
+    exact(
+      legacyDataApplication,
+      ['commitPath', 'expectedCommitDigest', 'expectedReceiptDigest'],
+      'legacy data application binding',
+    );
+  }
   const expectedCommitmentPath = path.join(
     intent.deployment.root,
     'service',
@@ -257,7 +280,8 @@ function adoptedBinding(
     '0002-legacy-stopped.json',
   );
   if (
-    config.schema !== 'qinglong/local-application-process@v3' ||
+    (config.schema !== 'qinglong/local-application-process@v3' &&
+      config.schema !== 'qinglong/local-application-process@v4') ||
     config.profile !== intent.profile ||
     config.instanceId !== intent.instanceId ||
     storage.mode !== 'adopted' ||
@@ -265,7 +289,12 @@ function adoptedBinding(
       intent.lineage.expectedActivationDigest ||
     cutover.cutoverId !== intent.lineage.cutoverId ||
     typeof cutover.expectedCommitmentDigest !== 'string' ||
-    !DIGEST_PATTERN.test(cutover.expectedCommitmentDigest)
+    !DIGEST_PATTERN.test(cutover.expectedCommitmentDigest) ||
+    (legacyDataApplication !== undefined &&
+      (typeof legacyDataApplication.expectedCommitDigest !== 'string' ||
+        !DIGEST_PATTERN.test(legacyDataApplication.expectedCommitDigest) ||
+        typeof legacyDataApplication.expectedReceiptDigest !== 'string' ||
+        !DIGEST_PATTERN.test(legacyDataApplication.expectedReceiptDigest)))
   ) {
     configurationError('adopted application configuration drifted');
   }
@@ -280,6 +309,19 @@ function adoptedBinding(
     recoveryPath: safeAbsolutePath(storage.recoveryPath, 'recoveryPath'),
     manifestPath: safeAbsolutePath(storage.manifestPath, 'manifestPath'),
     applicationConfigDigest: intent.deployment.applicationConfigSha256,
+    ...(legacyDataApplication === undefined
+      ? {}
+      : {
+          legacyDataApplication: Object.freeze({
+            commitPath: safeAbsolutePath(
+              legacyDataApplication.commitPath,
+              'legacyDataApplication.commitPath',
+            ),
+            commitDigest: legacyDataApplication.expectedCommitDigest as string,
+            receiptDigest:
+              legacyDataApplication.expectedReceiptDigest as string,
+          }),
+        }),
   });
   if (binding.commitmentPath !== expectedCommitmentPath) {
     configurationError('adopted application material binding drifted');
@@ -381,7 +423,7 @@ function verifyAdoptedEvidence(
   intent: Readonly<LocalServiceManagerIntent>,
   binding: Readonly<AdoptedBinding>,
   uid: number,
-): string {
+): Readonly<VerifiedAdoptedEvidence> {
   const activation = object(
     readPrivateLocalCommandFile(binding.activationPath),
     'activation',
@@ -428,6 +470,31 @@ function verifyAdoptedEvidence(
   ) {
     configurationError('adopted activation or commitment drifted');
   }
+  let legacyDataApplicationCommitDigest: string | null = null;
+  let legacyDataApplicationReceiptDigest: string | null = null;
+  if (binding.legacyDataApplication !== undefined) {
+    try {
+      const dataCommit = normalizeLocalDataDirectoryApplicationCommit(
+        readPrivateLocalCommandFile(binding.legacyDataApplication.commitPath),
+      );
+      if (
+        dataCommit.profile !== intent.profile ||
+        dataCommit.commitDigest !==
+          binding.legacyDataApplication.commitDigest ||
+        dataCommit.receiptDigest !== binding.legacyDataApplication.receiptDigest
+      ) {
+        configurationError('legacy data application commitment drifted');
+      }
+      legacyDataApplicationCommitDigest = dataCommit.commitDigest;
+      legacyDataApplicationReceiptDigest = dataCommit.receiptDigest;
+    } catch (error) {
+      if (error instanceof LocalDeploymentConfigurationError) throw error;
+      configurationError(
+        'legacy data application commitment is invalid',
+        error,
+      );
+    }
+  }
   const target = privateFileIdentity(
     binding.targetPath,
     uid,
@@ -458,14 +525,18 @@ function verifyAdoptedEvidence(
   ) {
     configurationError('adopted data evidence drifted');
   }
-  return cutoverDigest({
-    target: target.digest,
-    source: source.digest,
-    recovery: recovery.digest,
-    recoverySha256,
-    manifest: manifestIdentity.digest,
-    manifestDigest,
-    sourceSha256,
+  return Object.freeze({
+    targetDataIdentityDigest: cutoverDigest({
+      target: target.digest,
+      source: source.digest,
+      recovery: recovery.digest,
+      recoverySha256,
+      manifest: manifestIdentity.digest,
+      manifestDigest,
+      sourceSha256,
+    }),
+    legacyDataApplicationCommitDigest,
+    legacyDataApplicationReceiptDigest,
   });
 }
 
@@ -721,11 +792,7 @@ export async function consumeLocalServiceManagerCutoverOutcome(
   }
   const state = desiredState(intent, outcome);
   const binding = adoptedBinding(intent);
-  const targetDataIdentityDigest = verifyAdoptedEvidence(
-    intent,
-    binding,
-    identity.uid,
-  );
+  const adoptedEvidence = verifyAdoptedEvidence(intent, binding, identity.uid);
   let startupReceiptDigest: string | null = null;
   let shutdownReceiptDigest: string | null = null;
   let processIdentityDigest: string | null = null;
@@ -806,7 +873,11 @@ export async function consumeLocalServiceManagerCutoverOutcome(
     applicationConfigDigest: binding.applicationConfigDigest,
     activationDigest: binding.activationDigest,
     commitmentDigest: binding.commitmentDigest,
-    targetDataIdentityDigest,
+    targetDataIdentityDigest: adoptedEvidence.targetDataIdentityDigest,
+    legacyDataApplicationCommitDigest:
+      adoptedEvidence.legacyDataApplicationCommitDigest,
+    legacyDataApplicationReceiptDigest:
+      adoptedEvidence.legacyDataApplicationReceiptDigest,
     startupReceiptDigest,
     shutdownReceiptDigest,
     processIdentityDigest,

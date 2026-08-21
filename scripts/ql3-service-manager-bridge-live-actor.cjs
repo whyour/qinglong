@@ -813,7 +813,12 @@ function execute(root, controllerRoot, managerOptions, prepared, uid, gid) {
   return { commandPath, result, consumed };
 }
 
-function serviceProcessUid(kind, outcome) {
+function serviceProcessUid(
+  kind,
+  outcome,
+  expectedCommand = '/bin/sleep',
+  expectedArguments = ['300'],
+) {
   let pid = kind === 'systemd' ? outcome.observation.mainPid : 0;
   if (kind === 'openrc') {
     for (const entry of fs.readdirSync('/proc')) {
@@ -822,7 +827,12 @@ function serviceProcessUid(kind, outcome) {
         const command = fs
           .readFileSync(`/proc/${entry}/cmdline`, 'utf8')
           .split('\0');
-        if (command[0] === '/bin/sleep' && command[1] === '300') {
+        if (
+          command[0] === expectedCommand &&
+          expectedArguments.every(
+            (argument, index) => command[index + 1] === argument,
+          )
+        ) {
           pid = Number(entry);
           break;
         }
@@ -1128,9 +1138,17 @@ async function main(argv) {
       ) {
         fail('adopted legacy rollback did not converge to legacy_running');
       }
-      const legacyUid = serviceProcessUid(kind, {
-        observation: adoptedLegacyStarted.outcome.legacyObservation,
-      });
+      const legacyUid = serviceProcessUid(
+        kind,
+        {
+          observation: adoptedLegacyStarted.outcome.legacyObservation,
+        },
+        fs.realpathSync(process.execPath),
+        [
+          '/workspace/scripts/ql3-service-manager-legacy-live-service.cjs',
+          String(legacyHttpPort),
+        ],
+      );
       if (legacyUid !== uid) {
         fail(`legacy service process UID drifted: ${legacyUid} != ${uid}`);
       }
