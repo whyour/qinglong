@@ -11,17 +11,20 @@
 
 最新增量证据（2026-08-21）：
 
-- D-390/ADR-0483（契约已冻结，待实现）：`reconciliation_captured` 只证明原始字节可恢复，不授予自动回灌。下一切片先把 capture
-  manifest/receipt 升为 v2：逻辑名保持内容无关，payload 改用 SQLite 可识别的固定 `target.sqlite* / legacy.sqlite* /
-  recovery.sqlite` 名称，terminal asset/directory 收敛为 `0400/0500`，并把 activation source/target baseline SHA-256 纳入 lineage。
-  main-only 使用 immutable readonly；只有 WAL+SHM 完整配对且无 journal 时使用普通 readonly，打开前后必须重验全部 asset；hot
-  journal、不完整 sidecar 或漂移不执行 SQLite recovery，直接 `manual_required`。既有 Local Owner 增加独立
-  `reconciliation.plan.prepare|commit|verify`，以 `reconciliation_captured → reconciliation_plan_prepared → reconciliation_planned`
-  CAS fence 发布固定八领域的 bounded count/digest/disposition plan。plan 不保存 row value、command、Secret、credential、日志或业务
-  标识，不产生 `import_ready/rollback_ready/legacy_ready`；unknown schema、不可逆 Run/history、Secret custody、target-only Package/AI 与
-  未映射 Legacy facts 必须保守。实现继续进入 `deployment/reconciliation/sealed-bundle|planning/`，单 handle、64 KiB builder、Edge/
-  Standalone 2/8 MiB cache，不新增 package/dependency/binary/daemon 或 Local SQLite mutation authority import。本条在 Linux/Docker
-  readonly hash-stability、crash replay、完整 package/backend、架构/release 与十四档 artifact 门完成前保持 Proposed。
+- D-390/ADR-0483（已接受）：既有 Local Owner 已实现密封 capture 的严格只读消费与独立
+  `reconciliation.plan.prepare|commit|verify`。capture v2 使用 SQLite 可识别的固定 `target.sqlite* / legacy.sqlite* /
+  recovery.sqlite` 物理名和 `0400/0500` terminal seal；main-only 走 immutable readonly，WAL+SHM 完整配对走普通 readonly，hot
+  journal、不完整 sidecar 或任一 stat/hash/mode 漂移在 SQLite open 前稳定 `manual_required`。instance head 以
+  `reconciliation_captured → reconciliation_plan_prepared → reconciliation_planned` CAS fence 发布固定八领域的 bounded
+  count/digest/disposition plan；plan 不保存 row value、command、Secret、credential、日志、表名、路径或业务标识，也不产生
+  `import_ready/rollback_ready/legacy_ready`。实现内聚在 `deployment/reconciliation/sealed-bundle|planning/`，单 SQLite handle、
+  64 KiB hash/plan 上限、Edge/Standalone 2/8 MiB cache，不新增 package、dependency 或常驻对象。真实 Linux/Docker main-only 与
+  WAL+SHM readonly/hash-stability `2/2`，聚焦 `24 total / 22 pass / 2 conditional skip / 0 fail`，Local Owner
+  `246 total / 239 pass / 7 conditional skip / 0 fail`，tracked backend `1540 total / 1538 pass / 2 conditional skip / 0 fail`，
+  18-package clean build/逐包测试、八项架构/发布审计和十四档 artifact audit 全通过。workspace 仍为 18 packages，Local Owner
+  `146 source / 145 nested / 1 root binary entry`；基础 Edge/Standalone closure 仍为 319 files、58 modules，不含一次性 plan authority。
+  下一切片 D-391 应定义消费 exact plan digest 的私有逐对象诊断、人工裁决与审批协议；它仍不能借 plan 获得自动 import 或 rollback
+  authority。
 - D-389/ADR-0482（已接受）：target stopped 后的 `reconciliation_required` 不能直接逆迁移或覆盖 2.x source；既有 Local Owner
   已实现独立 `reconciliation.capture.prepare|commit|verify`，只允许 exact stopped reconciliation head，以 instance CAS 建立唯一
   capture fence，并把 target main/sidecars、Legacy source main/sidecars、activation recovery 与内容无关 lineage 以固定 64 KiB
@@ -36,8 +39,8 @@
   `141 source / 140 nested / 1 root binary entry`；基础 Edge/Standalone artifact 仍为 `2,611,978 / 2,612,056` bytes、319 files、
   58 modules，证明一次性 capture authority 未进入低配常驻闭包。Application+AI 为 `4,529,710 / 4,529,842` bytes，MCP 为
   `7,337,910 / 7,338,018` bytes，均 compatible。独立 PostgreSQL 18.6 arm64 HA Docker 基线继续以 timeline `1 → 2`、146
-  gates 和无 finding 的 evidence audit 通过，但不把本机 capture authority 带入 Cluster。后续 D-390 应定义消费 exact
-  bundle/head 的数据域 diff、冲突裁决与受审 plan，不能把 capture completion 当作 reconciliation completion。
+  gates 和无 finding 的 evidence audit 通过，但不把本机 capture authority 带入 Cluster。D-390 已完成 exact bundle/head 的只读
+  数据域 plan；capture completion 与 plan completion 仍都不等于 reconciliation completion。
 - D-388/ADR-0481（已接受）：D-387 committed data receipt 只作为启动前置事实，不获得 activation/rollback authority。
   adopted-only Application v4 在 signal、SQLite、Secret、Plugin、AI 前以 no-follow stable descriptor 验证
   `commitPath/expectedCommitDigest/expectedReceiptDigest`；独立 `local.deployment.adopted.prepare|verify` 已覆盖 systemd、OpenRC、

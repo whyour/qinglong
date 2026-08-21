@@ -25,6 +25,8 @@ export type LocalCutoverInstanceHeadState =
   | 'target_stopped'
   | 'reconciliation_capture_prepared'
   | 'reconciliation_captured'
+  | 'reconciliation_plan_prepared'
+  | 'reconciliation_planned'
   | 'rollback_prepared'
   | 'legacy_restart_requested'
   | 'legacy_running'
@@ -158,6 +160,8 @@ function parseHead(value: unknown): Readonly<LocalCutoverInstanceHead> {
       head.state !== 'target_stopped' &&
       head.state !== 'reconciliation_capture_prepared' &&
       head.state !== 'reconciliation_captured' &&
+      head.state !== 'reconciliation_plan_prepared' &&
+      head.state !== 'reconciliation_planned' &&
       head.state !== 'rollback_prepared' &&
       head.state !== 'legacy_restart_requested' &&
       head.state !== 'legacy_running' &&
@@ -326,6 +330,8 @@ export function advanceLocalCutoverInstanceHead(
     | 'target_stopped'
     | 'reconciliation_capture_prepared'
     | 'reconciliation_captured'
+    | 'reconciliation_plan_prepared'
+    | 'reconciliation_planned'
     | 'rollback_prepared'
     | 'legacy_restart_requested'
     | 'legacy_running'
@@ -366,6 +372,8 @@ export function advanceLocalCutoverInstanceHead(
     (current.state === 'rollback_prepared' ||
       current.state === 'reconciliation_capture_prepared' ||
       current.state === 'reconciliation_captured' ||
+      current.state === 'reconciliation_plan_prepared' ||
+      current.state === 'reconciliation_planned' ||
       current.state === 'legacy_restart_requested' ||
       current.state === 'legacy_running' ||
       current.state === 'legacy_ready')
@@ -385,6 +393,10 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'target_stopped') ||
     (state === 'reconciliation_captured' &&
       current.state === 'reconciliation_capture_prepared') ||
+    (state === 'reconciliation_plan_prepared' &&
+      current.state === 'reconciliation_captured') ||
+    (state === 'reconciliation_planned' &&
+      current.state === 'reconciliation_plan_prepared') ||
     (state === 'rollback_prepared' && current.state === 'target_stopped') ||
     (state === 'legacy_restart_requested' &&
       current.state === 'rollback_prepared') ||

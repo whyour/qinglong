@@ -103,6 +103,23 @@ import {
   verifyLocalReconciliationCapture,
   verifyLocalReconciliationCaptureCommandFile,
 } from './reconciliation/bundle';
+import {
+  commitLocalReconciliationPlan,
+  commitLocalReconciliationPlanCommandFile,
+  prepareLocalReconciliationPlan,
+  prepareLocalReconciliationPlanCommandFile,
+  verifyLocalReconciliationPlan,
+  verifyLocalReconciliationPlanCommandFile,
+} from './reconciliation/planning/preparation';
+
+export {
+  commitLocalReconciliationPlan,
+  commitLocalReconciliationPlanCommandFile,
+  prepareLocalReconciliationPlan,
+  prepareLocalReconciliationPlanCommandFile,
+  verifyLocalReconciliationPlan,
+  verifyLocalReconciliationPlanCommandFile,
+};
 
 export {
   LocalDeploymentConfigurationError,
@@ -143,6 +160,34 @@ export {
   type LocalReconciliationCaptureVerifyCommand,
   type LocalReconciliationStoppedAuthority,
 } from './reconciliation/contract';
+export {
+  LOCAL_RECONCILIATION_PLAN_DOMAINS,
+  normalizeLocalReconciliationPlanCommitCommand,
+  normalizeLocalReconciliationPlanPrepareCommand,
+  normalizeLocalReconciliationPlanVerifyCommand,
+  type LocalReconciliationPlanCommitCommand,
+  type LocalReconciliationPlanDisposition,
+  type LocalReconciliationPlanDomain,
+  type LocalReconciliationPlanPrepareCommand,
+  type LocalReconciliationPlanPrepareResult,
+  type LocalReconciliationPlanTerminalResult,
+  type LocalReconciliationPlanVerifyCommand,
+} from './reconciliation/planning/contract';
+export {
+  localReconciliationPlanDirectory,
+  normalizeLocalReconciliationPlanIntent,
+  readLocalReconciliationPlanIntent,
+  type LocalReconciliationPlanDependencies,
+  type LocalReconciliationPlanIntent,
+} from './reconciliation/planning/preparation';
+export {
+  normalizeLocalReconciliationPlan,
+  normalizeLocalReconciliationPlanReceipt,
+  type LocalReconciliationPlan,
+  type LocalReconciliationPlanDatabaseSummary,
+  type LocalReconciliationPlanDomainSummary,
+  type LocalReconciliationPlanReceipt,
+} from './reconciliation/planning/plan';
 export {
   localReconciliationCaptureDirectory,
   localReconciliationCaptureIntentPath,

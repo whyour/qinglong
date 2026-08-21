@@ -555,6 +555,17 @@ function readTerminal(
   return Object.freeze({ manifest, receipt });
 }
 
+export function readLocalReconciliationCaptureTerminal(
+  captureRoot: string,
+  captureId: string,
+  uid: number,
+): Readonly<{
+  manifest: Readonly<LocalReconciliationCaptureManifest>;
+  receipt: Readonly<LocalReconciliationCaptureReceipt>;
+}> {
+  return readTerminal(capturePaths(captureRoot, captureId), uid);
+}
+
 function readPublishedManifest(
   paths: ReturnType<typeof capturePaths>,
   uid: number,

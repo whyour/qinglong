@@ -749,7 +749,9 @@ function replayResult(
   const stoppedCaptureProgress =
     record.state === 'target_stopped' &&
     (head.state === 'reconciliation_capture_prepared' ||
-      head.state === 'reconciliation_captured');
+      head.state === 'reconciliation_captured' ||
+      head.state === 'reconciliation_plan_prepared' ||
+      head.state === 'reconciliation_planned');
   if (
     record.actionId !== intent.actionId ||
     record.intentDigest !== intent.intentDigest ||

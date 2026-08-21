@@ -4,12 +4,16 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { DatabaseSync } = require('node:sqlite');
 const { test } = require('node:test');
 
 const {
   commitLocalReconciliationCapture,
+  commitLocalReconciliationPlan,
   prepareLocalReconciliationCapture,
+  prepareLocalReconciliationPlan,
   verifyLocalReconciliationCapture,
+  verifyLocalReconciliationPlan,
 } = require('../dist/deployment/localDeployment.js');
 const {
   normalizeLocalReconciliationCaptureManifest,
@@ -79,6 +83,9 @@ function fixture(
   {
     reconciliationRequired = true,
     stoppedAuthority = 'docker',
+    profile = 'edge',
+    createDefaultSidecars = true,
+    initializeDatabases,
     mutateTarget,
   } = {},
 ) {
@@ -112,9 +119,17 @@ function fixture(
     deploymentRoot,
     'local-application.json',
   );
-  fs.writeFileSync(legacySourcePath, 'legacy-source\n', { mode: 0o600 });
-  fs.writeFileSync(targetDatabasePath, 'target-initial\n', { mode: 0o600 });
-  fs.writeFileSync(recoveryPath, 'legacy-source\n', { mode: 0o600 });
+  if (initializeDatabases === undefined) {
+    fs.writeFileSync(legacySourcePath, 'legacy-source\n', { mode: 0o600 });
+    fs.writeFileSync(targetDatabasePath, 'target-initial\n', { mode: 0o600 });
+    fs.writeFileSync(recoveryPath, 'legacy-source\n', { mode: 0o600 });
+  } else {
+    initializeDatabases({
+      legacySourcePath,
+      recoveryPath,
+      targetDatabasePath,
+    });
+  }
   const manifestPayload = {
     schemaVersion: 1,
     kind: 'qinglong3-local-sqlite-adoption-manifest-fixture',
@@ -130,7 +145,7 @@ function fixture(
     schemaVersion: 1,
     kind: 'qinglong3-local-sqlite-activation',
     state: 'prepared',
-    profile: 'edge',
+    profile,
     createdAtMs: 1_000,
     adoptionManifestDigest: manifestDigest,
     planDigest: '2'.repeat(64),
@@ -172,19 +187,21 @@ function fixture(
         mode: 0o600,
       });
     }
-    fs.writeFileSync(`${targetDatabasePath}-wal`, 'target-wal-facts\n', {
-      mode: 0o600,
-    });
-    fs.writeFileSync(`${legacySourcePath}-journal`, 'legacy-journal-state\n', {
-      mode: 0o600,
-    });
+    if (createDefaultSidecars) {
+      fs.writeFileSync(`${targetDatabasePath}-wal`, 'target-wal-facts\n', {
+        mode: 0o600,
+      });
+      fs.writeFileSync(`${legacySourcePath}-journal`, 'legacy-journal-state\n', {
+        mode: 0o600,
+      });
+    }
   }
   const commitmentPayload = {
     schemaVersion: 1,
     kind: 'qinglong3-local-legacy-silence-commitment',
     state: 'legacy_stopped',
     cutoverId,
-    profile: 'edge',
+    profile,
     instanceId: 'edge-router-1',
     activationDigest,
     requestedAtMs: 1_100,
@@ -208,7 +225,7 @@ function fixture(
   const dataCommit = createLocalDataDirectoryApplicationCommit({
     mutationId: '00000000-0000-4000-8000-000000000301',
     projectId: 'project-edge-router-1',
-    profile: 'edge',
+    profile,
     sourceStageManifestDigest: '6'.repeat(64),
     transformationDigest: '7'.repeat(64),
     modelDigest: '8'.repeat(64),
@@ -228,7 +245,7 @@ function fixture(
   const application = {
     schema: 'qinglong/local-application-process@v4',
     instanceId: 'edge-router-1',
-    profile: 'edge',
+    profile,
     storage: {
       mode: 'adopted',
       sourcePath: legacySourcePath,
@@ -272,7 +289,7 @@ function fixture(
     state: 'prepared',
     bundleId: '00000000-0000-4000-8000-000000000d88',
     preparedAtMs: 1_400,
-    profile: 'edge',
+    profile,
     instanceId: 'edge-router-1',
     cutoverId,
     serviceKind: 'compose',
@@ -311,7 +328,7 @@ function fixture(
     options: { deploymentRoot },
     request: {
       cutoverId,
-      profile: 'edge',
+      profile,
       instanceId: 'edge-router-1',
       expectedActivationDigest: activationDigest,
       requestedAtMs: 2_000,
@@ -335,7 +352,7 @@ function fixture(
   );
   const reconciliation = readTargetDataReconciliationEvidenceForPaths(
     {
-      profile: 'edge',
+      profile,
       activationPath,
       legacySourcePath,
       targetDatabasePath,
@@ -346,7 +363,7 @@ function fixture(
   const runCommand = {
     request: {
       cutoverId,
-      profile: 'edge',
+      profile,
       instanceId: 'edge-router-1',
       expectedActivationDigest: activationDigest,
       generation: 1,
@@ -396,7 +413,7 @@ function fixture(
       action: 'stop',
       state: 'target_stopped',
       cutoverId,
-      profile: 'edge',
+      profile,
       instanceId: 'edge-router-1',
       activationDigest,
       generation: 1,
@@ -431,7 +448,7 @@ function fixture(
     request: {
       captureId: '00000000-0000-4000-8000-000000000101',
       stoppedAuthority,
-      profile: 'edge',
+      profile,
       instanceId: 'edge-router-1',
       cutoverId,
       generation: 1,
@@ -582,6 +599,131 @@ function preparedCapture(t, options) {
     },
   };
   return { ...state, prepared, commitCommand };
+}
+
+function planningDatabaseInitializer({ unknownTargetTable = false } = {}) {
+  return ({ legacySourcePath, recoveryPath, targetDatabasePath }) => {
+    const legacy = new DatabaseSync(legacySourcePath);
+    legacy.exec(`
+      CREATE TABLE "Crontabs" (id INTEGER PRIMARY KEY, schedule TEXT NOT NULL);
+      CREATE TABLE "Envs" (id INTEGER PRIMARY KEY, name TEXT NOT NULL, value TEXT NOT NULL);
+      INSERT INTO "Crontabs" (id, schedule) VALUES (1, '0 0 * * *');
+      INSERT INTO "Envs" (id, name, value) VALUES (1, 'TOKEN', 'private-value');
+    `);
+    legacy.close();
+    fs.chmodSync(legacySourcePath, 0o600);
+    fs.copyFileSync(legacySourcePath, recoveryPath);
+    fs.chmodSync(recoveryPath, 0o600);
+
+    const target = new DatabaseSync(targetDatabasePath);
+    target.exec(`
+      CREATE TABLE "QingLong3SchemaCapabilities" (id INTEGER PRIMARY KEY);
+      CREATE TABLE "QingLong3TaskDefinitions" (id INTEGER PRIMARY KEY);
+      CREATE TABLE "Runs" (id INTEGER PRIMARY KEY);
+      ${
+        unknownTargetTable
+          ? 'CREATE TABLE "UnreviewedFacts" (id INTEGER PRIMARY KEY); INSERT INTO "UnreviewedFacts" (id) VALUES (1);'
+          : ''
+      }
+    `);
+    target.close();
+    fs.chmodSync(targetDatabasePath, 0o600);
+  };
+}
+
+function mutatePlanningTarget({ targetDatabasePath }) {
+  const target = new DatabaseSync(targetDatabasePath);
+  target.exec('INSERT INTO "QingLong3TaskDefinitions" (id) VALUES (1)');
+  target.close();
+  return Object.freeze({});
+}
+
+function preparedPlan(t, options = {}) {
+  const state = preparedCapture(t, {
+    createDefaultSidecars: options.createDefaultSidecars ?? false,
+    initializeDatabases:
+      options.initializeDatabases ?? planningDatabaseInitializer(options),
+    mutateTarget: options.mutateTarget ?? mutatePlanningTarget,
+    profile: options.profile ?? 'edge',
+  });
+  const captured = commitLocalReconciliationCapture(state.commitCommand);
+  const planRoot = path.join(path.dirname(state.captureRoot), 'plan-root');
+  fs.mkdirSync(planRoot, { mode: 0o700 });
+  const prepareCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.plan.prepare',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      captureRoot: state.captureRoot,
+      planRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      planId: options.planId ?? '00000000-0000-4000-8000-000000000201',
+      captureId: state.command.request.captureId,
+      expectedBundleDigest: captured.bundleDigest,
+      expectedHeadDigest: captured.instanceHeadDigest,
+      legacyTimezone: options.legacyTimezone ?? null,
+      preparedAtMs: 6_000,
+    },
+  };
+  const planPrepared = prepareLocalReconciliationPlan(prepareCommand);
+  const planCommitCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.plan.commit',
+    options: prepareCommand.options,
+    request: {
+      planId: prepareCommand.request.planId,
+      expectedPreparationDigest: planPrepared.preparationDigest,
+      committedAtMs: 7_000,
+    },
+  };
+  return {
+    ...state,
+    captured,
+    planRoot,
+    prepareCommand,
+    planPrepared,
+    planCommitCommand,
+  };
+}
+
+function dockerReadSealedSqlite(assetsDirectory, mode) {
+  const source =
+    mode === 'main_only_immutable'
+      ? 'file:/bundle/target.sqlite?immutable=1'
+      : '/bundle/target.sqlite';
+  const script = `
+    const crypto = require('node:crypto');
+    const fs = require('node:fs');
+    const { DatabaseSync } = require('node:sqlite');
+    const files = fs.readdirSync('/bundle').sort();
+    const snapshot = () => Object.fromEntries(files.map((name) => [name, crypto.createHash('sha256').update(fs.readFileSync('/bundle/' + name)).digest('hex')]));
+    const before = snapshot();
+    const client = new DatabaseSync(${JSON.stringify(source)}, { allowExtension: false, defensive: true, readOnly: true, timeout: 0 });
+    client.enableDefensive(true);
+    client.exec('PRAGMA trusted_schema = OFF; PRAGMA query_only = ON; PRAGMA temp_store = MEMORY; PRAGMA mmap_size = 0; PRAGMA cache_size = -2048');
+    const row = client.prepare('SELECT COUNT(*) AS count FROM "QingLong3TaskDefinitions"').get();
+    client.close();
+    const after = snapshot();
+    process.stdout.write(JSON.stringify({ count: row.count, unchanged: JSON.stringify(before) === JSON.stringify(after) }));
+  `;
+  const result = spawnSync(
+    'docker',
+    [
+      'run',
+      '--rm',
+      '--mount',
+      `type=bind,source=${assetsDirectory},target=/bundle,readonly`,
+      'node:24-bookworm-slim',
+      'node',
+      '-e',
+      script,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
 }
 
 function capturePath(state, name) {
@@ -992,6 +1134,419 @@ test('capture manifest schema v1 is rejected instead of silently upgraded', (t) 
   );
 });
 
+test('plan reads sealed main-only SQLite with fixed budgets and verifies without opening', (t) => {
+  const state = preparedPlan(t);
+  const beforeAssets = fs.readdirSync(
+    capturePath(state, 'assets'),
+  ).map((name) => ({
+    name,
+    bytes: fs.readFileSync(capturePath(state, `assets/${name}`)),
+    stat: fs.statSync(capturePath(state, `assets/${name}`), { bigint: true }),
+  }));
+  const opens = [];
+  const committed = commitLocalReconciliationPlan(state.planCommitCommand, {
+    beforeDatabaseOpen(kind, mode, cacheKiB) {
+      opens.push({ kind, mode, cacheKiB });
+    },
+  });
+  assert.equal(committed.status, 'prepared');
+  assert.equal(committed.state, 'reconciliation_planned');
+  assert.deepEqual(opens, [
+    { kind: 'legacy', mode: 'main_only_immutable', cacheKiB: 2048 },
+    { kind: 'target', mode: 'main_only_immutable', cacheKiB: 2048 },
+  ]);
+  const planPath = path.join(
+    state.planRoot,
+    state.prepareCommand.request.planId,
+    'plan.json',
+  );
+  const planText = fs.readFileSync(planPath, 'utf8');
+  const plan = JSON.parse(planText);
+  assert.equal(Buffer.byteLength(planText, 'utf8') <= 64 * 1024, true);
+  assert.deepEqual(
+    plan.domains.map((domain) => domain.domain),
+    [
+      'schema_lineage',
+      'automation',
+      'secret_and_config',
+      'run_history',
+      'plugin_package',
+      'ai_and_tool',
+      'identity_policy_audit',
+      'unknown',
+    ],
+  );
+  assert.equal(plan.domains.length, 8);
+  assert.equal(plan.outcome, 'manual_required');
+  assert.equal(planText.includes('private-value'), false);
+  assert.equal(planText.includes(state.captureRoot), false);
+  assert.equal(planText.includes(state.legacySourcePath), false);
+  assert.equal(planText.includes('Crontabs'), false);
+  const head = readLocalCutoverInstanceHead(
+    state.deploymentRoot,
+    state.command.request.instanceId,
+    state.uid,
+  );
+  assert.equal(head.state, 'reconciliation_planned');
+  assert.equal(head.sourceRecordDigest, committed.planDigest);
+  const verifyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.plan.verify',
+    options: state.prepareCommand.options,
+    request: {
+      planId: state.prepareCommand.request.planId,
+      expectedPlanDigest: committed.planDigest,
+    },
+  };
+  let verifyOpens = 0;
+  assert.equal(
+    verifyLocalReconciliationPlan(verifyCommand, {
+      beforeDatabaseOpen() {
+        verifyOpens += 1;
+      },
+    }).status,
+    'verified',
+  );
+  assert.equal(verifyOpens, 0);
+  for (const before of beforeAssets) {
+    const assetPath = capturePath(state, `assets/${before.name}`);
+    const after = fs.statSync(assetPath, { bigint: true });
+    assert.equal(fs.readFileSync(assetPath).equals(before.bytes), true);
+    for (const key of [
+      'dev',
+      'ino',
+      'uid',
+      'gid',
+      'mode',
+      'nlink',
+      'size',
+      'mtimeNs',
+      'ctimeNs',
+    ]) {
+      assert.equal(after[key], before.stat[key]);
+    }
+  }
+});
+
+test('plan reads a sealed WAL and SHM snapshot without changing either asset', (t) => {
+  let target;
+  const initializeDatabases = (paths) => {
+    planningDatabaseInitializer()(paths);
+    target = new DatabaseSync(paths.targetDatabasePath);
+    target.exec('PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0');
+  };
+  const mutateTarget = ({ targetDatabasePath }) => {
+    target.exec('INSERT INTO "QingLong3TaskDefinitions" (id) VALUES (1)');
+    fs.chmodSync(`${targetDatabasePath}-wal`, 0o600);
+    fs.chmodSync(`${targetDatabasePath}-shm`, 0o600);
+    return Object.freeze({});
+  };
+  t.after(() => {
+    try {
+      target?.close();
+    } catch {
+      // The fixture cleanup may already have invalidated the source handle.
+    }
+  });
+  const state = preparedPlan(t, {
+    initializeDatabases,
+    mutateTarget,
+    planId: '00000000-0000-4000-8000-000000000205',
+  });
+  const targetWal = captureAssetPath(state, 'target-wal');
+  const targetShm = captureAssetPath(state, 'target-shm');
+  const before = [targetWal, targetShm].map((assetPath) => ({
+    assetPath,
+    bytes: fs.readFileSync(assetPath),
+    stat: fs.statSync(assetPath, { bigint: true }),
+  }));
+  const opens = [];
+  commitLocalReconciliationPlan(state.planCommitCommand, {
+    beforeDatabaseOpen(kind, mode, cacheKiB) {
+      opens.push({ kind, mode, cacheKiB });
+    },
+  });
+  assert.deepEqual(opens, [
+    { kind: 'legacy', mode: 'main_only_immutable', cacheKiB: 2048 },
+    { kind: 'target', mode: 'wal_shm_readonly', cacheKiB: 2048 },
+  ]);
+  for (const item of before) {
+    const after = fs.statSync(item.assetPath, { bigint: true });
+    assert.equal(fs.readFileSync(item.assetPath).equals(item.bytes), true);
+    assert.equal(after.mtimeNs, item.stat.mtimeNs);
+    assert.equal(after.ctimeNs, item.stat.ctimeNs);
+    assert.equal(after.mode, item.stat.mode);
+  }
+});
+
+test('standalone planning fixes each SQLite cache at 8 MiB', (t) => {
+  const state = preparedPlan(t, {
+    profile: 'standalone',
+    planId: '00000000-0000-4000-8000-000000000206',
+  });
+  const opens = [];
+  commitLocalReconciliationPlan(state.planCommitCommand, {
+    beforeDatabaseOpen(kind, mode, cacheKiB) {
+      opens.push({ kind, mode, cacheKiB });
+    },
+  });
+  assert.deepEqual(opens, [
+    { kind: 'legacy', mode: 'main_only_immutable', cacheKiB: 8192 },
+    { kind: 'target', mode: 'main_only_immutable', cacheKiB: 8192 },
+  ]);
+});
+
+test('plan commit converges plan, receipt and head crash windows exactly', (t) => {
+  const planState = preparedPlan(t, {
+    planId: '00000000-0000-4000-8000-000000000211',
+  });
+  assert.throws(
+    () =>
+      commitLocalReconciliationPlan(planState.planCommitCommand, {
+        afterPlanPublished() {
+          throw new Error('plan crash');
+        },
+      }),
+    /plan crash/,
+  );
+  let replayOpens = 0;
+  const resumedPlan = commitLocalReconciliationPlan(
+    planState.planCommitCommand,
+    {
+      beforeDatabaseOpen() {
+        replayOpens += 1;
+      },
+    },
+  );
+  assert.equal(resumedPlan.status, 'prepared');
+  assert.equal(replayOpens, 0);
+
+  const receiptState = preparedPlan(t, {
+    planId: '00000000-0000-4000-8000-000000000212',
+  });
+  assert.throws(
+    () =>
+      commitLocalReconciliationPlan(receiptState.planCommitCommand, {
+        afterReceiptPublished() {
+          throw new Error('receipt crash');
+        },
+      }),
+    /receipt crash/,
+  );
+  replayOpens = 0;
+  assert.equal(
+    commitLocalReconciliationPlan(receiptState.planCommitCommand, {
+      beforeDatabaseOpen() {
+        replayOpens += 1;
+      },
+    }).status,
+    'prepared',
+  );
+  assert.equal(replayOpens, 0);
+
+  const headState = preparedPlan(t, {
+    planId: '00000000-0000-4000-8000-000000000213',
+  });
+  assert.throws(
+    () =>
+      commitLocalReconciliationPlan(headState.planCommitCommand, {
+        afterHeadAdvanced() {
+          throw new Error('head response loss');
+        },
+      }),
+    /head response loss/,
+  );
+  assert.equal(
+    commitLocalReconciliationPlan(headState.planCommitCommand).status,
+    'existing',
+  );
+});
+
+test('hot journal and unpaired sidecars become manual without SQLite open', (t) => {
+  const state = preparedPlan(t, {
+    createDefaultSidecars: true,
+    planId: '00000000-0000-4000-8000-000000000221',
+  });
+  let opens = 0;
+  const committed = commitLocalReconciliationPlan(state.planCommitCommand, {
+    beforeDatabaseOpen() {
+      opens += 1;
+    },
+  });
+  assert.equal(opens, 0);
+  assert.equal(committed.outcome, 'manual_required');
+  const plan = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        state.planRoot,
+        state.prepareCommand.request.planId,
+        'plan.json',
+      ),
+      'utf8',
+    ),
+  );
+  assert.deepEqual(
+    plan.databases.map((database) => ({
+      kind: database.kind,
+      topology: database.topology,
+      opened: database.opened,
+    })),
+    [
+      { kind: 'legacy', topology: 'manual_required', opened: false },
+      { kind: 'target', topology: 'manual_required', opened: false },
+    ],
+  );
+  assert.equal(
+    plan.domains.every(
+      (domain) => domain.disposition === 'manual_required',
+    ),
+    true,
+  );
+});
+
+test('unknown target schema is summarized only by digest and requires manual review', (t) => {
+  const state = preparedPlan(t, {
+    unknownTargetTable: true,
+    planId: '00000000-0000-4000-8000-000000000231',
+  });
+  commitLocalReconciliationPlan(state.planCommitCommand);
+  const planText = fs.readFileSync(
+    path.join(
+      state.planRoot,
+      state.prepareCommand.request.planId,
+      'plan.json',
+    ),
+    'utf8',
+  );
+  const plan = JSON.parse(planText);
+  const unknown = plan.domains.find((domain) => domain.domain === 'unknown');
+  assert.equal(unknown.targetTables, 1);
+  assert.equal(unknown.rowCountsComplete, false);
+  assert.equal(unknown.disposition, 'manual_required');
+  assert.equal(plan.outcome, 'manual_required');
+  assert.equal(planText.includes('UnreviewedFacts'), false);
+});
+
+test('one plan fence blocks a second plan and all rollback transitions', (t) => {
+  const state = preparedPlan(t, {
+    planId: '00000000-0000-4000-8000-000000000241',
+  });
+  const competing = structuredClone(state.prepareCommand);
+  competing.request.planId = '00000000-0000-4000-8000-000000000242';
+  assert.throws(
+    () => prepareLocalReconciliationPlan(competing),
+    /compare-and-swap/,
+  );
+  assert.throws(
+    () =>
+      advanceLocalCutoverInstanceHead(
+        state.identity,
+        state.uid,
+        'rollback_prepared',
+        1,
+        'f'.repeat(64),
+      ),
+    /transition is invalid/,
+  );
+  assert.throws(
+    () =>
+      advanceLocalCutoverInstanceHead(
+        state.identity,
+        state.uid,
+        'target_active',
+        2,
+        'e'.repeat(64),
+      ),
+    /transition is invalid/,
+  );
+});
+
+test('plan prepare recovers head response loss and CLI verify stays content-free', (t) => {
+  const capture = preparedCapture(t, {
+    createDefaultSidecars: false,
+    initializeDatabases: planningDatabaseInitializer(),
+    mutateTarget: mutatePlanningTarget,
+  });
+  const captured = commitLocalReconciliationCapture(capture.commitCommand);
+  const planRoot = path.join(path.dirname(capture.captureRoot), 'plan-root');
+  fs.mkdirSync(planRoot, { mode: 0o700 });
+  const prepareCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.plan.prepare',
+    options: {
+      deploymentRoot: capture.deploymentRoot,
+      captureRoot: capture.captureRoot,
+      planRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      planId: '00000000-0000-4000-8000-000000000251',
+      captureId: capture.command.request.captureId,
+      expectedBundleDigest: captured.bundleDigest,
+      expectedHeadDigest: captured.instanceHeadDigest,
+      legacyTimezone: null,
+      preparedAtMs: 6_000,
+    },
+  };
+  assert.throws(
+    () =>
+      prepareLocalReconciliationPlan(prepareCommand, {
+        afterHeadPrepared() {
+          throw new Error('prepare response loss');
+        },
+      }),
+    /prepare response loss/,
+  );
+  const prepared = prepareLocalReconciliationPlan(prepareCommand);
+  assert.equal(prepared.status, 'prepared');
+  const committed = commitLocalReconciliationPlan({
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.plan.commit',
+    options: prepareCommand.options,
+    request: {
+      planId: prepareCommand.request.planId,
+      expectedPreparationDigest: prepared.preparationDigest,
+      committedAtMs: 7_000,
+    },
+  });
+  const verifyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.plan.verify',
+    options: prepareCommand.options,
+    request: {
+      planId: prepareCommand.request.planId,
+      expectedPlanDigest: committed.planDigest,
+    },
+  };
+  const commandPath = path.join(capture.deploymentRoot, 'plan-verify.json');
+  fs.writeFileSync(commandPath, `${JSON.stringify(verifyCommand)}\n`, {
+    mode: 0o600,
+  });
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-plan-verify',
+      '--command-file',
+      commandPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).status, 'verified');
+  assert.equal(cli.stdout.includes(capture.captureRoot), false);
+  assert.equal(cli.stdout.includes(planRoot), false);
+  assert.equal(cli.stdout.includes(capture.targetDatabasePath), false);
+
+  const overlapping = structuredClone(prepareCommand);
+  overlapping.request.planId = '00000000-0000-4000-8000-000000000252';
+  overlapping.options.planRoot = capture.captureRoot;
+  assert.throws(
+    () => prepareLocalReconciliationPlan(overlapping),
+    /must not overlap/,
+  );
+});
+
 test(
   'real stopped Docker target produces an independently verified bundle',
   { skip: process.env.QL3_RECONCILIATION_DOCKER_GATE !== '1' },
@@ -1003,6 +1558,8 @@ test(
       });
     });
     const state = preparedCapture(t, {
+      createDefaultSidecars: false,
+      initializeDatabases: planningDatabaseInitializer(),
       mutateTarget({ root }) {
         const created = spawnSync(
           'docker',
@@ -1015,7 +1572,7 @@ test(
             'node:24-bookworm-slim',
             'node',
             '-e',
-            "require('node:fs').writeFileSync('/capture-fixture/database.ql3.sqlite','target-docker-mutated\\n')",
+            "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync('/capture-fixture/database.ql3.sqlite'); db.exec('INSERT INTO \\\"QingLong3TaskDefinitions\\\" (id) VALUES (1)'); db.close()",
           ],
           { encoding: 'utf8' },
         );
@@ -1051,9 +1608,12 @@ test(
       },
     });
     const committed = commitLocalReconciliationCapture(state.commitCommand);
-    assert.equal(
-      fs.readFileSync(captureAssetPath(state, 'target-main'), 'utf8'),
-      'target-docker-mutated\n',
+    assert.deepEqual(
+      dockerReadSealedSqlite(
+        capturePath(state, 'assets'),
+        'main_only_immutable',
+      ),
+      { count: 1, unchanged: true },
     );
     const verified = verifyLocalReconciliationCapture({
       schemaVersion: 1,
@@ -1066,5 +1626,39 @@ test(
     });
     assert.equal(verified.status, 'verified');
     assert.equal(verified.bundleDigest, committed.bundleDigest);
+  },
+);
+
+test(
+  'real Docker reads sealed WAL and SHM without changing the bundle',
+  { skip: process.env.QL3_RECONCILIATION_DOCKER_GATE !== '1' },
+  (t) => {
+    let target;
+    const state = preparedCapture(t, {
+      createDefaultSidecars: false,
+      initializeDatabases(paths) {
+        planningDatabaseInitializer()(paths);
+        target = new DatabaseSync(paths.targetDatabasePath);
+        target.exec('PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0');
+      },
+      mutateTarget({ targetDatabasePath }) {
+        target.exec('INSERT INTO "QingLong3TaskDefinitions" (id) VALUES (1)');
+        fs.chmodSync(`${targetDatabasePath}-wal`, 0o600);
+        fs.chmodSync(`${targetDatabasePath}-shm`, 0o600);
+        return Object.freeze({});
+      },
+    });
+    t.after(() => {
+      try {
+        target?.close();
+      } catch {
+        // The fixture cleanup may already have invalidated the source handle.
+      }
+    });
+    commitLocalReconciliationCapture(state.commitCommand);
+    assert.deepEqual(
+      dockerReadSealedSqlite(capturePath(state, 'assets'), 'wal_shm_readonly'),
+      { count: 1, unchanged: true },
+    );
   },
 );

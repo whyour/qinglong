@@ -1,6 +1,6 @@
 # ADR-0483：密封 Reconciliation Bundle 的有界数据域计划
 
-- 状态：Proposed（D-390 契约冻结）
+- 状态：Accepted（D-390 已实现）
 - 日期：2026-08-21
 - 关联 RFC：QL-RFC-0001 D-05、D-06、D-17、D-64、D-87、D-184、D-259、D-383、D-389、D-390
 - 关联 ADR：ADR-0064、ADR-0094、ADR-0095、ADR-0194、ADR-0201、ADR-0314、ADR-0315、ADR-0482
@@ -142,6 +142,29 @@ package、production dependency、binary、daemon、timer、watcher、listener�
 6. 无 import、DML、checkpoint、service、Docker/init/network 副作用，无新增 package/dependency/常驻对象或跨包写 authority import。
 7. Edge 固定 2 MiB cache、Standalone 8 MiB cache；完整 Local Owner/backend/package、架构、release、十四档 artifact 与真实 Docker
    readonly rehearsal 通过，基础 Edge closure 不增长。
+
+## 实现与验证证据
+
+D-390 已在既有 `@qinglong/local-owner-cli/src/deployment/reconciliation/` 内实现。`sealed-bundle/reader.ts` 只接受经 terminal
+validator 验证的密封 capture：main-only 走 immutable readonly，WAL+SHM 完整配对走普通 readonly；hot journal、sidecar 不配对或
+任一 stat/hash/mode 漂移均在 SQLite open 前失败关闭。`planning/` 以固定 contract、inventory、prepare/commit/verify 将 instance head
+从 `reconciliation_captured` CAS 推进到 `reconciliation_plan_prepared`、再推进到 `reconciliation_planned`。plan 只包含固定八领域的
+有界计数、digest、disposition 和保守 outcome，不保存表名、路径、row value、Secret、credential、命令或日志，也不产生 import authority。
+
+实现没有新增 workspace package、production dependency、binary、daemon、listener、timer、watcher 或网络访问。workspace 仍为 18
+packages，`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Owner 为 `146 source / 145 nested / 1 root binary entry`，新增的
+5 个源文件全部进入 `deployment/reconciliation/sealed-bundle|planning/`，没有回到 `src/` 根平铺。Edge/Standalone cache 固定为
+2/8 MiB，hash buffer 与 plan 上限均为 64 KiB，schema/table 上限为 4,096/512。
+
+验收结果：reconciliation 聚焦套件 `24 total / 22 pass / 2 conditional Docker skip / 0 fail`；真实 Linux/Docker main-only 与
+WAL+SHM readonly/hash-stability rehearsal `2/2`；完整 Local Owner `246 total / 239 pass / 7 conditional skip / 0 fail`；tracked
+backend `1540 total / 1538 pass / 2 conditional skip / 0 fail`；18-package clean build/逐包测试通过。Edge import、Cluster dependency、
+package boundary、service-manager bridge、Local image、image release、release version 与 deployment-lock surface 审计均 compatible。
+
+十四档 artifact audit 均 compatible。基础 Edge/Standalone 仍为 `2,611,978 / 2,612,056` bytes、319 files、58 modules；Adopted
+仍为 `2,831,713 / 2,831,836` bytes、339 files、59 modules；Application+AI 为 `4,529,710 / 4,529,842` bytes、516 files、
+144 modules；MCP 为 `7,337,910 / 7,338,018` bytes、805 files、228 modules。一次性 plan authority 未进入基础常驻闭包，也没有被
+Cluster/PostgreSQL 消费。
 
 ## 未包含
 

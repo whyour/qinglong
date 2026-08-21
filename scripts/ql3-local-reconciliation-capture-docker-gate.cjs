@@ -16,7 +16,7 @@ const test = spawnSync(
   [
     '--test',
     '--test-name-pattern',
-    'real stopped Docker target',
+    'real .*Docker',
     path.join(
       root,
       'packages/ql3-local-owner-cli/test/reconciliationCapturePrepare.test.cjs',
