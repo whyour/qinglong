@@ -123,6 +123,17 @@ export {
   type LocalDeploymentStatusResult,
 } from './foundation/contract';
 export {
+  prepareLocalDeploymentAdoptedBundle,
+  runLocalDeploymentAdoptedBundleCommandFile,
+  verifyLocalDeploymentAdoptedBundle,
+  type LocalDeploymentAdoptedBundleResult,
+} from './adopted-bundle/adoptedBundle';
+export {
+  normalizeLocalDeploymentAdoptedBundleCommand,
+  type LocalDeploymentAdoptedBundleCommand,
+  type LocalDeploymentAdoptedBundleOperation,
+} from './adopted-bundle/contract';
+export {
   type LocalComposeReleaseAuthority,
   type LocalComposeReleaseSelectionInput,
 } from './compose/releaseSelection';

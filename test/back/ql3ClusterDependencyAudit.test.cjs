@@ -2567,6 +2567,47 @@ test('service-manager Owner consumers receive only the pure data commit codec', 
   );
 });
 
+test('adopted deployment material receives only the pure data commit codec', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-adopted-bundle-codec-boundary-'),
+  );
+  const bundleDirectory = path.join(
+    root,
+    'packages/ql3-local-owner-cli/src/deployment/adopted-bundle',
+  );
+  fs.mkdirSync(bundleDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(bundleDirectory, 'material.ts'),
+    [
+      "import { normalize } from '@qinglong/local-sqlite/data-directory-application-commit';",
+      "import { mutate } from '@qinglong/local-sqlite/data-directory-adoption';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(bundleDirectory, 'neighbor.ts'),
+    "import { normalize } from '@qinglong/local-sqlite/data-directory-application-commit';",
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-owner-cli', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/adopted-bundle/material.ts',
+        specifier: '@qinglong/local-sqlite/data-directory-adoption',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/adopted-bundle/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/data-directory-application-commit',
+      },
+    ],
+  );
+});
+
 test('local AI application imports only the reviewed dynamic composition subpaths', (t) => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), 'ql3-local-ai-application-boundary-'),

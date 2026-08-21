@@ -1786,6 +1786,7 @@ function auditSourceImports(root, packagePath, findings) {
             'src/deployment/service-manager/serviceManagerIntent.ts',
             'src/deployment/service-manager/serviceCutoverConsumer.ts',
             'src/deployment/service-manager/legacy-rollback/preparation.ts',
+            'src/deployment/adopted-bundle/material.ts',
           ].includes(path.relative(packageDirectory, filePath)) &&
           specifier ===
             '@qinglong/local-sqlite/data-directory-application-commit'
@@ -2631,6 +2632,14 @@ function auditSourceImports(root, packagePath, findings) {
         path.relative(packageDirectory, filePath) ===
           'src/application-runtime/aiFeatureApplication.ts' &&
         specifier === '@qinglong/local-sqlite/optional-feature-runtime'
+      ) {
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-owner-cli' &&
+        path.relative(packageDirectory, filePath) ===
+          'src/deployment/adopted-bundle/material.ts' &&
+        specifier === '@qinglong/local-sqlite/data-directory-application-commit'
       ) {
         continue;
       }

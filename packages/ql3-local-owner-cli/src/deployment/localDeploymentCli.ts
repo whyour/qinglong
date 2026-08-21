@@ -17,6 +17,7 @@ import {
   proveLocalDeploymentLegacyReadinessCommandFile,
   restoreLocalDeploymentComposeCommitCommandFile,
   restoreLocalDeploymentComposePrepareCommandFile,
+  runLocalDeploymentAdoptedBundleCommandFile,
   runLocalDeploymentCutoverManualCommandFile,
   runLocalDeploymentLegacyRollbackCommandFile,
   runLocalDeploymentDockerTargetCommandFile,
@@ -26,7 +27,7 @@ import {
 } from './localDeployment';
 
 const USAGE =
-  'Usage: ql3-local-deploy <prepare|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-legacy-readiness-probe|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
+  'Usage: ql3-local-deploy <prepare|adopted-prepare|adopted-verify|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-legacy-readiness-probe|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
 
 async function main(argv: readonly string[]): Promise<void> {
   if (argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h')) {
@@ -36,6 +37,8 @@ async function main(argv: readonly string[]): Promise<void> {
   if (
     argv.length !== 3 ||
     (argv[0] !== 'prepare' &&
+      argv[0] !== 'adopted-prepare' &&
+      argv[0] !== 'adopted-verify' &&
       argv[0] !== 'status' &&
       argv[0] !== 'service-intent-prepare' &&
       argv[0] !== 'service-outcome-consume' &&
@@ -74,6 +77,13 @@ async function main(argv: readonly string[]): Promise<void> {
   try {
     const output = await (argv[0] === 'prepare'
       ? prepareLocalDeploymentCommandFile(argv[2]!)
+      : argv[0] === 'adopted-prepare' || argv[0] === 'adopted-verify'
+      ? runLocalDeploymentAdoptedBundleCommandFile(
+          argv[2]!,
+          argv[0] === 'adopted-prepare'
+            ? 'local.deployment.adopted.prepare'
+            : 'local.deployment.adopted.verify',
+        )
       : argv[0] === 'status'
       ? inspectLocalDeploymentStatusCommandFile(argv[2]!)
       : argv[0] === 'service-intent-prepare'

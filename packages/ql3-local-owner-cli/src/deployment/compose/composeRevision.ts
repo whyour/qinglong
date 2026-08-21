@@ -8,6 +8,7 @@ import {
   LocalDeploymentConfigurationError,
   normalizeLocalDeploymentComposeRevisionCommand,
   type LocalDeploymentComposeRevisionResult,
+  type NormalizedLocalDeploymentComposeService,
   type NormalizedLocalDeploymentComposeRevisionCommand,
   type NormalizedLocalDeploymentPrepareCommand,
 } from '../foundation/contract';
@@ -265,13 +266,25 @@ export function initialComposeImageSelection(
       'initial compose selection requires a compose service',
     );
   }
+  return initialComposeImageSelectionFromAuthority({
+    service: command.options.service,
+    mutationId: command.request.activateMutationId,
+    changedAtMs: command.request.activatedAtMs,
+  });
+}
+
+export function initialComposeImageSelectionFromAuthority(input: {
+  readonly service: Readonly<NormalizedLocalDeploymentComposeService>;
+  readonly mutationId: string;
+  readonly changedAtMs: number;
+}): string {
   return selectionContents({
     generation: 1,
     previousGeneration: 0,
     rollbackTargetGeneration: 0,
-    mutationId: command.request.activateMutationId,
-    changedAtMs: command.request.activatedAtMs,
-    ...command.options.service.releaseSelection.authority,
+    mutationId: input.mutationId,
+    changedAtMs: input.changedAtMs,
+    ...input.service.releaseSelection.authority,
   });
 }
 
