@@ -111,6 +111,12 @@ import {
   verifyLocalReconciliationPlan,
   verifyLocalReconciliationPlanCommandFile,
 } from './reconciliation/planning/preparation';
+import {
+  prepareLocalReconciliationReview,
+  prepareLocalReconciliationReviewCommandFile,
+  writeLocalReconciliationReviewDiagnostics,
+  writeLocalReconciliationReviewDiagnosticsCommandFile,
+} from './reconciliation/review/preparation';
 
 export {
   commitLocalReconciliationPlan,
@@ -119,6 +125,10 @@ export {
   prepareLocalReconciliationPlanCommandFile,
   verifyLocalReconciliationPlan,
   verifyLocalReconciliationPlanCommandFile,
+  prepareLocalReconciliationReview,
+  prepareLocalReconciliationReviewCommandFile,
+  writeLocalReconciliationReviewDiagnostics,
+  writeLocalReconciliationReviewDiagnosticsCommandFile,
 };
 
 export {
@@ -160,6 +170,30 @@ export {
   type LocalReconciliationCaptureVerifyCommand,
   type LocalReconciliationStoppedAuthority,
 } from './reconciliation/contract';
+export {
+  LOCAL_RECONCILIATION_DIAGNOSTIC_FACT_KINDS,
+  normalizeLocalReconciliationReviewDiagnosticsCommand,
+  normalizeLocalReconciliationReviewPrepareCommand,
+  type LocalReconciliationDiagnosticFactKind,
+  type LocalReconciliationReviewDiagnosticsCommand,
+  type LocalReconciliationReviewDiagnosticsResult,
+  type LocalReconciliationReviewOptions,
+  type LocalReconciliationReviewPrepareCommand,
+  type LocalReconciliationReviewPrepareResult,
+} from './reconciliation/review/contract';
+export {
+  localReconciliationReviewDirectory,
+  normalizeLocalReconciliationReviewIntent,
+  readLocalReconciliationReviewIntent,
+  type LocalReconciliationReviewDependencies,
+  type LocalReconciliationReviewIntent,
+} from './reconciliation/review/preparation';
+export {
+  type LocalReconciliationDiagnosticDecisionRequirement,
+  type LocalReconciliationDiagnosticFact,
+  type LocalReconciliationDiagnosticPage,
+  type LocalReconciliationDiagnosticReason,
+} from './reconciliation/review/diagnostics';
 export {
   LOCAL_RECONCILIATION_PLAN_DOMAINS,
   normalizeLocalReconciliationPlanCommitCommand,

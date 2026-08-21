@@ -136,6 +136,13 @@ function classify(
   return kind === 'legacy' ? legacyDomain(name) : targetDomain(name);
 }
 
+export function classifyLocalReconciliationFact(
+  kind: LocalReconciliationSealedDatabaseKind,
+  name: string,
+): LocalReconciliationPlanDomain {
+  return classify(kind, name);
+}
+
 function quotedIdentifier(name: string): string {
   return `"${name.replaceAll('"', '""')}"`;
 }

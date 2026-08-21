@@ -27,6 +27,8 @@ export type LocalCutoverInstanceHeadState =
   | 'reconciliation_captured'
   | 'reconciliation_plan_prepared'
   | 'reconciliation_planned'
+  | 'reconciliation_review_prepared'
+  | 'reconciliation_reviewed'
   | 'rollback_prepared'
   | 'legacy_restart_requested'
   | 'legacy_running'
@@ -162,6 +164,8 @@ function parseHead(value: unknown): Readonly<LocalCutoverInstanceHead> {
       head.state !== 'reconciliation_captured' &&
       head.state !== 'reconciliation_plan_prepared' &&
       head.state !== 'reconciliation_planned' &&
+      head.state !== 'reconciliation_review_prepared' &&
+      head.state !== 'reconciliation_reviewed' &&
       head.state !== 'rollback_prepared' &&
       head.state !== 'legacy_restart_requested' &&
       head.state !== 'legacy_running' &&
@@ -332,6 +336,8 @@ export function advanceLocalCutoverInstanceHead(
     | 'reconciliation_captured'
     | 'reconciliation_plan_prepared'
     | 'reconciliation_planned'
+    | 'reconciliation_review_prepared'
+    | 'reconciliation_reviewed'
     | 'rollback_prepared'
     | 'legacy_restart_requested'
     | 'legacy_running'
@@ -374,6 +380,8 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_captured' ||
       current.state === 'reconciliation_plan_prepared' ||
       current.state === 'reconciliation_planned' ||
+      current.state === 'reconciliation_review_prepared' ||
+      current.state === 'reconciliation_reviewed' ||
       current.state === 'legacy_restart_requested' ||
       current.state === 'legacy_running' ||
       current.state === 'legacy_ready')
@@ -397,6 +405,10 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_captured') ||
     (state === 'reconciliation_planned' &&
       current.state === 'reconciliation_plan_prepared') ||
+    (state === 'reconciliation_review_prepared' &&
+      current.state === 'reconciliation_planned') ||
+    (state === 'reconciliation_reviewed' &&
+      current.state === 'reconciliation_review_prepared') ||
     (state === 'rollback_prepared' && current.state === 'target_stopped') ||
     (state === 'legacy_restart_requested' &&
       current.state === 'rollback_prepared') ||

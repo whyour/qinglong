@@ -751,7 +751,9 @@ function replayResult(
     (head.state === 'reconciliation_capture_prepared' ||
       head.state === 'reconciliation_captured' ||
       head.state === 'reconciliation_plan_prepared' ||
-      head.state === 'reconciliation_planned');
+      head.state === 'reconciliation_planned' ||
+      head.state === 'reconciliation_review_prepared' ||
+      head.state === 'reconciliation_reviewed');
   if (
     record.actionId !== intent.actionId ||
     record.intentDigest !== intent.intentDigest ||

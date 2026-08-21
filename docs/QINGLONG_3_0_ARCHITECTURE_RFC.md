@@ -11,9 +11,9 @@
 
 最新增量证据（2026-08-21）：
 
-- D-391/ADR-0484（契约已冻结，待实现）：`reconciliation_planned` 仍是内容无关 summary，不能为人工裁决泄漏明细或获得 import authority。
-  下一切片在既有 Local Owner 的 `deployment/reconciliation/review/` 增加
-  `reconciliation.review.prepare|diagnostics|commit|verify`，以
+- D-391/ADR-0484（第一切片已实现，commit/verify 待实现）：`reconciliation_planned` 仍是内容无关 summary，不能为人工裁决泄漏明细或
+  获得 import authority。既有 Local Owner 已在 `deployment/reconciliation/review/` 增加
+  `reconciliation.review.prepare|diagnostics`，并为后续 commit/verify 冻结
   `reconciliation_planned → reconciliation_review_prepared → reconciliation_reviewed` CAS 建立唯一 review fence。diagnostics 每次只把
   一个 database/domain/fact-kind 的最多 64 条私有记录 no-replace 写入 caller 指定的 owner-only 文件；stdout 只返回 page digest、计数和
   offset，不含路径、名称或 fact digest。commit 不信任 page，而是从 exact sealed bundle 重新流式派生 canonical facts，与 Edge ≤8 MiB、
@@ -22,7 +22,10 @@
   exact review file/plan/bundle/head fence 签名；terminal review 只保存签名 authorization、compact counts/digest 和 content-free receipt。
   verify 不打开 SQLite。实现不新增 package/dependency/binary/daemon，不把文件平铺回 `src/` 根，也不调用 DML、Secret 解密、Docker/init/
   network。后续领域 adapter 必须消费 exact `reviewDigest` 后重新认证和授权，分别定义 backup、prepare/commit、幂等与 rollback，不能把
-  review completion 当作 reconciliation completion。
+  review completion 当作 reconciliation completion。当前聚焦套件 `28 total / 26 pass / 2 conditional Docker skip / 0 fail`，Local Owner
+  `250 total / 243 pass / 7 conditional skip / 0 fail`，tracked backend `1540 total / 1538 pass / 2 conditional skip / 0 fail`，
+  18-package clean build/逐包测试、八项架构/发布审计、十四档 artifact 和真实 Docker readonly `2/2` 全通过。workspace 仍为 18
+  packages，Local Owner `149 source / 148 nested / 1 root binary entry`；新增 3 个源码全部位于 review 子目录，基础常驻 closure 不增长。
 - D-390/ADR-0483（已接受）：既有 Local Owner 已实现密封 capture 的严格只读消费与独立
   `reconciliation.plan.prepare|commit|verify`。capture v2 使用 SQLite 可识别的固定 `target.sqlite* / legacy.sqlite* /
   recovery.sqlite` 物理名和 `0400/0500` terminal seal；main-only 走 immutable readonly，WAL+SHM 完整配对走普通 readonly，hot

@@ -448,6 +448,35 @@ function readTerminal(
   return Object.freeze({ plan, receipt });
 }
 
+export interface LocalReconciliationPlanTerminal {
+  readonly intent: Readonly<LocalReconciliationPlanIntent>;
+  readonly bundle: Readonly<LocalReconciliationSealedBundle>;
+  readonly plan: Readonly<LocalReconciliationPlan>;
+  readonly receipt: Readonly<LocalReconciliationPlanReceipt>;
+}
+
+export function readLocalReconciliationPlanTerminal(
+  planRoot: string,
+  planId: string,
+  uid: number,
+): Readonly<LocalReconciliationPlanTerminal> {
+  const paths = planPaths(planRoot, planId);
+  const intent = readLocalReconciliationPlanIntent(planRoot, planId);
+  if (
+    intent.command.options.planRoot !== planRoot ||
+    intent.command.request.planId !== planId
+  ) {
+    configurationError('terminal reconciliation plan path binding drifted');
+  }
+  const bundle = inspectLocalReconciliationSealedBundle(
+    intent.command.options.captureRoot,
+    intent.command.request.captureId,
+    uid,
+  );
+  const terminal = readTerminal(paths, intent, bundle, uid);
+  return Object.freeze({ intent, bundle, ...terminal });
+}
+
 function result(
   operation: LocalReconciliationPlanTerminalResult['operation'],
   status: LocalReconciliationPlanTerminalResult['status'],

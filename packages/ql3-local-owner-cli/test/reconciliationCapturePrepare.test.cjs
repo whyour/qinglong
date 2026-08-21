@@ -12,8 +12,10 @@ const {
   commitLocalReconciliationPlan,
   prepareLocalReconciliationCapture,
   prepareLocalReconciliationPlan,
+  prepareLocalReconciliationReview,
   verifyLocalReconciliationCapture,
   verifyLocalReconciliationPlan,
+  writeLocalReconciliationReviewDiagnostics,
 } = require('../dist/deployment/localDeployment.js');
 const {
   normalizeLocalReconciliationCaptureManifest,
@@ -685,6 +687,74 @@ function preparedPlan(t, options = {}) {
     prepareCommand,
     planPrepared,
     planCommitCommand,
+  };
+}
+
+function preparedReview(t, options = {}) {
+  const state = preparedPlan(t, options);
+  const planned = commitLocalReconciliationPlan(state.planCommitCommand);
+  const root = path.dirname(state.captureRoot);
+  const reviewRoot = path.join(root, `review-root-${options.reviewSuffix ?? '1'}`);
+  const diagnosticRoot = path.join(
+    root,
+    `diagnostic-root-${options.reviewSuffix ?? '1'}`,
+  );
+  fs.mkdirSync(reviewRoot, { mode: 0o700 });
+  fs.mkdirSync(diagnosticRoot, { mode: 0o700 });
+  const reviewCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.review.prepare',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      captureRoot: state.captureRoot,
+      planRoot: state.planRoot,
+      reviewRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      reviewId:
+        options.reviewId ?? '00000000-0000-4000-8000-000000000301',
+      planId: state.prepareCommand.request.planId,
+      expectedPlanDigest: planned.planDigest,
+      expectedHeadDigest: planned.instanceHeadDigest,
+      preparedAtMs: 8_000,
+    },
+  };
+  return {
+    ...state,
+    planned,
+    reviewRoot,
+    diagnosticRoot,
+    reviewCommand,
+  };
+}
+
+function diagnosticCommand(
+  state,
+  prepared,
+  {
+    database = 'legacy',
+    domain = 'automation',
+    factKind = 'table',
+    offset = 0,
+    limit = 64,
+    outputName = 'diagnostic-page.json',
+  } = {},
+) {
+  return {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.review.diagnostics',
+    options: state.reviewCommand.options,
+    request: {
+      reviewId: state.reviewCommand.request.reviewId,
+      expectedPreparationDigest: prepared.preparationDigest,
+      database,
+      domain,
+      factKind,
+      offset,
+      limit,
+      outputPath: path.join(state.diagnosticRoot, outputName),
+    },
   };
 }
 
@@ -1545,6 +1615,234 @@ test('plan prepare recovers head response loss and CLI verify stays content-free
     () => prepareLocalReconciliationPlan(overlapping),
     /must not overlap/,
   );
+});
+
+test('review prepare establishes one replayable fence and blocks rollback', (t) => {
+  const state = preparedReview(t, {
+    planId: '00000000-0000-4000-8000-000000000301',
+    reviewId: '00000000-0000-4000-8000-000000000311',
+  });
+  assert.throws(
+    () =>
+      prepareLocalReconciliationReview(state.reviewCommand, {
+        afterHeadPrepared() {
+          throw new Error('review prepare response loss');
+        },
+      }),
+    /review prepare response loss/,
+  );
+  const prepared = prepareLocalReconciliationReview(state.reviewCommand);
+  assert.equal(prepared.status, 'prepared');
+  assert.equal(prepared.state, 'reconciliation_review_prepared');
+  const replay = prepareLocalReconciliationReview(state.reviewCommand);
+  assert.equal(replay.status, 'existing');
+  assert.equal(replay.preparationDigest, prepared.preparationDigest);
+  assert.equal(replay.instanceHeadDigest, prepared.instanceHeadDigest);
+  const head = readLocalCutoverInstanceHead(
+    state.deploymentRoot,
+    state.command.request.instanceId,
+    state.uid,
+  );
+  assert.equal(head.state, 'reconciliation_review_prepared');
+  assert.equal(head.sourceRecordDigest, prepared.preparationDigest);
+
+  const competing = structuredClone(state.reviewCommand);
+  competing.request.reviewId = '00000000-0000-4000-8000-000000000312';
+  competing.options.reviewRoot = path.join(
+    path.dirname(state.reviewRoot),
+    'review-root-competing',
+  );
+  fs.mkdirSync(competing.options.reviewRoot, { mode: 0o700 });
+  assert.throws(
+    () => prepareLocalReconciliationReview(competing),
+    /compare-and-swap/,
+  );
+  assert.throws(
+    () =>
+      advanceLocalCutoverInstanceHead(
+        state.identity,
+        state.uid,
+        'rollback_prepared',
+        1,
+        'f'.repeat(64),
+      ),
+    /transition is invalid/,
+  );
+  assert.throws(
+    () =>
+      advanceLocalCutoverInstanceHead(
+        state.identity,
+        state.uid,
+        'target_active',
+        2,
+        'e'.repeat(64),
+      ),
+    /transition is invalid/,
+  );
+});
+
+test('review diagnostics publish one private exact page without changing assets', (t) => {
+  const state = preparedReview(t, {
+    planId: '00000000-0000-4000-8000-000000000321',
+    reviewId: '00000000-0000-4000-8000-000000000322',
+  });
+  const prepared = prepareLocalReconciliationReview(state.reviewCommand);
+  const assets = fs.readdirSync(capturePath(state, 'assets')).map((name) => ({
+    name,
+    bytes: fs.readFileSync(capturePath(state, `assets/${name}`)),
+    stat: fs.statSync(capturePath(state, `assets/${name}`), { bigint: true }),
+  }));
+  const command = diagnosticCommand(state, prepared);
+  const opens = [];
+  const result = writeLocalReconciliationReviewDiagnostics(command, {
+    beforeDatabaseOpen(kind, mode, cacheKiB) {
+      opens.push({ kind, mode, cacheKiB });
+    },
+  });
+  assert.deepEqual(opens, [
+    { kind: 'legacy', mode: 'main_only_immutable', cacheKiB: 2048 },
+  ]);
+  assert.equal(result.status, 'prepared');
+  assert.equal(result.recordCount, 1);
+  assert.equal(result.complete, true);
+  assert.equal(result.nextOffset, null);
+  assert.equal(JSON.stringify(result).includes(command.request.outputPath), false);
+  assert.equal(JSON.stringify(result).includes('Crontabs'), false);
+  const pageText = fs.readFileSync(command.request.outputPath, 'utf8');
+  const page = JSON.parse(pageText);
+  assert.equal(page.records[0].name, 'Crontabs');
+  assert.equal(page.records[0].rowCount, '1');
+  assert.equal(page.records[0].decisionRequirement, 'required');
+  assert.equal(pageText.includes('0 0 * * *'), false);
+  assert.equal(pageText.includes('private-value'), false);
+  assert.equal(fs.statSync(command.request.outputPath).mode & 0o777, 0o600);
+  assert.equal(
+    writeLocalReconciliationReviewDiagnostics(command).status,
+    'existing',
+  );
+  for (const before of assets) {
+    const assetPath = capturePath(state, `assets/${before.name}`);
+    const after = fs.statSync(assetPath, { bigint: true });
+    assert.equal(fs.readFileSync(assetPath).equals(before.bytes), true);
+    assert.equal(after.mtimeNs, before.stat.mtimeNs);
+    assert.equal(after.ctimeNs, before.stat.ctimeNs);
+    assert.equal(after.mode, before.stat.mode);
+  }
+});
+
+test('review diagnostics keep secret and unknown facts blocked and row-free', (t) => {
+  const state = preparedReview(t, {
+    unknownTargetTable: true,
+    planId: '00000000-0000-4000-8000-000000000331',
+    reviewId: '00000000-0000-4000-8000-000000000332',
+  });
+  const prepared = prepareLocalReconciliationReview(state.reviewCommand);
+  const secretCommand = diagnosticCommand(state, prepared, {
+    domain: 'secret_and_config',
+    outputName: 'secret.json',
+  });
+  writeLocalReconciliationReviewDiagnostics(secretCommand);
+  const secretText = fs.readFileSync(secretCommand.request.outputPath, 'utf8');
+  const secret = JSON.parse(secretText);
+  assert.equal(secret.records[0].name, 'Envs');
+  assert.equal(secret.records[0].decisionRequirement, 'blocked');
+  assert.equal(secret.records[0].reason, 'secret_custody_required');
+  assert.equal(secretText.includes('TOKEN'), false);
+  assert.equal(secretText.includes('private-value'), false);
+
+  const unknownCommand = diagnosticCommand(state, prepared, {
+    database: 'target',
+    domain: 'unknown',
+    outputName: 'unknown.json',
+  });
+  writeLocalReconciliationReviewDiagnostics(unknownCommand);
+  const unknown = JSON.parse(
+    fs.readFileSync(unknownCommand.request.outputPath, 'utf8'),
+  );
+  assert.equal(unknown.records[0].name, 'UnreviewedFacts');
+  assert.equal(unknown.records[0].rowCount, null);
+  assert.equal(unknown.records[0].decisionRequirement, 'blocked');
+  assert.equal(unknown.records[0].reason, 'unknown_schema');
+
+  const overlapping = structuredClone(unknownCommand);
+  overlapping.request.outputPath = path.join(state.reviewRoot, 'leak.json');
+  assert.throws(
+    () => writeLocalReconciliationReviewDiagnostics(overlapping),
+    /outside authority roots/,
+  );
+});
+
+test('review diagnostics page at sixty-four and CLI output stays content-free', (t) => {
+  const initializeDatabases = (paths) => {
+    planningDatabaseInitializer()(paths);
+    const target = new DatabaseSync(paths.targetDatabasePath);
+    for (let index = 0; index < 70; index += 1) {
+      target.exec(
+        `CREATE TABLE "QingLong3TaskDefinitionExtra${String(index).padStart(
+          2,
+          '0',
+        )}" (id INTEGER PRIMARY KEY)`,
+      );
+    }
+    target.close();
+    fs.chmodSync(paths.targetDatabasePath, 0o600);
+  };
+  const state = preparedReview(t, {
+    initializeDatabases,
+    planId: '00000000-0000-4000-8000-000000000341',
+    reviewId: '00000000-0000-4000-8000-000000000342',
+  });
+  const prepared = prepareLocalReconciliationReview(state.reviewCommand);
+  const firstCommand = diagnosticCommand(state, prepared, {
+    database: 'target',
+    domain: 'automation',
+    factKind: 'schema_object',
+    outputName: 'page-1.json',
+  });
+  const first = writeLocalReconciliationReviewDiagnostics(firstCommand);
+  assert.equal(first.recordCount, 64);
+  assert.equal(first.complete, false);
+  assert.equal(first.nextOffset, 64);
+  const secondCommand = diagnosticCommand(state, prepared, {
+    database: 'target',
+    domain: 'automation',
+    factKind: 'schema_object',
+    offset: first.nextOffset,
+    outputName: 'page-2.json',
+  });
+  const second = writeLocalReconciliationReviewDiagnostics(secondCommand);
+  assert.equal(second.recordCount, 7);
+  assert.equal(second.complete, true);
+  assert.equal(second.nextOffset, null);
+
+  const cliCommand = diagnosticCommand(state, prepared, {
+    database: 'target',
+    domain: 'automation',
+    factKind: 'table',
+    limit: 1,
+    outputName: 'cli-page.json',
+  });
+  const commandPath = path.join(state.deploymentRoot, 'review-diagnostic.json');
+  fs.writeFileSync(commandPath, `${JSON.stringify(cliCommand)}\n`, {
+    mode: 0o600,
+  });
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-review-diagnostics',
+      '--command-file',
+      commandPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cli.status, 0, cli.stderr);
+  const output = JSON.parse(cli.stdout);
+  assert.equal(output.recordCount, 1);
+  assert.equal(cli.stdout.includes(state.reviewRoot), false);
+  assert.equal(cli.stdout.includes(state.diagnosticRoot), false);
+  assert.equal(cli.stdout.includes('QingLong3TaskDefinitions'), false);
+  assert.equal(cli.stderr, '');
 });
 
 test(

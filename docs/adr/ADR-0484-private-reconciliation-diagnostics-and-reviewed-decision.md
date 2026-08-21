@@ -119,6 +119,23 @@ import Local SQLite mutation、adoption publisher 或 runtime execution authorit
 运行时最多一个 SQLite handle、一个 decision iterator、64 KiB hash/read buffer、64 条 page record 和固定八领域 counters。diagnostics
 output 不进入基础 Edge/Standalone artifact；Cluster/PostgreSQL/Kubernetes 不读取 Local review root、authorization 或 reviewer identity。
 
+## 当前实现进度
+
+D-391 第一切片已实现 `review.prepare` 与 `review.diagnostics`。prepare 读取并重验 exact terminal plan/bundle，以 instance CAS 建立
+`reconciliation_review_prepared` 唯一 fence，覆盖 head response loss、第二 review、rollback 和 restart 拒绝。diagnostics 在每次
+SQLite open 前后重验密封资产，只为一个 database/domain/fact-kind 发布最多 64 条 owner-only page；Secret、identity、history 和 unknown
+facts 固定 blocked，未知表不读取 row，terminal result 不返回路径、名称或 fact digest。page 使用 256 KiB 固定上限、deterministic
+stage、hard-link no-replace 与 fsync，重复请求只能得到 byte-exact existing page。
+
+验证结果：聚焦套件 `28 total / 26 pass / 2 conditional Docker skip / 0 fail`；完整 Local Owner
+`250 total / 243 pass / 7 conditional skip / 0 fail`；tracked backend `1540 total / 1538 pass / 2 conditional skip / 0 fail`；
+18-package clean build/逐包测试、八项架构/发布审计、十四档 artifact audit 与真实 Docker readonly `2/2` 均通过。workspace 仍为 18
+packages，`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Owner 为 `149 source / 148 nested / 1 root binary entry`，新增
+3 个源码全部位于 `deployment/reconciliation/review/`，没有新增 dependency 或常驻对象，基础 Edge/Standalone closure 未增长。
+
+`review.commit`、强认证 User/issuer keyring authorization、terminal seal、`reconciliation_reviewed` 推进和 `review.verify` 尚未实现，因此本
+ADR 继续保持 Proposed；当前 prepared review 不授予任何 import、rollback 或 restart authority。
+
 ## 被拒绝的替代方案
 
 ### 把对象名和冲突列表直接加入 plan
