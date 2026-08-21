@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
+  createLocalDataDirectoryApplicationCommit,
   createLocalDataDirectorySourceNameDigest,
+  type LocalDataDirectoryApplicationCommit,
   type LocalDataDirectoryAdoptionRecord,
 } from '@qinglong/local-sqlite/data-directory-adoption';
 
@@ -13,7 +15,6 @@ import {
   sortedNames,
   syncDirectory,
 } from '../filesystem';
-import { sha256Text } from '../manifest';
 import {
   readStablePrivateUtf8File,
   writePrivateJson,
@@ -29,34 +30,6 @@ const MODEL_NAME = 'model';
 const MAX_JSON_BYTES = 1024 * 1024;
 const ZERO_CHUNK = Buffer.alloc(64 * 1024);
 
-interface LocalDataDirectoryApplicationCommitPayload {
-  readonly schemaVersion: 1;
-  readonly kind: 'qinglong3-legacy-data-directory-application';
-  readonly state: 'committed';
-  readonly mutationId: string;
-  readonly profile: 'edge' | 'standalone';
-  readonly projectIdDigest: string;
-  readonly sourceStageManifestDigest: string;
-  readonly transformationDigest: string;
-  readonly modelDigest: string;
-  readonly publicationDigest: string;
-  readonly receiptDigest: string;
-  readonly secretCount: number;
-  readonly environmentSecretCount: number;
-  readonly sshSecretCount: number;
-  readonly committedAtMs: number;
-  readonly reclamation: Readonly<{
-    modelRemoved: true;
-    plaintextFilesRemoved: true;
-    physicalErasureGuaranteed: false;
-  }>;
-}
-
-export interface LocalDataDirectoryApplicationCommit
-  extends LocalDataDirectoryApplicationCommitPayload {
-  readonly commitDigest: string;
-}
-
 function exactKeys(value: object, expected: readonly string[]): boolean {
   const actual = Object.keys(value).sort();
   const canonical = [...expected].sort();
@@ -64,37 +37,6 @@ function exactKeys(value: object, expected: readonly string[]): boolean {
     actual.length === canonical.length &&
     actual.every((key, index) => key === canonical[index])
   );
-}
-
-function expectedCommit(
-  adoption: Readonly<LocalDataDirectoryAdoptionRecord>,
-): Readonly<LocalDataDirectoryApplicationCommit> {
-  const payload: LocalDataDirectoryApplicationCommitPayload = {
-    schemaVersion: 1,
-    kind: 'qinglong3-legacy-data-directory-application',
-    state: 'committed',
-    mutationId: adoption.mutationId,
-    profile: adoption.profile,
-    projectIdDigest: sha256Text(adoption.projectId),
-    sourceStageManifestDigest: adoption.sourceStageManifestDigest,
-    transformationDigest: adoption.transformationDigest,
-    modelDigest: adoption.modelDigest,
-    publicationDigest: adoption.publicationDigest,
-    receiptDigest: adoption.receiptDigest,
-    secretCount: adoption.receipt.secretCount,
-    environmentSecretCount: adoption.receipt.environmentSecretCount,
-    sshSecretCount: adoption.receipt.sshSecretCount,
-    committedAtMs: adoption.committedAtMs,
-    reclamation: Object.freeze({
-      modelRemoved: true,
-      plaintextFilesRemoved: true,
-      physicalErasureGuaranteed: false,
-    }),
-  };
-  return Object.freeze({
-    ...payload,
-    commitDigest: sha256Text(JSON.stringify(payload)),
-  });
 }
 
 function readJson(filePath: string, uid: number, label: string): unknown {
@@ -167,7 +109,7 @@ function verifyCommit(
     authority.uid,
     'application commit',
   );
-  const expected = expectedCommit(adoption);
+  const expected = createLocalDataDirectoryApplicationCommit(adoption);
   if (!sameJson(actual, expected)) {
     throw new LocalDataDirectoryAdoptionConfigurationError(
       'application commit does not match the durable database receipt',
@@ -415,7 +357,10 @@ export function reclaimCommittedTransformationModel(options: {
 
   const commitPath = path.join(root, APPLICATION_COMMIT_NAME);
   if (!fs.existsSync(commitPath)) {
-    writePrivateJson(commitPath, expectedCommit(adoption));
+    writePrivateJson(
+      commitPath,
+      createLocalDataDirectoryApplicationCommit(adoption),
+    );
     syncDirectory(root);
   }
   const commit = verifyCommit(authority, adoption);

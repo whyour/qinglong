@@ -80,6 +80,11 @@
       "require": "./dist/adoption/data-directory/dataDirectoryAdoptionDatabase.js",
       "default": "./dist/adoption/data-directory/dataDirectoryAdoptionDatabase.js"
     },
+    "./data-directory-application-commit": {
+      "types": "./dist/adoption/data-directory/applicationCommit.d.ts",
+      "require": "./dist/adoption/data-directory/applicationCommit.js",
+      "default": "./dist/adoption/data-directory/applicationCommit.js"
+    },
     "./plugin-package-install": {
       "types": "./dist/plugin-package/pluginPackageInstallRepository.d.ts",
       "require": "./dist/plugin-package/pluginPackageInstallRepository.js",

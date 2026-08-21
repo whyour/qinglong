@@ -2,9 +2,7 @@ import path from 'node:path';
 
 import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
 import { MAX_PLUGIN_PACKAGE_INSTALL_RECOVERY_PAGE_SIZE } from '@qinglong/runtime-core/plugin-package-install';
-import {
-  MAX_PLUGIN_PACKAGE_RECOVERY_PAGES,
-} from '@qinglong/runtime-core/plugin-package-recovery';
+import { MAX_PLUGIN_PACKAGE_RECOVERY_PAGES } from '@qinglong/runtime-core/plugin-package-recovery';
 import {
   MAX_PLUGIN_PACKAGE_TASK_PUBLICATION_RECOVERY_PAGES,
   MAX_PLUGIN_PACKAGE_TASK_PUBLICATION_RECOVERY_PAGE_SIZE,
@@ -18,6 +16,8 @@ export const LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V2 =
   'qinglong/local-application-process@v2' as const;
 export const LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3 =
   'qinglong/local-application-process@v3' as const;
+export const LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V4 =
+  'qinglong/local-application-process@v4' as const;
 
 const MAX_PATH_BYTES = 4_096;
 const INSTANCE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -56,6 +56,12 @@ export interface LocalApplicationProcessCutoverConfig {
   readonly expectedCommitmentDigest: string;
 }
 
+export interface LocalApplicationProcessLegacyDataApplicationConfig {
+  readonly commitPath: string;
+  readonly expectedCommitDigest: string;
+  readonly expectedReceiptDigest: string;
+}
+
 export type LocalApplicationProcessPluginPackageRecoverySourceConfig =
   | Readonly<{ mode: 'disabled' }>
   | Readonly<{
@@ -89,7 +95,8 @@ export interface LocalApplicationProcessConfig {
   readonly schema:
     | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA
     | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V2
-    | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3;
+    | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3
+    | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V4;
   readonly instanceId: string;
   readonly profile: LocalApplicationProfile;
   readonly storage: Readonly<LocalApplicationProcessStorageConfig>;
@@ -97,13 +104,17 @@ export interface LocalApplicationProcessConfig {
   readonly pluginPackages: Readonly<LocalApplicationProcessPluginPackageConfig>;
   readonly ai: LocalApplicationProcessAiConfig;
   readonly cutover?: Readonly<LocalApplicationProcessCutoverConfig>;
+  readonly legacyDataApplication?: Readonly<LocalApplicationProcessLegacyDataApplicationConfig>;
 }
 
 export class LocalApplicationProcessConfigError extends TypeError {
   readonly code = 'QL3_LOCAL_APPLICATION_PROCESS_CONFIG_INVALID';
 
   constructor(message: string, options?: ErrorOptions) {
-    super(`Local application process configuration is invalid: ${message}`, options);
+    super(
+      `Local application process configuration is invalid: ${message}`,
+      options,
+    );
     this.name = 'LocalApplicationProcessConfigError';
   }
 }
@@ -175,7 +186,8 @@ function storageConfig(
   schema:
     | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA
     | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V2
-    | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3,
+    | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3
+    | typeof LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V4,
 ): Readonly<LocalApplicationProcessStorageConfig> {
   const storage = record(value, 'storage');
   if (schema !== LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA) {
@@ -218,9 +230,7 @@ function storageConfig(
       'recoveryPath',
       'sourcePath',
       'targetPath',
-      ...(schema !== LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA
-        ? ['mode']
-        : []),
+      ...(schema !== LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA ? ['mode'] : []),
       ...optionalKeys,
     ],
     'storage',
@@ -294,6 +304,32 @@ function cutoverConfig(
     cutoverId: cutover.cutoverId,
     commitmentPath: absolutePath(cutover.commitmentPath, 'commitmentPath'),
     expectedCommitmentDigest: cutover.expectedCommitmentDigest,
+  });
+}
+
+function legacyDataApplicationConfig(
+  value: unknown,
+): Readonly<LocalApplicationProcessLegacyDataApplicationConfig> {
+  const application = record(value, 'legacyDataApplication');
+  exactKeys(
+    application,
+    ['commitPath', 'expectedCommitDigest', 'expectedReceiptDigest'],
+    'legacyDataApplication',
+  );
+  if (
+    typeof application.expectedCommitDigest !== 'string' ||
+    !DIGEST_PATTERN.test(application.expectedCommitDigest) ||
+    typeof application.expectedReceiptDigest !== 'string' ||
+    !DIGEST_PATTERN.test(application.expectedReceiptDigest)
+  ) {
+    throw new LocalApplicationProcessConfigError(
+      'legacyDataApplication digest is invalid',
+    );
+  }
+  return Object.freeze({
+    commitPath: absolutePath(application.commitPath, 'commitPath'),
+    expectedCommitDigest: application.expectedCommitDigest,
+    expectedReceiptDigest: application.expectedReceiptDigest,
   });
 }
 
@@ -498,7 +534,8 @@ export function normalizeLocalApplicationProcessConfig(
   if (
     config.schema !== LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA &&
     config.schema !== LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V2 &&
-    config.schema !== LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3
+    config.schema !== LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3 &&
+    config.schema !== LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V4
   ) {
     throw new LocalApplicationProcessConfigError('schema is invalid');
   }
@@ -506,10 +543,14 @@ export function normalizeLocalApplicationProcessConfig(
     config,
     [
       'ai',
-      ...(config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3
+      ...(config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3 ||
+      config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V4
         ? ['cutover']
         : []),
       'instanceId',
+      ...(config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V4
+        ? ['legacyDataApplication']
+        : []),
       'pluginPackages',
       'profile',
       'runtime',
@@ -528,7 +569,8 @@ export function normalizeLocalApplicationProcessConfig(
     throw new LocalApplicationProcessConfigError('profile is invalid');
   }
   if (
-    config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3 &&
+    (config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3 ||
+      config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V4) &&
     record(config.storage, 'storage').mode !== 'adopted'
   ) {
     throw new LocalApplicationProcessConfigError(
@@ -543,8 +585,16 @@ export function normalizeLocalApplicationProcessConfig(
     runtime: runtimeConfig(config.runtime),
     pluginPackages: pluginPackageConfig(config.pluginPackages),
     ai: aiConfig(config.ai),
-    ...(config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3
+    ...(config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V3 ||
+    config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V4
       ? { cutover: cutoverConfig(config.cutover) }
+      : {}),
+    ...(config.schema === LOCAL_APPLICATION_PROCESS_CONFIG_SCHEMA_V4
+      ? {
+          legacyDataApplication: legacyDataApplicationConfig(
+            config.legacyDataApplication,
+          ),
+        }
       : {}),
   } as const;
   const authorityPaths = [
@@ -565,8 +615,10 @@ export function normalizeLocalApplicationProcessConfig(
     ...(normalized.cutover === undefined
       ? []
       : [normalized.cutover.commitmentPath]),
-    ...(normalized.pluginPackages.recoverySource.mode ===
-    'materialized_catalog'
+    ...(normalized.legacyDataApplication === undefined
+      ? []
+      : [normalized.legacyDataApplication.commitPath]),
+    ...(normalized.pluginPackages.recoverySource.mode === 'materialized_catalog'
       ? [
           normalized.pluginPackages.recoverySource.catalogRoot,
           normalized.pluginPackages.recoverySource.bundleRoot,

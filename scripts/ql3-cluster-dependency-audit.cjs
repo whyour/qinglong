@@ -2650,6 +2650,14 @@ function auditSourceImports(root, packagePath, findings) {
         continue;
       }
       if (
+        packagePath === 'packages/ql3-local-application' &&
+        path.relative(packageDirectory, filePath) ===
+          'src/production-process/legacyDataApplicationCommitment.ts' &&
+        specifier === '@qinglong/local-sqlite/data-directory-application-commit'
+      ) {
+        continue;
+      }
+      if (
         packagePath === 'packages/ql3-local-owner-cli' &&
         path.relative(packageDirectory, filePath) ===
           'src/run-management/runRetryCommand.ts' &&

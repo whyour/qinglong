@@ -2477,6 +2477,47 @@ test('local application imports only reviewed execution subpaths and process bou
   );
 });
 
+test('local application receives only the pure data application commit codec', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-local-data-commit-codec-boundary-'),
+  );
+  const sourceDirectory = path.join(
+    root,
+    'packages/ql3-local-application/src/production-process',
+  );
+  fs.mkdirSync(sourceDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(sourceDirectory, 'legacyDataApplicationCommitment.ts'),
+    [
+      "import { normalize } from '@qinglong/local-sqlite/data-directory-application-commit';",
+      "import { mutate } from '@qinglong/local-sqlite/data-directory-adoption';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(sourceDirectory, 'neighbor.ts'),
+    "import { normalize } from '@qinglong/local-sqlite/data-directory-application-commit';",
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-application', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-application/src/production-process/legacyDataApplicationCommitment.ts',
+        specifier: '@qinglong/local-sqlite/data-directory-adoption',
+      },
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-application/src/production-process/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/data-directory-application-commit',
+      },
+    ],
+  );
+});
+
 test('local AI application imports only the reviewed dynamic composition subpaths', (t) => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), 'ql3-local-ai-application-boundary-'),

@@ -540,10 +540,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: localSqlite.rootSourceFileRoles,
     },
     {
-      sourceFiles: 201,
+      sourceFiles: 202,
       rootSourceFiles: 1,
       rootSourceLines: 31,
-      nestedSourceFiles: 200,
+      nestedSourceFiles: 201,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );

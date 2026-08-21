@@ -19,6 +19,7 @@ import {
   type LocalApplicationProcessConfig,
 } from './processConfig';
 import { verifyLocalApplicationCutoverCommitment } from './cutoverCommitment';
+import { verifyLocalApplicationLegacyDataCommitment } from './legacyDataApplicationCommitment';
 import { recordLocalApplicationShutdownReceipt } from './shutdownReceipt';
 import { recordLocalApplicationStartupReceipt } from './startupReceipt';
 
@@ -221,6 +222,7 @@ export async function runProductionLocalApplicationProcess(
     throw new TypeError('Local application process options are invalid');
   }
   const config = loadLocalApplicationProcessConfig(options.configFilePath);
+  verifyLocalApplicationLegacyDataCommitment(config);
   verifyLocalApplicationCutoverCommitment(config);
   const selectedAi = aiOptions(config, options);
   const start = options.start ?? defaultStarter;
