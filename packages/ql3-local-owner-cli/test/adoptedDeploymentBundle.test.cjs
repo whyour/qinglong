@@ -4,16 +4,26 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
 const { test } = require('node:test');
 
 const {
   LocalDeploymentConfigurationError,
+  applyLocalDeploymentCompose,
+  collectLocalDeploymentComposeEvidence,
   prepareLocalDeploymentAdoptedBundle,
+  preflightLocalDeploymentCompose,
+  restoreLocalDeploymentCompose,
+  switchLocalDeploymentComposeRevision,
   verifyLocalDeploymentAdoptedBundle,
 } = require('../dist/deployment/localDeployment.js');
 const {
   createLocalDataDirectoryApplicationCommit,
 } = require('@qinglong/local-sqlite/data-directory-application-commit');
+const { migrateLocalSqlitePath } = require('@qinglong/local-sqlite/migration');
+const {
+  createLocalSqliteRolloutBackup,
+} = require('@qinglong/local-sqlite/rollout-safety');
 const {
   normalizeLocalApplicationProcessConfig,
 } = require('../../ql3-local-application/dist/production-process/processConfig.js');
@@ -42,8 +52,8 @@ function writePrivate(filePath, value) {
   );
 }
 
-function releaseSelection(managementRoot) {
-  const image = `ghcr.io/example/qinglong3-local-application@sha256:${'a'.repeat(
+function releaseSelection(managementRoot, marker = 'a') {
+  const image = `ghcr.io/example/qinglong3-local-application@sha256:${marker.repeat(
     64,
   )}`;
   const releaseSetDigest = prefixedDigest(`release-set:${image}`);
@@ -86,7 +96,10 @@ function releaseSelection(managementRoot) {
     },
   };
   const selectionDigest = prefixedDigest(JSON.stringify(unsigned));
-  const filePath = path.join(managementRoot, 'release-selection.json');
+  const filePath = path.join(
+    managementRoot,
+    `release-selection-${marker}.json`,
+  );
   writePrivate(filePath, { ...unsigned, selectionDigest });
   return {
     path: filePath,
@@ -247,11 +260,371 @@ function fixture(t, kind) {
   };
   return {
     root,
+    managementRoot,
     command,
     commitPath,
     commitmentPath,
     sourcePath,
+    targetPath,
+    recoveryPath,
+    manifestPath,
+    activationPath,
   };
+}
+
+async function prepareRuntimeComposeFixture(t) {
+  const state = fixture(t, 'compose');
+  fs.unlinkSync(state.targetPath);
+  await migrateLocalSqlitePath({
+    databasePath: state.targetPath,
+    profile: 'edge',
+    busyTimeoutMs: 100,
+  });
+  const target = fs.statSync(state.targetPath, { bigint: true });
+  const activation = JSON.parse(fs.readFileSync(state.activationPath, 'utf8'));
+  delete activation.activationDigest;
+  activation.targetSha256 = hexDigest(fs.readFileSync(state.targetPath));
+  activation.targetDevice = target.dev.toString();
+  activation.targetInode = target.ino.toString();
+  const activationDigest = canonicalDigest(activation);
+  writePrivate(state.activationPath, { ...activation, activationDigest });
+  const commitment = JSON.parse(fs.readFileSync(state.commitmentPath, 'utf8'));
+  delete commitment.commitmentDigest;
+  commitment.activationDigest = activationDigest;
+  const commitmentDigest = canonicalDigest(commitment);
+  writePrivate(state.commitmentPath, { ...commitment, commitmentDigest });
+  state.command.request.storage.expectedActivationDigest = activationDigest;
+  state.command.request.cutover.expectedCommitmentDigest = commitmentDigest;
+  prepareLocalDeploymentAdoptedBundle(state.command);
+  return state;
+}
+
+function selectedComposeGeneration(state) {
+  const contents = fs.readFileSync(
+    path.join(state.root, 'service/compose.image.yaml'),
+    'utf8',
+  );
+  return {
+    generation: Number(/^  generation: ([0-9]+)$/m.exec(contents)[1]),
+    mutationId: /^  mutation_id: ([0-9a-f-]+)$/m.exec(contents)[1],
+    image: /^    image: ([^\n]+)$/m.exec(contents)[1],
+    releaseSelectionDigest: /^  release_selection_digest: ([^\n]+)$/m.exec(
+      contents,
+    )[1],
+    releaseSetDigest: /^  release_set_digest: ([^\n]+)$/m.exec(contents)[1],
+    catalogManifestDigest: /^  catalog_manifest_digest: ([^\n]+)$/m.exec(
+      contents,
+    )[1],
+    catalogConsumptionReportDigest:
+      /^  catalog_consumption_report_digest: ([^\n]+)$/m.exec(contents)[1],
+  };
+}
+
+function adoptedDockerHarness(state, options = {}) {
+  const calls = [];
+  const containerId = '1'.repeat(64);
+  const bundle = JSON.parse(
+    fs.readFileSync(path.join(state.root, 'service/adopted-bundle.json')),
+  );
+  const compose = fs.readFileSync(
+    path.join(state.root, 'service/compose.yaml'),
+    'utf8',
+  );
+  const projectName = /^name: ([a-z0-9_-]+)$/m.exec(compose)[1];
+  let running = false;
+  let loseNextUpResponse = options.loseNextUpResponse === true;
+  const labels = (selected) => ({
+    'io.qinglong.deployment.mode': 'adopted',
+    'io.qinglong.deployment.profile': 'edge',
+    'io.qinglong.deployment.instance': 'edge-router-1',
+    'io.qinglong.deployment.bundle': bundle.bundleId,
+    'io.qinglong.application.config': bundle.applicationConfigDigest,
+    'io.qinglong.data.commit': bundle.legacyDataApplicationCommitDigest,
+    'io.qinglong.data.receipt': bundle.legacyDataApplicationReceiptDigest,
+    'io.qinglong.deployment.generation': String(selected.generation),
+    'io.qinglong.deployment.mutation': selected.mutationId,
+    'io.qinglong.release.selection': selected.releaseSelectionDigest,
+    'io.qinglong.release.set': selected.releaseSetDigest,
+    'io.qinglong.release.catalog-manifest': selected.catalogManifestDigest,
+    'io.qinglong.release.catalog-report':
+      selected.catalogConsumptionReportDigest,
+  });
+  const runDocker = ({ args }) => {
+    calls.push(args);
+    const selected = selectedComposeGeneration(state);
+    if (args[0] === 'image') {
+      return JSON.stringify([
+        {
+          Id: `sha256:${'2'.repeat(64)}`,
+          RepoDigests: [selected.image],
+          Architecture: 'arm64',
+          Os: 'linux',
+          Config: {
+            User: '65532:65532',
+            Entrypoint: [
+              'node',
+              '/opt/qinglong/node_modules/@qinglong/local-application/dist/cli.js',
+            ],
+            Labels: {
+              'io.qinglong.local.sqlite-contract-min': '50',
+              'io.qinglong.local.sqlite-contract-max': '50',
+              'io.qinglong.local.sqlite-write-contract': '50',
+              'io.qinglong.local.application-config': '2,3,4',
+              'io.qinglong.local.compose-selection': '1',
+              'io.qinglong.ai': 'excluded',
+              'io.qinglong.profile': 'edge,standalone',
+              'org.opencontainers.image.source':
+                'https://github.com/whyour/qinglong',
+              'org.opencontainers.image.revision': '3'.repeat(40),
+              'org.opencontainers.image.version': '3.0.0-alpha.0',
+            },
+          },
+        },
+      ]);
+    }
+    if (args[0] === 'compose' && args.includes('config')) {
+      const volumes = [
+        { type: 'bind', source: state.root, target: state.root },
+        {
+          type: 'bind',
+          source: state.sourcePath,
+          target: state.sourcePath,
+          read_only: true,
+        },
+      ];
+      if (options.driftMount === true) volumes[0].target = '/var/lib/qinglong3';
+      return JSON.stringify({
+        name: projectName,
+        services: {
+          qinglong3: {
+            image: selected.image,
+            user: `${process.getuid()}:${process.getgid()}`,
+            read_only: true,
+            network_mode: 'none',
+            restart: 'no',
+            mem_limit: 128 * 1024 * 1024,
+            pids_limit: 64,
+            cap_drop: ['ALL'],
+            security_opt: ['no-new-privileges:true'],
+            command: [
+              '--config',
+              path.join(state.root, 'local-application.json'),
+            ],
+            labels: labels(selected),
+            volumes,
+            tmpfs: ['/tmp:rw,noexec,nosuid,nodev,size=16m'],
+          },
+        },
+      });
+    }
+    if (args[0] === 'compose' && args.includes('up')) {
+      running = true;
+      if (loseNextUpResponse) {
+        loseNextUpResponse = false;
+        throw new Error('injected Docker response loss');
+      }
+      return '';
+    }
+    if (args[0] === 'compose' && args.includes('stop')) {
+      running = false;
+      return '';
+    }
+    if (args[0] === 'compose' && args.includes('ps')) return `${containerId}\n`;
+    if (args[0] === 'container' && args[1] === 'inspect') {
+      return JSON.stringify([
+        {
+          Id: containerId,
+          State: { Running: running, Status: running ? 'running' : 'exited' },
+          Config: { Image: selected.image, Labels: labels(selected) },
+          HostConfig: {
+            ReadonlyRootfs: true,
+            NetworkMode: 'none',
+            Privileged: false,
+          },
+        },
+      ]);
+    }
+    if (args[0] === 'container' && args[1] === 'logs') {
+      return `${JSON.stringify({
+        schemaVersion: 1,
+        component: 'qinglong3-local-application',
+        level: 'info',
+        event: 'active',
+        profile: 'edge',
+        aiStatus: 'deployment_excluded',
+        instanceId: 'edge-router-1',
+      })}\n`;
+    }
+    return '';
+  };
+  return {
+    calls,
+    runDocker,
+    now: () => 10_000,
+    wait: async () => {},
+  };
+}
+
+function composeApplyCommand(state, generation, suffix) {
+  return {
+    schemaVersion: 1,
+    operation: 'local.deployment.compose.apply',
+    options: {
+      deploymentRoot: state.root,
+      dockerExecutable: fs.realpathSync(process.execPath),
+      dockerSocketPath: path.join(state.managementRoot, 'docker.sock'),
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      expectedGeneration: generation,
+      rolloutId: `00000000-0000-4000-8000-000000000d${suffix}`,
+      startedAtMs: 1786416000500,
+      failureRollbackMutationId: `00000000-0000-4000-8000-000000000e${suffix}`,
+      failureRollbackChangedAtMs: 1786416000501,
+    },
+  };
+}
+
+function composePreflightCommand(state, generation) {
+  return {
+    schemaVersion: 1,
+    operation: 'local.deployment.compose.preflight',
+    options: {
+      deploymentRoot: state.root,
+      dockerExecutable: fs.realpathSync(process.execPath),
+      dockerSocketPath: path.join(state.managementRoot, 'docker.sock'),
+      allowRootService: rootAcknowledgement(),
+    },
+    request: { expectedGeneration: generation },
+  };
+}
+
+function composeRevisionCommand(state, operation, request) {
+  return {
+    schemaVersion: 1,
+    operation,
+    options: {
+      deploymentRoot: state.root,
+      allowRootService: rootAcknowledgement(),
+    },
+    request,
+  };
+}
+
+function composeRestoreCommands(state, failedCommand, suffix) {
+  const options = {
+    deploymentRoot: state.root,
+    dockerExecutable: fs.realpathSync(process.execPath),
+    dockerSocketPath: path.join(state.managementRoot, 'docker.sock'),
+    allowRootService: rootAcknowledgement(),
+  };
+  const restoreId = `00000000-0000-4000-8000-000000000d${suffix}`;
+  return {
+    prepare: {
+      schemaVersion: 1,
+      operation: 'local.deployment.compose.restore.prepare',
+      options,
+      request: {
+        expectedGeneration: failedCommand.request.expectedGeneration + 1,
+        restoreId,
+        sourceRolloutId: failedCommand.request.rolloutId,
+        preparedAtMs: 1786416000600,
+      },
+    },
+    commit: {
+      schemaVersion: 1,
+      operation: 'local.deployment.compose.restore.commit',
+      options,
+      request: {
+        expectedGeneration: failedCommand.request.expectedGeneration + 1,
+        restoreId,
+        committedAtMs: 1786416000601,
+      },
+    },
+  };
+}
+
+function composeEvidenceCollectionCommands(
+  state,
+  generation,
+  restoreId,
+  suffix,
+) {
+  const options = {
+    deploymentRoot: state.root,
+    allowRootService: rootAcknowledgement(),
+  };
+  const collectionId = `00000000-0000-4000-8000-000000000d${suffix}`;
+  return {
+    prepare: {
+      schemaVersion: 1,
+      operation: 'local.deployment.compose.evidence-collection.prepare',
+      options,
+      request: {
+        expectedGeneration: generation,
+        collectionId,
+        rolloutIds: [],
+        restoreIds: [restoreId],
+        preparedAtMs: 1786416000700,
+      },
+    },
+    commit: {
+      schemaVersion: 1,
+      operation: 'local.deployment.compose.evidence-collection.commit',
+      options,
+      request: {
+        expectedGeneration: generation,
+        collectionId,
+        committedAtMs: 1786416000701,
+      },
+    },
+  };
+}
+
+async function createFailedRestoreState(state, currentGeneration, suffix) {
+  const attemptedGeneration = currentGeneration + 1;
+  const upgradeMutationId = `00000000-0000-4000-8000-000000000a${suffix}`;
+  await switchLocalDeploymentComposeRevision(
+    composeRevisionCommand(state, 'local.deployment.compose.upgrade', {
+      expectedGeneration: currentGeneration,
+      releaseSelection: releaseSelection(
+        state.managementRoot,
+        String(attemptedGeneration),
+      ),
+      mutationId: upgradeMutationId,
+      changedAtMs: 1786416000400 + attemptedGeneration,
+    }),
+  );
+  const failedCommand = composeApplyCommand(state, attemptedGeneration, suffix);
+  const intent = `${JSON.stringify(failedCommand, null, 2)}\n`;
+  fs.writeFileSync(
+    path.join(state.root, 'service/.compose-rollout.lock'),
+    intent,
+    { mode: 0o600 },
+  );
+  await createLocalSqliteRolloutBackup({
+    databasePath: state.targetPath,
+    backupPath: path.join(
+      state.root,
+      'service',
+      'rollout-backups',
+      `${failedCommand.request.rolloutId}.sqlite`,
+    ),
+    profile: 'edge',
+  });
+  const writer = new DatabaseSync(state.targetPath);
+  writer.exec(`PRAGMA user_version = ${900 + attemptedGeneration}`);
+  writer.close();
+  await switchLocalDeploymentComposeRevision(
+    composeRevisionCommand(state, 'local.deployment.compose.rollback', {
+      expectedGeneration: attemptedGeneration,
+      targetGeneration: currentGeneration,
+      mutationId: failedCommand.request.failureRollbackMutationId,
+      changedAtMs: failedCommand.request.failureRollbackChangedAtMs,
+    }),
+    intent,
+  );
+  return failedCommand;
 }
 
 for (const kind of ['systemd', 'openrc', 'compose']) {
@@ -404,6 +777,233 @@ test('requires the legacy source to be the only authority outside deployment roo
       }),
     LocalDeploymentConfigurationError,
   );
+});
+
+test('preflights adopted Compose identity mounts and rejects mount drift', async (t) => {
+  const state = await prepareRuntimeComposeFixture(t);
+  const harness = adoptedDockerHarness(state);
+  const ready = await preflightLocalDeploymentCompose(
+    composePreflightCommand(state, 1),
+    {
+      runDocker: harness.runDocker,
+      validateSocket() {},
+    },
+  );
+  assert.equal(ready.status, 'ready');
+  assert.equal(ready.profile, 'edge');
+  assert.equal(ready.sqlite.contractVersion, 50);
+  await assert.rejects(
+    preflightLocalDeploymentCompose(composePreflightCommand(state, 1), {
+      runDocker: adoptedDockerHarness(state, { driftMount: true }).runDocker,
+      validateSocket() {},
+    }),
+    LocalDeploymentConfigurationError,
+  );
+});
+
+const dockerComposeAvailable =
+  spawnSync('docker', ['compose', 'version'], { encoding: 'utf8' }).status ===
+  0;
+
+test(
+  'accepts the real Docker Compose adopted config projection',
+  { skip: !dockerComposeAvailable },
+  async (t) => {
+    const state = await prepareRuntimeComposeFixture(t);
+    const harness = adoptedDockerHarness(state);
+    const runDocker = ({ args, ...request }) => {
+      if (args[0] === 'compose' && args.includes('config')) {
+        const result = spawnSync('docker', args, { encoding: 'utf8' });
+        assert.equal(result.status, 0, result.stderr);
+        return result.stdout;
+      }
+      return harness.runDocker({ args, ...request });
+    };
+    const ready = await preflightLocalDeploymentCompose(
+      composePreflightCommand(state, 1),
+      { runDocker, validateSocket() {} },
+    );
+    assert.equal(ready.status, 'ready');
+  },
+);
+
+test('recovers adopted Compose up response loss and binds the rollout receipt', async (t) => {
+  const state = await prepareRuntimeComposeFixture(t);
+  const harness = adoptedDockerHarness(state, { loseNextUpResponse: true });
+  const command = composeApplyCommand(state, 1, '89');
+  const dependencies = {
+    runDocker: harness.runDocker,
+    validateSocket() {},
+    now: harness.now,
+    wait: harness.wait,
+  };
+  const applied = await applyLocalDeploymentCompose(command, dependencies);
+  assert.equal(applied.status, 'active');
+  assert.equal(
+    harness.calls.filter((args) => args[0] === 'compose' && args.includes('up'))
+      .length,
+    1,
+  );
+  const receipt = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        state.root,
+        'service',
+        'rollouts',
+        `${command.request.rolloutId}.json`,
+      ),
+      'utf8',
+    ),
+  );
+  assert.equal(receipt.schema, 'qinglong/local-compose-rollout-receipt@v3');
+  assert.equal(receipt.lineage.mode, 'adopted');
+  assert.equal(
+    receipt.lineage.legacyDataApplicationCommitDigest,
+    state.command.request.legacyDataApplication.expectedCommitDigest,
+  );
+  assert.equal(
+    receipt.lineage.legacyDataApplicationReceiptDigest,
+    state.command.request.legacyDataApplication.expectedReceiptDigest,
+  );
+  const replay = await applyLocalDeploymentCompose(command, dependencies);
+  assert.equal(replay.status, 'active');
+  assert.equal(
+    harness.calls.filter((args) => args[0] === 'compose' && args.includes('up'))
+      .length,
+    1,
+  );
+  const commitment = JSON.parse(fs.readFileSync(state.commitmentPath, 'utf8'));
+  writePrivate(state.commitmentPath, {
+    ...commitment,
+    observedAtMs: commitment.observedAtMs + 1,
+  });
+  await assert.rejects(
+    applyLocalDeploymentCompose(command, dependencies),
+    LocalDeploymentConfigurationError,
+  );
+  assert.equal(
+    harness.calls.filter((args) => args[0] === 'compose' && args.includes('up'))
+      .length,
+    1,
+  );
+});
+
+test('preserves adopted restore identity and carries lineage through evidence collection', async (t) => {
+  const state = await prepareRuntimeComposeFixture(t);
+  const activated = fs.statSync(state.targetPath, { bigint: true });
+  const failedCommand = await createFailedRestoreState(state, 1, '90');
+  const restore = composeRestoreCommands(state, failedCommand, '91');
+  const harness = adoptedDockerHarness(state);
+  const dependencies = {
+    runDocker: harness.runDocker,
+    validateSocket() {},
+  };
+  const prepared = await restoreLocalDeploymentCompose(
+    restore.prepare,
+    dependencies,
+  );
+  assert.equal(prepared.status, 'prepared');
+  const committed = await restoreLocalDeploymentCompose(
+    restore.commit,
+    dependencies,
+  );
+  assert.equal(committed.status, 'restored');
+  const restored = fs.statSync(state.targetPath, { bigint: true });
+  assert.equal(restored.dev, activated.dev);
+  assert.equal(restored.ino, activated.ino);
+  const commitPath = path.join(
+    state.root,
+    'service',
+    'restores',
+    `${restore.commit.request.restoreId}.commit.json`,
+  );
+  const restoreReceipt = JSON.parse(fs.readFileSync(commitPath, 'utf8'));
+  assert.equal(
+    restoreReceipt.schema,
+    'qinglong/local-compose-restore-commit@v2',
+  );
+  assert.equal(restoreReceipt.lineage.mode, 'adopted');
+  assert.equal(
+    restoreReceipt.lineage.legacyDataApplicationReceiptDigest,
+    state.command.request.legacyDataApplication.expectedReceiptDigest,
+  );
+
+  const applyHarness = adoptedDockerHarness(state);
+  await applyLocalDeploymentCompose(failedCommand, {
+    runDocker: applyHarness.runDocker,
+    validateSocket() {},
+    now: applyHarness.now,
+    wait: applyHarness.wait,
+  });
+  const secondRestoreId = '00000000-0000-4000-8000-000000000d92';
+  const secondSafeguard = await createLocalSqliteRolloutBackup({
+    databasePath: state.targetPath,
+    backupPath: path.join(
+      state.root,
+      'service',
+      'restore-safeguards',
+      `${secondRestoreId}.sqlite`,
+    ),
+    profile: 'edge',
+  });
+  const secondReceipt = {
+    ...restoreReceipt,
+    commandDigest: 'd'.repeat(64),
+    restoreId: secondRestoreId,
+    recordedAtMs: restoreReceipt.recordedAtMs + 1,
+    safeguard: {
+      contractVersion: secondSafeguard.contractVersion,
+      sha256: secondSafeguard.sha256,
+      bytes: secondSafeguard.bytes,
+      pageCount: secondSafeguard.pageCount,
+      pageSize: secondSafeguard.pageSize,
+    },
+  };
+  writePrivate(
+    path.join(
+      state.root,
+      'service',
+      'restores',
+      `${secondRestoreId}.commit.json`,
+    ),
+    `${JSON.stringify(secondReceipt, null, 2)}\n`,
+  );
+  const collection = composeEvidenceCollectionCommands(
+    state,
+    3,
+    restore.commit.request.restoreId,
+    '93',
+  );
+  const collectionPrepared = await collectLocalDeploymentComposeEvidence(
+    collection.prepare,
+  );
+  assert.equal(collectionPrepared.status, 'prepared');
+  const collectionCommitted = await collectLocalDeploymentComposeEvidence(
+    collection.commit,
+  );
+  assert.equal(collectionCommitted.status, 'collected');
+  const collectionReceipt = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        state.root,
+        'service',
+        'evidence-collections',
+        `${collection.commit.request.collectionId}.commit.json`,
+      ),
+      'utf8',
+    ),
+  );
+  assert.equal(
+    collectionReceipt.schema,
+    'qinglong/local-compose-evidence-collection-commit@v2',
+  );
+  assert.deepEqual(collectionReceipt.lineage, restoreReceipt.lineage);
+  const replay = await restoreLocalDeploymentCompose(
+    restore.commit,
+    dependencies,
+  );
+  assert.equal(replay.status, 'existing');
+  assert.equal(replay.sqlite.safeguard, 'collected');
 });
 
 test('exposes separate exact prepare and verify CLI operations', (t) => {

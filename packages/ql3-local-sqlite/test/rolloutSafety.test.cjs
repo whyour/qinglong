@@ -210,6 +210,72 @@ test('converges the moved-current restore window and cleans ENOSPC stage', async
   assert.equal(fs.existsSync(replacedDatabasePath), false);
 });
 
+test('preserves an activated inode and recovers an ENOSPC partial rewrite', async (t) => {
+  const state = fixture(t);
+  await migrateLocalSqlitePath(state);
+  const activated = fs.statSync(state.databasePath, { bigint: true });
+  const source = await createLocalSqliteRolloutBackup(state);
+  const writer = new DatabaseSync(state.databasePath);
+  writer.exec('PRAGMA user_version = 29');
+  writer.close();
+  const current = await checkpointLocalSqliteForRestore(state);
+  const restoreStagePath = path.join(state.root, '.identity.restore-stage');
+  const replacedDatabasePath = path.join(
+    path.dirname(state.backupPath),
+    'identity.replaced.sqlite',
+  );
+  const restoreOptions = {
+    databasePath: state.databasePath,
+    profile: state.profile,
+    sourceSnapshotPath: state.backupPath,
+    restoreStagePath,
+    replacedDatabasePath,
+    expectedCurrentSha256: current.sha256,
+    expectedSourceSha256: source.sha256,
+    preserveDatabaseIdentity: true,
+  };
+  await assert.rejects(
+    restoreLocalSqliteSnapshot(restoreOptions, {
+      rewriteSnapshot(_sourcePath, targetPath) {
+        const descriptor = fs.openSync(
+          targetPath,
+          fs.constants.O_WRONLY |
+            fs.constants.O_TRUNC |
+            fs.constants.O_NOFOLLOW,
+        );
+        try {
+          fs.writeSync(descriptor, Buffer.from('partial'));
+          fs.fsyncSync(descriptor);
+        } finally {
+          fs.closeSync(descriptor);
+        }
+        throw Object.assign(new Error('injected identity restore ENOSPC'), {
+          code: 'ENOSPC',
+        });
+      },
+    }),
+    /identity-preserving restore write could not complete/,
+  );
+  assert.equal(fs.existsSync(restoreStagePath), true);
+  assert.equal(fs.existsSync(replacedDatabasePath), true);
+  const partial = fs.statSync(state.databasePath, { bigint: true });
+  assert.equal(partial.dev, activated.dev);
+  assert.equal(partial.ino, activated.ino);
+
+  const recovered = await restoreLocalSqliteSnapshot(restoreOptions);
+  assert.equal(recovered.status, 'restored');
+  assert.equal(recovered.sha256, source.sha256);
+  const restored = fs.statSync(state.databasePath, { bigint: true });
+  assert.equal(restored.dev, activated.dev);
+  assert.equal(restored.ino, activated.ino);
+  assert.equal(fs.existsSync(restoreStagePath), false);
+  assert.equal(fs.existsSync(replacedDatabasePath), false);
+  assert.equal(
+    (await restoreLocalSqliteSnapshot(restoreOptions)).status,
+    'existing',
+  );
+});
+
 test('rollout safety subpath excludes DDL and mutable repositories', () => {
   const script = `
     const safety = require(${JSON.stringify(

@@ -156,7 +156,7 @@ test('rejects removal of the SQLite rollout compatibility labels', () => {
     const dockerfilePath = path.join(current.target, 'Dockerfile');
     const dockerfile = fs
       .readFileSync(dockerfilePath, 'utf8')
-      .replace('  io.qinglong.local.sqlite-write-contract="44" \\\n', '');
+      .replace('  io.qinglong.local.sqlite-write-contract="50" \\\n', '');
     fs.writeFileSync(dockerfilePath, dockerfile);
     const report = auditLocalImageContract(current.root);
     assert.equal(report.compatible, false);

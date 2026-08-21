@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 
 import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
@@ -31,6 +30,10 @@ import {
   deploymentPaths,
   descriptor,
 } from '../foundation/render';
+import {
+  inspectLocalDeploymentComposeLineage,
+  type LocalDeploymentComposeLineage,
+} from './composeLineage';
 
 const CONTAINER_ROOT = '/var/lib/qinglong3';
 const MAX_DOCKER_OUTPUT_BYTES = 256 * 1024;
@@ -46,85 +49,8 @@ export interface LocalDeploymentComposePreflightDependencies {
   readonly validateSocket?: (socketPath: string, uid: number) => void;
 }
 
-interface ApplicationIdentity {
-  readonly instanceId: string;
-  readonly profile: LocalDeploymentProfile;
-  readonly busyTimeoutMs?: number;
-}
-
 function configurationError(message: string, cause?: unknown): never {
   throw new LocalDeploymentConfigurationError(message, { cause });
-}
-
-function readApplicationIdentity(
-  filePath: string,
-  uid: number,
-): Readonly<ApplicationIdentity> {
-  let stat: fs.Stats;
-  try {
-    stat = fs.lstatSync(filePath);
-  } catch (error) {
-    configurationError('application configuration is unavailable', error);
-  }
-  if (
-    !stat.isFile() ||
-    stat.isSymbolicLink() ||
-    stat.uid !== uid ||
-    (stat.mode & 0o777) !== 0o600 ||
-    stat.nlink !== 1 ||
-    stat.size < 2 ||
-    stat.size > 64 * 1024
-  ) {
-    configurationError('application configuration identity is invalid');
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch (error) {
-    configurationError('application configuration is invalid', error);
-  }
-  const candidate = value as {
-    readonly schema?: unknown;
-    readonly instanceId?: unknown;
-    readonly profile?: unknown;
-    readonly storage?: {
-      readonly mode?: unknown;
-      readonly databasePath?: unknown;
-      readonly busyTimeoutMs?: unknown;
-    };
-  };
-  if (
-    !candidate ||
-    typeof candidate !== 'object' ||
-    Array.isArray(candidate) ||
-    candidate.schema !== 'qinglong/local-application-process@v2' ||
-    typeof candidate.instanceId !== 'string' ||
-    (candidate.profile !== 'edge' && candidate.profile !== 'standalone') ||
-    !candidate.storage ||
-    candidate.storage.mode !== 'fresh' ||
-    candidate.storage.databasePath !== `${CONTAINER_ROOT}/qinglong3.sqlite`
-  ) {
-    configurationError('application configuration is not a fresh Compose v2');
-  }
-  const busyTimeoutMs =
-    candidate.storage.busyTimeoutMs === undefined
-      ? undefined
-      : candidate.storage.busyTimeoutMs;
-  if (
-    busyTimeoutMs !== undefined &&
-    (!Number.isSafeInteger(busyTimeoutMs) ||
-      (busyTimeoutMs as number) < 100 ||
-      (busyTimeoutMs as number) > 30_000)
-  ) {
-    configurationError('application busyTimeoutMs is invalid');
-  }
-  return Object.freeze({
-    instanceId: candidate.instanceId,
-    profile: candidate.profile,
-    ...(busyTimeoutMs === undefined
-      ? {}
-      : { busyTimeoutMs: busyTimeoutMs as number }),
-  });
 }
 
 function parseJson(value: string, label: string): unknown {
@@ -157,6 +83,7 @@ function inspectImage(
   image: string,
   profile: LocalDeploymentProfile,
   sqliteContractVersion: number,
+  applicationConfigVersion: '2' | '4',
 ): 'amd64' | 'arm64' {
   const parsed = parseJson(output, 'Docker image inspect') as unknown[];
   if (!Array.isArray(parsed) || parsed.length !== 1) {
@@ -194,6 +121,10 @@ function inspectImage(
   const minimum = safeLabel(labels, 'io.qinglong.local.sqlite-contract-min');
   const maximum = safeLabel(labels, 'io.qinglong.local.sqlite-contract-max');
   const profiles = safeLabel(labels, 'io.qinglong.profile').split(',');
+  const applicationConfigs = safeLabel(
+    labels,
+    'io.qinglong.local.application-config',
+  ).split(',');
   if (
     !/^[1-9][0-9]{0,3}$/.test(minimum) ||
     !/^[1-9][0-9]{0,3}$/.test(maximum) ||
@@ -201,7 +132,7 @@ function inspectImage(
     Number(maximum) < sqliteContractVersion ||
     safeLabel(labels, 'io.qinglong.local.sqlite-write-contract') !==
       String(sqliteContractVersion) ||
-    safeLabel(labels, 'io.qinglong.local.application-config') !== '2' ||
+    !applicationConfigs.includes(applicationConfigVersion) ||
     safeLabel(labels, 'io.qinglong.local.compose-selection') !== '1' ||
     safeLabel(labels, 'io.qinglong.ai') !== 'excluded' ||
     !profiles.includes(profile) ||
@@ -233,10 +164,15 @@ function inspectComposeConfig(
     image: string;
     generation: number;
     mutationId: string;
+    releaseSelectionDigest: string;
+    releaseSetDigest: string;
+    catalogManifestDigest: string;
+    catalogConsumptionReportDigest: string;
     deploymentRoot: string;
     uid: number;
     gid: number;
     profile: LocalDeploymentProfile;
+    lineage: Readonly<LocalDeploymentComposeLineage>;
   }>,
 ): void {
   const config = parseJson(output, 'Docker Compose config') as {
@@ -267,7 +203,8 @@ function inspectComposeConfig(
     service.user !== `${expected.uid}:${expected.gid}` ||
     service.read_only !== true ||
     service.network_mode !== 'none' ||
-    service.restart !== 'unless-stopped' ||
+    service.restart !==
+      (expected.lineage.mode === 'fresh' ? 'unless-stopped' : 'no') ||
     Number(service.mem_limit) !== expectedMemory ||
     Number(service.pids_limit) !== expectedPids ||
     service.privileged === true ||
@@ -279,7 +216,9 @@ function inspectComposeConfig(
     !exactArray(service.security_opt, ['no-new-privileges:true']) ||
     !exactArray(service.command, [
       '--config',
-      `${CONTAINER_ROOT}/local-application.json`,
+      expected.lineage.mode === 'fresh'
+        ? `${CONTAINER_ROOT}/local-application.json`
+        : path.join(expected.deploymentRoot, 'local-application.json'),
     ])
   ) {
     configurationError('Docker Compose service contract is invalid');
@@ -287,9 +226,44 @@ function inspectComposeConfig(
   const labels = service.labels as
     | Readonly<Record<string, unknown>>
     | undefined;
+  const expectedLabels =
+    expected.lineage.mode === 'fresh'
+      ? {
+          'io.qinglong.deployment.generation': String(expected.generation),
+          'io.qinglong.deployment.mutation': expected.mutationId,
+          'io.qinglong.release.selection': expected.releaseSelectionDigest,
+          'io.qinglong.release.set': expected.releaseSetDigest,
+          'io.qinglong.release.catalog-manifest':
+            expected.catalogManifestDigest,
+          'io.qinglong.release.catalog-report':
+            expected.catalogConsumptionReportDigest,
+        }
+      : {
+          'io.qinglong.deployment.mode': 'adopted',
+          'io.qinglong.deployment.profile': expected.profile,
+          'io.qinglong.deployment.instance': expected.lineage.instanceId,
+          'io.qinglong.deployment.bundle': expected.lineage.bundleId!,
+          'io.qinglong.application.config':
+            expected.lineage.receipt.applicationConfigDigest,
+          'io.qinglong.data.commit':
+            expected.lineage.receipt.legacyDataApplicationCommitDigest!,
+          'io.qinglong.data.receipt':
+            expected.lineage.receipt.legacyDataApplicationReceiptDigest!,
+          'io.qinglong.deployment.generation': String(expected.generation),
+          'io.qinglong.deployment.mutation': expected.mutationId,
+          'io.qinglong.release.selection': expected.releaseSelectionDigest,
+          'io.qinglong.release.set': expected.releaseSetDigest,
+          'io.qinglong.release.catalog-manifest':
+            expected.catalogManifestDigest,
+          'io.qinglong.release.catalog-report':
+            expected.catalogConsumptionReportDigest,
+        };
   if (
     !labels ||
-    Object.keys(labels).length !== 2 ||
+    Object.keys(labels).length !== Object.keys(expectedLabels).length ||
+    Object.entries(expectedLabels).some(
+      ([key, value]) => labels[key] !== value,
+    ) ||
     labels['io.qinglong.deployment.generation'] !==
       String(expected.generation) ||
     labels['io.qinglong.deployment.mutation'] !== expected.mutationId
@@ -297,15 +271,32 @@ function inspectComposeConfig(
     configurationError('Docker Compose deployment labels are invalid');
   }
   const volumes = service.volumes as readonly unknown[] | undefined;
-  const volume = volumes?.[0] as Readonly<Record<string, unknown>> | undefined;
   const tmpfs = service.tmpfs as readonly unknown[] | undefined;
+  const expectedVolumes =
+    expected.lineage.mode === 'fresh'
+      ? [
+          {
+            type: 'bind',
+            source: expected.deploymentRoot,
+            target: CONTAINER_ROOT,
+          },
+        ]
+      : [
+          {
+            type: 'bind',
+            source: expected.deploymentRoot,
+            target: expected.deploymentRoot,
+          },
+          {
+            type: 'bind',
+            source: expected.lineage.sourcePath,
+            target: expected.lineage.sourcePath,
+            read_only: true,
+          },
+        ];
   if (
     !Array.isArray(volumes) ||
-    volumes.length !== 1 ||
-    !volume ||
-    volume.type !== 'bind' ||
-    volume.source !== expected.deploymentRoot ||
-    volume.target !== CONTAINER_ROOT ||
+    JSON.stringify(volumes) !== JSON.stringify(expectedVolumes) ||
     !Array.isArray(tmpfs) ||
     tmpfs.length !== 1 ||
     typeof tmpfs[0] !== 'string' ||
@@ -353,62 +344,66 @@ export async function preflightLocalDeploymentCompose(
       'active compose generation does not match expectedGeneration',
     );
   }
-  const application = readApplicationIdentity(
-    paths.applicationConfig,
-    identity.uid,
-  );
-  const syntheticPrepare: Readonly<LocalDeploymentPrepareCommand> = {
-    schemaVersion: 1,
-    operation: 'local.deployment.prepare',
-    options: {
-      deploymentRoot: command.options.deploymentRoot,
-      profile: application.profile,
-      instanceId: application.instanceId,
-      ...(application.busyTimeoutMs === undefined
-        ? {}
-        : { busyTimeoutMs: application.busyTimeoutMs }),
-      service: {
-        kind: 'compose',
-        releaseSelection: {
-          path: paths.composeSelection,
-          expectedSelectionDigest: selection.selectionDigest,
-        },
-        allowRootService: command.options.allowRootService,
-      },
-    },
-    request: {
-      ownerPepperKeyId: 'preflight',
-      registerMutationId: '00000000-0000-4000-8000-000000000001',
-      activateMutationId: '00000000-0000-4000-8000-000000000002',
-      registeredAtMs: 0,
-      activatedAtMs: 0,
-    },
-  };
-  preflightPublishedFile(
-    paths.applicationConfig,
-    applicationConfiguration(syntheticPrepare, paths),
-    0o600,
-    identity.uid,
-    'application configuration',
-  );
-  const expectedDescriptor = descriptor(
-    syntheticPrepare,
-    paths.applicationConfig,
+  const application = inspectLocalDeploymentComposeLineage(
+    command.options.deploymentRoot,
     identity.uid,
     identity.gid,
+    command.options.allowRootService,
   );
-  preflightPublishedFile(
-    path.join(paths.service, expectedDescriptor.fileName),
-    expectedDescriptor.contents,
-    expectedDescriptor.mode,
-    identity.uid,
-    'service descriptor',
-  );
+  if (application.mode === 'fresh') {
+    const syntheticPrepare: Readonly<LocalDeploymentPrepareCommand> = {
+      schemaVersion: 1,
+      operation: 'local.deployment.prepare',
+      options: {
+        deploymentRoot: command.options.deploymentRoot,
+        profile: application.profile,
+        instanceId: application.instanceId,
+        ...(application.busyTimeoutMs === undefined
+          ? {}
+          : { busyTimeoutMs: application.busyTimeoutMs }),
+        service: {
+          kind: 'compose',
+          releaseSelection: {
+            path: paths.composeSelection,
+            expectedSelectionDigest: selection.selectionDigest,
+          },
+          allowRootService: command.options.allowRootService,
+        },
+      },
+      request: {
+        ownerPepperKeyId: 'preflight',
+        registerMutationId: '00000000-0000-4000-8000-000000000001',
+        activateMutationId: '00000000-0000-4000-8000-000000000002',
+        registeredAtMs: 0,
+        activatedAtMs: 0,
+      },
+    };
+    preflightPublishedFile(
+      paths.applicationConfig,
+      applicationConfiguration(syntheticPrepare, paths),
+      0o600,
+      identity.uid,
+      'application configuration',
+    );
+    const expectedDescriptor = descriptor(
+      syntheticPrepare,
+      paths.applicationConfig,
+      identity.uid,
+      identity.gid,
+    );
+    preflightPublishedFile(
+      path.join(paths.service, expectedDescriptor.fileName),
+      expectedDescriptor.contents,
+      expectedDescriptor.mode,
+      identity.uid,
+      'service descriptor',
+    );
+  }
 
   const auditSqlite =
     dependencies.auditSqlite ?? inspectLocalSqliteReadinessPath;
   const sqlite = await auditSqlite({
-    databasePath: paths.database,
+    databasePath: application.databasePath,
     profile: application.profile,
     ...(application.busyTimeoutMs === undefined
       ? {}
@@ -429,6 +424,7 @@ export async function preflightLocalDeploymentCompose(
     selection.image,
     application.profile,
     sqlite.contractVersion,
+    application.mode === 'fresh' ? '2' : '4',
   );
   const composeOutput = runDocker({
     executable: command.options.dockerExecutable,
@@ -451,10 +447,15 @@ export async function preflightLocalDeploymentCompose(
     image: selection.image,
     generation: selection.generation,
     mutationId: selection.mutationId,
+    releaseSelectionDigest: selection.selectionDigest,
+    releaseSetDigest: selection.releaseSetDigest,
+    catalogManifestDigest: selection.catalogManifestDigest,
+    catalogConsumptionReportDigest: selection.catalogConsumptionReportDigest,
     deploymentRoot: command.options.deploymentRoot,
     uid: identity.uid,
     gid: identity.gid,
     profile: application.profile,
+    lineage: application,
   });
 
   return Object.freeze({

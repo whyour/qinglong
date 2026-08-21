@@ -34,6 +34,14 @@ export interface LocalDeploymentAdoptedBundlePaths {
   readonly composeSelection: string;
   readonly composeRevisions: string;
   readonly composeRevision: string;
+  readonly composeRollouts: string;
+  readonly composeRolloutBackups: string;
+  readonly composeRestores: string;
+  readonly composeRestoreSafeguards: string;
+  readonly composeEvidenceCollections: string;
+  readonly composeCollectedEvidence: string;
+  readonly composeCollectedRolloutBackups: string;
+  readonly composeCollectedRestoreSafeguards: string;
 }
 
 export interface LocalDeploymentAdoptedEvidence {
@@ -316,6 +324,22 @@ export function adoptedBundlePaths(
     composeSelection: path.join(service, 'compose.image.yaml'),
     composeRevisions: path.join(service, 'revisions'),
     composeRevision: path.join(service, 'revisions', '1.yaml'),
+    composeRollouts: path.join(service, 'rollouts'),
+    composeRolloutBackups: path.join(service, 'rollout-backups'),
+    composeRestores: path.join(service, 'restores'),
+    composeRestoreSafeguards: path.join(service, 'restore-safeguards'),
+    composeEvidenceCollections: path.join(service, 'evidence-collections'),
+    composeCollectedEvidence: path.join(service, 'collected-evidence'),
+    composeCollectedRolloutBackups: path.join(
+      service,
+      'collected-evidence',
+      'rollout-backups',
+    ),
+    composeCollectedRestoreSafeguards: path.join(
+      service,
+      'collected-evidence',
+      'restore-safeguards',
+    ),
   });
 }
 

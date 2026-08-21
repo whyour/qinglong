@@ -222,7 +222,7 @@ function expectedImageConfig(architecture, revision, image) {
         WorkingDir: '/opt/qinglong',
         Labels: {
           'io.qinglong.ai': 'excluded',
-          'io.qinglong.local.application-config': '2',
+          'io.qinglong.local.application-config': '2,3,4',
           'io.qinglong.local.compose-selection': '1',
           'io.qinglong.local.sqlite-contract-max': '41',
           'io.qinglong.local.sqlite-contract-min': '41',

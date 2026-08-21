@@ -49,6 +49,7 @@ export interface LocalSqliteRestoreOptions extends LocalSqliteDatabaseOptions {
   readonly replacedDatabasePath: string;
   readonly expectedCurrentSha256: string;
   readonly expectedSourceSha256: string;
+  readonly preserveDatabaseIdentity?: boolean;
 }
 
 export interface LocalSqliteRestoreEvidence
@@ -58,6 +59,7 @@ export interface LocalSqliteRestoreEvidence
 
 export interface LocalSqliteRestoreDependencies {
   readonly copySnapshot?: (sourcePath: string, targetPath: string) => void;
+  readonly rewriteSnapshot?: (sourcePath: string, targetPath: string) => void;
 }
 
 export interface LocalSqliteChangeObserver {
@@ -582,6 +584,239 @@ function sameSnapshot(
   );
 }
 
+function rewriteSnapshotFilePreservingIdentity(
+  sourcePath: string,
+  targetPath: string,
+): void {
+  const targetIdentity = fs.lstatSync(targetPath, { bigint: true });
+  let sourceDescriptor: number | undefined;
+  let targetDescriptor: number | undefined;
+  const buffer = Buffer.allocUnsafe(64 * 1024);
+  try {
+    sourceDescriptor = fs.openSync(
+      sourcePath,
+      fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW,
+    );
+    targetDescriptor = fs.openSync(
+      targetPath,
+      fs.constants.O_WRONLY | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
+    );
+    const openedTarget = fs.fstatSync(targetDescriptor, { bigint: true });
+    if (
+      !openedTarget.isFile() ||
+      openedTarget.dev !== targetIdentity.dev ||
+      openedTarget.ino !== targetIdentity.ino ||
+      openedTarget.nlink !== 1n
+    ) {
+      configurationError('identity-preserving restore target drifted');
+    }
+    for (;;) {
+      const count = fs.readSync(
+        sourceDescriptor,
+        buffer,
+        0,
+        buffer.byteLength,
+        null,
+      );
+      if (count === 0) break;
+      let offset = 0;
+      while (offset < count) {
+        const written = fs.writeSync(
+          targetDescriptor,
+          buffer,
+          offset,
+          count - offset,
+          null,
+        );
+        if (written < 1) {
+          configurationError('identity-preserving restore write stalled');
+        }
+        offset += written;
+      }
+    }
+    fs.fsyncSync(targetDescriptor);
+    const writtenTarget = fs.fstatSync(targetDescriptor, { bigint: true });
+    if (
+      writtenTarget.dev !== targetIdentity.dev ||
+      writtenTarget.ino !== targetIdentity.ino ||
+      writtenTarget.nlink !== 1n
+    ) {
+      configurationError('identity-preserving restore target changed');
+    }
+  } finally {
+    buffer.fill(0);
+    if (targetDescriptor !== undefined) fs.closeSync(targetDescriptor);
+    if (sourceDescriptor !== undefined) fs.closeSync(sourceDescriptor);
+  }
+}
+
+async function restoreSnapshotPreservingIdentity(
+  options: Readonly<LocalSqliteRestoreOptions>,
+  dependencies: LocalSqliteRestoreDependencies,
+  input: Readonly<{
+    uid: number;
+    databasePath: string;
+    sourceSnapshotPath: string;
+    restoreStagePath: string;
+    replacedDatabasePath: string;
+    source: Readonly<LocalSqliteSnapshotEvidence>;
+  }>,
+): Promise<Readonly<LocalSqliteRestoreEvidence>> {
+  if (!fs.existsSync(input.databasePath)) {
+    configurationError(
+      'identity-preserving restore requires the activated database inode',
+    );
+  }
+  const targetIdentity = fs.lstatSync(input.databasePath);
+  if (
+    !targetIdentity.isFile() ||
+    targetIdentity.isSymbolicLink() ||
+    targetIdentity.uid !== input.uid ||
+    (targetIdentity.mode & 0o777) !== 0o600 ||
+    targetIdentity.nlink !== 1 ||
+    fs.realpathSync(input.databasePath) !== input.databasePath
+  ) {
+    configurationError('identity-preserving restore database is invalid');
+  }
+  let current: Readonly<LocalSqliteSnapshotEvidence> | undefined;
+  try {
+    current = await inspectSnapshotFile(
+      input.databasePath,
+      options.profile,
+      input.uid,
+      'restore current database',
+    );
+  } catch (error) {
+    if (
+      !fs.existsSync(input.restoreStagePath) ||
+      !fs.existsSync(input.replacedDatabasePath)
+    ) {
+      throw error;
+    }
+  }
+  const restoredAtEntry =
+    current !== undefined && sameSnapshot(current, input.source);
+  if (
+    current !== undefined &&
+    !restoredAtEntry &&
+    current.sha256 !== options.expectedCurrentSha256
+  ) {
+    configurationError('restore current database drifted');
+  }
+
+  if (!fs.existsSync(input.restoreStagePath) && !restoredAtEntry) {
+    try {
+      (
+        dependencies.copySnapshot ??
+        ((sourcePath: string, targetPath: string) =>
+          fs.copyFileSync(sourcePath, targetPath, fs.constants.COPYFILE_EXCL))
+      )(input.sourceSnapshotPath, input.restoreStagePath);
+      fs.chmodSync(input.restoreStagePath, 0o600);
+      syncFile(input.restoreStagePath);
+      syncDirectory(path.dirname(input.restoreStagePath));
+    } catch (error) {
+      if (fs.existsSync(input.restoreStagePath)) {
+        try {
+          fs.unlinkSync(input.restoreStagePath);
+          syncDirectory(path.dirname(input.restoreStagePath));
+        } catch {
+          // A deterministic stage remains fail-closed for exact replay.
+        }
+      }
+      configurationError('restore stage could not be created', error);
+    }
+  }
+  if (fs.existsSync(input.restoreStagePath)) {
+    const staged = await inspectSnapshotFile(
+      input.restoreStagePath,
+      options.profile,
+      input.uid,
+      'restore stage',
+    );
+    if (!sameSnapshot(staged, input.source)) {
+      configurationError('restore stage drifted');
+    }
+  }
+
+  if (!restoredAtEntry && !fs.existsSync(input.replacedDatabasePath)) {
+    if (current === undefined) {
+      configurationError('restore replacement evidence is unavailable');
+    }
+    try {
+      fs.copyFileSync(
+        input.databasePath,
+        input.replacedDatabasePath,
+        fs.constants.COPYFILE_EXCL,
+      );
+      fs.chmodSync(input.replacedDatabasePath, 0o600);
+      syncFile(input.replacedDatabasePath);
+      syncDirectory(path.dirname(input.replacedDatabasePath));
+    } catch (error) {
+      configurationError(
+        'restore replacement evidence cannot be created',
+        error,
+      );
+    }
+  }
+  if (fs.existsSync(input.replacedDatabasePath)) {
+    const replaced = await inspectSnapshotFile(
+      input.replacedDatabasePath,
+      options.profile,
+      input.uid,
+      'replaced database',
+    );
+    if (replaced.sha256 !== options.expectedCurrentSha256) {
+      configurationError('replaced database evidence drifted');
+    }
+  }
+
+  if (!restoredAtEntry) {
+    try {
+      (dependencies.rewriteSnapshot ?? rewriteSnapshotFilePreservingIdentity)(
+        input.restoreStagePath,
+        input.databasePath,
+      );
+    } catch (error) {
+      configurationError(
+        'identity-preserving restore write could not complete',
+        error,
+      );
+    }
+  }
+  const afterIdentity = validateDatabaseFile(
+    input.databasePath,
+    input.uid,
+    'identity-preserving restored database',
+  );
+  if (
+    afterIdentity.dev !== targetIdentity.dev ||
+    afterIdentity.ino !== targetIdentity.ino
+  ) {
+    configurationError('identity-preserving restore changed the target inode');
+  }
+  const restored = await inspectSnapshotFile(
+    input.databasePath,
+    options.profile,
+    input.uid,
+    'restored database',
+  );
+  if (!sameSnapshot(restored, input.source)) {
+    configurationError('restored database drifted');
+  }
+  for (const evidencePath of [
+    input.restoreStagePath,
+    input.replacedDatabasePath,
+  ]) {
+    if (!fs.existsSync(evidencePath)) continue;
+    fs.unlinkSync(evidencePath);
+    syncDirectory(path.dirname(evidencePath));
+  }
+  return Object.freeze({
+    status: restoredAtEntry ? ('existing' as const) : ('restored' as const),
+    ...restored,
+  });
+}
+
 export async function restoreLocalSqliteSnapshot(
   options: Readonly<LocalSqliteRestoreOptions>,
   dependencies: LocalSqliteRestoreDependencies = {},
@@ -608,6 +843,8 @@ export async function restoreLocalSqliteSnapshot(
     !DIGEST_PATTERN.test(options.expectedCurrentSha256) ||
     !DIGEST_PATTERN.test(options.expectedSourceSha256) ||
     options.expectedCurrentSha256 === options.expectedSourceSha256 ||
+    (options.preserveDatabaseIdentity !== undefined &&
+      typeof options.preserveDatabaseIdentity !== 'boolean') ||
     new Set([
       databasePath,
       sourceSnapshotPath,
@@ -640,6 +877,17 @@ export async function restoreLocalSqliteSnapshot(
     configurationError('restore source snapshot drifted');
   }
   assertNoRestoreSidecars(databasePath, uid);
+
+  if (options.preserveDatabaseIdentity === true) {
+    return restoreSnapshotPreservingIdentity(options, dependencies, {
+      uid,
+      databasePath,
+      sourceSnapshotPath,
+      restoreStagePath,
+      replacedDatabasePath,
+      source,
+    });
+  }
 
   let restoredAtEntry = false;
   if (fs.existsSync(databasePath)) {

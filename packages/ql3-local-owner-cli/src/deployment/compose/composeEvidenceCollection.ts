@@ -37,11 +37,18 @@ import {
   deploymentPaths,
   type LocalDeploymentPaths,
 } from '../foundation/render';
+import {
+  assertLocalDeploymentComposeLineageReceipt,
+  inspectLocalDeploymentComposeLineage,
+  normalizeLocalDeploymentComposeLineageReceipt,
+  type LocalDeploymentComposeLineage,
+  type LocalDeploymentComposeLineageReceipt,
+} from './composeLineage';
 
-const PREPARE_SCHEMA = 'qinglong/local-compose-evidence-collection-prepare@v1';
-const COMMIT_SCHEMA = 'qinglong/local-compose-evidence-collection-commit@v1';
-const ROLLOUT_RECEIPT_SCHEMA = 'qinglong/local-compose-rollout-receipt@v2';
-const RESTORE_COMMIT_SCHEMA = 'qinglong/local-compose-restore-commit@v1';
+const PREPARE_SCHEMA = 'qinglong/local-compose-evidence-collection-prepare@v2';
+const COMMIT_SCHEMA = 'qinglong/local-compose-evidence-collection-commit@v2';
+const ROLLOUT_RECEIPT_SCHEMA = 'qinglong/local-compose-rollout-receipt@v3';
+const RESTORE_COMMIT_SCHEMA = 'qinglong/local-compose-restore-commit@v2';
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -61,6 +68,7 @@ interface CollectionPrepareReceipt {
   readonly collectionId: string;
   readonly generation: number;
   readonly profile: LocalDeploymentProfile;
+  readonly lineage: Readonly<LocalDeploymentComposeLineageReceipt>;
   readonly recordedAtMs: number;
   readonly items: readonly Readonly<CollectionItem>[];
 }
@@ -72,6 +80,7 @@ interface CollectionCommitReceipt {
   readonly collectionId: string;
   readonly generation: number;
   readonly profile: LocalDeploymentProfile;
+  readonly lineage: Readonly<LocalDeploymentComposeLineageReceipt>;
   readonly recordedAtMs: number;
   readonly items: readonly Readonly<CollectionItem>[];
   readonly bytes: number;
@@ -174,31 +183,11 @@ function exactSnapshot(
   }
 }
 
-function readProfile(
-  paths: Readonly<LocalDeploymentPaths>,
-  uid: number,
-): LocalDeploymentProfile {
-  const value = readJson(
-    boundedPrivateFile(
-      paths.applicationConfig,
-      uid,
-      'application configuration',
-    ),
-    'application configuration',
-  );
-  if (
-    value.schema !== 'qinglong/local-application-process@v2' ||
-    (value.profile !== 'edge' && value.profile !== 'standalone')
-  ) {
-    configurationError('application configuration collection binding drifted');
-  }
-  return value.profile;
-}
-
 function rolloutItem(
   paths: Readonly<LocalDeploymentPaths>,
   uid: number,
   rolloutId: string,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
 ): Readonly<CollectionItem> {
   const receiptContents = boundedPrivateFile(
     path.join(paths.composeRollouts, `${rolloutId}.json`),
@@ -210,6 +199,7 @@ function rolloutItem(
   const sqlite = receipt.sqlite as Record<string, unknown> | undefined;
   const backup = sqlite?.backup as Record<string, unknown> | undefined;
   const result = receipt.result as Record<string, unknown> | undefined;
+  assertLocalDeploymentComposeLineageReceipt(receipt.lineage, lineage.receipt);
   if (
     receipt.schema !== ROLLOUT_RECEIPT_SCHEMA ||
     receipt.rolloutId !== rolloutId ||
@@ -243,6 +233,7 @@ function restoreItem(
   paths: Readonly<LocalDeploymentPaths>,
   uid: number,
   restoreId: string,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
 ): Readonly<CollectionItem> {
   const receiptContents = boundedPrivateFile(
     path.join(paths.composeRestores, `${restoreId}.commit.json`),
@@ -251,6 +242,7 @@ function restoreItem(
     [1, 2],
   );
   const receipt = readJson(receiptContents, 'compose restore commit receipt');
+  assertLocalDeploymentComposeLineageReceipt(receipt.lineage, lineage.receipt);
   if (
     receipt.schema !== RESTORE_COMMIT_SCHEMA ||
     receipt.restoreId !== restoreId ||
@@ -348,6 +340,7 @@ async function prepareItems(
   paths: Readonly<LocalDeploymentPaths>,
   uid: number,
   profile: LocalDeploymentProfile,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
 ): Promise<readonly Readonly<CollectionItem>[]> {
   const rolloutCatalog = catalogIds(
     paths.composeRolloutBackups,
@@ -359,14 +352,14 @@ async function prepareItems(
   );
   const rolloutItems = await Promise.all(
     rolloutCatalog.map(async (id) => {
-      const item = rolloutItem(paths, uid, id);
+      const item = rolloutItem(paths, uid, id, lineage);
       await inspectPhysicalItem(paths, profile, item);
       return item;
     }),
   );
   const restoreItems = await Promise.all(
     restoreCatalog.map(async (id) => {
-      const item = restoreItem(paths, uid, id);
+      const item = restoreItem(paths, uid, id, lineage);
       await inspectPhysicalItem(paths, profile, item);
       return item;
     }),
@@ -491,6 +484,7 @@ function inspectPrepareReceipt(
   paths: Readonly<LocalDeploymentPaths>,
   uid: number,
   command: Readonly<LocalDeploymentComposeEvidenceCollectionPrepareCommand>,
+  expectedLineage: Readonly<LocalDeploymentComposeLineage>,
 ): Readonly<CollectionPrepareReceipt> | null {
   const filePath = prepareReceiptPath(paths, command.request.collectionId);
   if (!fs.existsSync(filePath)) return null;
@@ -505,7 +499,12 @@ function inspectPrepareReceipt(
     'compose evidence collection prepare receipt',
   );
   const items = parseItems(value.items);
-  const receipt = { ...value, items } as unknown as CollectionPrepareReceipt;
+  const lineage = normalizeLocalDeploymentComposeLineageReceipt(value.lineage);
+  const receipt = {
+    ...value,
+    lineage,
+    items,
+  } as unknown as CollectionPrepareReceipt;
   if (
     Object.keys(value).sort().join(',') !==
       [
@@ -513,6 +512,7 @@ function inspectPrepareReceipt(
         'commandDigest',
         'generation',
         'items',
+        'lineage',
         'profile',
         'recordedAtMs',
         'schema',
@@ -529,6 +529,10 @@ function inspectPrepareReceipt(
   ) {
     configurationError('compose evidence collection prepare receipt drifted');
   }
+  assertLocalDeploymentComposeLineageReceipt(
+    receipt.lineage,
+    expectedLineage.receipt,
+  );
   publishExactFile(
     filePath,
     contents,
@@ -543,6 +547,7 @@ function inspectCommitReceipt(
   paths: Readonly<LocalDeploymentPaths>,
   uid: number,
   command: Readonly<LocalDeploymentComposeEvidenceCollectionCommand>,
+  expectedLineage: Readonly<LocalDeploymentComposeLineage>,
 ): Readonly<CollectionCommitReceipt> | null {
   const filePath = commitReceiptPath(paths, command.request.collectionId);
   if (!fs.existsSync(filePath)) return null;
@@ -557,7 +562,12 @@ function inspectCommitReceipt(
     'compose evidence collection commit receipt',
   );
   const items = parseItems(value.items);
-  const receipt = { ...value, items } as unknown as CollectionCommitReceipt;
+  const lineage = normalizeLocalDeploymentComposeLineageReceipt(value.lineage);
+  const receipt = {
+    ...value,
+    lineage,
+    items,
+  } as unknown as CollectionCommitReceipt;
   if (
     Object.keys(value).sort().join(',') !==
       [
@@ -566,6 +576,7 @@ function inspectCommitReceipt(
         'commandDigest',
         'generation',
         'items',
+        'lineage',
         'prepareReceiptDigest',
         'profile',
         'recordedAtMs',
@@ -590,6 +601,10 @@ function inspectCommitReceipt(
   ) {
     configurationError('compose evidence collection commit receipt drifted');
   }
+  assertLocalDeploymentComposeLineageReceipt(
+    receipt.lineage,
+    expectedLineage.receipt,
+  );
   publishExactFile(
     filePath,
     contents,
@@ -658,8 +673,9 @@ async function prepareCollection(
   command: Readonly<LocalDeploymentComposeEvidenceCollectionPrepareCommand>,
   paths: Readonly<LocalDeploymentPaths>,
   uid: number,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
 ): Promise<Readonly<LocalDeploymentComposeEvidenceCollectionResult>> {
-  const replay = inspectPrepareReceipt(paths, uid, command);
+  const replay = inspectPrepareReceipt(paths, uid, command, lineage);
   if (replay) return result(command, 'existing', replay.profile, replay.items);
   assertOperationsIdle(paths);
   const selection = inspectActiveComposeImageSelection(
@@ -672,8 +688,8 @@ async function prepareCollection(
       'active compose generation does not match evidence collection',
     );
   }
-  const profile = readProfile(paths, uid);
-  const items = await prepareItems(command, paths, uid, profile);
+  const profile = lineage.profile;
+  const items = await prepareItems(command, paths, uid, profile, lineage);
   if (items.some((item) => item.recordedAtMs > command.request.preparedAtMs)) {
     configurationError(
       'compose evidence collection precedes retained evidence',
@@ -699,6 +715,7 @@ async function prepareCollection(
     collectionId: command.request.collectionId,
     generation: command.request.expectedGeneration,
     profile,
+    lineage: lineage.receipt,
     recordedAtMs: command.request.preparedAtMs,
     items,
   });
@@ -826,13 +843,14 @@ async function commitCollection(
   command: Readonly<LocalDeploymentComposeEvidenceCollectionCommand>,
   paths: Readonly<LocalDeploymentPaths>,
   uid: number,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
 ): Promise<Readonly<LocalDeploymentComposeEvidenceCollectionResult>> {
   if (
     command.operation !== 'local.deployment.compose.evidence-collection.commit'
   ) {
     configurationError('compose evidence collection commit command is invalid');
   }
-  const existing = inspectCommitReceipt(paths, uid, command);
+  const existing = inspectCommitReceipt(paths, uid, command, lineage);
   if (existing) {
     const prepareContents = boundedPrivateFile(
       prepareReceiptPath(paths, command.request.collectionId),
@@ -875,7 +893,7 @@ async function commitCollection(
     return result(command, 'existing', existing.profile, existing.items);
   }
   const prepared = prepareCommandFromLock(command, paths, uid);
-  const prepareReceipt = inspectPrepareReceipt(paths, uid, prepared);
+  const prepareReceipt = inspectPrepareReceipt(paths, uid, prepared, lineage);
   if (!prepareReceipt) {
     configurationError(
       'compose evidence collection prepare receipt is unavailable',
@@ -911,6 +929,7 @@ async function commitCollection(
     collectionId: command.request.collectionId,
     generation: command.request.expectedGeneration,
     profile: prepareReceipt.profile,
+    lineage: lineage.receipt,
     recordedAtMs: command.request.committedAtMs,
     items: prepareReceipt.items,
     bytes: prepareReceipt.items.reduce(
@@ -992,10 +1011,16 @@ export async function collectLocalDeploymentComposeEvidence(
     identity.uid,
     'composeCollectedRestoreSafeguardRoot',
   );
+  const lineage = inspectLocalDeploymentComposeLineage(
+    command.options.deploymentRoot,
+    identity.uid,
+    identity.gid,
+    command.options.allowRootService,
+  );
   return command.operation ===
     'local.deployment.compose.evidence-collection.prepare'
-    ? prepareCollection(command, paths, identity.uid)
-    : commitCollection(command, paths, identity.uid);
+    ? prepareCollection(command, paths, identity.uid, lineage)
+    : commitCollection(command, paths, identity.uid, lineage);
 }
 
 export function collectLocalDeploymentComposeEvidencePrepareCommandFile(

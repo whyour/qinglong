@@ -12,7 +12,10 @@ import {
   type LocalSqliteRolloutBackupOptions,
 } from '@qinglong/local-sqlite/rollout-safety';
 
-import { preflightLocalDeploymentCompose } from './composePreflight';
+import {
+  preflightLocalDeploymentCompose,
+  type LocalDeploymentComposePreflightDependencies,
+} from './composePreflight';
 import { evidenceDigest, inspectCollectedEvidence } from './composeEvidence';
 import {
   inspectActiveComposeImageSelection,
@@ -43,8 +46,15 @@ import {
   deploymentPaths,
   type LocalDeploymentPaths,
 } from '../foundation/render';
+import {
+  assertLocalDeploymentComposeLineageReceipt,
+  inspectLocalDeploymentComposeLineage,
+  normalizeLocalDeploymentComposeLineageReceipt,
+  type LocalDeploymentComposeLineage,
+  type LocalDeploymentComposeLineageReceipt,
+} from './composeLineage';
 
-const RECEIPT_SCHEMA = 'qinglong/local-compose-rollout-receipt@v2';
+const RECEIPT_SCHEMA = 'qinglong/local-compose-rollout-receipt@v3';
 const CONTAINER_ID_PATTERN = /^[0-9a-f]{12,64}$/;
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -59,6 +69,7 @@ export interface LocalDeploymentComposeApplyDependencies {
   readonly createBackup?: typeof createLocalSqliteRolloutBackup;
   readonly inspectBackup?: typeof inspectLocalSqliteRolloutBackup;
   readonly openChangeObserver?: typeof openLocalSqliteChangeObserver;
+  readonly auditSqlite?: LocalDeploymentComposePreflightDependencies['auditSqlite'];
 }
 
 interface ActiveEvidence {
@@ -88,6 +99,7 @@ interface RolloutReceipt {
   readonly attemptedGeneration: number;
   readonly recordedAtMs: number;
   readonly healthEventDigest: string | null;
+  readonly lineage: Readonly<LocalDeploymentComposeLineageReceipt>;
   readonly sqlite: Readonly<RolloutSqliteReceipt>;
   readonly result: Readonly<LocalDeploymentComposeApplyResult>;
 }
@@ -181,6 +193,7 @@ function inspectRunningContainer(
   output: string,
   containerId: string,
   selection: Readonly<ComposeImageSelection>,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
 ): boolean {
   let value: unknown;
   try {
@@ -207,6 +220,19 @@ function inspectRunningContainer(
         };
       }
     | undefined;
+  const labels = candidate?.Config?.Labels;
+  const lineageLabelsValid =
+    lineage.mode === 'fresh' ||
+    (labels?.['io.qinglong.deployment.mode'] === 'adopted' &&
+      labels['io.qinglong.deployment.profile'] === lineage.profile &&
+      labels['io.qinglong.deployment.instance'] === lineage.instanceId &&
+      labels['io.qinglong.deployment.bundle'] === lineage.bundleId &&
+      labels['io.qinglong.application.config'] ===
+        lineage.receipt.applicationConfigDigest &&
+      labels['io.qinglong.data.commit'] ===
+        lineage.receipt.legacyDataApplicationCommitDigest &&
+      labels['io.qinglong.data.receipt'] ===
+        lineage.receipt.legacyDataApplicationReceiptDigest);
   return (
     (candidate?.Id === containerId ||
       (typeof candidate?.Id === 'string' &&
@@ -214,10 +240,10 @@ function inspectRunningContainer(
     candidate?.State?.Running === true &&
     candidate.State.Status === 'running' &&
     candidate.Config?.Image === selection.image &&
-    candidate.Config.Labels?.['io.qinglong.deployment.generation'] ===
+    labels?.['io.qinglong.deployment.generation'] ===
       String(selection.generation) &&
-    candidate.Config.Labels?.['io.qinglong.deployment.mutation'] ===
-      selection.mutationId &&
+    labels?.['io.qinglong.deployment.mutation'] === selection.mutationId &&
+    lineageLabelsValid &&
     candidate.HostConfig?.ReadonlyRootfs === true &&
     candidate.HostConfig.NetworkMode === 'none' &&
     candidate.HostConfig.Privileged !== true
@@ -260,6 +286,7 @@ async function observeActive(
   paths: Readonly<LocalDeploymentPaths>,
   selection: Readonly<ComposeImageSelection>,
   profile: LocalDeploymentProfile,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
   dependencies: Required<
     Pick<LocalDeploymentComposeApplyDependencies, 'runDocker' | 'now' | 'wait'>
   >,
@@ -285,6 +312,7 @@ async function observeActive(
           ]),
           containerId,
           selection,
+          lineage,
         );
         if (running) {
           const evidence = activeEventEvidence(
@@ -321,9 +349,10 @@ function backupOptions(
   command: Readonly<LocalDeploymentComposeApplyCommand>,
   paths: Readonly<LocalDeploymentPaths>,
   profile: LocalDeploymentProfile,
+  databasePath: string,
 ): Readonly<LocalSqliteRolloutBackupOptions> {
   return Object.freeze({
-    databasePath: paths.database,
+    databasePath,
     backupPath: backupPathFor(paths, command.request.rolloutId),
     profile,
   });
@@ -389,6 +418,7 @@ async function applyAndObserveCandidate(
   paths: Readonly<LocalDeploymentPaths>,
   selection: Readonly<ComposeImageSelection>,
   profile: LocalDeploymentProfile,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
   dependencies: Required<
     Pick<
       LocalDeploymentComposeApplyDependencies,
@@ -402,23 +432,26 @@ async function applyAndObserveCandidate(
   }>
 > {
   const observer = dependencies.openChangeObserver({
-    databasePath: paths.database,
+    databasePath: lineage.databasePath,
     profile,
   });
   let evidence: Readonly<ActiveEvidence> | null = null;
   try {
     try {
       applyActiveSelection(command, paths, dependencies.runDocker);
-      evidence = await observeActive(
-        command,
-        paths,
-        selection,
-        profile,
-        dependencies,
-      );
     } catch {
-      evidence = null;
+      // Docker may lose the response after creating the exact candidate. The
+      // bounded observation below is the recovery authority; do not issue a
+      // second `compose up` in the same attempt.
     }
+    evidence = await observeActive(
+      command,
+      paths,
+      selection,
+      profile,
+      lineage,
+      dependencies,
+    );
     let writeObservation: SqliteWriteObservation;
     try {
       writeObservation = observer.changed() ? 'changed' : 'unchanged';
@@ -467,6 +500,7 @@ async function readReceipt(
   expectedGeneration: number,
   paths: Readonly<LocalDeploymentPaths>,
   inspectBackup: typeof inspectLocalSqliteRolloutBackup,
+  expectedLineage: Readonly<LocalDeploymentComposeLineage>,
 ): Promise<Readonly<LocalDeploymentComposeApplyResult> | null> {
   if (!fs.existsSync(filePath)) return null;
   const stat = fs.lstatSync(filePath);
@@ -496,11 +530,15 @@ async function readReceipt(
   const healthKeys = Object.keys(receipt.result?.health ?? {}).sort();
   const serviceKeys = Object.keys(receipt.result?.service ?? {}).sort();
   const sqliteKeys = Object.keys(receipt.sqlite ?? {}).sort();
+  const lineage = normalizeLocalDeploymentComposeLineageReceipt(
+    receipt.lineage,
+  );
   const backupKeys = Object.keys(receipt.sqlite?.backup ?? {}).sort();
   const expectedReceiptKeys = [
     'attemptedGeneration',
     'commandDigest',
     'healthEventDigest',
+    'lineage',
     'recordedAtMs',
     'result',
     'rolloutId',
@@ -546,6 +584,7 @@ async function readReceipt(
     attemptedGeneration: receipt.attemptedGeneration,
     recordedAtMs: receipt.recordedAtMs,
     healthEventDigest: receipt.healthEventDigest,
+    lineage,
     sqlite: {
       contractVersion: receipt.sqlite?.contractVersion,
       writeContractVersion: receipt.sqlite?.writeContractVersion,
@@ -636,11 +675,15 @@ async function readReceipt(
   ) {
     configurationError('compose rollout receipt drifted');
   }
+  assertLocalDeploymentComposeLineageReceipt(
+    receipt.lineage,
+    expectedLineage.receipt,
+  );
   if (receipt.sqlite.backup !== null) {
     const backupPath = backupPathFor(paths, rolloutId);
     if (fs.existsSync(backupPath)) {
       const inspected = await inspectBackup({
-        databasePath: paths.database,
+        databasePath: expectedLineage.databasePath,
         backupPath,
         profile: receipt.result.profile,
       });
@@ -698,6 +741,7 @@ function publishReceipt(
   rolloutResult: Readonly<LocalDeploymentComposeApplyResult>,
   evidence: Readonly<ActiveEvidence> | null,
   sqlite: Readonly<RolloutSqliteReceipt>,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
   uid: number,
 ): void {
   publishExactFile(
@@ -709,6 +753,7 @@ function publishReceipt(
       attemptedGeneration: command.request.expectedGeneration,
       recordedAtMs: command.request.failureRollbackChangedAtMs,
       healthEventDigest: evidence?.digest ?? null,
+      lineage: lineage.receipt,
       sqlite,
       result: rolloutResult,
     }),
@@ -763,6 +808,12 @@ export async function applyLocalDeploymentCompose(
     identity.uid,
     'composeRolloutBackupRoot',
   );
+  const lineage = inspectLocalDeploymentComposeLineage(
+    command.options.deploymentRoot,
+    identity.uid,
+    identity.gid,
+    command.options.allowRootService,
+  );
   if (fs.existsSync(paths.composeEvidenceCollectionLock)) {
     configurationError('compose rollout is fenced by an evidence collection');
   }
@@ -785,6 +836,7 @@ export async function applyLocalDeploymentCompose(
     dependencies.inspectBackup ?? inspectLocalSqliteRolloutBackup;
   const openChangeObserver =
     dependencies.openChangeObserver ?? openLocalSqliteChangeObserver;
+  const auditSqlite = dependencies.auditSqlite;
   const receiptPath = path.join(
     paths.composeRollouts,
     `${command.request.rolloutId}.json`,
@@ -798,6 +850,7 @@ export async function applyLocalDeploymentCompose(
     command.request.expectedGeneration,
     paths,
     inspectBackup,
+    lineage,
   );
   if (replay) {
     releaseLock(paths.composeRolloutLock, intent, identity.uid);
@@ -851,11 +904,11 @@ export async function applyLocalDeploymentCompose(
           expectedGeneration: command.request.expectedGeneration,
         },
       },
-      { runDocker, validateSocket },
+      { runDocker, validateSocket, auditSqlite },
     );
     if (selection.previousGeneration >= 1) {
       rolloutBackup = await createBackup(
-        backupOptions(command, paths, preflight.profile),
+        backupOptions(command, paths, preflight.profile, lineage.databasePath),
       );
     }
     const candidate = await applyAndObserveCandidate(
@@ -863,6 +916,7 @@ export async function applyLocalDeploymentCompose(
       paths,
       selection,
       preflight.profile,
+      lineage,
       { runDocker, now, wait, openChangeObserver },
     );
     const evidence = candidate.evidence;
@@ -880,6 +934,7 @@ export async function applyLocalDeploymentCompose(
         active,
         evidence,
         sqliteReceipt(rolloutBackup, writeObservation),
+        lineage,
         identity.uid,
       );
       releaseLock(paths.composeRolloutLock, intent, identity.uid);
@@ -899,6 +954,7 @@ export async function applyLocalDeploymentCompose(
         stopped,
         null,
         sqliteReceipt(null, writeObservation),
+        lineage,
         identity.uid,
       );
       releaseLock(paths.composeRolloutLock, intent, identity.uid);
@@ -936,19 +992,30 @@ export async function applyLocalDeploymentCompose(
       options: command.options,
       request: { expectedGeneration: selection.generation },
     },
-    { runDocker, validateSocket },
+    { runDocker, validateSocket, auditSqlite },
   );
   if (command.request.expectedGeneration > 1 && rolloutBackup === null) {
     rolloutBackup = await inspectBackup(
-      backupOptions(command, paths, rollbackPreflight.profile),
+      backupOptions(
+        command,
+        paths,
+        rollbackPreflight.profile,
+        lineage.databasePath,
+      ),
     );
   }
-  applyActiveSelection(rollbackCommand, paths, runDocker);
+  try {
+    applyActiveSelection(rollbackCommand, paths, runDocker);
+  } catch {
+    // As with the candidate, inspect the exact generation after a lost Docker
+    // response instead of blindly recreating the rollback container.
+  }
   const rollbackEvidence = await observeActive(
     rollbackCommand,
     paths,
     selection,
     rollbackPreflight.profile,
+    lineage,
     { runDocker, now, wait },
   );
   if (!rollbackEvidence) {
@@ -968,6 +1035,7 @@ export async function applyLocalDeploymentCompose(
     rolledBack,
     rollbackEvidence,
     sqliteReceipt(rolloutBackup, writeObservation),
+    lineage,
     identity.uid,
   );
   releaseLock(paths.composeRolloutLock, intent, identity.uid);

@@ -450,6 +450,15 @@ function composeDockerHarness(
       generation: Number(/^  generation: ([0-9]+)$/m.exec(source)[1]),
       mutationId: /^  mutation_id: ([0-9a-f-]+)$/m.exec(source)[1],
       image: /^    image: ([^\n]+)$/m.exec(source)[1],
+      releaseSelectionDigest: /^  release_selection_digest: ([^\n]+)$/m.exec(
+        source,
+      )[1],
+      releaseSetDigest: /^  release_set_digest: ([^\n]+)$/m.exec(source)[1],
+      catalogManifestDigest: /^  catalog_manifest_digest: ([^\n]+)$/m.exec(
+        source,
+      )[1],
+      catalogConsumptionReportDigest:
+        /^  catalog_consumption_report_digest: ([^\n]+)$/m.exec(source)[1],
     };
   };
   const composeSource = fs.readFileSync(
@@ -457,6 +466,12 @@ function composeDockerHarness(
     'utf8',
   );
   const projectName = /^name: ([a-z0-9_-]+)$/m.exec(composeSource)[1];
+  const release = JSON.parse(
+    fs.readFileSync(
+      state.command.options.service.releaseSelection.path,
+      'utf8',
+    ),
+  );
   let running = true;
   const runDocker = ({ args }) => {
     calls.push(args);
@@ -509,6 +524,12 @@ function composeDockerHarness(
             labels: {
               'io.qinglong.deployment.generation': String(selected.generation),
               'io.qinglong.deployment.mutation': selected.mutationId,
+              'io.qinglong.release.selection': selected.releaseSelectionDigest,
+              'io.qinglong.release.set': selected.releaseSetDigest,
+              'io.qinglong.release.catalog-manifest':
+                selected.catalogManifestDigest,
+              'io.qinglong.release.catalog-report':
+                selected.catalogConsumptionReportDigest,
             },
             volumes: [
               {
@@ -1137,6 +1158,12 @@ test('preflights exact local image, Compose merge and SQLite capability', async 
   await prepareLocalDeployment(state.command);
   const dockerSocketPath = path.join(state.managementRoot, 'docker.sock');
   const image = state.composeImage;
+  const release = JSON.parse(
+    fs.readFileSync(
+      state.command.options.service.releaseSelection.path,
+      'utf8',
+    ),
+  );
   const composeSource = fs.readFileSync(
     path.join(state.deploymentRoot, 'service', 'compose.yaml'),
     'utf8',
@@ -1206,6 +1233,12 @@ test('preflights exact local image, Compose merge and SQLite capability', async 
             'io.qinglong.deployment.generation': '1',
             'io.qinglong.deployment.mutation':
               state.command.request.activateMutationId,
+            'io.qinglong.release.selection': release.selectionDigest,
+            'io.qinglong.release.set': release.releaseSetDigest,
+            'io.qinglong.release.catalog-manifest':
+              release.catalog.manifestDigest,
+            'io.qinglong.release.catalog-report':
+              release.catalog.consumptionReportDigest,
           },
           volumes: [
             {

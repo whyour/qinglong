@@ -49,9 +49,16 @@ import {
   deploymentPaths,
   type LocalDeploymentPaths,
 } from '../foundation/render';
+import {
+  assertLocalDeploymentComposeLineageReceipt,
+  inspectLocalDeploymentComposeLineage,
+  normalizeLocalDeploymentComposeLineageReceipt,
+  type LocalDeploymentComposeLineage,
+  type LocalDeploymentComposeLineageReceipt,
+} from './composeLineage';
 
-const PREPARE_SCHEMA = 'qinglong/local-compose-restore-prepare@v1';
-const COMMIT_SCHEMA = 'qinglong/local-compose-restore-commit@v1';
+const PREPARE_SCHEMA = 'qinglong/local-compose-restore-prepare@v2';
+const COMMIT_SCHEMA = 'qinglong/local-compose-restore-commit@v2';
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -68,6 +75,7 @@ interface RestorePrepareReceipt {
   readonly generation: number;
   readonly recordedAtMs: number;
   readonly profile: LocalDeploymentProfile;
+  readonly lineage: Readonly<LocalDeploymentComposeLineageReceipt>;
   readonly current: Readonly<LocalSqliteSnapshotEvidence>;
   readonly source: Readonly<LocalSqliteSnapshotEvidence>;
   readonly safeguard: Readonly<LocalSqliteSnapshotEvidence>;
@@ -82,6 +90,7 @@ interface RestoreCommitReceipt {
   readonly generation: number;
   readonly recordedAtMs: number;
   readonly profile: LocalDeploymentProfile;
+  readonly lineage: Readonly<LocalDeploymentComposeLineageReceipt>;
   readonly source: Readonly<LocalSqliteSnapshotEvidence>;
   readonly safeguard: Readonly<LocalSqliteSnapshotEvidence>;
   readonly restored: Readonly<LocalSqliteSnapshotEvidence>;
@@ -211,40 +220,6 @@ function boundedReceipt(
   return fs.readFileSync(filePath, 'utf8');
 }
 
-function readApplicationProfile(
-  paths: Readonly<LocalDeploymentPaths>,
-  uid: number,
-): LocalDeploymentProfile {
-  const contents = boundedReceipt(
-    paths.applicationConfig,
-    uid,
-    'application configuration',
-  );
-  let value: unknown;
-  try {
-    value = JSON.parse(contents);
-  } catch (error) {
-    configurationError('application configuration is invalid', error);
-  }
-  const candidate = value as {
-    readonly schema?: unknown;
-    readonly profile?: unknown;
-    readonly storage?: {
-      readonly mode?: unknown;
-      readonly databasePath?: unknown;
-    };
-  };
-  if (
-    candidate?.schema !== 'qinglong/local-application-process@v2' ||
-    (candidate.profile !== 'edge' && candidate.profile !== 'standalone') ||
-    candidate.storage?.mode !== 'fresh' ||
-    candidate.storage.databasePath !== '/var/lib/qinglong3/qinglong3.sqlite'
-  ) {
-    configurationError('application configuration restore binding drifted');
-  }
-  return candidate.profile;
-}
-
 function composeArgs(
   paths: Readonly<LocalDeploymentPaths>,
   args: readonly string[],
@@ -280,12 +255,17 @@ function stopAndVerifyCompose(
   paths: Readonly<LocalDeploymentPaths>,
   runDocker: LocalDeploymentDockerRunner,
 ): void {
-  docker(
-    command,
-    runDocker,
-    composeArgs(paths, ['stop', '--timeout', '30', 'qinglong3']),
-    45_000,
-  );
+  try {
+    docker(
+      command,
+      runDocker,
+      composeArgs(paths, ['stop', '--timeout', '30', 'qinglong3']),
+      45_000,
+    );
+  } catch {
+    // A lost Docker response is reconciled by the inspect-only observation
+    // below. The restore ceremony never repeats `compose stop` blindly.
+  }
   const containerId = docker(
     command,
     runDocker,
@@ -418,6 +398,7 @@ async function readRestoreState(
   command: Readonly<LocalDeploymentComposeRestorePrepareCommand>,
   paths: Readonly<LocalDeploymentPaths>,
   uid: number,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
 ): Promise<Readonly<RestoreState>> {
   const failedIntent = boundedReceipt(
     paths.composeRolloutLock,
@@ -478,7 +459,7 @@ async function readRestoreState(
   ) {
     configurationError('compose restore recovery generation drifted');
   }
-  const profile = readApplicationProfile(paths, uid);
+  const profile = lineage.profile;
   const sourcePath = path.join(
     paths.composeRolloutBackups,
     `${command.request.sourceRolloutId}.sqlite`,
@@ -503,6 +484,7 @@ async function inspectPrepareReceipt(
   expectedCommandDigest: string,
   command: Readonly<LocalDeploymentComposeRestorePrepareCommand>,
   paths: Readonly<LocalDeploymentPaths>,
+  expectedLineage: Readonly<LocalDeploymentComposeLineage>,
 ): Promise<Readonly<RestorePrepareReceipt> | null> {
   if (!fs.existsSync(filePath)) return null;
   const contents = boundedReceipt(
@@ -518,6 +500,9 @@ async function inspectPrepareReceipt(
     configurationError('compose restore prepare receipt is invalid', error);
   }
   const receipt = value as RestorePrepareReceipt;
+  const lineage = normalizeLocalDeploymentComposeLineageReceipt(
+    receipt.lineage,
+  );
   if (
     !receipt ||
     typeof receipt !== 'object' ||
@@ -528,6 +513,7 @@ async function inspectPrepareReceipt(
         'current',
         'failedApplyCommandDigest',
         'generation',
+        'lineage',
         'profile',
         'recordedAtMs',
         'restoreId',
@@ -550,10 +536,12 @@ async function inspectPrepareReceipt(
     !snapshotIsValid(receipt.source) ||
     !snapshotIsValid(receipt.safeguard) ||
     receipt.current.sha256 === receipt.source.sha256 ||
+    JSON.stringify(receipt.lineage) !== JSON.stringify(lineage) ||
     contents !== receiptContents(receipt)
   ) {
     configurationError('compose restore prepare receipt drifted');
   }
+  assertLocalDeploymentComposeLineageReceipt(lineage, expectedLineage.receipt);
   const source = await inspectLocalSqliteSnapshot({
     databasePath: path.join(
       paths.composeRolloutBackups,
@@ -586,6 +574,7 @@ function inspectCommitReceipt(
   uid: number,
   expectedCommandDigest: string,
   command: Readonly<LocalDeploymentComposeRestoreCommand>,
+  expectedLineage: Readonly<LocalDeploymentComposeLineage>,
 ): Readonly<RestoreCommitReceipt> | null {
   if (!fs.existsSync(filePath)) return null;
   const contents = boundedReceipt(
@@ -601,6 +590,9 @@ function inspectCommitReceipt(
     configurationError('compose restore commit receipt is invalid', error);
   }
   const receipt = value as RestoreCommitReceipt;
+  const lineage = normalizeLocalDeploymentComposeLineageReceipt(
+    receipt.lineage,
+  );
   if (
     !receipt ||
     typeof receipt !== 'object' ||
@@ -609,6 +601,7 @@ function inspectCommitReceipt(
       [
         'commandDigest',
         'generation',
+        'lineage',
         'prepareReceiptDigest',
         'profile',
         'recordedAtMs',
@@ -636,10 +629,12 @@ function inspectCommitReceipt(
     !snapshotIsValid(receipt.safeguard) ||
     !snapshotIsValid(receipt.restored) ||
     receipt.source.sha256 !== receipt.restored.sha256 ||
+    JSON.stringify(receipt.lineage) !== JSON.stringify(lineage) ||
     contents !== receiptContents(receipt)
   ) {
     configurationError('compose restore commit receipt drifted');
   }
+  assertLocalDeploymentComposeLineageReceipt(lineage, expectedLineage.receipt);
   publishExactFile(
     filePath,
     contents,
@@ -671,6 +666,7 @@ async function prepareRestore(
   command: Readonly<LocalDeploymentComposeRestorePrepareCommand>,
   paths: Readonly<LocalDeploymentPaths>,
   dependencies: LocalDeploymentComposeRestoreDependencies,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
 ): Promise<Readonly<LocalDeploymentComposeRestoreResult>> {
   const identity = currentIdentity();
   if (fs.existsSync(commitReceiptPath(paths, command.request.restoreId))) {
@@ -680,7 +676,7 @@ async function prepareRestore(
     dependencies.validateSocket ?? validateLocalDeploymentDockerSocket;
   validateSocket(command.options.dockerSocketPath, identity.uid);
   const runDocker = dependencies.runDocker ?? runLocalDeploymentDockerCommand;
-  const state = await readRestoreState(command, paths, identity.uid);
+  const state = await readRestoreState(command, paths, identity.uid, lineage);
   const intent = `${JSON.stringify(command, null, 2)}\n`;
   publishExactFile(
     paths.composeRestoreLock,
@@ -701,10 +697,11 @@ async function prepareRestore(
     commandDigest(command),
     command,
     paths,
+    lineage,
   );
   if (replay) {
     const current = await inspectLocalSqliteSnapshot({
-      databasePath: paths.database,
+      databasePath: lineage.databasePath,
       profile: replay.profile,
     });
     exactSnapshot(replay.current, current, 'compose restore current database');
@@ -717,7 +714,7 @@ async function prepareRestore(
   }
   const checkpoint = dependencies.checkpoint ?? checkpointLocalSqliteForRestore;
   const current = await checkpoint({
-    databasePath: paths.database,
+    databasePath: lineage.databasePath,
     profile: state.profile,
   });
   if (current.sha256 === state.source.sha256) {
@@ -728,7 +725,7 @@ async function prepareRestore(
   const createSafeguard =
     dependencies.createSafeguard ?? createLocalSqliteRolloutBackup;
   const safeguard = await createSafeguard({
-    databasePath: paths.database,
+    databasePath: lineage.databasePath,
     backupPath: safeguardPath(paths, command.request.restoreId),
     profile: state.profile,
   });
@@ -741,6 +738,7 @@ async function prepareRestore(
     generation: command.request.expectedGeneration,
     recordedAtMs: command.request.preparedAtMs,
     profile: state.profile,
+    lineage: lineage.receipt,
     current: snapshotReceipt(current),
     source: snapshotReceipt(state.source),
     safeguard: snapshotReceipt(safeguard),
@@ -764,6 +762,7 @@ async function commitRestore(
   command: Readonly<LocalDeploymentComposeRestoreCommand>,
   paths: Readonly<LocalDeploymentPaths>,
   dependencies: LocalDeploymentComposeRestoreDependencies,
+  lineage: Readonly<LocalDeploymentComposeLineage>,
 ): Promise<Readonly<LocalDeploymentComposeRestoreResult>> {
   if (command.operation !== 'local.deployment.compose.restore.commit') {
     configurationError('compose restore commit command is invalid');
@@ -775,6 +774,7 @@ async function commitRestore(
     identity.uid,
     commandDigest(command),
     command,
+    lineage,
   );
   if (replay) {
     const sourcePath = path.join(
@@ -945,11 +945,17 @@ async function commitRestore(
     commandDigest(prepareCommand),
     prepareCommand,
     paths,
+    lineage,
   );
   if (!prepareReceipt) {
     configurationError('compose restore prepare receipt is unavailable');
   }
-  const state = await readRestoreState(prepareCommand, paths, identity.uid);
+  const state = await readRestoreState(
+    prepareCommand,
+    paths,
+    identity.uid,
+    lineage,
+  );
   if (
     state.failedCommandDigest !== prepareReceipt.failedApplyCommandDigest ||
     state.source.sha256 !== prepareReceipt.source.sha256
@@ -961,11 +967,11 @@ async function commitRestore(
   validateSocket(command.options.dockerSocketPath, identity.uid);
   const runDocker = dependencies.runDocker ?? runLocalDeploymentDockerCommand;
   stopAndVerifyCompose(command, paths, runDocker);
-  if (fs.existsSync(paths.database)) {
+  if (fs.existsSync(lineage.databasePath)) {
     const checkpoint =
       dependencies.checkpoint ?? checkpointLocalSqliteForRestore;
     const current = await checkpoint({
-      databasePath: paths.database,
+      databasePath: lineage.databasePath,
       profile: prepareReceipt.profile,
     });
     if (
@@ -980,12 +986,13 @@ async function commitRestore(
   const restoreSnapshot =
     dependencies.restoreSnapshot ?? restoreLocalSqliteSnapshot;
   const restored: Readonly<LocalSqliteRestoreEvidence> = await restoreSnapshot({
-    databasePath: paths.database,
+    databasePath: lineage.databasePath,
     profile: prepareReceipt.profile,
+    preserveDatabaseIdentity: lineage.mode === 'adopted',
     sourceSnapshotPath: state.sourcePath,
     restoreStagePath: path.join(
-      path.dirname(paths.database),
-      `.${path.basename(paths.database)}.${
+      path.dirname(lineage.databasePath),
+      `.${path.basename(lineage.databasePath)}.${
         command.request.restoreId
       }.restore-stage`,
     ),
@@ -1011,6 +1018,7 @@ async function commitRestore(
     generation: command.request.expectedGeneration,
     recordedAtMs: command.request.committedAtMs,
     profile: prepareReceipt.profile,
+    lineage: lineage.receipt,
     source: prepareReceipt.source,
     safeguard: prepareReceipt.safeguard,
     restored: snapshotReceipt(restored),
@@ -1073,13 +1081,19 @@ export async function restoreLocalDeploymentCompose(
     identity.uid,
     'composeRestoreSafeguardRoot',
   );
+  const lineage = inspectLocalDeploymentComposeLineage(
+    command.options.deploymentRoot,
+    identity.uid,
+    identity.gid,
+    command.options.allowRootService,
+  );
   if (fs.existsSync(paths.composeEvidenceCollectionLock)) {
     configurationError('compose restore is fenced by an evidence collection');
   }
   preflightRestoreCatalog(paths, command.request.restoreId);
   return command.operation === 'local.deployment.compose.restore.prepare'
-    ? prepareRestore(command, paths, dependencies)
-    : commitRestore(command, paths, dependencies);
+    ? prepareRestore(command, paths, dependencies, lineage)
+    : commitRestore(command, paths, dependencies, lineage);
 }
 
 export function restoreLocalDeploymentComposeCommandFile(

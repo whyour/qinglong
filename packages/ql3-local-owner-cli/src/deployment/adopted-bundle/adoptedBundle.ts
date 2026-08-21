@@ -237,7 +237,32 @@ export function prepareLocalDeploymentAdoptedBundle(
     [material.paths.pluginActivation, 'pluginActivationRoot'],
     ...(material.composeSelection === null
       ? []
-      : ([[material.paths.composeRevisions, 'composeRevisionRoot']] as const)),
+      : ([
+          [material.paths.composeRevisions, 'composeRevisionRoot'],
+          [material.paths.composeRollouts, 'composeRolloutRoot'],
+          [material.paths.composeRolloutBackups, 'composeRolloutBackupRoot'],
+          [material.paths.composeRestores, 'composeRestoreRoot'],
+          [
+            material.paths.composeRestoreSafeguards,
+            'composeRestoreSafeguardRoot',
+          ],
+          [
+            material.paths.composeEvidenceCollections,
+            'composeEvidenceCollectionRoot',
+          ],
+          [
+            material.paths.composeCollectedEvidence,
+            'composeCollectedEvidenceRoot',
+          ],
+          [
+            material.paths.composeCollectedRolloutBackups,
+            'composeCollectedRolloutBackupRoot',
+          ],
+          [
+            material.paths.composeCollectedRestoreSafeguards,
+            'composeCollectedRestoreSafeguardRoot',
+          ],
+        ] as const)),
   ] as const;
   const directoryStatuses = directoryPaths.map(([directory, label]) =>
     ensurePrivateDirectory(directory, identity.uid, label),
@@ -352,7 +377,32 @@ export function verifyLocalDeploymentAdoptedBundle(
     [material.paths.pluginActivation, 'pluginActivationRoot'],
     ...(material.composeSelection === null
       ? []
-      : ([[material.paths.composeRevisions, 'composeRevisionRoot']] as const)),
+      : ([
+          [material.paths.composeRevisions, 'composeRevisionRoot'],
+          [material.paths.composeRollouts, 'composeRolloutRoot'],
+          [material.paths.composeRolloutBackups, 'composeRolloutBackupRoot'],
+          [material.paths.composeRestores, 'composeRestoreRoot'],
+          [
+            material.paths.composeRestoreSafeguards,
+            'composeRestoreSafeguardRoot',
+          ],
+          [
+            material.paths.composeEvidenceCollections,
+            'composeEvidenceCollectionRoot',
+          ],
+          [
+            material.paths.composeCollectedEvidence,
+            'composeCollectedEvidenceRoot',
+          ],
+          [
+            material.paths.composeCollectedRolloutBackups,
+            'composeCollectedRolloutBackupRoot',
+          ],
+          [
+            material.paths.composeCollectedRestoreSafeguards,
+            'composeCollectedRestoreSafeguardRoot',
+          ],
+        ] as const)),
   ] as const) {
     validatePrivateDirectory(directory, identity.uid, label);
   }
@@ -420,7 +470,7 @@ export function verifyLocalDeploymentAdoptedBundle(
     }),
     directories: Object.freeze({
       created: 0,
-      existing: material.composeSelection === null ? 4 : 5,
+      existing: material.composeSelection === null ? 4 : 13,
     }),
   });
 }
