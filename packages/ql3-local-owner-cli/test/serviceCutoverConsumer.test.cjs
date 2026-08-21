@@ -704,6 +704,40 @@ test('stop advances only after the exact receipted process identity disappears',
     ),
   );
   assert.equal(record.evidence.shutdownReceiptDigest, shutdownReceiptDigest);
+  const lineageIdentity = {
+    options: { deploymentRoot: state.root },
+    request: {
+      cutoverId: state.cutoverId,
+      profile: 'edge',
+      instanceId: 'edge-router-1',
+      expectedActivationDigest: state.activationDigest,
+      requestedAtMs: 1786416000400,
+    },
+  };
+  advanceLocalCutoverInstanceHead(
+    lineageIdentity,
+    process.getuid(),
+    'reconciliation_capture_prepared',
+    1,
+    'e'.repeat(64),
+  );
+  const preparedReplay = await consumeLocalServiceManagerCutoverOutcome(
+    consumeCommand(state, stopped),
+    { procRoot: state.procRoot },
+  );
+  assert.equal(preparedReplay.status, 'existing');
+  advanceLocalCutoverInstanceHead(
+    lineageIdentity,
+    process.getuid(),
+    'reconciliation_captured',
+    1,
+    'f'.repeat(64),
+  );
+  const capturedReplay = await consumeLocalServiceManagerCutoverOutcome(
+    consumeCommand(state, stopped),
+    { procRoot: state.procRoot },
+  );
+  assert.equal(capturedReplay.status, 'existing');
 });
 
 test('prepares and exactly replays lossless service-manager legacy rollback evidence', async (t) => {

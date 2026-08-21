@@ -97,6 +97,12 @@ import {
   prepareLocalReconciliationCapture,
   prepareLocalReconciliationCaptureCommandFile,
 } from './reconciliation/preparation';
+import {
+  commitLocalReconciliationCapture,
+  commitLocalReconciliationCaptureCommandFile,
+  verifyLocalReconciliationCapture,
+  verifyLocalReconciliationCaptureCommandFile,
+} from './reconciliation/bundle';
 
 export {
   LocalDeploymentConfigurationError,
@@ -128,14 +134,29 @@ export {
 } from './foundation/contract';
 export {
   normalizeLocalReconciliationCapturePrepareCommand,
+  normalizeLocalReconciliationCaptureCommitCommand,
+  normalizeLocalReconciliationCaptureVerifyCommand,
+  type LocalReconciliationCaptureCommitCommand,
   type LocalReconciliationCapturePrepareCommand,
   type LocalReconciliationCapturePrepareResult,
+  type LocalReconciliationCaptureTerminalResult,
+  type LocalReconciliationCaptureVerifyCommand,
   type LocalReconciliationStoppedAuthority,
 } from './reconciliation/contract';
 export {
   localReconciliationCaptureDirectory,
   localReconciliationCaptureIntentPath,
+  normalizeLocalReconciliationCaptureIntent,
+  readLocalReconciliationCaptureIntent,
+  type LocalReconciliationCaptureIntent,
 } from './reconciliation/preparation';
+export {
+  normalizeLocalReconciliationCaptureManifest,
+  normalizeLocalReconciliationCaptureReceipt,
+  type LocalReconciliationCaptureDependencies,
+  type LocalReconciliationCaptureManifest,
+  type LocalReconciliationCaptureReceipt,
+} from './reconciliation/bundle';
 export {
   prepareLocalDeploymentAdoptedBundle,
   runLocalDeploymentAdoptedBundleCommandFile,
@@ -241,6 +262,10 @@ export {
   consumeLocalServiceManagerLegacyRollbackCommandFile,
   prepareLocalReconciliationCapture,
   prepareLocalReconciliationCaptureCommandFile,
+  commitLocalReconciliationCapture,
+  commitLocalReconciliationCaptureCommandFile,
+  verifyLocalReconciliationCapture,
+  verifyLocalReconciliationCaptureCommandFile,
 };
 export {
   localServiceManagerIntentDigest,

@@ -1,6 +1,6 @@
 # ADR-0482：停止态 Local SQLite Reconciliation Recovery Bundle
 
-- 状态：Proposed（D-389 契约冻结）
+- 状态：Accepted
 - 日期：2026-08-21
 - 关联 RFC：QL-RFC-0001 D-05、D-06、D-17、D-64、D-87、D-184、D-259、D-383、D-388、D-389
 - 关联 ADR：ADR-0064、ADR-0194、ADR-0201、ADR-0314、ADR-0315、ADR-0476、ADR-0480、ADR-0481
@@ -49,6 +49,7 @@ reconciliation evidence、Application v4、activation、Legacy silence commitmen
 ```text
 captureRoot       已存在、current-UID、0700、canonical、non-root 的目录
 captureId         UUID
+applicationConfigPath  deployment root 内固定的 local-application.json
 expectedHeadDigest
 expectedStoppedRecordDigest
 preparedAtMs
@@ -165,6 +166,30 @@ package/import/artifact closure 必须保持零 Local reconciliation authority�
 7. Edge 64 KiB 固定缓冲与 Standalone 同协议；无新增 package/dependency/常驻对象，边界与十四档 artifact 不退化。
 8. 完整 Local Owner、backend、package、架构、distribution 和 release gate 通过；真实 stopped target bundle 在 Linux/Docker
    rehearsal 中可由独立 verify 重建相同 digest。
+
+## 实现与验证证据
+
+D-389 已在既有 `@qinglong/local-owner-cli/src/deployment/reconciliation/` 内实现 prepare、commit、verify。实现使用固定 64 KiB
+buffer、descriptor-bound stable copy、同目录 deterministic stage、hard-link no-replace publication、file/directory fsync 与 terminal
+manifest/receipt/head 收敛；manifest 已发布、receipt 已发布、head 未推进和 commit response loss 均可在 source 不再存在时重放。
+输入读取期间的 stat 或 sidecar 集合漂移、partial write、ENOSPC、retained stage、既有 asset 漂移和不同 commit time 重放均失败关闭。
+
+最初的架构门发现 reconciliation proof 直接 import 了 Local SQLite data-application commit authority。实现没有扩充例外清单，而是
+改为 reconciliation 内固定 schema、固定字段顺序和 digest 的只读 evidence validator；最终 Cluster dependency audit 无 finding，
+capture 也没有获得数据库写 authority。
+
+验收结果：reconciliation/service-manager 聚焦套件 `27 total / 26 pass / 1 conditional Docker skip / 0 fail`；真实 stopped Docker
+target capture 与独立 verify `1/1`；完整 Local Owner `235 total / 229 pass / 6 conditional skip / 0 fail`；tracked backend
+`1540 total / 1538 pass / 2 conditional skip / 0 fail`；backend build 与 18-package clean build/逐包测试通过。Edge import、Cluster
+dependency、package boundary、service-manager bridge、local image、image release、release version 和 deployment lock surface 审计均
+compatible。workspace 仍为 18 packages，`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为
+`141 source / 140 nested / 1 root binary entry`，没有新增 dependency、binary、daemon、listener、timer 或 watcher。
+
+十四档 artifact audit 均 compatible。基础 Edge/Standalone 仍为 `2,611,978 / 2,612,056` bytes、319 files、58 modules；Adopted
+仍为 `2,831,713 / 2,831,836` bytes、339 files、59 modules；Application+AI 为 `4,529,710 / 4,529,842` bytes、516 files、
+144 modules；MCP 为 `7,337,910 / 7,338,018` bytes、805 files、228 modules。一次性 capture authority 未进入基础常驻闭包。
+独立 PostgreSQL 18.6 arm64 HA Docker 基线也以 timeline `1 → 2`、`146` gates 和无 finding 的 evidence audit 通过；它只证明本
+切片没有破坏 Cluster 基线，不把 Local reconciliation authority 带入 Cluster。
 
 ## 未包含
 

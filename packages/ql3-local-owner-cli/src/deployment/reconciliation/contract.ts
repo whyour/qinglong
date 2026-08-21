@@ -9,9 +9,7 @@ const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const MAX_PATH_BYTES = 4_096;
 
-export type LocalReconciliationStoppedAuthority =
-  | 'docker'
-  | 'service-manager';
+export type LocalReconciliationStoppedAuthority = 'docker' | 'service-manager';
 
 export interface LocalReconciliationCapturePrepareCommand {
   readonly schemaVersion: 1;
@@ -28,6 +26,7 @@ export interface LocalReconciliationCapturePrepareCommand {
     instanceId: string;
     cutoverId: string;
     generation: number;
+    applicationConfigPath: string;
     activationPath: string;
     legacySourcePath: string;
     targetDatabasePath: string;
@@ -46,6 +45,42 @@ export interface LocalReconciliationCapturePrepareResult {
   readonly state: 'reconciliation_capture_prepared';
   readonly captureId: string;
   readonly preparationDigest: string;
+  readonly instanceHeadDigest: string;
+}
+
+export interface LocalReconciliationCaptureCommitCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'local.deployment.reconciliation.capture.commit';
+  readonly options: LocalReconciliationCapturePrepareCommand['options'];
+  readonly request: Readonly<{
+    captureId: string;
+    expectedPreparationDigest: string;
+    committedAtMs: number;
+  }>;
+}
+
+export interface LocalReconciliationCaptureVerifyCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'local.deployment.reconciliation.capture.verify';
+  readonly options: LocalReconciliationCapturePrepareCommand['options'];
+  readonly request: Readonly<{
+    captureId: string;
+    expectedBundleDigest: string;
+  }>;
+}
+
+export interface LocalReconciliationCaptureTerminalResult {
+  readonly schemaVersion: 1;
+  readonly operation:
+    | 'local.deployment.reconciliation.capture.commit'
+    | 'local.deployment.reconciliation.capture.verify';
+  readonly status: 'prepared' | 'existing' | 'verified';
+  readonly state: 'reconciliation_captured';
+  readonly captureId: string;
+  readonly bundleDigest: string;
+  readonly profile: 'edge' | 'standalone';
+  readonly assetCount: number;
+  readonly totalBytes: number;
   readonly instanceHeadDigest: string;
 }
 
@@ -124,6 +159,7 @@ export function normalizeLocalReconciliationCapturePrepareCommand(
     request,
     [
       'activationPath',
+      'applicationConfigPath',
       'captureId',
       'cutoverId',
       'expectedActivationDigest',
@@ -143,8 +179,7 @@ export function normalizeLocalReconciliationCapturePrepareCommand(
   const identity = currentIdentity();
   if (
     command.schemaVersion !== 1 ||
-    command.operation !==
-      'local.deployment.reconciliation.capture.prepare' ||
+    command.operation !== 'local.deployment.reconciliation.capture.prepare' ||
     typeof options.allowRootService !== 'boolean' ||
     (identity.uid === 0) !== options.allowRootService ||
     typeof request.captureId !== 'string' ||
@@ -175,8 +210,7 @@ export function normalizeLocalReconciliationCapturePrepareCommand(
   }
   return Object.freeze({
     schemaVersion: 1 as const,
-    operation:
-      'local.deployment.reconciliation.capture.prepare' as const,
+    operation: 'local.deployment.reconciliation.capture.prepare' as const,
     options: Object.freeze({
       deploymentRoot,
       captureRoot,
@@ -189,6 +223,10 @@ export function normalizeLocalReconciliationCapturePrepareCommand(
       instanceId: request.instanceId,
       cutoverId: request.cutoverId,
       generation: request.generation as number,
+      applicationConfigPath: safeAbsolutePath(
+        request.applicationConfigPath,
+        'applicationConfigPath',
+      ),
       activationPath: safeAbsolutePath(
         request.activationPath,
         'activationPath',
@@ -215,6 +253,112 @@ export function normalizeLocalReconciliationCapturePrepareCommand(
         'expectedStoppedRecordDigest',
       ),
       preparedAtMs: request.preparedAtMs as number,
+    }),
+  });
+}
+
+function normalizeTerminalOptions(value: unknown): Readonly<{
+  deploymentRoot: string;
+  captureRoot: string;
+  allowRootService: boolean;
+}> {
+  const options = object(value, 'options');
+  exact(
+    options,
+    ['allowRootService', 'captureRoot', 'deploymentRoot'],
+    'options',
+  );
+  const identity = currentIdentity();
+  if (
+    typeof options.allowRootService !== 'boolean' ||
+    (identity.uid === 0) !== options.allowRootService
+  ) {
+    configurationError('capture command identity is invalid');
+  }
+  const deploymentRoot = safeAbsolutePath(
+    options.deploymentRoot,
+    'deploymentRoot',
+  );
+  const captureRoot = safeAbsolutePath(options.captureRoot, 'captureRoot');
+  if (captureRoot === deploymentRoot) {
+    configurationError('captureRoot must be distinct from deploymentRoot');
+  }
+  return Object.freeze({
+    deploymentRoot,
+    captureRoot,
+    allowRootService: options.allowRootService,
+  });
+}
+
+export function normalizeLocalReconciliationCaptureCommitCommand(
+  value: unknown,
+): Readonly<LocalReconciliationCaptureCommitCommand> {
+  const command = object(value, 'reconciliation capture commit command');
+  exact(
+    command,
+    ['operation', 'options', 'request', 'schemaVersion'],
+    'command',
+  );
+  const request = object(command.request, 'request');
+  exact(
+    request,
+    ['captureId', 'committedAtMs', 'expectedPreparationDigest'],
+    'request',
+  );
+  if (
+    command.schemaVersion !== 1 ||
+    command.operation !== 'local.deployment.reconciliation.capture.commit' ||
+    typeof request.captureId !== 'string' ||
+    !UUID_V4_PATTERN.test(request.captureId) ||
+    !Number.isSafeInteger(request.committedAtMs) ||
+    (request.committedAtMs as number) < 0
+  ) {
+    configurationError('reconciliation capture commit command is invalid');
+  }
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    operation: 'local.deployment.reconciliation.capture.commit' as const,
+    options: normalizeTerminalOptions(command.options),
+    request: Object.freeze({
+      captureId: request.captureId,
+      expectedPreparationDigest: digest(
+        request.expectedPreparationDigest,
+        'expectedPreparationDigest',
+      ),
+      committedAtMs: request.committedAtMs as number,
+    }),
+  });
+}
+
+export function normalizeLocalReconciliationCaptureVerifyCommand(
+  value: unknown,
+): Readonly<LocalReconciliationCaptureVerifyCommand> {
+  const command = object(value, 'reconciliation capture verify command');
+  exact(
+    command,
+    ['operation', 'options', 'request', 'schemaVersion'],
+    'command',
+  );
+  const request = object(command.request, 'request');
+  exact(request, ['captureId', 'expectedBundleDigest'], 'request');
+  if (
+    command.schemaVersion !== 1 ||
+    command.operation !== 'local.deployment.reconciliation.capture.verify' ||
+    typeof request.captureId !== 'string' ||
+    !UUID_V4_PATTERN.test(request.captureId)
+  ) {
+    configurationError('reconciliation capture verify command is invalid');
+  }
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    operation: 'local.deployment.reconciliation.capture.verify' as const,
+    options: normalizeTerminalOptions(command.options),
+    request: Object.freeze({
+      captureId: request.captureId,
+      expectedBundleDigest: digest(
+        request.expectedBundleDigest,
+        'expectedBundleDigest',
+      ),
     }),
   });
 }

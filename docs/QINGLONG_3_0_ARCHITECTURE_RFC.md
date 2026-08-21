@@ -11,16 +11,22 @@
 
 最新增量证据（2026-08-21）：
 
-- D-389/ADR-0482（契约已冻结，待实现）：target stopped 后的 `reconciliation_required` 不能直接逆迁移或覆盖 2.x source；
-  3.0 Run/TaskDefinition/Trigger/Secret/Plugin Package/AI facts 没有通用无损 Legacy 映射。下一切片先提供独立
-  `reconciliation.capture.prepare|commit|verify`，只允许 exact stopped reconciliation head，以 instance CAS 建立唯一 capture
-  fence，并把 target main/sidecars、Legacy source main/sidecars、activation recovery 与内容无关 lineage 以 64 KiB buffer
-  字节精确复制到 operator 显式提供的私有 capture root。payload、manifest、receipt 逐级 no-replace/fsync 发布，ENOSPC、partial
-  write、stage/link/manifest/receipt/head 和 commit-response-loss 均由同命令 exact replay；verify 完全只读。bundle 不复制 keyring/
-  pepper，不打开 SQLite/checkpoint，不调用 Docker/init/socket/network，也不授予 import、rollback、Legacy start 或 target restart。
-  实现必须进入既有 Local Owner `deployment/reconciliation/`，不新增 package、dependency、binary 或常驻对象。后续数据域 diff、冲突
-  裁决和受审回灌必须消费 exact bundle/head 并另立 ADR；本条在实现、Linux/Docker rehearsal、完整 package/backend、架构、release 与
-  十四档 artifact 门完成前保持 Proposed。
+- D-389/ADR-0482（已接受）：target stopped 后的 `reconciliation_required` 不能直接逆迁移或覆盖 2.x source；既有 Local Owner
+  已实现独立 `reconciliation.capture.prepare|commit|verify`，只允许 exact stopped reconciliation head，以 instance CAS 建立唯一
+  capture fence，并把 target main/sidecars、Legacy source main/sidecars、activation recovery 与内容无关 lineage 以固定 64 KiB
+  buffer 字节精确复制到 operator 显式提供的私有 capture root。descriptor-bound copy、deterministic stage、hard-link no-replace、
+  file/directory fsync、manifest/receipt/head 分段提交覆盖 ENOSPC、partial write、retained stage、各崩溃窗口和 response loss；terminal
+  commit replay/verify 不再读取 source。lineage proof 使用本地固定 schema/digest 的只读 evidence validator，没有为 Local SQLite 写
+  authority 放宽跨包 import。bundle 不复制 keyring/pepper，不打开 SQLite/checkpoint，不调用 Docker/init/socket/network，也不授予
+  import、rollback、Legacy start 或 target restart。真实 stopped Docker capture/independent verify `1/1`；聚焦套件
+  `27 total / 26 pass / 1 conditional skip / 0 fail`，Local Owner `235 total / 229 pass / 6 conditional skip / 0 fail`，tracked backend
+  `1540 total / 1538 pass / 2 conditional skip / 0 fail`，backend build、18-package clean build/逐包测试、八项架构/发布门和十四档
+  artifact audit 全通过。workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为
+  `141 source / 140 nested / 1 root binary entry`；基础 Edge/Standalone artifact 仍为 `2,611,978 / 2,612,056` bytes、319 files、
+  58 modules，证明一次性 capture authority 未进入低配常驻闭包。Application+AI 为 `4,529,710 / 4,529,842` bytes，MCP 为
+  `7,337,910 / 7,338,018` bytes，均 compatible。独立 PostgreSQL 18.6 arm64 HA Docker 基线继续以 timeline `1 → 2`、146
+  gates 和无 finding 的 evidence audit 通过，但不把本机 capture authority 带入 Cluster。后续 D-390 应定义消费 exact
+  bundle/head 的数据域 diff、冲突裁决与受审 plan，不能把 capture completion 当作 reconciliation completion。
 - D-388/ADR-0481（已接受）：D-387 committed data receipt 只作为启动前置事实，不获得 activation/rollback authority。
   adopted-only Application v4 在 signal、SQLite、Secret、Plugin、AI 前以 no-follow stable descriptor 验证
   `commitPath/expectedCommitDigest/expectedReceiptDigest`；独立 `local.deployment.adopted.prepare|verify` 已覆盖 systemd、OpenRC、

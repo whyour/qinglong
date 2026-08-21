@@ -485,7 +485,7 @@
 | [ADR-0479](./ADR-0479-private-versioned-legacy-config-keyv-ssh-transformation.md)                            | 私有、版本化的 Legacy Config、Keyv 与 SSH 转换                                                                                                                                                    | Accepted |
 | [ADR-0480](./ADR-0480-authenticated-atomic-legacy-data-application.md)                                      | 受认证、原子且可恢复的 Legacy Data Application                                                                                                                                                    | Accepted |
 | [ADR-0481](./ADR-0481-committed-legacy-data-deployment-lineage.md)                                        | Committed Legacy Data Receipt 的本机部署 Lineage                                                                                                                                                    | Accepted |
-| [ADR-0482](./ADR-0482-stopped-local-sqlite-reconciliation-recovery-bundle.md)                             | 停止态 Local SQLite Reconciliation Recovery Bundle                                                                                                                                                   | Proposed（D-389 契约冻结） |
+| [ADR-0482](./ADR-0482-stopped-local-sqlite-reconciliation-recovery-bundle.md)                             | 停止态 Local SQLite Reconciliation Recovery Bundle                                                                                                                                                   | Accepted |
 
 ## 规则
 

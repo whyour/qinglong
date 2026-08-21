@@ -746,14 +746,18 @@ function replayResult(
     intent.instanceId,
     currentIdentity().uid,
   );
+  const stoppedCaptureProgress =
+    record.state === 'target_stopped' &&
+    (head.state === 'reconciliation_capture_prepared' ||
+      head.state === 'reconciliation_captured');
   if (
     record.actionId !== intent.actionId ||
     record.intentDigest !== intent.intentDigest ||
     record.evidence.managerOutcomeDigest !== outcome.outcomeDigest ||
     head.cutoverId !== intent.lineage.cutoverId ||
     head.generation !== intent.lineage.generation ||
-    head.state !== record.state ||
-    head.sourceRecordDigest !== record.recordDigest
+    (!stoppedCaptureProgress && head.state !== record.state) ||
+    (!stoppedCaptureProgress && head.sourceRecordDigest !== record.recordDigest)
   ) {
     configurationError('service manager cutover replay drifted');
   }
