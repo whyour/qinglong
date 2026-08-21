@@ -23,6 +23,8 @@ export type LocalCutoverInstanceHeadState =
   | 'legacy_stopped'
   | 'target_active'
   | 'target_stopped'
+  | 'reconciliation_capture_prepared'
+  | 'reconciliation_captured'
   | 'rollback_prepared'
   | 'legacy_restart_requested'
   | 'legacy_running'
@@ -154,6 +156,8 @@ function parseHead(value: unknown): Readonly<LocalCutoverInstanceHead> {
       head.state !== 'legacy_stopped' &&
       head.state !== 'target_active' &&
       head.state !== 'target_stopped' &&
+      head.state !== 'reconciliation_capture_prepared' &&
+      head.state !== 'reconciliation_captured' &&
       head.state !== 'rollback_prepared' &&
       head.state !== 'legacy_restart_requested' &&
       head.state !== 'legacy_running' &&
@@ -320,6 +324,8 @@ export function advanceLocalCutoverInstanceHead(
     | 'legacy_stopped'
     | 'target_active'
     | 'target_stopped'
+    | 'reconciliation_capture_prepared'
+    | 'reconciliation_captured'
     | 'rollback_prepared'
     | 'legacy_restart_requested'
     | 'legacy_running'
@@ -358,6 +364,8 @@ export function advanceLocalCutoverInstanceHead(
     state === 'target_stopped' &&
     current.generation === generation &&
     (current.state === 'rollback_prepared' ||
+      current.state === 'reconciliation_capture_prepared' ||
+      current.state === 'reconciliation_captured' ||
       current.state === 'legacy_restart_requested' ||
       current.state === 'legacy_running' ||
       current.state === 'legacy_ready')
@@ -373,6 +381,10 @@ export function advanceLocalCutoverInstanceHead(
       (current.state === 'legacy_stopped' ||
         current.state === 'target_active')) ||
     (state === 'target_stopped' && current.state === 'target_active') ||
+    (state === 'reconciliation_capture_prepared' &&
+      current.state === 'target_stopped') ||
+    (state === 'reconciliation_captured' &&
+      current.state === 'reconciliation_capture_prepared') ||
     (state === 'rollback_prepared' && current.state === 'target_stopped') ||
     (state === 'legacy_restart_requested' &&
       current.state === 'rollback_prepared') ||

@@ -93,6 +93,10 @@ import {
   consumeLocalServiceManagerLegacyRollback,
   consumeLocalServiceManagerLegacyRollbackCommandFile,
 } from './service-manager/legacy-rollback/consumer';
+import {
+  prepareLocalReconciliationCapture,
+  prepareLocalReconciliationCaptureCommandFile,
+} from './reconciliation/preparation';
 
 export {
   LocalDeploymentConfigurationError,
@@ -122,6 +126,16 @@ export {
   type LocalDeploymentStatusCommand,
   type LocalDeploymentStatusResult,
 } from './foundation/contract';
+export {
+  normalizeLocalReconciliationCapturePrepareCommand,
+  type LocalReconciliationCapturePrepareCommand,
+  type LocalReconciliationCapturePrepareResult,
+  type LocalReconciliationStoppedAuthority,
+} from './reconciliation/contract';
+export {
+  localReconciliationCaptureDirectory,
+  localReconciliationCaptureIntentPath,
+} from './reconciliation/preparation';
 export {
   prepareLocalDeploymentAdoptedBundle,
   runLocalDeploymentAdoptedBundleCommandFile,
@@ -225,6 +239,8 @@ export {
   authorizeLocalServiceManagerLegacyRollbackCommandFile,
   consumeLocalServiceManagerLegacyRollback,
   consumeLocalServiceManagerLegacyRollbackCommandFile,
+  prepareLocalReconciliationCapture,
+  prepareLocalReconciliationCaptureCommandFile,
 };
 export {
   localServiceManagerIntentDigest,

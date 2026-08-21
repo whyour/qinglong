@@ -13,6 +13,7 @@ import {
   preflightLocalDeploymentComposeCommandFile,
   prepareLocalServiceManagerIntentCommandFile,
   prepareLocalServiceManagerLegacyRollbackCommandFile,
+  prepareLocalReconciliationCaptureCommandFile,
   prepareLocalDeploymentCommandFile,
   proveLocalDeploymentLegacyReadinessCommandFile,
   restoreLocalDeploymentComposeCommitCommandFile,
@@ -27,7 +28,7 @@ import {
 } from './localDeployment';
 
 const USAGE =
-  'Usage: ql3-local-deploy <prepare|adopted-prepare|adopted-verify|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-legacy-readiness-probe|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
+  'Usage: ql3-local-deploy <prepare|adopted-prepare|adopted-verify|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-legacy-readiness-probe|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|reconciliation-capture-prepare|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
 
 async function main(argv: readonly string[]): Promise<void> {
   if (argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h')) {
@@ -56,6 +57,7 @@ async function main(argv: readonly string[]): Promise<void> {
       argv[0] !== 'cutover-manual-diagnose' &&
       argv[0] !== 'cutover-manual-resolution-prepare' &&
       argv[0] !== 'cutover-manual-resolution-commit' &&
+      argv[0] !== 'reconciliation-capture-prepare' &&
       argv[0] !== 'compose-revision' &&
       argv[0] !== 'compose-preflight' &&
       argv[0] !== 'compose-apply' &&
@@ -126,6 +128,8 @@ async function main(argv: readonly string[]): Promise<void> {
             ? 'local.deployment.cutover.manual-resolution-prepare'
             : 'local.deployment.cutover.manual-resolution-commit',
         )
+      : argv[0] === 'reconciliation-capture-prepare'
+      ? prepareLocalReconciliationCaptureCommandFile(argv[2]!)
       : argv[0] === 'compose-revision'
       ? switchLocalDeploymentComposeRevisionCommandFile(argv[2]!)
       : argv[0] === 'compose-preflight'
