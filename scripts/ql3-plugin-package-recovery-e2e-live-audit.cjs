@@ -193,11 +193,9 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
     images?.controlSourceRevision !== report?.sourceRevision ||
     images?.postgresRepositoryDigest !==
       'postgres@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296' ||
-    !imageDigest(images?.migrationImageId) ||
-    imageDigest(images?.initialRecoveryImageId) !==
-      imageDigest(images?.migrationImageId) ||
-    imageDigest(images?.upgradeRecoveryImageId) !==
-      imageDigest(images?.migrationImageId) ||
+    imageDigest(images?.migrationImageId) !== images?.controlBuildId ||
+    imageDigest(images?.initialRecoveryImageId) !== images?.adminBuildId ||
+    imageDigest(images?.upgradeRecoveryImageId) !== images?.adminBuildId ||
     !imageDigest(images?.postgresImageId)
   ) {
     findings.push(

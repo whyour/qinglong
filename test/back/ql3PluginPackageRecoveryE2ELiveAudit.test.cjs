@@ -42,7 +42,7 @@ function validReport() {
       controlSourceRevision: sourceRevision,
       postgresRepositoryDigest:
         'postgres@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296',
-      migrationImageId: `docker://${admin}`,
+      migrationImageId: `docker://${control}`,
       initialRecoveryImageId: `docker://${admin}`,
       upgradeRecoveryImageId: `docker://${admin}`,
       postgresImageId: `containerd://sha256:${'e'.repeat(64)}`,
@@ -135,6 +135,7 @@ test('offline audit rejects broken upgrade, ordering and image relationships', (
   report.database.upgradeRevisionCount = 1;
   report.ordering.upgradeRecoveryCompletedAt =
     '2026-08-14T07:59:59.000Z';
+  report.images.initialRecoveryImageId = `docker://${report.images.controlBuildId}`;
   report.runtime.imageIds = [`docker://sha256:${'9'.repeat(64)}`];
   report.gates.activePointerJsonUnchanged = false;
   const codes = validatePluginPackageRecoveryE2ELiveReport(report).findings.map(
@@ -142,6 +143,7 @@ test('offline audit rejects broken upgrade, ordering and image relationships', (
   );
   assert.ok(codes.includes('QL3_PLUGIN_RECOVERY_E2E_DATABASE'));
   assert.ok(codes.includes('QL3_PLUGIN_RECOVERY_E2E_ORDERING'));
+  assert.ok(codes.includes('QL3_PLUGIN_RECOVERY_E2E_IMAGES'));
   assert.ok(codes.includes('QL3_PLUGIN_RECOVERY_E2E_RUNTIME'));
   assert.ok(codes.includes('QL3_PLUGIN_RECOVERY_E2E_GATES'));
 });
