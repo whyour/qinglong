@@ -24,6 +24,9 @@ const { migrateLocalSqlitePath } = require('@qinglong/local-sqlite/migration');
 const {
   visitLegacyCrontabAdoptionInspections,
 } = require('../dist/legacy-adoption/legacyCrontabAdoption');
+const {
+  applyReconciliationAutomationDecision,
+} = require('../dist/legacy-adoption/reconciliationAutomationDecision');
 
 const REVIEWED_AT_MS = 1_760_000_000_000;
 const REVIEWER = Object.freeze({
@@ -442,19 +445,20 @@ test('publishes one reviewed legacy task set into the target atomically', async 
     authorizationDirectory,
     `${decisionId}.ndjson`,
   );
-  await publishReviewedLegacyCrontabAdoptionDecisionAuthorizationFile({
-    sourcePath: value.sourcePath,
-    profile: 'edge',
-    legacyTimezone: 'UTC',
-    expectedPlanDigest: plan.planDigest,
-    decisionId,
-    reviewer: REVIEWER,
-    issuedAtMs: REVIEWED_AT_MS,
-    expiresAtMs: REVIEWED_AT_MS + 10 * 60 * 1_000,
-    decisions: page.diagnostics.map(decisionFor),
-    authorizationPath,
-    keyProvider: authorizationKeyProvider(),
-  });
+  const authorization =
+    await publishReviewedLegacyCrontabAdoptionDecisionAuthorizationFile({
+      sourcePath: value.sourcePath,
+      profile: 'edge',
+      legacyTimezone: 'UTC',
+      expectedPlanDigest: plan.planDigest,
+      decisionId,
+      reviewer: REVIEWER,
+      issuedAtMs: REVIEWED_AT_MS,
+      expiresAtMs: REVIEWED_AT_MS + 10 * 60 * 1_000,
+      decisions: page.diagnostics.map(decisionFor),
+      authorizationPath,
+      keyProvider: authorizationKeyProvider(),
+    });
   await migrateLocalSqlitePath({
     databasePath: value.targetPath,
     profile: 'edge',
@@ -492,13 +496,42 @@ test('publishes one reviewed legacy task set into the target atomically', async 
       reviewerAuthorityChecks += 1;
     },
   };
-  const inserted = await publishReviewedLegacyCrontabAdoption(
-    publicationOptions,
-  );
+  const publicationSource = new DatabaseSync(value.sourcePath, {
+    readOnly: true,
+  });
+  let sourceIdentityChecks = 0;
+  const inserted = await applyReconciliationAutomationDecision({
+    authorizationPath,
+    decisionId,
+    profile: 'edge',
+    automationPlanDigest: plan.planDigest,
+    inventoryDigest: authorization.receipt.inventoryDigest,
+    sourceClient: publicationSource,
+    timezone: 'UTC',
+    keyProvider: authorizationKeyProvider(),
+    observedAtMs: REVIEWED_AT_MS + 1,
+    openRequirements: () =>
+      page.diagnostics.map((diagnostic) => ({
+        rowOrdinal: diagnostic.rowOrdinal,
+        sourceDigest: diagnostic.sourceDigest,
+        classification: diagnostic.classification,
+        requirement: 'review_adopt',
+      })),
+    targetPath: value.targetPath,
+    projectId: 'default',
+    mutationId,
+    requestId: 'reconciliation-automation-publication-test',
+    confirmSourceIdentity() {
+      sourceIdentityChecks += 1;
+    },
+    confirmReviewerAuthority: publicationOptions.confirmReviewerAuthority,
+  });
+  publicationSource.close();
   assert.equal(inserted.status, 'inserted');
   assert.equal(inserted.adoption.adoptedTaskCount, 1);
   assert.equal(inserted.adoption.adoptedTriggerCount, 1);
   assert.equal(reviewerAuthorityChecks, 2);
+  assert.equal(sourceIdentityChecks, 2);
   assert.equal(
     (await publishReviewedLegacyCrontabAdoption(publicationOptions)).status,
     'existing',

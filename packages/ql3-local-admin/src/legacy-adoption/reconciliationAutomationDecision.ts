@@ -3,6 +3,11 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { LocalSecretKeyProvider } from '@qinglong/runtime-core/local-secret';
 import type { SecurityPrincipal } from '@qinglong/runtime-core/security';
 import {
+  publishVerifiedLegacyCrontabAdoption,
+  type PublishReviewedLegacyCrontabAdoptionResult,
+  type PublishVerifiedLegacyCrontabAdoptionOptions,
+} from './legacyCrontabPublisher';
+import {
   publishLegacyCrontabDecisionAuthorizationFile,
   withVerifiedLegacyCrontabDecisionAuthorizationFile,
   type LegacyCrontabDecisionAuthorizationFileResult,
@@ -35,7 +40,7 @@ export interface ReconciliationAutomationDecisionIdentity {
   readonly inventoryDigest: string;
 }
 
-interface ReconciliationAutomationDecisionVerificationOptions
+export interface ReconciliationAutomationDecisionVerificationOptions
   extends ReconciliationAutomationDecisionIdentity {
   readonly authorizationPath: string;
   readonly sourceClient: DatabaseSync;
@@ -46,6 +51,13 @@ interface ReconciliationAutomationDecisionVerificationOptions
   readonly allowedModes?: readonly (0o400 | 0o600)[];
   readonly allowedParentModes?: readonly (0o500 | 0o700)[];
 }
+
+export interface ApplyReconciliationAutomationDecisionOptions
+  extends ReconciliationAutomationDecisionVerificationOptions,
+    Omit<
+      PublishVerifiedLegacyCrontabAdoptionOptions,
+      'sourceClient' | 'profile' | 'timezone'
+    > {}
 
 export interface IssueReconciliationAutomationDecisionOptions
   extends ReconciliationAutomationDecisionVerificationOptions {
@@ -408,4 +420,30 @@ export async function verifyReconciliationAutomationDecision(
     scope.confirmIdentity();
     return scope.result;
   });
+}
+
+export async function applyReconciliationAutomationDecision(
+  options: ApplyReconciliationAutomationDecisionOptions,
+): Promise<PublishReviewedLegacyCrontabAdoptionResult> {
+  return withVerifiedReconciliationAutomationDecision(options, (scope) =>
+    publishVerifiedLegacyCrontabAdoption(
+      {
+        sourceClient: options.sourceClient,
+        targetPath: options.targetPath,
+        profile: options.profile,
+        timezone: options.timezone,
+        projectId: options.projectId,
+        mutationId: options.mutationId,
+        requestId: options.requestId,
+        observedAtMs: options.observedAtMs,
+        confirmSourceIdentity: options.confirmSourceIdentity,
+        ...(options.confirmReviewerAuthority === undefined
+          ? {}
+          : {
+              confirmReviewerAuthority: options.confirmReviewerAuthority,
+            }),
+      },
+      scope,
+    ),
+  );
 }

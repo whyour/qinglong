@@ -48,6 +48,20 @@ export interface PublishReviewedLegacyCrontabAdoptionOptions {
   ) => void | Promise<void>;
 }
 
+export type PublishVerifiedLegacyCrontabAdoptionOptions = Pick<
+  PublishReviewedLegacyCrontabAdoptionOptions,
+  | 'sourceClient'
+  | 'targetPath'
+  | 'profile'
+  | 'timezone'
+  | 'projectId'
+  | 'mutationId'
+  | 'requestId'
+  | 'observedAtMs'
+  | 'confirmSourceIdentity'
+  | 'confirmReviewerAuthority'
+>;
+
 export class LegacyCrontabPublicationAuthorizationError extends Error {
   readonly code = 'LEGACY_CRONTAB_PUBLICATION_NOT_AUTHORIZED';
   constructor() {
@@ -65,7 +79,7 @@ export class LegacyCrontabPublicationUnavailableError extends Error {
 }
 
 function auditRecord(
-  options: PublishReviewedLegacyCrontabAdoptionOptions,
+  options: PublishVerifiedLegacyCrontabAdoptionOptions,
   scope: VerifiedLegacyCrontabDecisionAuthorizationFileScope,
   decision: Readonly<SecurityPolicyDecision> | null,
   outcome: SecurityAuditRecord['outcome'],
@@ -157,96 +171,114 @@ export async function publishReviewedLegacyCrontabAdoption(
           options.observedAtMs,
         ),
     },
-    async (scope) => {
-      options.confirmSourceIdentity();
-      await options.confirmReviewerAuthority?.(scope.result.receipt.reviewer);
-      const target = await openLocalSqliteAdoptionDatabase({
-        databasePath: options.targetPath,
-        profile: options.profile,
-      });
+    (scope) => publishVerifiedLegacyCrontabAdoption(options, scope),
+  );
+}
+
+export async function publishVerifiedLegacyCrontabAdoption(
+  options: PublishVerifiedLegacyCrontabAdoptionOptions,
+  scope: VerifiedLegacyCrontabDecisionAuthorizationFileScope,
+): Promise<PublishLocalLegacyAdoptionResult> {
+  if (
+    !options ||
+    typeof options !== 'object' ||
+    Array.isArray(options) ||
+    typeof options.confirmSourceIdentity !== 'function' ||
+    !scope ||
+    typeof scope !== 'object' ||
+    typeof scope.confirmIdentity !== 'function'
+  ) {
+    throw new LegacyCrontabPublicationUnavailableError(
+      'Verified Legacy publication scope is invalid',
+    );
+  }
+  options.confirmSourceIdentity();
+  await options.confirmReviewerAuthority?.(scope.result.receipt.reviewer);
+  const target = await openLocalSqliteAdoptionDatabase({
+    databasePath: options.targetPath,
+    profile: options.profile,
+  });
+  try {
+    const policy = new ProjectPolicyEngine(target.projectPolicy);
+    let decision: Readonly<SecurityPolicyDecision>;
+    try {
+      decision = await policy.authorize(
+        scope.result.receipt.reviewer,
+        options.projectId,
+        'project.manage',
+      );
+    } catch (error) {
+      if (!(error instanceof ProjectPolicyUnavailableError)) {
+        throw new LegacyCrontabPublicationUnavailableError();
+      }
       try {
-        const policy = new ProjectPolicyEngine(target.projectPolicy);
-        let decision: Readonly<SecurityPolicyDecision>;
-        try {
-          decision = await policy.authorize(
-            scope.result.receipt.reviewer,
-            options.projectId,
-            'project.manage',
-          );
-        } catch (error) {
-          if (!(error instanceof ProjectPolicyUnavailableError)) {
-            throw new LegacyCrontabPublicationUnavailableError();
-          }
-          try {
-            await target.securityAudit.record(
-              auditRecord(options, scope, null, 'authorization_unavailable', [
-                'policy_unavailable',
-              ]),
-            );
-          } catch {
-            throw new LegacyCrontabPublicationUnavailableError();
-          }
-          throw new LegacyCrontabPublicationUnavailableError();
-        }
-        if (decision.effect !== 'allow') {
-          try {
-            await target.securityAudit.record(
-              auditRecord(
-                options,
-                scope,
-                decision,
-                decision.effect === 'require_approval'
-                  ? 'approval_required'
-                  : 'denied',
-                decision.reasons,
-              ),
-            );
-          } catch {
-            throw new LegacyCrontabPublicationUnavailableError();
-          }
-          throw new LegacyCrontabPublicationAuthorizationError();
-        }
-        if (!decision.fence || decision.fence.bindingVersion === null) {
-          throw new LegacyCrontabPublicationUnavailableError();
-        }
-        return await target.publisher.publish({
-          mutationId: options.mutationId,
-          decisionId: scope.result.receipt.decisionId,
-          projectId: options.projectId,
-          profile: options.profile,
-          planDigest: scope.result.receipt.planDigest,
-          inventoryDigest: scope.result.receipt.inventoryDigest,
-          decisionDigest: scope.result.receipt.decisions.decisionDigest,
-          receiptDigest: scope.result.receipt.receiptDigest,
-          authorizationFileDigest: scope.result.file.fileDigest,
-          rowCount: scope.result.receipt.decisions.rowCount,
-          skippedCount: scope.result.receipt.decisions.dispositions.skip,
-          subject: scope.result.receipt.reviewer.subject,
-          fence: decision.fence,
-          audit: auditRecord(
+        await target.securityAudit.record(
+          auditRecord(options, scope, null, 'authorization_unavailable', [
+            'policy_unavailable',
+          ]),
+        );
+      } catch {
+        throw new LegacyCrontabPublicationUnavailableError();
+      }
+      throw new LegacyCrontabPublicationUnavailableError();
+    }
+    if (decision.effect !== 'allow') {
+      try {
+        await target.securityAudit.record(
+          auditRecord(
             options,
             scope,
             decision,
-            'allowed',
+            decision.effect === 'require_approval'
+              ? 'approval_required'
+              : 'denied',
             decision.reasons,
           ),
-          candidates: reviewedCandidates(
-            options.sourceClient,
-            options.timezone,
-            scope.decisions,
-          ),
-          async confirmExternalAuthority() {
-            options.confirmSourceIdentity();
-            scope.confirmIdentity();
-            await options.confirmReviewerAuthority?.(
-              scope.result.receipt.reviewer,
-            );
-          },
-          createdAtMs: options.observedAtMs,
-        });
-      } finally {
-        await target.close();
+        );
+      } catch {
+        throw new LegacyCrontabPublicationUnavailableError();
       }
-    },
-  );
+      throw new LegacyCrontabPublicationAuthorizationError();
+    }
+    if (!decision.fence || decision.fence.bindingVersion === null) {
+      throw new LegacyCrontabPublicationUnavailableError();
+    }
+    return await target.publisher.publish({
+      mutationId: options.mutationId,
+      decisionId: scope.result.receipt.decisionId,
+      projectId: options.projectId,
+      profile: options.profile,
+      planDigest: scope.result.receipt.planDigest,
+      inventoryDigest: scope.result.receipt.inventoryDigest,
+      decisionDigest: scope.result.receipt.decisions.decisionDigest,
+      receiptDigest: scope.result.receipt.receiptDigest,
+      authorizationFileDigest: scope.result.file.fileDigest,
+      rowCount: scope.result.receipt.decisions.rowCount,
+      skippedCount: scope.result.receipt.decisions.dispositions.skip,
+      subject: scope.result.receipt.reviewer.subject,
+      fence: decision.fence,
+      audit: auditRecord(
+        options,
+        scope,
+        decision,
+        'allowed',
+        decision.reasons,
+      ),
+      candidates: reviewedCandidates(
+        options.sourceClient,
+        options.timezone,
+        scope.decisions,
+      ),
+      async confirmExternalAuthority() {
+        options.confirmSourceIdentity();
+        scope.confirmIdentity();
+        await options.confirmReviewerAuthority?.(
+          scope.result.receipt.reviewer,
+        );
+      },
+      createdAtMs: options.observedAtMs,
+    });
+  } finally {
+    await target.close();
+  }
 }
