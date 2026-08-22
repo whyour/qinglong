@@ -4,8 +4,12 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const {
+  postgresqlMainMigrationStream,
+} = require('../packages/ql3-cluster-postgres/dist/migration/migration.js');
 
 const FIXTURE = 'qinglong/plugin-package-recovery-e2e-live-contract@v3';
+const MIGRATION_COUNT = postgresqlMainMigrationStream.migrations.length;
 const LIMITATIONS = Object.freeze([
   'isolated PostgreSQL uses explicit TLS disable; production manifests remain verify-full',
   'the authenticated HTTPS OCI Distribution fixture implements the immutable GET/referrers surface used by the resolver, not a production registry storage implementation',
@@ -269,7 +273,7 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
   ];
   if (
     !exactKeys(database, databaseKeys) ||
-    database?.migrationCount !== 65 ||
+    database?.migrationCount !== MIGRATION_COUNT ||
     database?.capabilityVersion !== 64 ||
     database?.initialState !== 'active' ||
     database?.upgradeState !== 'failed' ||
@@ -487,6 +491,7 @@ module.exports = {
   FIXTURE,
   GATE_KEYS,
   LIMITATIONS,
+  MIGRATION_COUNT,
   readPrivateReport,
   validatePluginPackageRecoveryE2ELiveReport,
 };

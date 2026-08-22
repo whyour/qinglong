@@ -14,6 +14,9 @@ const {
   REGISTRY_EVENT_SCHEMA,
   createFixture,
 } = require('./ql3-plugin-package-recovery-e2e-fixture.cjs');
+const {
+  MIGRATION_COUNT,
+} = require('./ql3-plugin-package-recovery-e2e-live-audit.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const FIXTURE_SCRIPT = path.join(
@@ -1283,7 +1286,7 @@ SELECT json_build_object(
     { capture: true, quiet: true },
   ).stdout;
   const value = JSON.parse(output);
-  assert.equal(value.migrationCount, 65);
+  assert.equal(value.migrationCount, MIGRATION_COUNT);
   assert.equal(value.capabilityVersion, 64);
   assert.equal(value.initialState, 'active');
   assert.equal(value.initialActiveLockDigest, fixture.initial.lock.lockDigest);

@@ -13,6 +13,7 @@ const producerPath = path.join(
 const {
   FIXTURE,
   GATE_KEYS,
+  MIGRATION_COUNT,
   readPrivateReport,
   validatePluginPackageRecoveryE2ELiveReport,
 } = require('../../scripts/ql3-plugin-package-recovery-e2e-live-audit.cjs');
@@ -62,7 +63,7 @@ function validReport() {
       activePointerUnchanged: true,
     },
     database: {
-      migrationCount: 65,
+      migrationCount: MIGRATION_COUNT,
       capabilityVersion: 64,
       initialState: 'active',
       initialActiveLockDigest: lock,
