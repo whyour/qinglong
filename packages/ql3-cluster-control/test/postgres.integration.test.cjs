@@ -66,6 +66,9 @@ const migrationConnectionString =
   process.env.QL3_TEST_POSTGRES_MIGRATION_URL ??
   process.env.QL3_TEST_POSTGRES_URL;
 const runtimeConnectionString = process.env.QL3_TEST_POSTGRES_RUNTIME_URL;
+const faultInjectionConnectionString =
+  process.env.QL3_TEST_POSTGRES_FAULT_INJECTION_URL ??
+  migrationConnectionString;
 const workerIngressConnectionString =
   process.env.QL3_TEST_POSTGRES_WORKER_INGRESS_URL;
 const mtlsFixtures = path.join(__dirname, 'fixtures', 'mtls');
@@ -1038,7 +1041,12 @@ if (!migrationConnectionString || !runtimeConnectionString) {
 
   test('terminating the active runtime backend withdraws admission without killing liveness', async () => {
     const openMigration = opener('migration', migrationConnectionString);
+    const openFaultInjector = opener(
+      'migration',
+      faultInjectionConnectionString,
+    );
     const migration = await openMigration();
+    const faultInjector = await openFaultInjector();
     let application;
     let reactivatedApplication;
     try {
@@ -1082,7 +1090,7 @@ if (!migrationConnectionString || !runtimeConnectionString) {
         body: { status: 'ready' },
       });
 
-      const backend = await migration.pool.query(
+      const backend = await faultInjector.pool.query(
         `SELECT pid
            FROM pg_stat_activity
           WHERE application_name = 'ql3-cluster-availability-integration'
@@ -1092,7 +1100,7 @@ if (!migrationConnectionString || !runtimeConnectionString) {
       );
       assert.equal(backend.rowCount, 1);
       const terminatedBackendPid = backend.rows[0].pid;
-      const terminated = await migration.pool.query(
+      const terminated = await faultInjector.pool.query(
         'SELECT pg_terminate_backend($1) AS terminated',
         [terminatedBackendPid],
       );
@@ -1119,7 +1127,7 @@ if (!migrationConnectionString || !runtimeConnectionString) {
         await probeRequest(reactivatedApplication.address, '/readyz'),
         { status: 200, body: { status: 'ready' } },
       );
-      const replacementBackend = await migration.pool.query(
+      const replacementBackend = await faultInjector.pool.query(
         `SELECT pid
            FROM pg_stat_activity
           WHERE application_name = 'ql3-cluster-availability-integration'
@@ -1132,6 +1140,7 @@ if (!migrationConnectionString || !runtimeConnectionString) {
     } finally {
       await application?.stop();
       await reactivatedApplication?.stop();
+      await faultInjector.close();
       await migration.close();
     }
   });

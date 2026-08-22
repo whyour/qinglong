@@ -987,6 +987,7 @@ jobs:
         env:
           QL3_TEST_POSTGRES_MIGRATION_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract
           QL3_TEST_POSTGRES_RUNTIME_URL: postgresql://ql3_runtime:ql3_runtime_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_FAULT_INJECTION_URL: postgresql://postgres:postgres@127.0.0.1:5432/ql3_contract
           QL3_TEST_POSTGRES_WORKER_INGRESS_URL: postgresql://ql3_worker_ingress:ql3_worker_ingress_test@127.0.0.1:5432/ql3_contract
         run: node --test packages/ql3-cluster-control/test/postgres.integration.test.cjs
       - name: Test optional AI invocation and price catalog against isolated roles
