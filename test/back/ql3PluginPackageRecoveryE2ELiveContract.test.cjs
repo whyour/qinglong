@@ -243,6 +243,8 @@ test('private Registry evidence uses one exact Secret file and authenticated req
   assert.match(live, /secretName: 'ql3-e2e-registry-auth'/);
   assert.match(live, /defaultMode: 288/);
   assert.match(live, /authentication: 'exact-registry-basic'/);
+  assert.match(live, /fixture\.initial\.routes\.length \* 2/);
+  assert.match(live, /fixture\.upgrade\.routes\.length \* 2/);
   assert.match(
     live,
     /packageRequests\.every\(\(event\) => event\.authenticated === true\)/,

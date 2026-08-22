@@ -313,11 +313,11 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
     ]) ||
     oci?.https !== true ||
     oci?.authentication !== 'exact-registry-basic' ||
-    oci?.authenticatedRequestCount !== 12 ||
-    oci?.requestCount !== 12 ||
+    oci?.authenticatedRequestCount !== 24 ||
+    oci?.requestCount !== 24 ||
     oci?.uniquePaths !== 12 ||
-    oci?.initialRequestCount !== 6 ||
-    oci?.upgradeRequestCount !== 6 ||
+    oci?.initialRequestCount !== 12 ||
+    oci?.upgradeRequestCount !== 12 ||
     oci?.redirects !== 0
   ) {
     findings.push(

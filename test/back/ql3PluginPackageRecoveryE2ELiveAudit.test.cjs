@@ -82,11 +82,11 @@ function validReport() {
     oci: {
       https: true,
       authentication: 'exact-registry-basic',
-      authenticatedRequestCount: 12,
-      requestCount: 12,
+      authenticatedRequestCount: 24,
+      requestCount: 24,
       uniquePaths: 12,
-      initialRequestCount: 6,
-      upgradeRequestCount: 6,
+      initialRequestCount: 12,
+      upgradeRequestCount: 12,
       redirects: 0,
     },
     kubernetes: {

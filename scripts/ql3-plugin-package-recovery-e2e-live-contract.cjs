@@ -1358,8 +1358,14 @@ function registryEvidence(fixture) {
     .filter((value) => value.schema === REGISTRY_EVENT_SCHEMA);
   const packageRequests = events.filter((event) => event.path !== '/v2/');
   const expectedPaths = [
-    ...fixture.initial.routes.map((routeValue) => routeValue.path),
-    ...fixture.upgrade.routes.map((routeValue) => routeValue.path),
+    ...fixture.initial.routes.flatMap((routeValue) => [
+      routeValue.path,
+      routeValue.path,
+    ]),
+    ...fixture.upgrade.routes.flatMap((routeValue) => [
+      routeValue.path,
+      routeValue.path,
+    ]),
   ].sort();
   assert.equal(packageRequests.length, expectedPaths.length);
   assert.deepEqual(
@@ -1374,8 +1380,8 @@ function registryEvidence(fixture) {
     authenticatedRequestCount: packageRequests.length,
     requestCount: packageRequests.length,
     uniquePaths: new Set(packageRequests.map((event) => event.path)).size,
-    initialRequestCount: fixture.initial.routes.length,
-    upgradeRequestCount: fixture.upgrade.routes.length,
+    initialRequestCount: fixture.initial.routes.length * 2,
+    upgradeRequestCount: fixture.upgrade.routes.length * 2,
     redirects: 0,
   });
 }
