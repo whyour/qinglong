@@ -84,6 +84,7 @@ export interface LocalServiceManagerCutoverDependencies {
   readonly procRoot?: string;
   readonly now?: () => number;
   readonly wait?: (milliseconds: number) => Promise<void>;
+  readonly afterRecordPublished?: () => void;
 }
 
 interface AdoptedBinding {
@@ -736,16 +737,28 @@ function replayResult(
 ): Readonly<LocalServiceManagerCutoverConsumeResult> | undefined {
   if (intent.lineage.mode !== 'adopted') return undefined;
   const state = desiredState(intent, outcome);
-  const recordPath = localServiceManagerCutoverRecordPath(intent, state);
-  if (!fs.existsSync(recordPath)) return undefined;
+  const candidatePaths = [
+    localServiceManagerCutoverRecordPath(intent, state),
+    ...(state === 'manual_required'
+      ? []
+      : [localServiceManagerCutoverRecordPath(intent, 'manual_required')]),
+  ].filter((candidate) => fs.existsSync(candidate));
+  if (candidatePaths.length === 0) return undefined;
+  if (candidatePaths.length !== 1) {
+    configurationError('service manager cutover replay is ambiguous');
+  }
   const record = normalizeLocalServiceManagerCutoverRecord(
-    readPrivateLocalCommandFile(recordPath),
+    readPrivateLocalCommandFile(candidatePaths[0]!),
   );
-  const head = readLocalCutoverInstanceHead(
+  let head = readLocalCutoverInstanceHead(
     intent.deployment.root,
     intent.instanceId,
     currentIdentity().uid,
   );
+  const completionFence =
+    intent.schemaVersion === 2 && intent.lineage.mode === 'adopted'
+      ? intent.lineage.completionFence
+      : undefined;
   const stoppedCaptureProgress =
     record.state === 'target_stopped' &&
     (head.state === 'reconciliation_capture_prepared' ||
@@ -759,16 +772,57 @@ function replayResult(
       head.state === 'reconciliation_automation_planned' ||
       head.state === 'reconciliation_automation_decision_prepared' ||
       head.state === 'reconciliation_automation_reviewed');
+  const completionRestartPendingHead =
+    (record.state === 'target_active' || record.state === 'manual_required') &&
+    completionFence !== undefined &&
+    record.schemaVersion === 3 &&
+    record.evidence.completionFence?.expectedInstanceHeadDigest ===
+      completionFence.expectedInstanceHeadDigest &&
+    record.evidence.completionFence.expectedCompletionDigest ===
+      completionFence.expectedCompletionDigest &&
+    head.state === 'reconciliation_completed' &&
+    head.headDigest === completionFence.expectedInstanceHeadDigest &&
+    head.sourceRecordDigest === completionFence.expectedCompletionDigest;
   if (
     record.actionId !== intent.actionId ||
     record.intentDigest !== intent.intentDigest ||
     record.evidence.managerOutcomeDigest !== outcome.outcomeDigest ||
+    record.profile !== intent.profile ||
+    record.instanceId !== intent.instanceId ||
+    record.activationDigest !== intent.lineage.expectedActivationDigest ||
+    record.generation !== intent.lineage.generation ||
+    record.previousRecordDigest !== intent.lineage.previousRecordDigest ||
     head.cutoverId !== intent.lineage.cutoverId ||
-    head.generation !== intent.lineage.generation ||
-    (!stoppedCaptureProgress && head.state !== record.state) ||
-    (!stoppedCaptureProgress && head.sourceRecordDigest !== record.recordDigest)
+    head.generation !==
+      (completionRestartPendingHead
+        ? intent.lineage.generation - 1
+        : intent.lineage.generation) ||
+    (!stoppedCaptureProgress &&
+      !completionRestartPendingHead &&
+      head.state !== record.state) ||
+    (!stoppedCaptureProgress &&
+      !completionRestartPendingHead &&
+      head.sourceRecordDigest !== record.recordDigest)
   ) {
     configurationError('service manager cutover replay drifted');
+  }
+  if (completionRestartPendingHead) {
+    head = advanceLocalCutoverInstanceHead(
+      {
+        options: { deploymentRoot: intent.deployment.root },
+        request: {
+          cutoverId: intent.lineage.cutoverId,
+          profile: intent.profile,
+          instanceId: intent.instanceId,
+          expectedActivationDigest: intent.lineage.expectedActivationDigest,
+          requestedAtMs: record.completedAtMs,
+        },
+      },
+      currentIdentity().uid,
+      record.state,
+      intent.lineage.generation,
+      record.recordDigest,
+    );
   }
   return Object.freeze({
     schemaVersion: 1 as const,
@@ -895,6 +949,12 @@ export async function consumeLocalServiceManagerCutoverOutcome(
     shutdownReceiptDigest,
     processIdentityDigest,
     manualReason,
+    ...(intent.schemaVersion === 2 &&
+    intent.lineage.completionFence !== undefined
+      ? {
+          completionFence: intent.lineage.completionFence,
+        }
+      : {}),
   });
   const record = localServiceManagerCutoverRecord(
     intent,
@@ -907,6 +967,7 @@ export async function consumeLocalServiceManagerCutoverOutcome(
     record,
     identity.uid,
   );
+  dependencies.afterRecordPublished?.();
   const head = advanceLocalCutoverInstanceHead(
     {
       options: { deploymentRoot: intent.deployment.root },

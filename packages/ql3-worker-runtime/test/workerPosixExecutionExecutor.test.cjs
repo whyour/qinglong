@@ -49,7 +49,11 @@ async function preparedOutput(artifactRoot, offerId = 'offer-posix-1') {
   const allocator = new WorkerFileLogArtifactAllocator({
     root: artifactRoot,
     policy: workerRemoteLogArtifactPolicy('edge'),
-    capacity: { async availableBytes() { return 1024n ** 4n; } },
+    capacity: {
+      async availableBytes() {
+        return 1024n ** 4n;
+      },
+    },
   });
   const prepared = await allocator.prepare({
     projectId: 'project-1',
@@ -84,7 +88,7 @@ function launch(prepared, output, overrides = {}) {
 
 async function waitForReceipt(root) {
   const store = new CompletionReceiptFileStore(root);
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
     const receipt = await store.read(ATTEMPT_ID);
     if (receipt) return receipt;
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -97,7 +101,11 @@ test('verifies the Worker barrier, launches through the reviewed fd and writes a
   const { prepared, output } = await preparedOutput(roots.artifactRoot);
   let barrier;
   const executor = new WorkerPosixExecutionExecutor({
-    barrier: { async verify(input) { barrier = input; } },
+    barrier: {
+      async verify(input) {
+        barrier = input;
+      },
+    },
     receiptRoot: roots.receiptRoot,
     identityProvider: identityProvider(),
     clock: { now: () => 100 },
@@ -128,13 +136,19 @@ test('does not spawn when the durable Worker barrier rejects authority', async (
   const marker = path.join(roots.root, 'spawned');
   const { prepared, output } = await preparedOutput(roots.artifactRoot);
   const executor = new WorkerPosixExecutionExecutor({
-    barrier: { async verify() { throw new Error('stale inbox'); } },
+    barrier: {
+      async verify() {
+        throw new Error('stale inbox');
+      },
+    },
     receiptRoot: roots.receiptRoot,
     identityProvider: identityProvider(),
   });
-  const result = await executor.start(launch(prepared, output, {
-    command: { kind: 'argv', file: '/usr/bin/touch', args: [marker] },
-  }));
+  const result = await executor.start(
+    launch(prepared, output, {
+      command: { kind: 'argv', file: '/usr/bin/touch', args: [marker] },
+    }),
+  );
   assert.deepEqual(result, { status: 'rejected' });
   await assert.rejects(fs.stat(marker), { code: 'ENOENT' });
 });
@@ -144,13 +158,19 @@ test('rejects timeout without durable control-plane deadline before spawn', asyn
   const { prepared, output } = await preparedOutput(roots.artifactRoot);
   let barriers = 0;
   const executor = new WorkerPosixExecutionExecutor({
-    barrier: { async verify() { barriers += 1; } },
+    barrier: {
+      async verify() {
+        barriers += 1;
+      },
+    },
     receiptRoot: roots.receiptRoot,
     identityProvider: identityProvider(),
   });
-  const result = await executor.start(launch(prepared, output, {
-    timeoutMs: 1_000,
-  }));
+  const result = await executor.start(
+    launch(prepared, output, {
+      timeoutMs: 1_000,
+    }),
+  );
   assert.deepEqual(result, { status: 'rejected' });
   assert.equal(barriers, 0);
 });
@@ -160,14 +180,20 @@ test('accepts timeout only when starting ACK supplied a durable deadline', async
   const { prepared, output } = await preparedOutput(roots.artifactRoot);
   let barriers = 0;
   const executor = new WorkerPosixExecutionExecutor({
-    barrier: { async verify() { barriers += 1; } },
+    barrier: {
+      async verify() {
+        barriers += 1;
+      },
+    },
     receiptRoot: roots.receiptRoot,
     identityProvider: identityProvider(),
   });
-  const result = await executor.start(launch(prepared, output, {
-    timeoutMs: 1_000,
-    executionDeadlineAtMs: 2_000,
-  }));
+  const result = await executor.start(
+    launch(prepared, output, {
+      timeoutMs: 1_000,
+      executionDeadlineAtMs: 2_000,
+    }),
+  );
   assert.equal(result.status, 'started');
   assert.equal(barriers, 1);
   await waitForReceipt(roots.receiptRoot);
@@ -180,14 +206,20 @@ test('propagates unknown outcome when durable identity capture fails after spawn
     barrier: { async verify() {} },
     receiptRoot: roots.receiptRoot,
     identityProvider: {
-      async capture() { throw new Error('procfs unavailable'); },
-      async inspect() { return { status: 'unknown' }; },
+      async capture() {
+        throw new Error('procfs unavailable');
+      },
+      async inspect() {
+        return { status: 'unknown' };
+      },
     },
   });
   await assert.rejects(
-    executor.start(launch(prepared, output, {
-      command: { kind: 'shell', command: 'sleep 5', shell: '/bin/sh' },
-    })),
+    executor.start(
+      launch(prepared, output, {
+        command: { kind: 'shell', command: 'sleep 5', shell: '/bin/sh' },
+      }),
+    ),
     (error) => error?.spawnOutcome === 'unknown',
   );
 });

@@ -403,6 +403,110 @@ async function stopAdoptedTarget(state, suffix = '031') {
   return { stoppedResult, head };
 }
 
+async function completeStoppedServiceTarget(state, suffix = '061') {
+  const active = prepare(
+    state,
+    1,
+    'install-enable-start',
+    state.commitmentDigest,
+    `123e4567-e89b-42d3-a456-426614174${suffix}`,
+  );
+  publishOutcome(active, 'install-enable-start', 'active', 6123, 1786416000200);
+  const startupReceiptDigest = publishReceipt(state, 6123, '100061');
+  const activeResult = await consumeLocalServiceManagerCutoverOutcome(
+    consumeCommand(state, active),
+    { procRoot: state.procRoot },
+  );
+  const stopped = prepare(
+    state,
+    1,
+    'stop',
+    activeResult.recordDigest,
+    `123e4567-e89b-42d3-a456-426614174${String(Number(suffix) + 1).padStart(
+      3,
+      '0',
+    )}`,
+  );
+  publishOutcome(stopped, 'stop', 'stopped', 0, 1786416000300);
+  publishShutdownReceipt(state, 6123, '100061', startupReceiptDigest);
+  fs.rmSync(path.join(state.procRoot, '6123'), {
+    recursive: true,
+    force: true,
+  });
+  const stoppedResult = await consumeLocalServiceManagerCutoverOutcome(
+    consumeCommand(state, stopped),
+    { procRoot: state.procRoot },
+  );
+  const states = [
+    'reconciliation_capture_prepared',
+    'reconciliation_captured',
+    'reconciliation_plan_prepared',
+    'reconciliation_planned',
+    'reconciliation_review_prepared',
+    'reconciliation_reviewed',
+    'reconciliation_application_prepared',
+    'reconciliation_application_planned',
+    'reconciliation_completed',
+  ];
+  let completedHead;
+  for (const [index, nextState] of states.entries()) {
+    completedHead = advanceLocalCutoverInstanceHead(
+      {
+        options: { deploymentRoot: state.root },
+        request: {
+          cutoverId: state.cutoverId,
+          profile: 'edge',
+          instanceId: 'edge-router-1',
+          expectedActivationDigest: state.activationDigest,
+          requestedAtMs: 1786416000400 + index,
+        },
+      },
+      process.getuid(),
+      nextState,
+      1,
+      index === states.length - 1
+        ? sha256('service-manager-completion-receipt')
+        : sha256(`service-manager-${nextState}`),
+    );
+  }
+  return { activeResult, stoppedResult, completedHead };
+}
+
+function prepareCompletionRestart(
+  state,
+  previousRecordDigest,
+  completedHead,
+  actionId,
+  lineageOverrides = {},
+) {
+  return prepareLocalServiceManagerIntent({
+    schemaVersion: 2,
+    operation: 'local.deployment.service-manager.intent.prepare',
+    options: {
+      deploymentRoot: state.root,
+      allowRootService: process.getuid() === 0,
+    },
+    request: {
+      actionId,
+      action: 'restart',
+      serviceKind: 'systemd',
+      lineage: {
+        mode: 'adopted',
+        cutoverId: state.cutoverId,
+        generation: 2,
+        expectedActivationDigest: state.activationDigest,
+        previousRecordDigest,
+        completionFence: {
+          expectedInstanceHeadDigest: completedHead.headDigest,
+          expectedCompletionDigest: completedHead.sourceRecordDigest,
+        },
+        ...lineageOverrides,
+      },
+      requestedAtMs: 1786416000600,
+    },
+  });
+}
+
 function rollbackPrepareCommand(state, stoppedResult, head) {
   return {
     schemaVersion: 1,
@@ -644,6 +748,165 @@ test('restart cannot reuse the previous generation startup receipt', async (t) =
     process.getuid(),
   );
   assert.equal(head.state, 'manual_required');
+});
+
+test('restarts a completed service lineage with dual evidence and replays record-first response loss', async (t) => {
+  const state = fixture(t);
+  const { activeResult, completedHead } = await completeStoppedServiceTarget(
+    state,
+  );
+  const restart = prepareCompletionRestart(
+    state,
+    activeResult.recordDigest,
+    completedHead,
+    '123e4567-e89b-42d3-a456-426614174063',
+  );
+  publishOutcome(restart, 'restart', 'active', 7123, 1786416000700);
+  const startupReceiptDigest = publishReceipt(state, 7123, '100063');
+  const command = consumeCommand(state, restart);
+  let injected = false;
+  await assert.rejects(
+    () =>
+      consumeLocalServiceManagerCutoverOutcome(command, {
+        procRoot: state.procRoot,
+        afterRecordPublished() {
+          if (!injected) {
+            injected = true;
+            throw new Error('simulated service record response loss');
+          }
+        },
+      }),
+    /simulated service record response loss/,
+  );
+  const pendingHead = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(pendingHead.state, 'reconciliation_completed');
+  assert.equal(pendingHead.headDigest, completedHead.headDigest);
+
+  const record = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        state.root,
+        'service',
+        'cutovers',
+        state.cutoverId,
+        'service-manager-g02-active.json',
+      ),
+      'utf8',
+    ),
+  );
+  assert.equal(record.schemaVersion, 3);
+  assert.equal(record.evidence.startupReceiptDigest, startupReceiptDigest);
+  assert.deepEqual(record.evidence.completionFence, {
+    expectedInstanceHeadDigest: completedHead.headDigest,
+    expectedCompletionDigest: completedHead.sourceRecordDigest,
+  });
+
+  const replay = await consumeLocalServiceManagerCutoverOutcome(command, {
+    procRoot: state.procRoot,
+  });
+  assert.equal(replay.status, 'existing');
+  assert.equal(replay.state, 'target_active');
+  const activeHead = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(activeHead.state, 'target_active');
+  assert.equal(activeHead.generation, 2);
+  assert.equal(activeHead.sourceRecordDigest, replay.recordDigest);
+});
+
+test('rejects completed service restart without both the prior record and exact completion head', async (t) => {
+  const state = fixture(t);
+  const { activeResult, completedHead } = await completeStoppedServiceTarget(
+    state,
+    '071',
+  );
+  assert.throws(
+    () =>
+      prepare(
+        state,
+        2,
+        'restart',
+        activeResult.recordDigest,
+        '123e4567-e89b-42d3-a456-426614174073',
+      ),
+    /lost the instance lineage compare-and-swap/,
+  );
+  assert.throws(
+    () =>
+      prepareCompletionRestart(
+        state,
+        activeResult.recordDigest,
+        completedHead,
+        '123e4567-e89b-42d3-a456-426614174074',
+        {
+          completionFence: {
+            expectedInstanceHeadDigest: completedHead.headDigest,
+            expectedCompletionDigest: '0'.repeat(64),
+          },
+        },
+      ),
+    /completion restart lost the instance head compare-and-swap/,
+  );
+  assert.throws(
+    () =>
+      prepareCompletionRestart(
+        state,
+        '0'.repeat(64),
+        completedHead,
+        '123e4567-e89b-42d3-a456-426614174075',
+      ),
+    /completion restart lost the previous active record/,
+  );
+  const unchanged = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(unchanged.headDigest, completedHead.headDigest);
+  assert.equal(unchanged.state, 'reconciliation_completed');
+});
+
+test('terminalizes and replays a completed service restart without a new startup receipt', async (t) => {
+  const state = fixture(t);
+  const { activeResult, completedHead } = await completeStoppedServiceTarget(
+    state,
+    '081',
+  );
+  const restart = prepareCompletionRestart(
+    state,
+    activeResult.recordDigest,
+    completedHead,
+    '123e4567-e89b-42d3-a456-426614174083',
+  );
+  publishOutcome(restart, 'restart', 'active', 8123, 1786416000700);
+  let clock = 0;
+  const command = consumeCommand(state, restart);
+  const result = await consumeLocalServiceManagerCutoverOutcome(command, {
+    procRoot: state.procRoot,
+    now: () => clock,
+    wait: async (milliseconds) => {
+      clock += milliseconds;
+    },
+  });
+  assert.equal(result.state, 'manual_required');
+  const terminal = readLocalCutoverInstanceHead(
+    state.root,
+    'edge-router-1',
+    process.getuid(),
+  );
+  assert.equal(terminal.state, 'manual_required');
+  assert.equal(terminal.sourceRecordDigest, result.recordDigest);
+  const replay = await consumeLocalServiceManagerCutoverOutcome(command, {
+    procRoot: state.procRoot,
+  });
+  assert.equal(replay.status, 'existing');
+  assert.equal(replay.state, 'manual_required');
 });
 
 test('stop advances only after the exact receipted process identity disappears', async (t) => {

@@ -109,6 +109,21 @@
   `268 total / 261 pass / 7 conditional skip / 0 fail`、18-package clean build/逐包测试、dependency/package boundary `70/70` 和 122-module Edge
   import audit 已通过；其余六个领域的 terminal adapter、Service Manager v2 binding、完整 target readiness/restart 演练和 Cluster 自有 completion
   authority 仍是后续门禁。
+- D-395/ADR-0489（已接受）：systemd/OpenRC 不再因 v1 `previousRecordDigest` 同时承担历史 service record 与 current head source 两种含义而永久拒绝
+  completed restart。Service Manager intent 新增严格版本化 schema v2，且只允许 adopted generation ≥ 2 的 `restart`：保留
+  `previousRecordDigest` 精确绑定上一代 active record，并以 `completionFence.expectedInstanceHeadDigest|expectedCompletionDigest` 同时绑定当前
+  `reconciliation_completed` head 和 completion receipt digest。Owner 在 intent publish 前及 root outcome consume 后都重验 head，并打开上一代 active
+  record 复验 Profile、instance、activation、generation 与 record digest；v1 completed restart、缺字段、额外字段、旧 record、stale head、时间倒序全部失败关闭。
+
+  v2 产生的 service cutover record 使用 schema v3 显式保存双谱系证据；发布仍为 record-first、head-second。record publish 后响应丢失时，重放只有在
+  v3 record、intent、manager outcome、completed head 和 completion fence 全部一致时才 CAS 到下一代 `target_active`，不重复 root manager mutation，也不接受
+  上一代 startup receipt。新 receipt 或进程 identity 无法证明时，从 completed head 窄化为 `manual_required` 并可 exact replay。旧 v1 intent、普通 active
+  restart 和 v1/v2 journal 保持原语义，没有静默升级。实现全部留在既有 Local Owner Service Manager 子域，没有新增 package、`src/` 根平铺、dependency、
+  SQL、daemon、timer、watcher、listener、Pool 或 Cluster workload；Cluster restart/completion 仍需独立事务与 HA evidence。focused 组合门为
+  `75 total / 73 pass / 2 conditional Docker skip / 0 fail`，完整 Local Owner 为 `271 total / 264 pass / 7 conditional Docker skip / 0 fail`，18-package
+  clean build/逐包测试为 `2917 total / 2895 pass / 22 conditional integration skip / 0 fail`；package/dependency boundary `70/70`、122-module Edge import audit
+  与 18-package non-shallow 边界保持通过。本机 root service bridge Docker 门因 Docker Desktop `ENOSPC` 条件跳过且未清理用户匿名卷，必须由同一提交的远程
+  fresh runner root/non-root 门补齐。
 - D-392/ADR-0485（已接受）：D-391 的 signed review 不能直接获得通用 DML authority；表级 `adopt_legacy/retain_both` 也不能证明
   Automation 行级 command/trigger 兼容，更不能覆盖 Secret custody、append-only history、Plugin/AI 外部资产与 Identity/Policy 语义。
   因此既有 Local Owner 新增 `reconciliation.application.prepare|commit|verify`，以

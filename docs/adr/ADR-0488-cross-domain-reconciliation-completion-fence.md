@@ -51,7 +51,7 @@ receipt publish、seal、head advance 或 backup collection 任一响应丢失�
 
 Docker target authority 继续拒绝 `reconciliation_application_planned`、`reconciliation_automation_applied` 和所有 manual/rolled-back 中间态；只有 `reconciliation_completed` 能重新进入 `target_active`，且调用方必须使用下一 generation。
 
-Service Manager 虽然复用同一个 head assertion，但既有 v1 intent 只绑定 prior service journal `previousRecordDigest`，没有独立的 expected completion-head digest；其后续 compare-and-swap 因而继续拒绝 completed head。D-394 不通过忽略该比较来伪造兼容性。systemd/OpenRC 的 restart-ready 必须由后续 v2 intent 同时绑定 prior service record 与 exact completion head 后才能开放。
+Service Manager 虽然复用同一个 head assertion，但既有 v1 intent 只绑定 prior service journal `previousRecordDigest`，没有独立的 expected completion-head digest；其后续 compare-and-swap 因而继续拒绝 completed head。D-394 不通过忽略该比较来伪造兼容性。该后续边界现由 D-395/ADR-0489 的 v2 intent 完成：systemd/OpenRC 必须同时绑定 prior service record、exact completion head 与 completion digest 才能获得 restart-ready authority；v1 仍失败关闭。
 
 ### 5. 部署规模与代码边界
 
@@ -84,4 +84,4 @@ Service Manager 虽然复用同一个 head assertion，但既有 v1 intent 只�
 - 完整 Local Owner `268 total / 261 pass / 7 conditional skip / 0 fail`；18-package clean build 与逐包测试 exit 0。
 - dependency/package boundary 组合门 `70/70`，Edge import audit 为 122 modules、0 forbidden；workspace 保持 18 packages、无 single-source/shallow package；Local Owner 为 `172 source / 171 nested / 1 root binary entry`。
 - 不新增 production dependency、SQL migration、daemon、timer、watcher、listener、Pool、PostgreSQL role/ACL 或 cluster workload。
-- Secret/Config、Run History、Plugin Package、AI/Tool、Identity/Policy/Audit、Unknown 的 terminal adapter，以及 Service Manager v2 completion-head binding/真实 restart 演练仍是后续工作；D-394 不把尚未实现的领域或部署方式宣称为完成。
+- Secret/Config、Run History、Plugin Package、AI/Tool、Identity/Policy/Audit、Unknown 的 terminal adapter，以及固定真实 systemd/OpenRC completed restart 演练仍是后续工作；Service Manager v2 completion-head binding 已由 D-395/ADR-0489 完成，D-394 本身不倒填该结论。

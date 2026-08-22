@@ -27,10 +27,14 @@ export type LocalServiceManagerIntentLineage =
       generation: number;
       expectedActivationDigest: string;
       previousRecordDigest: string;
+      completionFence?: Readonly<{
+        expectedInstanceHeadDigest: string;
+        expectedCompletionDigest: string;
+      }>;
     }>;
 
 export interface LocalServiceManagerIntent {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly kind: 'qinglong3-local-service-manager-intent';
   readonly actionId: string;
   readonly action: LocalServiceManagerAction;
@@ -169,7 +173,10 @@ function safeInteger(value: unknown, label: string, maximum: number): number {
   return value as number;
 }
 
-function normalizedLineage(value: unknown): LocalServiceManagerIntentLineage {
+function normalizedLineage(
+  value: unknown,
+  schemaVersion: 1 | 2,
+): LocalServiceManagerIntentLineage {
   const lineage = object(value, 'lineage');
   if (lineage.mode === 'fresh') {
     exact(lineage, ['mode'], 'lineage');
@@ -179,6 +186,7 @@ function normalizedLineage(value: unknown): LocalServiceManagerIntentLineage {
     lineage,
     [
       'cutoverId',
+      ...(schemaVersion === 2 ? ['completionFence'] : []),
       'expectedActivationDigest',
       'generation',
       'mode',
@@ -186,6 +194,17 @@ function normalizedLineage(value: unknown): LocalServiceManagerIntentLineage {
     ],
     'lineage',
   );
+  const completionFence =
+    schemaVersion === 2
+      ? object(lineage.completionFence, 'completion fence')
+      : undefined;
+  if (completionFence !== undefined) {
+    exact(
+      completionFence,
+      ['expectedCompletionDigest', 'expectedInstanceHeadDigest'],
+      'completion fence',
+    );
+  }
   if (
     lineage.mode !== 'adopted' ||
     typeof lineage.cutoverId !== 'string' ||
@@ -196,7 +215,12 @@ function normalizedLineage(value: unknown): LocalServiceManagerIntentLineage {
     typeof lineage.expectedActivationDigest !== 'string' ||
     !DIGEST_PATTERN.test(lineage.expectedActivationDigest) ||
     typeof lineage.previousRecordDigest !== 'string' ||
-    !DIGEST_PATTERN.test(lineage.previousRecordDigest)
+    !DIGEST_PATTERN.test(lineage.previousRecordDigest) ||
+    (completionFence !== undefined &&
+      (typeof completionFence.expectedInstanceHeadDigest !== 'string' ||
+        !DIGEST_PATTERN.test(completionFence.expectedInstanceHeadDigest) ||
+        typeof completionFence.expectedCompletionDigest !== 'string' ||
+        !DIGEST_PATTERN.test(completionFence.expectedCompletionDigest)))
   ) {
     configurationError('adopted lineage is invalid');
   }
@@ -206,6 +230,16 @@ function normalizedLineage(value: unknown): LocalServiceManagerIntentLineage {
     generation: lineage.generation as number,
     expectedActivationDigest: lineage.expectedActivationDigest,
     previousRecordDigest: lineage.previousRecordDigest,
+    ...(completionFence === undefined
+      ? {}
+      : {
+          completionFence: Object.freeze({
+            expectedInstanceHeadDigest:
+              completionFence.expectedInstanceHeadDigest as string,
+            expectedCompletionDigest:
+              completionFence.expectedCompletionDigest as string,
+          }),
+        }),
   });
 }
 
@@ -297,9 +331,12 @@ export function normalizeLocalServiceManagerIntent(
       : '/etc/init.d/qinglong3';
   const expectedSourceMode = service.kind === 'systemd' ? 0o600 : 0o700;
   const expectedDestinationMode = service.kind === 'systemd' ? 0o644 : 0o755;
-  const lineage = normalizedLineage(intent.lineage);
+  if (intent.schemaVersion !== 1 && intent.schemaVersion !== 2) {
+    configurationError('service manager intent schema version is invalid');
+  }
+  const schemaVersion = intent.schemaVersion;
+  const lineage = normalizedLineage(intent.lineage, schemaVersion);
   if (
-    intent.schemaVersion !== 1 ||
     intent.kind !== 'qinglong3-local-service-manager-intent' ||
     typeof intent.actionId !== 'string' ||
     !UUID_V4_PATTERN.test(intent.actionId) ||
@@ -336,20 +373,27 @@ export function normalizeLocalServiceManagerIntent(
   }
   if (
     lineage.mode === 'adopted' &&
-    ((lineage.generation === 1 &&
-      intent.action !== 'install-enable-start' &&
-      intent.action !== 'start' &&
-      intent.action !== 'stop') ||
-      (lineage.generation >= 2 &&
-        intent.action !== 'restart' &&
-        intent.action !== 'stop'))
+    (schemaVersion === 2
+      ? lineage.generation < 2 || intent.action !== 'restart'
+      : (lineage.generation === 1 &&
+          intent.action !== 'install-enable-start' &&
+          intent.action !== 'start' &&
+          intent.action !== 'stop') ||
+        (lineage.generation >= 2 &&
+          intent.action !== 'restart' &&
+          intent.action !== 'stop'))
   ) {
     configurationError(
       'service manager action does not match the adopted generation',
     );
   }
+  if (schemaVersion === 2 && lineage.mode !== 'adopted') {
+    configurationError(
+      'service manager v2 intent requires adopted completion lineage',
+    );
+  }
   const payload = Object.freeze({
-    schemaVersion: 1 as const,
+    schemaVersion,
     kind: 'qinglong3-local-service-manager-intent' as const,
     actionId: intent.actionId,
     action: intent.action,

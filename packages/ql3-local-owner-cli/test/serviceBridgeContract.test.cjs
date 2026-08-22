@@ -92,6 +92,32 @@ test('normalizes exact systemd fresh and OpenRC adopted intents', () => {
     ),
   });
   assert.deepEqual(normalizeLocalServiceManagerIntent(openrc), openrc);
+
+  const completedRestart = intent({
+    schemaVersion: 2,
+    actionId: '123e4567-e89b-42d3-a456-426614174003',
+    action: 'restart',
+    lineage: {
+      mode: 'adopted',
+      cutoverId: 'router-edge-1-cutover',
+      generation: 2,
+      expectedActivationDigest: 'c'.repeat(64),
+      previousRecordDigest: 'd'.repeat(64),
+      completionFence: {
+        expectedInstanceHeadDigest: '1'.repeat(64),
+        expectedCompletionDigest: '2'.repeat(64),
+      },
+    },
+    outcomePath: path.join(
+      '/opt/qinglong3',
+      'service/service-manager-outcomes',
+      '123e4567-e89b-42d3-a456-426614174003.json',
+    ),
+  });
+  assert.deepEqual(
+    normalizeLocalServiceManagerIntent(completedRestart),
+    completedRestart,
+  );
 });
 
 test('rejects arbitrary destinations, root drift, digest drift and unknown fields', () => {
@@ -125,6 +151,30 @@ test('rejects arbitrary destinations, root drift, digest drift and unknown field
         generation: 2,
         expectedActivationDigest: 'c'.repeat(64),
         previousRecordDigest: 'd'.repeat(64),
+      },
+    }),
+    intent({
+      schemaVersion: 2,
+      action: 'restart',
+      lineage: {
+        mode: 'adopted',
+        cutoverId: 'router-edge-1-cutover',
+        generation: 2,
+        expectedActivationDigest: 'c'.repeat(64),
+        previousRecordDigest: 'd'.repeat(64),
+      },
+    }),
+    intent({
+      lineage: {
+        mode: 'adopted',
+        cutoverId: 'router-edge-1-cutover',
+        generation: 2,
+        expectedActivationDigest: 'c'.repeat(64),
+        previousRecordDigest: 'd'.repeat(64),
+        completionFence: {
+          expectedInstanceHeadDigest: '1'.repeat(64),
+          expectedCompletionDigest: '2'.repeat(64),
+        },
       },
     }),
   ]) {

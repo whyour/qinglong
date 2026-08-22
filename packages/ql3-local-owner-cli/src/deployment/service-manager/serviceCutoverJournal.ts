@@ -33,11 +33,15 @@ export interface LocalServiceManagerCutoverEvidence {
   readonly shutdownReceiptDigest: string | null;
   readonly processIdentityDigest: string | null;
   readonly manualReason: string | null;
+  readonly completionFence?: Readonly<{
+    expectedInstanceHeadDigest: string;
+    expectedCompletionDigest: string;
+  }>;
 }
 
 export interface LocalServiceManagerCutoverRecord {
   readonly schema: typeof SCHEMA;
-  readonly schemaVersion: 1 | 2;
+  readonly schemaVersion: 1 | 2 | 3;
   readonly actionId: string;
   readonly action: LocalServiceManagerAction;
   readonly state: LocalServiceManagerCutoverState;
@@ -145,6 +149,7 @@ export function localServiceManagerCutoverRecord(
     evidence,
     'legacyDataApplicationReceiptDigest',
   );
+  const hasCompletionFence = Object.hasOwn(evidence, 'completionFence');
   if (
     hasCommitDigest !== hasReceiptDigest ||
     (hasCommitDigest &&
@@ -153,9 +158,25 @@ export function localServiceManagerCutoverRecord(
   ) {
     configurationError('legacy data application evidence is incomplete');
   }
+  if (
+    hasCompletionFence !== (intent.schemaVersion === 2) ||
+    (hasCompletionFence &&
+      (intent.lineage.mode !== 'adopted' ||
+        intent.lineage.completionFence === undefined ||
+        evidence.completionFence?.expectedInstanceHeadDigest !==
+          intent.lineage.completionFence.expectedInstanceHeadDigest ||
+        evidence.completionFence?.expectedCompletionDigest !==
+          intent.lineage.completionFence.expectedCompletionDigest))
+  ) {
+    configurationError('service manager completion evidence is incomplete');
+  }
   const payload = Object.freeze({
     schema: SCHEMA,
-    schemaVersion: hasCommitDigest ? (2 as const) : (1 as const),
+    schemaVersion: hasCompletionFence
+      ? (3 as const)
+      : hasCommitDigest
+      ? (2 as const)
+      : (1 as const),
     actionId: intent.actionId,
     action: intent.action,
     state,
@@ -213,6 +234,12 @@ export function normalizeLocalServiceManagerCutoverRecord(
             'legacyDataApplicationCommitDigest',
             'legacyDataApplicationReceiptDigest',
           ]
+        : record.schemaVersion === 3
+        ? [
+            'completionFence',
+            'legacyDataApplicationCommitDigest',
+            'legacyDataApplicationReceiptDigest',
+          ]
         : []),
       'manualReason',
       'processIdentityDigest',
@@ -226,9 +253,22 @@ export function normalizeLocalServiceManagerCutoverRecord(
     candidate === null ||
     (typeof candidate === 'string' && DIGEST_PATTERN.test(candidate));
   const { recordDigest, ...payload } = record;
+  const completionFence =
+    record.schemaVersion === 3
+      ? object(evidence.completionFence, 'service manager completion evidence')
+      : undefined;
+  if (completionFence !== undefined) {
+    exact(
+      completionFence,
+      ['expectedCompletionDigest', 'expectedInstanceHeadDigest'],
+      'service manager completion evidence',
+    );
+  }
   if (
     record.schema !== SCHEMA ||
-    (record.schemaVersion !== 1 && record.schemaVersion !== 2) ||
+    (record.schemaVersion !== 1 &&
+      record.schemaVersion !== 2 &&
+      record.schemaVersion !== 3) ||
     typeof record.actionId !== 'string' ||
     (record.action !== 'install-enable-start' &&
       record.action !== 'start' &&
@@ -244,6 +284,8 @@ export function normalizeLocalServiceManagerCutoverRecord(
     !DIGEST_PATTERN.test(record.activationDigest) ||
     !Number.isSafeInteger(record.generation) ||
     (record.generation as number) < 1 ||
+    (record.schemaVersion === 3 &&
+      (record.action !== 'restart' || (record.generation as number) < 2)) ||
     typeof record.previousRecordDigest !== 'string' ||
     !DIGEST_PATTERN.test(record.previousRecordDigest) ||
     typeof record.intentDigest !== 'string' ||
@@ -264,11 +306,16 @@ export function normalizeLocalServiceManagerCutoverRecord(
     !DIGEST_PATTERN.test(evidence.commitmentDigest) ||
     typeof evidence.targetDataIdentityDigest !== 'string' ||
     !DIGEST_PATTERN.test(evidence.targetDataIdentityDigest) ||
-    (record.schemaVersion === 2 &&
+    ((record.schemaVersion === 2 || record.schemaVersion === 3) &&
       (!nullableDigest(evidence.legacyDataApplicationCommitDigest) ||
         !nullableDigest(evidence.legacyDataApplicationReceiptDigest) ||
         (evidence.legacyDataApplicationCommitDigest === null) !==
           (evidence.legacyDataApplicationReceiptDigest === null))) ||
+    (completionFence !== undefined &&
+      (typeof completionFence.expectedInstanceHeadDigest !== 'string' ||
+        !DIGEST_PATTERN.test(completionFence.expectedInstanceHeadDigest) ||
+        typeof completionFence.expectedCompletionDigest !== 'string' ||
+        !DIGEST_PATTERN.test(completionFence.expectedCompletionDigest))) ||
     !nullableDigest(evidence.startupReceiptDigest) ||
     !nullableDigest(evidence.shutdownReceiptDigest) ||
     !nullableDigest(evidence.processIdentityDigest) ||

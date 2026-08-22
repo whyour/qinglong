@@ -34,6 +34,7 @@ import {
   normalizeLocalServiceManagerOutcome,
   type LocalServiceManagerOutcome,
 } from './serviceOutcomeContract';
+import { readLocalServiceManagerActiveRecord } from './serviceCutoverJournal';
 
 const MAX_PATH_BYTES = 4_096;
 const MAX_DESCRIPTOR_BYTES = 64 * 1024;
@@ -43,7 +44,7 @@ const UUID_V4_PATTERN =
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 
 export interface LocalServiceManagerIntentPrepareCommand {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly operation: 'local.deployment.service-manager.intent.prepare';
   readonly options: Readonly<{
     deploymentRoot: string;
@@ -454,6 +455,39 @@ function assertIntentLineageHead(
     }),
     uid,
   );
+  if (intent.schemaVersion === 2) {
+    if (
+      intent.action !== 'restart' ||
+      intent.lineage.completionFence === undefined ||
+      head.state !== 'reconciliation_completed' ||
+      head.generation !== intent.lineage.generation - 1 ||
+      head.headDigest !==
+        intent.lineage.completionFence.expectedInstanceHeadDigest ||
+      head.sourceRecordDigest !==
+        intent.lineage.completionFence.expectedCompletionDigest ||
+      intent.requestedAtMs < head.updatedAtMs
+    ) {
+      configurationError(
+        'service manager completion restart lost the instance head compare-and-swap',
+      );
+    }
+    const previous = readLocalServiceManagerActiveRecord(
+      intent.deployment.root,
+      intent.lineage.cutoverId,
+      intent.lineage.generation - 1,
+    );
+    if (
+      previous.recordDigest !== intent.lineage.previousRecordDigest ||
+      previous.profile !== intent.profile ||
+      previous.instanceId !== intent.instanceId ||
+      previous.activationDigest !== intent.lineage.expectedActivationDigest
+    ) {
+      configurationError(
+        'service manager completion restart lost the previous active record',
+      );
+    }
+    return;
+  }
   const expected =
     intent.action === 'restart'
       ? Object.freeze({
@@ -495,7 +529,7 @@ function normalizePrepareCommand(
     'request',
   );
   if (
-    command.schemaVersion !== 1 ||
+    (command.schemaVersion !== 1 && command.schemaVersion !== 2) ||
     command.operation !== 'local.deployment.service-manager.intent.prepare' ||
     typeof request.actionId !== 'string' ||
     !UUID_V4_PATTERN.test(request.actionId) ||
@@ -510,7 +544,7 @@ function normalizePrepareCommand(
     configurationError('service manager intent command is invalid');
   }
   return Object.freeze({
-    schemaVersion: 1 as const,
+    schemaVersion: command.schemaVersion,
     operation: 'local.deployment.service-manager.intent.prepare' as const,
     options: Object.freeze({
       deploymentRoot: safeAbsolutePath(
@@ -576,7 +610,7 @@ export function prepareLocalServiceManagerIntent(
     const application = parseApplicationIdentity(applicationBytes);
     const payload: Omit<LocalServiceManagerIntent, 'intentDigest'> =
       Object.freeze({
-        schemaVersion: 1 as const,
+        schemaVersion: command.schemaVersion,
         kind: 'qinglong3-local-service-manager-intent' as const,
         actionId: command.request.actionId,
         action: command.request.action,

@@ -474,6 +474,7 @@ export function advanceLocalCutoverInstanceHead(
     (state === 'manual_required' &&
       (current.state === 'legacy_stopped' ||
         current.state === 'target_active' ||
+        current.state === 'reconciliation_completed' ||
         current.state === 'rollback_prepared' ||
         current.state === 'legacy_restart_requested'));
   if (!allowed)
