@@ -43,6 +43,14 @@ test('accepts the exact AI-excluded local application image contract', () => {
   const report = auditLocalImageContract(root);
   assert.equal(report.compatible, true);
   assert.deepEqual(report.findings, []);
+  assert.equal(
+    report.nodeImage,
+    'node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436',
+  );
+  assert.equal(
+    report.buildNodeImage,
+    'node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d',
+  );
   assert.deepEqual(report.runtimePackages, [
     '@qinglong/local-admin',
     '@qinglong/local-application',
@@ -55,6 +63,30 @@ test('accepts the exact AI-excluded local application image contract', () => {
     'croner',
     'semver',
   ]);
+});
+
+test('rejects a mutable runtime base image', () => {
+  const current = fixture();
+  try {
+    const dockerfilePath = path.join(current.target, 'Dockerfile');
+    const dockerfile = fs.readFileSync(dockerfilePath, 'utf8');
+    fs.writeFileSync(
+      dockerfilePath,
+      dockerfile.replace(
+        '@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436',
+        '',
+      ),
+    );
+    const report = auditLocalImageContract(current.root);
+    assert.equal(report.compatible, false);
+    assert.ok(
+      report.findings.some(
+        ({ code }) => code === 'BASE_IMAGE_NOT_EXACTLY_PINNED',
+      ),
+    );
+  } finally {
+    current.close();
+  }
 });
 
 test('rejects a mutable or build-argument-controlled base image', () => {

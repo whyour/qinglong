@@ -409,13 +409,15 @@ test('keeps Prompt output active-key rotation caller-driven and least privilege'
 });
 
 test('rejects mutable or overridable Cluster image bases', () => {
-  const digest =
+  const buildDigest =
     '@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d';
+  const runtimeDigest =
+    '@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436';
   const control = auditClusterDeployment({
     root: ROOT,
     readFile: intercept(
       'deploy/containers/ql3-cluster-control/Dockerfile',
-      (source) => source.replace(digest, ''),
+      (source) => source.replace(buildDigest, ''),
     ),
   });
   assert.equal(control.compatible, false);
@@ -432,7 +434,7 @@ test('rejects mutable or overridable Cluster image bases', () => {
       'deploy/containers/ql3-cluster-admin/Dockerfile',
       (source) =>
         `ARG NODE_IMAGE=node:24.18.0-bookworm-slim\n${source.replaceAll(
-          `node:24.18.0-bookworm-slim${digest}`,
+          `node:24.18.0-bookworm-slim${buildDigest}`,
           '${NODE_IMAGE}',
         )}`,
     ),
@@ -442,6 +444,21 @@ test('rejects mutable or overridable Cluster image bases', () => {
     admin.findings.some(
       ({ code }) =>
         code === 'QL3_CLUSTER_ADMIN_DOCKERFILE_BASE_IMAGE_NOT_PINNED',
+    ),
+    true,
+  );
+
+  const runtimeControl = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/containers/ql3-cluster-control/Dockerfile',
+      (source) => source.replace(runtimeDigest, ''),
+    ),
+  });
+  assert.equal(runtimeControl.compatible, false);
+  assert.equal(
+    runtimeControl.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_DOCKERFILE_BASE_IMAGE_NOT_PINNED',
     ),
     true,
   );

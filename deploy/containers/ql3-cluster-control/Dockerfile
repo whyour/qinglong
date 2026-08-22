@@ -89,7 +89,7 @@ COPY --from=workspace-ai /workspace/packages/ql3-ai/dist \
 COPY --from=workspace-ai /workspace/packages/ql3-cluster-control/dist \
   node_modules/@qinglong/cluster-control/dist
 
-FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runtime-base
+FROM node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436 AS runtime-base
 
 ARG SOURCE_REVISION=uncommitted
 

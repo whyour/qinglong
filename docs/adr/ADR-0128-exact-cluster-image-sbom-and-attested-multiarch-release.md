@@ -11,8 +11,9 @@
 > ADR-0196 已把该供应链扩展为 `control|admin|local` 三个 profile，并将唯一
 > 发布入口迁移到 `.github/workflows/ql3-image-release.yml`。本 ADR 以下
 > control/admin 数字保留为建立该机制时的历史证据。ADR-0254 随后删除 control/admin 可覆盖的
-> `NODE_IMAGE` build arg，将两个 build/runtime stage 与 local 一起固定到同一 Node 多架构 digest，并增加六矩阵
-> OS vulnerability pre-publish gate。
+> `NODE_IMAGE` build arg，并增加跨架构 OS vulnerability pre-publish gate。2026-08-22 的 ADR-0254 修订进一步把
+> build stage 保留在固定 Bookworm digest、runtime stage 切到零 HIGH/CRITICAL 的固定 Alpine 3.23 digest，覆盖
+> `control|control-ai|admin|local|worker` 十个 native image。
 
 ## 背景
 

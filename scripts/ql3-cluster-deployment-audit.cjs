@@ -517,8 +517,10 @@ function assertExactExternalClosure(readFile, root, findings) {
 }
 
 function assertDockerfile(readFile, root, findings) {
-  const pinnedNodeBase =
+  const pinnedBuildNodeBase =
     'node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d';
+  const pinnedRuntimeNodeBase =
+    'node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436';
   const dockerfile = readFile(
     path.join(root, 'deploy/containers/ql3-cluster-control/Dockerfile'),
     'utf8',
@@ -596,11 +598,16 @@ function assertDockerfile(readFile, root, findings) {
       ),
     );
   }
-  if (dockerfile.split(`FROM ${pinnedNodeBase}`).length - 1 !== 2) {
+  if (
+    !dockerfile.includes(
+      `FROM ${pinnedBuildNodeBase} AS dependency-manifest`,
+    ) ||
+    !dockerfile.includes(`FROM ${pinnedRuntimeNodeBase} AS runtime-base`)
+  ) {
     findings.push(
       finding(
         'QL3_CLUSTER_DOCKERFILE_BASE_IMAGE_NOT_PINNED',
-        'Cluster control build and runtime stages must use the exact immutable Node base digest',
+        'Cluster control build and runtime stages must use their exact immutable Node base digests',
       ),
     );
   }
@@ -652,11 +659,16 @@ function assertDockerfile(readFile, root, findings) {
       );
     }
   }
-  if (adminDockerfile.split(`FROM ${pinnedNodeBase}`).length - 1 !== 2) {
+  if (
+    !adminDockerfile.includes(
+      `FROM ${pinnedBuildNodeBase} AS dependency-manifest`,
+    ) ||
+    !adminDockerfile.includes(`FROM ${pinnedRuntimeNodeBase} AS runtime`)
+  ) {
     findings.push(
       finding(
         'QL3_CLUSTER_ADMIN_DOCKERFILE_BASE_IMAGE_NOT_PINNED',
-        'Cluster admin build and runtime stages must use the exact immutable Node base digest',
+        'Cluster admin build and runtime stages must use their exact immutable Node base digests',
       ),
     );
   }

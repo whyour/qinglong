@@ -6,8 +6,10 @@ const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const IMAGE_DIRECTORY = 'deploy/containers/ql3-local-application';
 const QL3_VERSION = readReleaseIdentity(path.resolve(__dirname, '..')).version;
-const NODE_IMAGE =
+const BUILD_NODE_IMAGE =
   'node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d';
+const RUNTIME_NODE_IMAGE =
+  'node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436';
 const BUILD_DEPENDENCIES = Object.freeze({
   croner: '7.0.8',
   'drizzle-orm': '1.0.0-rc.4',
@@ -169,14 +171,26 @@ function counts(values) {
 }
 
 function auditDockerfile(contents, findings) {
-  const exactBasePattern = new RegExp(
-    `^FROM ${NODE_IMAGE.replace(
-      /[.*+?^${}()|[\]\\]/g,
-      '\\$&',
-    )} AS (?:dependency-manifest|runtime)$`,
+  const escapedBuildNodeImage = BUILD_NODE_IMAGE.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&',
+  );
+  const escapedRuntimeNodeImage = RUNTIME_NODE_IMAGE.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&',
+  );
+  const exactBuildBasePattern = new RegExp(
+    `^FROM ${escapedBuildNodeImage} AS dependency-manifest$`,
     'gm',
   );
-  if ([...contents.matchAll(exactBasePattern)].length !== 2) {
+  const exactRuntimeBasePattern = new RegExp(
+    `^FROM ${escapedRuntimeNodeImage} AS runtime$`,
+    'gm',
+  );
+  if (
+    [...contents.matchAll(exactBuildBasePattern)].length !== 1 ||
+    [...contents.matchAll(exactRuntimeBasePattern)].length !== 1
+  ) {
     addFinding(findings, 'BASE_IMAGE_NOT_EXACTLY_PINNED');
   }
   if (/(?:^|\n)\s*ARG\s+NODE_IMAGE\b/.test(contents)) {
@@ -323,7 +337,8 @@ function auditLocalImageContract(root) {
   return Object.freeze({
     schemaVersion: 1,
     image: 'local-application',
-    nodeImage: NODE_IMAGE,
+    nodeImage: RUNTIME_NODE_IMAGE,
+    buildNodeImage: BUILD_NODE_IMAGE,
     runtimePackages: Object.freeze(
       [
         ...RUNTIME_PACKAGES.map((name) => `@qinglong/${name.slice(4)}`),

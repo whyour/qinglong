@@ -78,6 +78,7 @@ const dockerfile = fs.readFileSync(
 );
 for (const required of [
   'node:24.18.0-bookworm-slim@sha256:',
+  'node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436',
   'npm ci --omit=dev --ignore-scripts',
   'packages/ql3-runtime-core',
   'packages/ql3-local-process',
