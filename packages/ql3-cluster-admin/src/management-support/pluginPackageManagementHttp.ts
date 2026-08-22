@@ -122,6 +122,20 @@ const MAX_AUTHORIZATION_BYTES = 16 * 1024;
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const CONTROL_PATTERN = /[\u0000-\u001f\u007f]/;
 
+function tlsPemBlocks(
+  bytes: Buffer,
+  label: 'CERTIFICATE' | 'X509 CRL',
+): Buffer[] {
+  const pattern = new RegExp(
+    `-----BEGIN ${label}-----[\\s\\S]*?-----END ${label}-----`,
+    'g',
+  );
+  const value = bytes.toString('utf8');
+  const matches = value.match(pattern);
+  if (!matches || value.replace(pattern, '').trim() !== '') return [bytes];
+  return matches.map((match) => Buffer.from(`${match}\n`, 'utf8'));
+}
+
 export interface ClusterPluginPackageManagementHttpLimits {
   readonly maxBodyBytes?: number;
   readonly maxConnections?: number;
@@ -742,6 +756,18 @@ export async function startClusterPluginPackageManagementHttp(
   const createRequestId = options.createRequestId ?? randomUUID;
   const clientCertificateRequired =
     options.tls.clientCertificateAuthority !== undefined;
+  const clientTrust = clientCertificateRequired
+    ? {
+        ca: tlsPemBlocks(
+          options.tls.clientCertificateAuthority as Buffer,
+          'CERTIFICATE',
+        ),
+        crl: tlsPemBlocks(
+          options.tls.clientCertificateRevocationList as Buffer,
+          'X509 CRL',
+        ),
+      }
+    : undefined;
   const rateLimiter = new BoundedRateLimiter(limits, now);
   let availability: 'ready' | 'unavailable' | 'stopped' = 'ready';
   let inFlight = 0;
@@ -755,12 +781,7 @@ export async function startClusterPluginPackageManagementHttp(
       minVersion: 'TLSv1.3',
       maxVersion: 'TLSv1.3',
       honorCipherOrder: true,
-      ...(clientCertificateRequired
-        ? {
-            ca: options.tls.clientCertificateAuthority,
-            crl: options.tls.clientCertificateRevocationList,
-          }
-        : {}),
+      ...(clientTrust ?? {}),
       requestCert: clientCertificateRequired,
       // Health probes intentionally remain reachable without a client
       // certificate. Every non-health route checks TLSSocket.authorized before

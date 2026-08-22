@@ -47,13 +47,21 @@ const REVOKED_CLIENT_CRL = resolve(
   __dirname,
   '../../ql3-cluster-control/test/fixtures/mtls/revoked-client-crl.pem',
 );
+const NEXT_CLIENT_CA = resolve(
+  __dirname,
+  'fixtures/next-client-ca-cert.pem',
+);
+const NEXT_CLIENT_CRL = resolve(
+  __dirname,
+  'fixtures/next-client-empty-crl.pem',
+);
 const NEXT_CLIENT_CERT = resolve(
   __dirname,
-  'fixtures/management-service-cert.pem',
+  'fixtures/next-client-cert.pem',
 );
 const NEXT_CLIENT_KEY = resolve(
   __dirname,
-  'fixtures/management-service-key.pem',
+  'fixtures/next-client-key.pem',
 );
 const WORKER_PATH = '/api/v3/worker-credentials/management';
 const CANONICAL_WORKER_PATH = '/api/v3/workers/management';
@@ -171,7 +179,11 @@ async function health(application, path) {
   });
 }
 
-async function startWithClientTrust(certificateAuthority, execute) {
+async function startWithClientTrust(
+  certificateAuthority,
+  certificateRevocationList,
+  execute,
+) {
   return startClusterWorkerCredentialManagementHttp({
     host: '127.0.0.1',
     port: 0,
@@ -179,7 +191,7 @@ async function startWithClientTrust(certificateAuthority, execute) {
       privateKey: Buffer.from(readFileSync(SERVER_KEY)),
       certificate: Buffer.from(readFileSync(SERVER_CERT)),
       clientCertificateAuthority: certificateAuthority,
-      clientCertificateRevocationList: Buffer.from(readFileSync(EMPTY_CRL)),
+      clientCertificateRevocationList: certificateRevocationList,
     },
     identities: identities(),
     transport: { execute },
@@ -402,9 +414,12 @@ test('accepts both client CAs during overlap then rejects the retired CA', async
     stale: false,
   });
   const oldAuthority = Buffer.from(readFileSync(CLIENT_CA));
-  const nextAuthority = Buffer.from(readFileSync(NEXT_CLIENT_CERT));
+  const nextAuthority = Buffer.from(readFileSync(NEXT_CLIENT_CA));
+  const oldRevocationList = Buffer.from(readFileSync(EMPTY_CRL));
+  const nextRevocationList = Buffer.from(readFileSync(NEXT_CLIENT_CRL));
   const overlap = await startWithClientTrust(
     Buffer.concat([oldAuthority, nextAuthority]),
+    Buffer.concat([oldRevocationList, nextRevocationList]),
     execute,
   );
   try {
@@ -423,7 +438,11 @@ test('accepts both client CAs during overlap then rejects the retired CA', async
     await overlap.close();
   }
 
-  const retired = await startWithClientTrust(nextAuthority, execute);
+  const retired = await startWithClientTrust(
+    nextAuthority,
+    nextRevocationList,
+    execute,
+  );
   try {
     assert.equal((await request(retired)).statusCode, 401);
     assert.equal(

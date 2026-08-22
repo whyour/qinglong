@@ -26,16 +26,10 @@ jobs:
         include:
           - runner: ubuntu-24.04
             arch: x64
-            node: '20'
-          - runner: ubuntu-24.04
-            arch: x64
-            node: '24'
+            node: '24.18.0'
           - runner: ubuntu-24.04-arm
             arch: arm64
-            node: '20'
-          - runner: ubuntu-24.04-arm
-            arch: arm64
-            node: '24'
+            node: '24.18.0'
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -48,12 +42,18 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Verify native runner architecture
         run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Initialize the public test environment
+        run: cp .env.example .env
+      - name: Rebuild the reviewed native SQLite binding
+        run: pnpm rebuild @whyour/sqlite3
+      - name: Build backend and QL3 workspace from source
+        run: |
+          pnpm build:back
+          pnpm run build:packages:ql3
       - name: Test backend migrations
         run: pnpm test:back
-      - name: Build backend
-        run: pnpm build:back
       - name: Audit edge dependency and import isolation
         run: |
           pnpm audit:edge-imports:ql3
@@ -62,14 +62,12 @@ jobs:
       - name: Smoke benchmark edge executor
         run: pnpm benchmark:edge -- --json
       - name: Prove disabled AI Profile has zero storage or credential reachability
-        if: matrix.node == '24'
         run: >-
           pnpm benchmark:ai-profile --
           --json
           --max-rss-delta-mb=8
           --max-disabled-activation-ms=50
       - name: Benchmark Node SQLite transaction boundary
-        if: matrix.node == '24'
         run: >-
           pnpm benchmark:db:node-sqlite --
           --json
@@ -106,6 +104,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install workspace dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build the complete local test fixture workspace
+        run: pnpm run build:packages:ql3
       - name: Build and test Local Owner product closure
         run: pnpm --filter @qinglong/local-owner-cli test
       - name: Audit root bridge static import closure
@@ -138,6 +138,8 @@ jobs:
         run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
       - name: Install workspace dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Rebuild the reviewed native SQLite binding
+        run: pnpm rebuild @whyour/sqlite3
       - name: Build benchmark targets once
         run: |
           pnpm build:back
@@ -536,9 +538,16 @@ jobs:
             target: runtime
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
       - uses: actions/setup-node@v6
         with:
           node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Verify native runner architecture
         run: node -e "if (process.arch !== '${{ matrix.node_arch }}') throw new Error('unexpected architecture ' + process.arch)"
       - name: Test exact SBOM and release contract failures
@@ -731,11 +740,18 @@ jobs:
             target: runtime
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
       - uses: actions/setup-node@v6
         with:
           node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Test bounded OCI layout audit failures
         run: node --test test/back/ql3ClusterOciLayoutAudit.test.cjs
       - name: Build an attested amd64 and arm64 OCI layout
@@ -784,6 +800,8 @@ jobs:
         run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
       - name: Install workspace dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Initialize the public test environment
+        run: cp .env.example .env
       - name: Audit profile dependency boundaries
         run: |
           pnpm audit:edge-imports:ql3
@@ -1002,6 +1020,8 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Audit exact cluster dependency graph
         run: pnpm audit:cluster-dependencies:ql3
+      - name: Build QL3 workspace once
+        run: pnpm run build:packages:ql3
       - name: Rotate PostgreSQL TLS trust through overlap and rollback
         run: pnpm test:postgres-tls-rotation:ql3
       - name: Fence the old primary, promote the standby and reactivate two controls
@@ -1105,6 +1125,8 @@ jobs:
           echo "f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88  cnpg-1.30.0.yaml" | sha256sum --check
       - name: Install workspace dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build QL3 workspace once
+        run: pnpm run build:packages:ql3
       - name: Audit the static provider credential test deployment
         run: pnpm audit:provider-credential-test-deployment:ql3
       - name: Prove eight isolated Jobs, material and CIDR rotation, and database failover
@@ -1203,9 +1225,9 @@ jobs:
           QL3_KIND_CLUSTER: ql3-plugin-recovery-e2e-ci
         run: |
           install -d -m 0700 "${RUNNER_TEMP}/ql3-plugin-package-recovery-e2e"
-          pnpm test:plugin-package-recovery-e2e:ql3 -- \
+          pnpm test:plugin-package-recovery-e2e:ql3 \
             --report="${RUNNER_TEMP}/ql3-plugin-package-recovery-e2e/report.json"
-          pnpm audit:plugin-package-recovery-e2e:ql3 -- \
+          pnpm audit:plugin-package-recovery-e2e:ql3 \
             --report="${RUNNER_TEMP}/ql3-plugin-package-recovery-e2e/report.json"
       - name: Upload Plugin Package recovery E2E evidence
         if: always()

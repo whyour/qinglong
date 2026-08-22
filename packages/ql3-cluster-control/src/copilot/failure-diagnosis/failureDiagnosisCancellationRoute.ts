@@ -1,11 +1,5 @@
 // Cluster Copilot resolves an external request key before cancelling its Run.
 import {
-  CopilotFailureDiagnosisCancellationNotFoundError,
-  CopilotFailureDiagnosisCancellationUnavailableError,
-  InvalidCopilotFailureDiagnosisCancellationError,
-  type CopilotFailureDiagnosisCancellationCommand,
-} from '@qinglong/ai/failure-diagnosis-cancellation';
-import {
   CLUSTER_RUN_CANCELLATION_SCHEMA,
   ClusterRunCancellationFenceRejectedError,
   ClusterRunCancellationNotFoundError,
@@ -13,6 +7,10 @@ import {
   InvalidClusterRunCancellationError,
   parseClusterRunCancellationRequestBody,
 } from '@qinglong/runtime-core/cluster-run-cancellation';
+import type {
+  SecurityPolicyFence,
+  SecuritySubject,
+} from '@qinglong/runtime-core/security';
 
 import type { ClusterControlAdmissionResponse } from '../../transport/httpSurface';
 import type {
@@ -33,9 +31,19 @@ export const CLUSTER_CONTROL_COPILOT_FAILURE_DIAGNOSIS_CANCELLATION_ROUTE =
     projectParameter: 'projectId',
   });
 
+export interface ClusterCopilotFailureDiagnosisCancellationCommand {
+  readonly projectId: string;
+  readonly sourceRunId: string;
+  readonly requestId: string;
+  readonly mutationId: string;
+  readonly eventId: string;
+  readonly subject: Readonly<SecuritySubject>;
+  readonly policyFence: Readonly<SecurityPolicyFence>;
+}
+
 export interface ClusterCopilotFailureDiagnosisCancellationCapability {
   cancel(
-    command: Readonly<CopilotFailureDiagnosisCancellationCommand>,
+    command: Readonly<ClusterCopilotFailureDiagnosisCancellationCommand>,
   ): Promise<unknown>;
 }
 
@@ -53,6 +61,14 @@ const CANCEL_REASONS = new Set([
   'reconcile',
   'timeout',
 ]);
+
+function hasFailureCode(error: unknown, code: string): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as Error & { readonly code?: unknown }).code === code
+  );
+}
 
 function response(
   statusCode: number,
@@ -228,7 +244,10 @@ export function createClusterControlCopilotFailureDiagnosisCancellationRoute(
         return response(view.status === 'accepted' ? 202 : 200, view);
       } catch (error) {
         if (
-          error instanceof CopilotFailureDiagnosisCancellationNotFoundError ||
+          hasFailureCode(
+            error,
+            'COPILOT_FAILURE_DIAGNOSIS_CANCELLATION_NOT_FOUND',
+          ) ||
           error instanceof ClusterRunCancellationNotFoundError
         ) {
           return response(404, {
@@ -242,9 +261,14 @@ export function createClusterControlCopilotFailureDiagnosisCancellationRoute(
           });
         }
         if (
-          error instanceof InvalidCopilotFailureDiagnosisCancellationError ||
-          error instanceof
-            CopilotFailureDiagnosisCancellationUnavailableError ||
+          hasFailureCode(
+            error,
+            'COPILOT_FAILURE_DIAGNOSIS_CANCELLATION_INVALID',
+          ) ||
+          hasFailureCode(
+            error,
+            'COPILOT_FAILURE_DIAGNOSIS_CANCELLATION_UNAVAILABLE',
+          ) ||
           error instanceof InvalidClusterRunCancellationError ||
           error instanceof ClusterRunCancellationUnavailableError
         ) {

@@ -4,7 +4,7 @@
     "rootDir": "../../../packages/ql3-cluster-control/src",
     "outDir": "../../../.ql3-image-build/cluster-control-default-dist"
   },
-  "include": ["../../../packages/ql3-cluster-control/src/**/*.ts"],
+  "include": ["../../../packages/ql3-cluster-control/src/cli.ts"],
   "exclude": [
     "../../../packages/ql3-cluster-control/src/aiCli.ts",
     "../../../packages/ql3-cluster-control/src/application-runtime/aiProductionApplication.ts"

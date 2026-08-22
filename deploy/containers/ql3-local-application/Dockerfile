@@ -54,19 +54,19 @@ RUN ln -s /opt/qinglong/node_modules node_modules \
   && /opt/qinglong/node_modules/.bin/tsc \
     -p packages/ql3-runtime-core/tsconfig.json \
   && /opt/qinglong/node_modules/.bin/tsc \
-    -p packages/ql3-ai/tsconfig.json \
-  && /opt/qinglong/node_modules/.bin/tsc \
     -p packages/ql3-local-command-file/tsconfig.json \
-  && /opt/qinglong/node_modules/.bin/tsc \
-    -p packages/ql3-local-sqlite/tsconfig.json \
-  && /opt/qinglong/node_modules/.bin/tsc \
-    -p packages/ql3-local-admin/tsconfig.json \
   && /opt/qinglong/node_modules/.bin/tsc \
     -p packages/ql3-local-process/tsconfig.json \
   && /opt/qinglong/node_modules/.bin/tsc \
-    -p packages/ql3-local-execution/tsconfig.json \
+    -p packages/ql3-local-sqlite/tsconfig.json \
+  && /opt/qinglong/node_modules/.bin/tsc \
+    -p packages/ql3-ai/tsconfig.json \
   && /opt/qinglong/node_modules/.bin/tsc \
     -p packages/ql3-local-secret/tsconfig.json \
+  && /opt/qinglong/node_modules/.bin/tsc \
+    -p packages/ql3-local-admin/tsconfig.json \
+  && /opt/qinglong/node_modules/.bin/tsc \
+    -p packages/ql3-local-execution/tsconfig.json \
   && /opt/qinglong/node_modules/.bin/tsc \
     -p packages/ql3-local-application/tsconfig.json
 
