@@ -45,7 +45,9 @@ jobs:
       - name: Install dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Initialize the public test environment
-        run: cp .env.example .env
+        run: |
+          cp .env.example .env
+          mkdir -p data/db
       - name: Rebuild the reviewed native SQLite binding
         run: pnpm rebuild @whyour/sqlite3
       - name: Build backend and QL3 workspace from source
@@ -951,6 +953,8 @@ jobs:
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_runtime LOGIN PASSWORD 'ql3_runtime_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_admin LOGIN PASSWORD 'ql3_admin_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_automation_manager LOGIN PASSWORD 'ql3_automation_manager_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_approval_manager LOGIN PASSWORD 'ql3_approval_manager_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_run_manager LOGIN PASSWORD 'ql3_run_manager_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_package_manager LOGIN PASSWORD 'ql3_package_manager_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_package_executor LOGIN PASSWORD 'ql3_package_executor_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_worker_credential_manager LOGIN PASSWORD 'ql3_worker_credential_manager_test'"

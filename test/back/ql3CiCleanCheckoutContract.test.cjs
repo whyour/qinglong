@@ -39,12 +39,25 @@ test('pins backend CI to the released Node line and bootstraps a clean checkout'
   assertOrdered(backend, [
     'pnpm install --frozen-lockfile --ignore-scripts',
     'cp .env.example .env',
+    'mkdir -p data/db',
     'pnpm rebuild @whyour/sqlite3',
     'pnpm build:back',
     'pnpm run build:packages:ql3',
     'pnpm test:back',
   ]);
   assert.doesNotMatch(backend, /if: matrix\.node == '24'/);
+});
+
+test('provisions every role required by the PostgreSQL migration stream', () => {
+  const postgres = jobSource('cluster-postgres', 'cluster-postgres-ha');
+  for (const role of [
+    'ql3_automation_manager',
+    'ql3_approval_manager',
+    'ql3_run_manager',
+    'ql3_package_manager',
+  ]) {
+    assert.match(postgres, new RegExp(`CREATE ROLE ${role} LOGIN PASSWORD`));
+  }
 });
 
 test('bootstraps jobs that previously depended on local modules or artifacts', () => {
@@ -99,9 +112,7 @@ test('rebuilds the only native legacy binding used by resource evidence', () => 
 });
 
 test('does not forward a literal separator into recovery evidence CLIs', () => {
-  const recovery = jobSource(
-    'cluster-plugin-package-recovery-e2e',
-  );
+  const recovery = jobSource('cluster-plugin-package-recovery-e2e');
   assert.doesNotMatch(
     recovery,
     /pnpm (?:test|audit):plugin-package-recovery-e2e:ql3 -- \\/,

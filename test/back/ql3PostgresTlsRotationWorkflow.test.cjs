@@ -60,7 +60,21 @@ test('builds cluster-postgres before the standalone TLS rotation contract', () =
     'pg_stat_ssl',
     'pg_is_in_recovery()',
     "current_setting('transaction_read_only')",
+    'PostgreSQL container logs:',
   ]) {
     assert.ok(source.includes(required), `missing TLS evidence: ${required}`);
   }
+  assert.match(source, /const uid = process\.getuid\?\.\(\)/);
+  assert.match(source, /const gid = process\.getgid\?\.\(\)/);
+  const certificateTool = source.match(
+    /function runCertificateTool[\s\S]*?\n}\n/,
+  )?.[0];
+  assert.ok(certificateTool);
+  assert.match(certificateTool, /'--user',\s*`\$\{uid}:\$\{gid}`/);
+  assert.doesNotMatch(certificateTool, /'0:0'/);
+  assert.match(source, /'\/work\/server\.key',\s*'\/work\/active\.crt'/);
+  assert.match(
+    source,
+    /activateServerCertificate\(directory, generation\);\s*preparePostgresFileOwnership\(directory\);\s*docker\(\['kill'/,
+  );
 });

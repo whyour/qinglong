@@ -54,11 +54,21 @@ function docker(args, options = {}) {
 }
 
 function runCertificateTool(directory, args) {
+  const uid = process.getuid?.();
+  const gid = process.getgid?.();
+  if (
+    !Number.isSafeInteger(uid) ||
+    uid < 0 ||
+    !Number.isSafeInteger(gid) ||
+    gid < 0
+  ) {
+    throw new Error('cannot resolve the host certificate owner');
+  }
   docker([
     'run',
     '--rm',
     '--user',
-    '0:0',
+    `${uid}:${gid}`,
     '--volume',
     `${directory}:/work`,
     '--workdir',
@@ -187,6 +197,7 @@ function preparePostgresFileOwnership(directory) {
     'chown',
     `${identity[0]}:${identity[1]}`,
     '/work/server.key',
+    '/work/active.crt',
   ]);
 }
 
@@ -221,24 +232,34 @@ async function waitFor(operation, description, timeoutMs = WAIT_TIMEOUT_MS) {
 }
 
 async function waitForPostgres(containerName) {
-  await waitFor(
-    () =>
-      docker(
-        [
-          'exec',
-          containerName,
-          'pg_isready',
-          '-h',
-          '127.0.0.1',
-          '-U',
-          USER,
-          '-d',
-          DATABASE,
-        ],
-        { allowFailure: true },
-      ).status === 0,
-    'TLS PostgreSQL readiness',
-  );
+  try {
+    await waitFor(
+      () =>
+        docker(
+          [
+            'exec',
+            containerName,
+            'pg_isready',
+            '-h',
+            '127.0.0.1',
+            '-U',
+            USER,
+            '-d',
+            DATABASE,
+          ],
+          { allowFailure: true },
+        ).status === 0,
+      'TLS PostgreSQL readiness',
+    );
+  } catch (error) {
+    const logs = docker(['logs', containerName], { allowFailure: true });
+    const detail = [logs.stderr, logs.stdout].filter(Boolean).join('\n');
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}${
+        detail ? `\nPostgreSQL container logs:\n${detail}` : ''
+      }`,
+    );
+  }
 }
 
 function databaseUrl(port) {
@@ -340,6 +361,7 @@ async function expectTlsRejection(
 
 async function reloadCertificate(containerName, directory, generation) {
   activateServerCertificate(directory, generation);
+  preparePostgresFileOwnership(directory);
   docker(['kill', '--signal', 'HUP', containerName]);
   await delay(500);
 }
