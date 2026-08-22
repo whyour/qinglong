@@ -15,6 +15,7 @@ const {
   createFixture,
 } = require('./ql3-plugin-package-recovery-e2e-fixture.cjs');
 const {
+  CONTRACT_VERSION,
   MIGRATION_COUNT,
 } = require('./ql3-plugin-package-recovery-e2e-live-audit.cjs');
 
@@ -1287,7 +1288,7 @@ SELECT json_build_object(
   ).stdout;
   const value = JSON.parse(output);
   assert.equal(value.migrationCount, MIGRATION_COUNT);
-  assert.equal(value.capabilityVersion, 64);
+  assert.equal(value.capabilityVersion, CONTRACT_VERSION);
   assert.equal(value.initialState, 'active');
   assert.equal(value.initialActiveLockDigest, fixture.initial.lock.lockDigest);
   assert.equal(value.upgradeState, 'failed');

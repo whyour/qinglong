@@ -289,6 +289,18 @@ function providerPods(fixture) {
   ]).items;
 }
 
+function providerObservationKey(pod) {
+  assert.match(pod?.metadata?.uid ?? '', /^[A-Za-z0-9][A-Za-z0-9._-]+$/);
+  const provider = pod?.status?.containerStatuses?.find(
+    (container) => container.name === 'provider',
+  );
+  assert.ok(provider);
+  assert.ok(
+    Number.isSafeInteger(provider.restartCount) && provider.restartCount >= 0,
+  );
+  return `${pod.metadata.uid}:${provider.restartCount}`;
+}
+
 function applyExecutorNetworkPolicy(fixture, providerPodIp) {
   const egress = [
     {
@@ -1604,10 +1616,11 @@ async function main() {
         providerPodIp: pod.status.podIP,
       });
       const count = evidence.requestCount;
-      const previous = requestObservations.get(pod.metadata.uid) ?? 0;
+      const observationKey = providerObservationKey(pod);
+      const previous = requestObservations.get(observationKey) ?? 0;
       assert.ok(count >= previous);
       observedProviderRequests += count - previous;
-      requestObservations.set(pod.metadata.uid, count);
+      requestObservations.set(observationKey, count);
     };
 
     applyExecutorNetworkPolicy(fixture, null);
@@ -2049,6 +2062,7 @@ module.exports = {
   canI,
   deployProvider,
   executorJob,
+  providerObservationKey,
   providerServerSource,
   terminalJobSnapshot,
 };

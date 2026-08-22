@@ -11,6 +11,7 @@ const producerPath = path.join(
   'scripts/ql3-plugin-package-recovery-e2e-live-contract.cjs',
 );
 const {
+  CONTRACT_VERSION,
   FIXTURE,
   GATE_KEYS,
   MIGRATION_COUNT,
@@ -64,7 +65,7 @@ function validReport() {
     },
     database: {
       migrationCount: MIGRATION_COUNT,
-      capabilityVersion: 64,
+      capabilityVersion: CONTRACT_VERSION,
       initialState: 'active',
       initialActiveLockDigest: lock,
       upgradeState: 'failed',

@@ -12,6 +12,7 @@ const {
   canI,
   deployProvider,
   executorJob,
+  providerObservationKey,
   providerServerSource,
   terminalJobSnapshot,
 } = require('../../scripts/ql3-provider-credential-test-kubernetes-live-contract.cjs');
@@ -347,6 +348,19 @@ test('reads provider evidence from the exact ready Pod with trusted TLS SNI', ()
     source,
     /fetch\('https:\/\/'\+process\.argv\[1\].*\/evidence/,
   );
+});
+
+test('starts a fresh provider request baseline after a container restart', () => {
+  const pod = {
+    metadata: { uid: 'provider-uid' },
+    status: {
+      containerStatuses: [{ name: 'provider', restartCount: 0 }],
+    },
+  };
+
+  assert.equal(providerObservationKey(pod), 'provider-uid:0');
+  pod.status.containerStatuses[0].restartCount = 1;
+  assert.equal(providerObservationKey(pod), 'provider-uid:1');
 });
 
 test('provider fixture logs only generation and authorization decision', () => {

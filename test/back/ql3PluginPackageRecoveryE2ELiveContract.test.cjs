@@ -7,9 +7,11 @@ const {
   createFixture,
 } = require('../../scripts/ql3-plugin-package-recovery-e2e-fixture.cjs');
 const {
+  CONTRACT_VERSION,
   MIGRATION_COUNT,
 } = require('../../scripts/ql3-plugin-package-recovery-e2e-live-audit.cjs');
 const {
+  postgresqlControlSchemaContract,
   postgresqlMainMigrationStream,
 } = require('../../packages/ql3-cluster-postgres/dist/migration/migration.js');
 
@@ -64,6 +66,10 @@ test('fixture uses a real HTTPS and content-addressed OCI Distribution surface',
 
 test('report migration evidence follows the complete PostgreSQL stream', () => {
   assert.equal(MIGRATION_COUNT, postgresqlMainMigrationStream.migrations.length);
+  assert.equal(
+    CONTRACT_VERSION,
+    postgresqlControlSchemaContract.contractVersion,
+  );
 });
 
 test('fixture locks are bound to durable version-three approval dispatches', () => {
@@ -127,7 +133,7 @@ test('gate runs migration, healthy activation and a durable rejected upgrade', (
   assert.match(live, /initialSeed\.state, 'queued'/);
   assert.match(live, /upgradeSeed\.state, 'queued'/);
   assert.match(live, /value\.migrationCount, MIGRATION_COUNT/);
-  assert.match(live, /value\.capabilityVersion, 64/);
+  assert.match(live, /value\.capabilityVersion, CONTRACT_VERSION/);
   assert.match(live, /postgresEnvironment\(\s*'PACKAGE_EXECUTOR'/);
   assert.match(fixture, /assertPostgresPackageExecutorSchemaReady/);
   assert.match(live, /value\.initialState, 'active'/);
