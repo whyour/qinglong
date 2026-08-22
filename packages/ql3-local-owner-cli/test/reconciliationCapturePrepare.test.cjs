@@ -11,17 +11,21 @@ const {
   commitLocalReconciliationCapture,
   commitLocalReconciliationApplication,
   commitLocalReconciliationAutomationDecision,
+  applyLocalReconciliationAutomation,
   commitLocalReconciliationPlan,
   commitLocalReconciliationReview,
   prepareLocalReconciliationCapture,
   prepareLocalReconciliationApplication,
   prepareLocalReconciliationAutomationDecision,
+  readLocalReconciliationAutomationDecisionTerminal,
+  rollbackLocalReconciliationAutomationApply,
   planLocalReconciliationAutomation,
   prepareLocalReconciliationPlan,
   prepareLocalReconciliationReview,
   verifyLocalReconciliationCapture,
   verifyLocalReconciliationApplication,
   verifyLocalReconciliationAutomationDecision,
+  verifyLocalReconciliationAutomationApply,
   verifyLocalReconciliationAutomationPlan,
   verifyLocalReconciliationPlan,
   verifyLocalReconciliationReview,
@@ -703,6 +707,41 @@ function automationDatabaseInitializer() {
   };
 }
 
+function automationReadyDatabaseInitializer() {
+  const initializeLegacy = automationDatabaseInitializer();
+  return (paths) => {
+    initializeLegacy(paths);
+    fs.truncateSync(paths.targetDatabasePath, 0);
+    const migration = spawnSync(
+      process.execPath,
+      [
+        '-e',
+        `require('@qinglong/local-sqlite/migration')
+          .migrateLocalSqlitePath({ databasePath: process.argv[1], profile: 'edge' })
+          .catch((error) => { console.error(error); process.exitCode = 1; });`,
+        paths.targetDatabasePath,
+      ],
+      { encoding: 'utf8', cwd: path.join(__dirname, '..') },
+    );
+    assert.equal(migration.status, 0, migration.stderr);
+    fs.chmodSync(paths.targetDatabasePath, 0o600);
+    const target = new DatabaseSync(paths.targetDatabasePath);
+    target.exec(`
+      INSERT INTO "QingLong3ProjectRoleBindings" (
+        "project_id", "subject_type", "subject_id", "version", "state",
+        "role", "mutation_id", "changed_by_type", "changed_by_id",
+        "created_at_ms"
+      ) VALUES (
+        'default', 'user', 'review-owner', 1, 'active', 'owner',
+        'automation-apply-owner-binding', 'user', 'review-owner', 1
+      );
+      PRAGMA wal_checkpoint(TRUNCATE);
+      PRAGMA journal_mode=DELETE;
+    `);
+    target.close();
+  };
+}
+
 function mutateAutomationTarget({ targetDatabasePath }, occupied = false) {
   const target = new DatabaseSync(targetDatabasePath);
   if (occupied) {
@@ -715,6 +754,13 @@ function mutateAutomationTarget({ targetDatabasePath }, occupied = false) {
   } else {
     target.exec('INSERT INTO "QingLong3SchemaCapabilities" (id) VALUES (1)');
   }
+  target.close();
+  return Object.freeze({});
+}
+
+function mutateReadyAutomationTarget({ targetDatabasePath }) {
+  const target = new DatabaseSync(targetDatabasePath);
+  target.exec('PRAGMA user_version=1');
   target.close();
   return Object.freeze({});
 }
@@ -1080,9 +1126,14 @@ async function plannedAutomationFixture(t, options = {}) {
     applicationId: options.applicationId,
     reviewSuffix: `automation-decision-${suffix}`,
     createDefaultSidecars: false,
-    initializeDatabases: automationDatabaseInitializer(),
+    initializeDatabases:
+      options.readyTarget === true
+        ? automationReadyDatabaseInitializer()
+        : automationDatabaseInitializer(),
     mutateTarget(paths) {
-      return mutateAutomationTarget(paths, options.occupied === true);
+      return options.readyTarget === true
+        ? mutateReadyAutomationTarget(paths)
+        : mutateAutomationTarget(paths, options.occupied === true);
     },
     mutateDecisions(records) {
       const selected = records.find(
@@ -1094,8 +1145,10 @@ async function plannedAutomationFixture(t, options = {}) {
           record.disposition === 'exclude_legacy',
       );
       assert.ok(selected);
-      selected.disposition = options.occupied === true ? 'retain_both' : 'adopt_legacy';
-      selected.reason = options.occupied === true ? 'preserve_both' : 'prefer_legacy';
+      selected.disposition =
+        options.occupied === true ? 'retain_both' : 'adopt_legacy';
+      selected.reason =
+        options.occupied === true ? 'preserve_both' : 'prefer_legacy';
     },
   });
   const preparedApplication = await prepareLocalReconciliationApplication(
@@ -1242,7 +1295,8 @@ function automationDecisionCommitFixture(
     options: {
       ...prepared.commandOptions,
       targetDatabasePath: state.targetDatabasePath,
-      ownerPepperKeyringDirectory: state.command.options.ownerPepperKeyringDirectory,
+      ownerPepperKeyringDirectory:
+        state.command.options.ownerPepperKeyringDirectory,
       credentialFilePath: state.command.options.credentialFilePath,
     },
     request: {
@@ -2885,7 +2939,10 @@ test('automation adapter builds a sealed row plan with bounded conflict evidence
   const application = await commitLocalReconciliationApplication(
     applicationCommitCommand(state, prepared),
   );
-  const automationRoot = path.join(path.dirname(state.captureRoot), 'automation-root');
+  const automationRoot = path.join(
+    path.dirname(state.captureRoot),
+    'automation-root',
+  );
   fs.mkdirSync(automationRoot, { mode: 0o700 });
   const targetBefore = fs.readFileSync(state.targetDatabasePath);
   const command = {
@@ -2944,7 +3001,10 @@ test('automation adapter builds a sealed row plan with bounded conflict evidence
   assert.equal(planText.includes('legacy-cron:1'), true);
   assert.equal(planText.includes('review-owner'), false);
   assert.equal(planText.includes('"requirement":"review_adopt"'), true);
-  assert.equal(fs.readFileSync(state.targetDatabasePath).equals(targetBefore), true);
+  assert.equal(
+    fs.readFileSync(state.targetDatabasePath).equals(targetBefore),
+    true,
+  );
 
   const replay = await planLocalReconciliationAutomation(command);
   assert.equal(replay.status, 'existing');
@@ -2994,6 +3054,7 @@ test('automation decision reauthenticates the same reviewer, seals exact row dec
     reviewId: '00000000-0000-4000-8000-000000000462',
     applicationId: '00000000-0000-4000-8000-000000000463',
     automationId: '00000000-0000-4000-8000-000000000464',
+    readyTarget: true,
   });
   assert.equal(state.planRows[0].requirement, 'review_adopt');
   const decisionId = '019b0000-0000-7000-8000-000000000461';
@@ -3067,11 +3128,28 @@ test('automation decision reauthenticates the same reviewer, seals exact row dec
     verifyCommand,
   );
   assert.equal(verified.status, 'verified');
-  assert.equal(verified.signedDecisionSetDigest, committed.signedDecisionSetDigest);
+  assert.equal(
+    verified.signedDecisionSetDigest,
+    committed.signedDecisionSetDigest,
+  );
   const serialized = JSON.stringify(verified);
   assert.equal(serialized.includes('review-owner'), false);
   assert.equal(serialized.includes(state.planRows[0].sourceDigest), false);
   assert.equal(serialized.includes(review.filePath), false);
+  const terminal = await readLocalReconciliationAutomationDecisionTerminal(
+    prepareCommand.options,
+    state.automationCommand.request.automationId,
+    process.getuid(),
+  );
+  assert.equal(terminal.receipt.decisionDigest, committed.decisionDigest);
+  assert.equal(
+    terminal.context.application.plan.applicationPlanDigest,
+    state.application.applicationPlanDigest,
+  );
+  assert.equal(
+    terminal.authorizationPath.endsWith('/authorization.ndjson'),
+    true,
+  );
   const commandPath = path.join(
     state.deploymentRoot,
     'automation-decision-verify.json',
@@ -3093,6 +3171,249 @@ test('automation decision reauthenticates the same reviewer, seals exact row dec
   assert.equal(JSON.parse(cli.stdout).status, 'verified');
   assert.equal(cli.stdout.includes('review-owner'), false);
   assert.equal(cli.stdout.includes(state.planRows[0].sourceDigest), false);
+
+  const automationApplyRoot = path.join(
+    path.dirname(state.captureRoot),
+    'automation-apply-signed-success',
+  );
+  fs.mkdirSync(automationApplyRoot, { mode: 0o700 });
+  const appliedAtMs = commit.command.request.committedAtMs + 1;
+  const targetIdentity = fs.statSync(state.targetDatabasePath);
+  const applyOptions = {
+    ...prepareCommand.options,
+    automationApplyRoot,
+    targetDatabasePath: state.targetDatabasePath,
+    ownerPepperKeyringDirectory:
+      state.command.options.ownerPepperKeyringDirectory,
+    credentialFilePath: state.command.options.credentialFilePath,
+  };
+  const applyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.apply',
+    options: applyOptions,
+    request: {
+      decisionId,
+      automationId: state.automationCommand.request.automationId,
+      expectedDecisionDigest: committed.decisionDigest,
+      expectedHeadDigest: committed.instanceHeadDigest,
+      mutationId: '00000000-0000-4000-8000-000000000465',
+      requestId: 'automation-apply-signed-success',
+      appliedAtMs,
+    },
+  };
+  const applyDependencies = {
+    async openAuthenticationDatabase() {
+      return { async close() {} };
+    },
+    async authenticate(_database, options) {
+      assert.equal(
+        options.authenticationNamespace,
+        'local_reconciliation_automation_apply',
+      );
+      const authenticatedAtMs = options.now();
+      return {
+        principal: {
+          subject: { type: 'user', id: 'review-owner' },
+          authenticationId: 'local_reconciliation_automation_apply:test',
+          authenticatedAtMs,
+          expiresAtMs: authenticatedAtMs + 60 * 60 * 1_000,
+          assurance: 'local_console',
+        },
+        databaseFence: {
+          credentialId: 'review-owner',
+          credentialVersion: 1,
+          pepperKeyId: 'review-owner-v1',
+          pepperVersion: 1,
+        },
+        async confirm() {},
+      };
+    },
+  };
+  const liveApplyEvidence = readTargetDataReconciliationEvidenceForPaths(
+    {
+      profile: state.captureCommand.request.profile,
+      activationPath: state.captureCommand.request.activationPath,
+      legacySourcePath: state.captureCommand.request.legacySourcePath,
+      targetDatabasePath: state.targetDatabasePath,
+      expectedActivationDigest:
+        state.captureCommand.request.expectedActivationDigest,
+    },
+    process.getuid(),
+  );
+  assert.equal(
+    liveApplyEvidence.disposition,
+    'reconciliation_required',
+    JSON.stringify({
+      liveApplyEvidence,
+      activation: JSON.parse(
+        fs.readFileSync(state.captureCommand.request.activationPath, 'utf8'),
+      ),
+      target: {
+        ...fs.statSync(state.targetDatabasePath),
+        mode: fs.statSync(state.targetDatabasePath).mode & 0o777,
+        realpath: fs.realpathSync(state.targetDatabasePath),
+        sidecars: ['-wal', '-shm', '-journal'].map((suffix) =>
+          fs.existsSync(`${state.targetDatabasePath}${suffix}`),
+        ),
+      },
+    }),
+  );
+  for (const boundary of ['afterBackupPublished', 'afterPreparedHead']) {
+    await assert.rejects(
+      applyLocalReconciliationAutomation(applyCommand, {
+        ...applyDependencies,
+        [boundary]() {
+          throw new Error(`automation apply ${boundary} response loss`);
+        },
+      }),
+      new RegExp(`automation apply ${boundary} response loss`),
+    );
+  }
+  await assert.rejects(
+    applyLocalReconciliationAutomation(applyCommand, {
+      ...applyDependencies,
+      async authenticate(database, options) {
+        const authenticated = await applyDependencies.authenticate(
+          database,
+          options,
+        );
+        return {
+          ...authenticated,
+          principal: {
+            ...authenticated.principal,
+            subject: { type: 'user', id: 'another-owner' },
+          },
+        };
+      },
+    }),
+    /current reviewer authentication is not strong or identical/,
+  );
+  for (const boundary of ['afterDatabaseCommit', 'afterReceiptPublished']) {
+    await assert.rejects(
+      applyLocalReconciliationAutomation(applyCommand, {
+        ...applyDependencies,
+        [boundary]() {
+          throw new Error(`automation apply ${boundary} response loss`);
+        },
+      }),
+      new RegExp(`automation apply ${boundary} response loss`),
+    );
+  }
+  const applied = await applyLocalReconciliationAutomation(
+    applyCommand,
+    applyDependencies,
+  );
+  assert.equal(applied.status, 'existing');
+  assert.equal(applied.state, 'reconciliation_automation_applied');
+  assert.equal(applied.adoptedTaskCount, 1);
+  assert.equal(fs.statSync(state.targetDatabasePath).ino, targetIdentity.ino);
+  const applyReplay = await applyLocalReconciliationAutomation(
+    applyCommand,
+    applyDependencies,
+  );
+  assert.equal(applyReplay.status, 'existing');
+  const applyVerified = await verifyLocalReconciliationAutomationApply({
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.apply.verify',
+    options: applyOptions,
+    request: {
+      decisionId,
+      automationId: state.automationCommand.request.automationId,
+      expectedApplyDigest: applied.applyDigest,
+    },
+  });
+  assert.equal(applyVerified.status, 'verified');
+  const rollbackCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.apply.rollback',
+    options: applyOptions,
+    request: {
+      decisionId,
+      automationId: state.automationCommand.request.automationId,
+      expectedApplyDigest: applied.applyDigest,
+      expectedHeadDigest: applied.instanceHeadDigest,
+      rolledBackAtMs: appliedAtMs + 1,
+    },
+  };
+  for (const boundary of ['afterRestore', 'afterRollbackReceipt']) {
+    await assert.rejects(
+      rollbackLocalReconciliationAutomationApply(rollbackCommand, {
+        ...applyDependencies,
+        [boundary]() {
+          throw new Error(`automation rollback ${boundary} response loss`);
+        },
+      }),
+      new RegExp(`automation rollback ${boundary} response loss`),
+    );
+  }
+  const rolledBack = await rollbackLocalReconciliationAutomationApply(
+    rollbackCommand,
+    applyDependencies,
+  );
+  assert.equal(rolledBack.status, 'existing');
+  assert.equal(rolledBack.state, 'reconciliation_automation_rolled_back');
+  assert.equal(fs.statSync(state.targetDatabasePath).ino, targetIdentity.ino);
+  assert.equal(
+    (
+      await rollbackLocalReconciliationAutomationApply(
+        rollbackCommand,
+        applyDependencies,
+      )
+    ).status,
+    'existing',
+  );
+  const rollbackVerified = await verifyLocalReconciliationAutomationApply({
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.apply.verify',
+    options: applyOptions,
+    request: {
+      decisionId,
+      automationId: state.automationCommand.request.automationId,
+      expectedApplyDigest: applied.applyDigest,
+    },
+  });
+  assert.equal(rollbackVerified.status, 'verified');
+  assert.equal(rollbackVerified.state, 'reconciliation_automation_rolled_back');
+  const applyVerifyPath = path.join(
+    state.deploymentRoot,
+    'automation-apply-verify.json',
+  );
+  fs.writeFileSync(
+    applyVerifyPath,
+    `${JSON.stringify({
+      schemaVersion: 1,
+      operation: 'local.deployment.reconciliation.automation.apply.verify',
+      options: applyOptions,
+      request: {
+        decisionId,
+        automationId: state.automationCommand.request.automationId,
+        expectedApplyDigest: applied.applyDigest,
+      },
+    })}\n`,
+    { mode: 0o600 },
+  );
+  const applyCli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-automation-apply-verify',
+      '--command-file',
+      applyVerifyPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(applyCli.status, 0, applyCli.stderr);
+  assert.equal(JSON.parse(applyCli.stdout).status, 'verified');
+  const restored = new DatabaseSync(state.targetDatabasePath, {
+    readOnly: true,
+  });
+  assert.equal(
+    restored
+      .prepare('SELECT COUNT(*) AS count FROM "QingLong3LegacyAdoptions"')
+      .get().count,
+    0,
+  );
+  restored.close();
 });
 
 test('automation decision rejects conflict adoption, another reviewer and weak assurance', async (t) => {
@@ -3294,8 +3615,7 @@ test('automation decision verification rejects sealed authorization and plan dri
     suffix: 'authorization-drift',
     automationId: '00000000-0000-4000-8000-000000000475',
   });
-  const authorizationDecisionId =
-    '019b0000-0000-7000-8000-000000000475';
+  const authorizationDecisionId = '019b0000-0000-7000-8000-000000000475';
   const authorizationReview = automationDecisionReviewFile(
     authorizationState,
     authorizationDecisionId,
@@ -3483,7 +3803,9 @@ test('automation row plan fails closed to manual review on a target task collisi
 });
 
 test('automation row planner makes an empty table no-effect and a missing timezone manual', (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-automation-row-unit-'));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-automation-row-unit-'),
+  );
   t.after(() => removeFixtureRoot(root));
   const legacySourcePath = path.join(root, 'legacy.sqlite');
   const recoveryPath = path.join(root, 'recovery.sqlite');
@@ -3548,7 +3870,10 @@ test('automation row planner makes an empty table no-effect and a missing timezo
     manual = writeLocalReconciliationAutomationPlan({
       descriptor: manualDescriptor,
       maxBytes: 64 * 1024,
-      header: { ...header, automationId: '00000000-0000-4000-8000-00000000043b' },
+      header: {
+        ...header,
+        automationId: '00000000-0000-4000-8000-00000000043b',
+      },
       legacy,
       target,
     });
@@ -3639,7 +3964,13 @@ test('automation row planning replays every publication boundary and rejects dri
     ['seal', '000000000449', '00000000044a', '00000000044b', '00000000044c'],
     ['head', '00000000044d', '00000000044e', '00000000044f', '000000000450'],
   ];
-  for (const [window, planTail, reviewTail, applicationTail, automationTail] of windows) {
+  for (const [
+    window,
+    planTail,
+    reviewTail,
+    applicationTail,
+    automationTail,
+  ] of windows) {
     const state = await reviewedApplicationFixture(t, {
       planId: `00000000-0000-4000-8000-${planTail}`,
       reviewId: `00000000-0000-4000-8000-${reviewTail}`,

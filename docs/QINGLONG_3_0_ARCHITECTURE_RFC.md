@@ -55,6 +55,30 @@
   signed decision，完成 target 写前可恢复 backup 证明、Project Policy/credential 复验、幂等原子 transaction/replay、post-apply evidence 与显式
   rollback。当前状态仍不代表 applied、restart-ready 或 reconciliation-complete。进入 apply 写语义时必须重新选择 SQLite/Docker 数据门禁，不能
   复用本切片只读证明。
+
+  第三切片已消费上述 signed decision 并建立首个真实写入闭环，而没有新增第二套 Task/Trigger DML。Local Admin 的 plan-bound verifier 现在只把
+  已验证的 decision scope 交给既有 `LocalSqliteLegacyAdoptionPublisher`；后者继续以 `BEGIN IMMEDIATE`、Project/RoleBinding version fence、
+  mutation/decision exact replay、Task/Trigger collision 检查、security audit 与 adoption ledger 作为唯一写入 authority。Local Owner 新增
+  `reconciliation-automation-apply|apply-verify|apply-rollback`，实例 lineage 严格前进为
+  `reconciliation_automation_reviewed → reconciliation_automation_apply_prepared → reconciliation_automation_applied →
+  reconciliation_automation_rolled_back`。apply 在 DML 前重新证明原 target 仍处于同一 stopped authority，直接复用 `local-sqlite/rollout-safety`
+  的 online SQLite backup、readiness/snapshot audit 和 no-replace stage/link publication；backup、intent 与 prepared head 完成后，再重新打开 sealed
+  Legacy bundle、逐行 plan 和 `0400/0500` signed authorization，并把最多 5 分钟的当前强认证 User 与原 reviewer 精确匹配。事务提交前还会复验
+  prepared head、sealed bundle、authorization inode、当前 credential 与 Project Policy fence。database commit、receipt、head 任一 response-loss
+  窗口通过相同 mutation/decision ledger 收敛，不能重复插入 Task/Trigger。
+
+  apply receipt 绑定 publication digest、adopted Task/Trigger/skipped counters、写后完整 SQLite snapshot 和写前 backup；verify 同时检查 signed
+  decision、instance head 与当前 target snapshot，stdout 不返回 reviewer、路径、row digest 或 command。rollback 不是裸文件覆盖：它先以当前 reviewer
+  强认证和当前 Project Policy 重放已存在 publication，再要求 target 精确等于 apply snapshot，最后调用 `preserveDatabaseIdentity=true` 的 restore，
+  保持 activation 所绑定的 SQLite inode。restore、rollback receipt 和 rollback head 的 response-loss 同样可恢复；可恢复 backup authority 因仍需支持
+  apply 后显式 rollback，保持 current-UID `0700/0600`，不伪装成已经归档的 `0500/0400` terminal。聚焦 reconciliation 套件仍为
+  `44 total / 42 pass / 2 conditional Docker skip / 0 fail`，但成功场景现在额外覆盖首次 apply、mutation replay、不同 reviewer 拒绝、六个
+  backup/apply/rollback response-loss 窗口、content-free CLI verify、identity-preserving rollback 与 rollback replay。完整 Local Owner 在受限沙箱为
+  `266 total / 256 pass / 7 conditional skip / 3 loopback-listen EPERM`，两个对应文件在沙箱外 `15/15` 通过；package/dependency boundary 为
+  `69/69`。workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为
+  `168 source / 167 nested / 1 root binary entry`，没有新增 package、production dependency、daemon、listener、timer 或 `src/` 根平铺。
+  D-393 仍未代表完整 reconciliation：Automation 之外的 Secret、Plugin、Identity、history 等领域 adapter 尚未 apply，target service 也未获得 restart
+  authority；后续必须先完成 apply-root 的 retention/seal 策略和跨领域 completion fence，再进入 target restart/readiness。
 - D-392/ADR-0485（已接受）：D-391 的 signed review 不能直接获得通用 DML authority；表级 `adopt_legacy/retain_both` 也不能证明
   Automation 行级 command/trigger 兼容，更不能覆盖 Secret custody、append-only history、Plugin/AI 外部资产与 Identity/Policy 语义。
   因此既有 Local Owner 新增 `reconciliation.application.prepare|commit|verify`，以

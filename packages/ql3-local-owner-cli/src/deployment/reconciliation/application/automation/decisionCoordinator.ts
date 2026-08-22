@@ -13,6 +13,7 @@ import {
   type AuthenticatedLocalCommand,
 } from '@qinglong/local-owner-console/authenticated-command';
 import { openLocalSqliteAuthenticationReadDatabase } from '@qinglong/local-sqlite/authentication-read';
+import type { SecurityPrincipal } from '@qinglong/runtime-core/security';
 
 import { currentIdentity } from '../../../foundation/contract';
 import { LocalDeploymentConfigurationError } from '../../../foundation/error';
@@ -103,6 +104,15 @@ export interface LocalReconciliationAutomationDecisionDependencies
   readonly afterHeadAdvanced?: () => void;
 }
 
+export interface LocalReconciliationAutomationDecisionTerminal {
+  readonly intent: Readonly<LocalReconciliationAutomationDecisionIntent>;
+  readonly receipt: Readonly<LocalReconciliationAutomationDecisionReceipt>;
+  readonly authorizationPath: string;
+  readonly context: Readonly<DecisionContext>;
+  readonly plan: ReturnType<typeof readLocalReconciliationPlanTerminal>;
+  readonly reviewer: Readonly<SecurityPrincipal>;
+}
+
 function configurationError(message: string, cause?: unknown): never {
   throw new LocalDeploymentConfigurationError(
     `reconciliation automation decision ${message}`,
@@ -149,17 +159,17 @@ function validateDirectory(
   return mode;
 }
 
-function validateCatalog(selected: Readonly<DecisionPaths>, terminal: boolean): void {
+function validateCatalog(
+  selected: Readonly<DecisionPaths>,
+  terminal: boolean,
+): void {
   const allowed = new Set([
     'authorization.ndjson',
     'intent.json',
     'receipt.json',
     'staging',
     ...(!terminal
-      ? [
-          '.intent.json.ql3-deploy-stage',
-          '.receipt.json.ql3-deploy-stage',
-        ]
+      ? ['.intent.json.ql3-deploy-stage', '.receipt.json.ql3-deploy-stage']
       : []),
   ]);
   for (const entry of fs.readdirSync(selected.root, { withFileTypes: true })) {
@@ -242,7 +252,9 @@ function terminalJson(
 }
 
 async function context(
-  options: Readonly<LocalReconciliationAutomationDecisionPrepareCommand['options']>,
+  options: Readonly<
+    LocalReconciliationAutomationDecisionPrepareCommand['options']
+  >,
   automationId: string,
   uid: number,
 ): Promise<Readonly<DecisionContext>> {
@@ -412,7 +424,7 @@ export async function prepareLocalReconciliationAutomationDecision(
   );
   if (
     current.automation.receipt.automationPlanDigest !==
-      command.request.expectedAutomationPlanDigest
+    command.request.expectedAutomationPlanDigest
   ) {
     configurationError('expected automation plan digest drifted');
   }
@@ -438,7 +450,8 @@ export async function prepareLocalReconciliationAutomationDecision(
   if (
     (head.state === 'reconciliation_automation_planned' &&
       (head.headDigest !== command.request.expectedHeadDigest ||
-        head.sourceRecordDigest !== intent.command.request.expectedAutomationPlanDigest)) ||
+        head.sourceRecordDigest !==
+          intent.command.request.expectedAutomationPlanDigest)) ||
     (head.state === 'reconciliation_automation_decision_prepared' &&
       head.sourceRecordDigest !== intent.preparationDigest) ||
     (head.state !== 'reconciliation_automation_planned' &&
@@ -453,7 +466,8 @@ export async function prepareLocalReconciliationAutomationDecision(
   ensurePrivateDirectory(selected.root, uid, 'automationDecisionDirectory');
   ensurePrivateDirectory(selected.staging, uid, 'automationDecisionStaging');
   validateCatalog(selected, false);
-  const contents = localReconciliationAutomationDecisionEvidenceContents(intent);
+  const contents =
+    localReconciliationAutomationDecisionEvidenceContents(intent);
   preflightPublishedFile(
     selected.intent,
     contents,
@@ -505,7 +519,9 @@ function validateCommitBinding(
 
 function strongReviewer(
   authenticated: Readonly<AuthenticatedLocalCommand>,
-  original: Readonly<DecisionContext['application']['review']['authorization']['header']['reviewer']>,
+  original: Readonly<
+    DecisionContext['application']['review']['authorization']['header']['reviewer']
+  >,
   committedAtMs: number,
 ) {
   const principal = authenticated.principal;
@@ -598,15 +614,16 @@ async function authorization(
   );
   if (
     capture.command.request.targetDatabasePath !==
-      command.options.targetDatabasePath
+    command.options.targetDatabasePath
   ) {
     configurationError('authentication database is detached from capture');
   }
-  const openRequirements = createLocalReconciliationAutomationRequirementFactory(
-    selected.automation.planPath,
-    selected.automation.receipt,
-    uid,
-  );
+  const openRequirements =
+    createLocalReconciliationAutomationRequirementFactory(
+      selected.automation.planPath,
+      selected.automation.receipt,
+      uid,
+    );
   const keyringPath =
     selected.application.intent.command.options.issuerKeyringPath;
   ensureLocalReconciliationReviewIssuerKeyring(keyringPath);
@@ -774,11 +791,12 @@ async function verifyPublication(
   allowedParentModes: readonly (0o500 | 0o700)[],
 ): Promise<Readonly<ReconciliationAutomationDecisionPublication>> {
   const terminal = planTerminal(selected);
-  const openRequirements = createLocalReconciliationAutomationRequirementFactory(
-    selected.automation.planPath,
-    selected.automation.receipt,
-    uid,
-  );
+  const openRequirements =
+    createLocalReconciliationAutomationRequirementFactory(
+      selected.automation.planPath,
+      selected.automation.receipt,
+      uid,
+    );
   const keyProvider = new LocalReconciliationReviewIssuerKeyringFileProvider(
     selected.application.intent.command.options.issuerKeyringPath,
   );
@@ -862,8 +880,7 @@ export async function commitLocalReconciliationAutomationDecision(
       receipt.preparedHeadDigest !== command.request.expectedHeadDigest ||
       receipt.issuedAtMs !== command.request.committedAtMs ||
       receipt.expiresAtMs !==
-        command.request.committedAtMs +
-          command.request.authorizationLifetimeMs
+        command.request.committedAtMs + command.request.authorizationLifetimeMs
     ) {
       configurationError('terminal receipt is not an exact command replay');
     }
@@ -1011,6 +1028,58 @@ export async function verifyLocalReconciliationAutomationDecision(
     configurationError('terminal decision is detached from instance head');
   }
   return terminalResult(command.operation, 'verified', receipt, head);
+}
+
+export async function readLocalReconciliationAutomationDecisionTerminal(
+  options: Readonly<
+    LocalReconciliationAutomationDecisionPrepareCommand['options']
+  >,
+  automationId: string,
+  uid: number,
+  dependencies: LocalReconciliationAutomationDecisionDependencies = {},
+): Promise<Readonly<LocalReconciliationAutomationDecisionTerminal>> {
+  for (const [directory, label] of [
+    [options.deploymentRoot, 'deploymentRoot'],
+    [options.applicationRoot, 'applicationRoot'],
+    [options.automationRoot, 'automationRoot'],
+    [options.automationDecisionRoot, 'automationDecisionRoot'],
+  ] as const) {
+    validatePrivateDirectory(directory, uid, label);
+  }
+  const selectedPaths = paths(options.automationDecisionRoot, automationId);
+  validateDirectory(selectedPaths.root, uid, [0o500], 'decision root');
+  validateDirectory(selectedPaths.staging, uid, [0o500], 'decision staging');
+  validateCatalog(selectedPaths, true);
+  const intent = readIntent(selectedPaths, uid, [0o400]);
+  const receipt = readReceipt(selectedPaths, uid, [0o400]);
+  if (
+    intent.command.request.automationId !== automationId ||
+    receipt.automationId !== automationId ||
+    receipt.decisionId !== intent.command.request.decisionId
+  ) {
+    configurationError('terminal decision identity drifted');
+  }
+  const selected = await context(options, automationId, uid);
+  intentBinding(intent, selected);
+  const publication = await verifyPublication(
+    selectedPaths,
+    intent,
+    selected,
+    receipt,
+    dependencies,
+    uid,
+    [0o400],
+    [0o500],
+  );
+  validateReceiptBinding(receipt, intent, publication);
+  return Object.freeze({
+    intent,
+    receipt,
+    authorizationPath: selectedPaths.authorization,
+    context: selected,
+    plan: planTerminal(selected),
+    reviewer: publication.authorization.receipt.reviewer,
+  });
 }
 
 export function prepareLocalReconciliationAutomationDecisionCommandFile(

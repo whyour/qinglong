@@ -34,6 +34,9 @@ export type LocalCutoverInstanceHeadState =
   | 'reconciliation_automation_planned'
   | 'reconciliation_automation_decision_prepared'
   | 'reconciliation_automation_reviewed'
+  | 'reconciliation_automation_apply_prepared'
+  | 'reconciliation_automation_applied'
+  | 'reconciliation_automation_rolled_back'
   | 'rollback_prepared'
   | 'legacy_restart_requested'
   | 'legacy_running'
@@ -176,6 +179,9 @@ function parseHead(value: unknown): Readonly<LocalCutoverInstanceHead> {
       head.state !== 'reconciliation_automation_planned' &&
       head.state !== 'reconciliation_automation_decision_prepared' &&
       head.state !== 'reconciliation_automation_reviewed' &&
+      head.state !== 'reconciliation_automation_apply_prepared' &&
+      head.state !== 'reconciliation_automation_applied' &&
+      head.state !== 'reconciliation_automation_rolled_back' &&
       head.state !== 'rollback_prepared' &&
       head.state !== 'legacy_restart_requested' &&
       head.state !== 'legacy_running' &&
@@ -353,6 +359,9 @@ export function advanceLocalCutoverInstanceHead(
     | 'reconciliation_automation_planned'
     | 'reconciliation_automation_decision_prepared'
     | 'reconciliation_automation_reviewed'
+    | 'reconciliation_automation_apply_prepared'
+    | 'reconciliation_automation_applied'
+    | 'reconciliation_automation_rolled_back'
     | 'rollback_prepared'
     | 'legacy_restart_requested'
     | 'legacy_running'
@@ -402,6 +411,9 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_automation_planned' ||
       current.state === 'reconciliation_automation_decision_prepared' ||
       current.state === 'reconciliation_automation_reviewed' ||
+      current.state === 'reconciliation_automation_apply_prepared' ||
+      current.state === 'reconciliation_automation_applied' ||
+      current.state === 'reconciliation_automation_rolled_back' ||
       current.state === 'legacy_restart_requested' ||
       current.state === 'legacy_running' ||
       current.state === 'legacy_ready')
@@ -439,6 +451,12 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_automation_planned') ||
     (state === 'reconciliation_automation_reviewed' &&
       current.state === 'reconciliation_automation_decision_prepared') ||
+    (state === 'reconciliation_automation_apply_prepared' &&
+      current.state === 'reconciliation_automation_reviewed') ||
+    (state === 'reconciliation_automation_applied' &&
+      current.state === 'reconciliation_automation_apply_prepared') ||
+    (state === 'reconciliation_automation_rolled_back' &&
+      current.state === 'reconciliation_automation_applied') ||
     (state === 'rollback_prepared' && current.state === 'target_stopped') ||
     (state === 'legacy_restart_requested' &&
       current.state === 'rollback_prepared') ||

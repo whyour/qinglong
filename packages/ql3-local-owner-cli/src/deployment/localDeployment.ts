@@ -142,9 +142,18 @@ import {
   commitLocalReconciliationAutomationDecisionCommandFile,
   prepareLocalReconciliationAutomationDecision,
   prepareLocalReconciliationAutomationDecisionCommandFile,
+  readLocalReconciliationAutomationDecisionTerminal,
   verifyLocalReconciliationAutomationDecision,
   verifyLocalReconciliationAutomationDecisionCommandFile,
 } from './reconciliation/application/automation/decisionCoordinator';
+import {
+  applyLocalReconciliationAutomation,
+  applyLocalReconciliationAutomationCommandFile,
+  rollbackLocalReconciliationAutomationApply,
+  rollbackLocalReconciliationAutomationApplyCommandFile,
+  verifyLocalReconciliationAutomationApply,
+  verifyLocalReconciliationAutomationApplyCommandFile,
+} from './reconciliation/application/automation/applyCoordinator';
 
 export {
   commitLocalReconciliationPlan,
@@ -173,11 +182,30 @@ export {
   verifyLocalReconciliationAutomationPlanCommandFile,
   prepareLocalReconciliationAutomationDecision,
   prepareLocalReconciliationAutomationDecisionCommandFile,
+  readLocalReconciliationAutomationDecisionTerminal,
   commitLocalReconciliationAutomationDecision,
   commitLocalReconciliationAutomationDecisionCommandFile,
   verifyLocalReconciliationAutomationDecision,
   verifyLocalReconciliationAutomationDecisionCommandFile,
+  applyLocalReconciliationAutomation,
+  applyLocalReconciliationAutomationCommandFile,
+  verifyLocalReconciliationAutomationApply,
+  verifyLocalReconciliationAutomationApplyCommandFile,
+  rollbackLocalReconciliationAutomationApply,
+  rollbackLocalReconciliationAutomationApplyCommandFile,
 };
+
+export {
+  normalizeLocalReconciliationAutomationApplyCommand,
+  normalizeLocalReconciliationAutomationApplyRollbackCommand,
+  normalizeLocalReconciliationAutomationApplyVerifyCommand,
+  type LocalReconciliationAutomationApplyCommand,
+  type LocalReconciliationAutomationApplyOptions,
+  type LocalReconciliationAutomationApplyResult,
+  type LocalReconciliationAutomationApplyRollbackCommand,
+  type LocalReconciliationAutomationApplyVerifyCommand,
+} from './reconciliation/application/automation/applyContract';
+export { type LocalReconciliationAutomationApplyDependencies } from './reconciliation/application/automation/applyCoordinator';
 
 export {
   normalizeLocalReconciliationApplicationCommitCommand,
@@ -214,9 +242,7 @@ export {
   type LocalReconciliationAutomationPlanResult,
   type LocalReconciliationAutomationVerifyCommand,
 } from './reconciliation/application/automation/contract';
-export {
-  type LocalReconciliationAutomationPlanDependencies,
-} from './reconciliation/application/automation/coordinator';
+export { type LocalReconciliationAutomationPlanDependencies } from './reconciliation/application/automation/coordinator';
 export {
   normalizeLocalReconciliationAutomationDecisionCommitCommand,
   normalizeLocalReconciliationAutomationDecisionPrepareCommand,
@@ -229,9 +255,7 @@ export {
   type LocalReconciliationAutomationDecisionTerminalResult,
   type LocalReconciliationAutomationDecisionVerifyCommand,
 } from './reconciliation/application/automation/decisionContract';
-export {
-  type LocalReconciliationAutomationDecisionDependencies,
-} from './reconciliation/application/automation/decisionCoordinator';
+export { type LocalReconciliationAutomationDecisionDependencies } from './reconciliation/application/automation/decisionCoordinator';
 export {
   MAX_EDGE_LOCAL_RECONCILIATION_AUTOMATION_PLAN_BYTES,
   MAX_STANDALONE_LOCAL_RECONCILIATION_AUTOMATION_PLAN_BYTES,
