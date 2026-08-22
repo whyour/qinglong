@@ -3,6 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
 const yaml = require('js-yaml');
+const {
+  createFixture,
+} = require('../../scripts/ql3-plugin-package-recovery-e2e-fixture.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const livePath = path.join(
@@ -53,6 +56,27 @@ test('fixture uses a real HTTPS and content-addressed OCI Distribution surface',
   assert.match(live, /requestCount: packageRequests\.length/);
 });
 
+test('fixture locks are bound to durable version-three approval dispatches', () => {
+  const value = createFixture({
+    registry: 'registry.fixture.test',
+    architecture: 'amd64',
+    createdAtMs: 1_000,
+  });
+  for (const selected of [value.initial, value.upgrade]) {
+    const proposal = selected.authority.proposalCommand.proposal;
+    const dispatch = selected.authority.dispatch;
+    assert.equal(selected.lock.approval.requestVersion, 3);
+    assert.equal(selected.lock.approval.dispatchId, dispatch.id);
+    assert.equal(selected.lock.actionDigest, proposal.actionDigest);
+    assert.equal(selected.lock.planDigest, proposal.previewDigest);
+    assert.equal(dispatch.action.actionRef, proposal.actionRef);
+    assert.equal(
+      selected.authority.consumptionCommand.dispatchId,
+      dispatch.id,
+    );
+  }
+});
+
 test('gate runs migration, healthy activation and a durable rejected upgrade', () => {
   assert.match(live, /operations\/base\/migrate-job\.yaml/);
   assert.match(
@@ -69,6 +93,14 @@ test('gate runs migration, healthy activation and a durable rejected upgrade', (
   );
   assert.match(live, /plugin-package-recovery\/base\/recover-job\.yaml/);
   assert.match(fixture, /PostgresPluginPackageInstallRepository/);
+  assert.match(fixture, /PostgresPluginPackageInstallProposalRepository/);
+  assert.match(fixture, /PostgresApprovalRequestRepository/);
+  assert.match(fixture, /PostgresApprovedActionExecutionRepository/);
+  assert.match(fixture, /PostgresProjectPolicyRepository/);
+  assert.match(fixture, /\.createProposal\(selected\.authority\.proposalCommand\)/);
+  assert.match(fixture, /\.consume\(selected\.authority\.consumptionCommand\)/);
+  assert.match(fixture, /repository\.admit\(/);
+  assert.doesNotMatch(fixture, /pluginPackageInstallCreate/);
   assert.match(
     fixture,
     /PostgresPluginPackagePublisherTrustAuthorityRepository/,
@@ -79,12 +111,9 @@ test('gate runs migration, healthy activation and a durable rejected upgrade', (
   assert.match(fixture, /publisherTrustStatus/);
   assert.match(live, /QL3_E2E_POSTGRES_PACKAGE_MANAGER_USER/);
   assert.match(live, /key: 'package-manager-password'/);
-  assert.match(
-    fixture,
-    /PostgresPluginPackageSecretBindingTransitionRepository/,
-  );
-  assert.match(fixture, /createPluginPackageInstall/);
-  assert.match(fixture, /pluginPackageInstallCreate/);
+  assert.match(live, /QL3_E2E_POSTGRES_RUNTIME_USER/);
+  assert.match(live, /key: 'runtime-password'/);
+  assert.doesNotMatch(fixture, /commit-transition/);
   assert.match(live, /initialSeed\.state, 'queued'/);
   assert.match(live, /upgradeSeed\.state, 'queued'/);
   assert.match(live, /value\.migrationCount, 65/);
@@ -99,27 +128,18 @@ test('gate runs migration, healthy activation and a durable rejected upgrade', (
 });
 
 test('deployment controller rejects the upgrade before creating runtime', () => {
-  const failedStageWait = live.indexOf(
-    "waitForJob(UPGRADE_STAGE_JOB, 'failed')",
-  );
-  const transitionWait = live.indexOf('waitForJob(TRANSITION_JOB)');
-  const rejectionWait = live.indexOf('waitForJob(UPGRADE_REJECTION_JOB)');
+  const rejectionWait = live.indexOf('waitForJob(UPGRADE_RECOVERY_JOB)');
   const pointerProof = live.indexOf(
     'assert.deepEqual(pointerAfterRejection, pointerBeforeUpgrade)',
   );
   const runtimeApply = live.indexOf(
     'const runtime = applyRuntimeAfterRecovery(',
   );
-  assert.ok(failedStageWait > 0);
-  assert.ok(transitionWait > failedStageWait);
-  assert.ok(rejectionWait > transitionWait);
+  assert.ok(rejectionWait > 0);
   assert.ok(pointerProof > rejectionWait);
   assert.ok(runtimeApply > pointerProof);
   assert.match(live, /activePointerUnchanged: true/);
-  assert.match(
-    live,
-    /stageFailure\.name,[\s\S]*'ClusterPluginPackageRecoveryRequiredError'/,
-  );
+  assert.doesNotMatch(live, /missingTransitionFailedClosed/);
   assert.match(live, /qinglong\.io\/plugin-recovery-job-uid/);
   assert.match(live, /qinglong\.io\/plugin-recovery-completed-at/);
   assert.match(live, /rollout[\s\S]*status/);

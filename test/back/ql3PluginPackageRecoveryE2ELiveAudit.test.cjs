@@ -42,8 +42,7 @@ function validReport() {
         'postgres@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296',
       migrationImageId: `docker://${admin}`,
       initialRecoveryImageId: `docker://${admin}`,
-      stageRecoveryImageId: `docker://${admin}`,
-      rejectionRecoveryImageId: `docker://${admin}`,
+      upgradeRecoveryImageId: `docker://${admin}`,
       postgresImageId: `containerd://sha256:${'e'.repeat(64)}`,
     },
     ordering: {
@@ -51,22 +50,13 @@ function validReport() {
       migrationCompletedAt: '2026-08-14T08:00:01.000Z',
       initialRecoveryJobUid: '00000000-0000-4000-8000-000000000002',
       initialRecoveryCompletedAt: '2026-08-14T08:00:02.000Z',
-      upgradeStageJobUid: '00000000-0000-4000-8000-000000000003',
-      upgradeStageFailedAt: '2026-08-14T08:00:03.000Z',
-      transitionJobUid: '00000000-0000-4000-8000-000000000004',
-      transitionCompletedAt: '2026-08-14T08:00:04.000Z',
-      rejectionRecoveryJobUid: '00000000-0000-4000-8000-000000000005',
-      rejectionRecoveryCompletedAt: '2026-08-14T08:00:05.000Z',
-      runtimeCreatedAt: '2026-08-14T08:00:06.000Z',
-      runtimeBoundRecoveryJobUid: '00000000-0000-4000-8000-000000000005',
+      upgradeRecoveryJobUid: '00000000-0000-4000-8000-000000000003',
+      upgradeRecoveryCompletedAt: '2026-08-14T08:00:03.000Z',
+      runtimeCreatedAt: '2026-08-14T08:00:04.000Z',
+      runtimeBoundRecoveryJobUid: '00000000-0000-4000-8000-000000000003',
     },
     failedUpgrade: {
-      stageFailure: {
-        jobUid: '00000000-0000-4000-8000-000000000003',
-        reason: 'ClusterPluginPackageRecoveryRequiredError',
-        durableState: 'staged',
-      },
-      transitionReceiptDigest: 'f'.repeat(64),
+      recoveryJobUid: '00000000-0000-4000-8000-000000000003',
       rejectionReason: 'activation_fact_conflict',
       candidateRevisionCount: 0,
       activePointerUnchanged: true,
@@ -83,7 +73,6 @@ function validReport() {
       initialMutationCount: 4,
       upgradeMutationCount: 3,
       headInstallationId: 'install-plugin-recovery-e2e-upgrade',
-      transitionReceiptCount: 1,
       initialRevisionCount: 1,
       upgradeRevisionCount: 0,
       recoverableCount: 0,
@@ -91,11 +80,11 @@ function validReport() {
     oci: {
       https: true,
       authentication: 'exact-registry-basic',
-      authenticatedRequestCount: 18,
-      requestCount: 18,
+      authenticatedRequestCount: 12,
+      requestCount: 12,
       uniquePaths: 12,
       initialRequestCount: 6,
-      upgradeRequestCount: 12,
+      upgradeRequestCount: 6,
       redirects: 0,
     },
     kubernetes: {
@@ -118,9 +107,9 @@ function validReport() {
     },
     runtime: {
       replicas: 2,
-      creationTimestamp: '2026-08-14T08:00:06.000Z',
-      recoveryJobUid: '00000000-0000-4000-8000-000000000005',
-      recoveryCompletedAt: '2026-08-14T08:00:05.000Z',
+      creationTimestamp: '2026-08-14T08:00:04.000Z',
+      recoveryJobUid: '00000000-0000-4000-8000-000000000003',
+      recoveryCompletedAt: '2026-08-14T08:00:03.000Z',
       nodes: ['worker-a', 'worker-b'],
       imageIds: [`docker://${control}`],
     },
@@ -142,7 +131,8 @@ test('offline audit accepts one exact low-sensitive recovery report', () => {
 test('offline audit rejects broken upgrade, ordering and image relationships', () => {
   const report = validReport();
   report.database.upgradeRevisionCount = 1;
-  report.ordering.transitionCompletedAt = '2026-08-14T07:59:59.000Z';
+  report.ordering.upgradeRecoveryCompletedAt =
+    '2026-08-14T07:59:59.000Z';
   report.runtime.imageIds = [`docker://sha256:${'9'.repeat(64)}`];
   report.gates.activePointerJsonUnchanged = false;
   const codes = validatePluginPackageRecoveryE2ELiveReport(report).findings.map(

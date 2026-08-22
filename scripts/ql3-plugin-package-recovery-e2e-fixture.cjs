@@ -340,6 +340,172 @@ function signedPackageRoutes(material, lock, privateKey) {
   ]);
 }
 
+function createInstallAuthority(actionInput, phase, proposedAtMs, eventBase) {
+  const {
+    consumeApprovalRequest,
+    createApprovalRequest,
+    decideApprovalRequest,
+  } = ql3Require('@qinglong/runtime-core/approved-action');
+  const {
+    createPluginPackageInstallProposal,
+    resolvePluginPackageInstallProposal,
+  } = ql3Require('@qinglong/runtime-core/plugin-package-proposal');
+  const requester = { type: 'user', id: 'plugin-recovery-e2e-owner' };
+  const reviewer = { type: 'user', id: 'plugin-recovery-e2e-reviewer' };
+  const consumer = { type: 'system', id: 'plugin-recovery-e2e-dispatcher' };
+  const fence = { projectVersion: 1, bindingVersion: 1 };
+  const requestedAtMs = proposedAtMs + 1;
+  const decidedAtMs = proposedAtMs + 2;
+  const consumedAtMs = proposedAtMs + 3;
+  const lockCreatedAtMs = proposedAtMs + 4;
+  const expiresAtMs = proposedAtMs + 60 * 60 * 1000;
+  const actionRef = `plugin-package:e2e-monitor:${phase}`;
+  const proposal = createPluginPackageInstallProposal({
+    actionRef,
+    actionInput,
+    proposedBy: requester,
+    proposalFence: fence,
+    createdAtMs: proposedAtMs,
+  });
+  const action = {
+    actionRef: proposal.actionRef,
+    actionType: proposal.actionType,
+    permission: proposal.permission,
+    actionDigest: proposal.actionDigest,
+    previewDigest: proposal.previewDigest,
+  };
+  const request = createApprovalRequest({
+    id: `approval-plugin-recovery-e2e-${phase}`,
+    projectId: proposal.projectId,
+    action,
+    risk: 'high',
+    decisionMode: 'separation_of_duty',
+    requestedBy: requester,
+    requestedAtMs,
+    expiresAtMs,
+    requestFence: fence,
+  });
+  const decision = {
+    expectedVersion: 1,
+    decisionId: `decision-plugin-recovery-e2e-${phase}`,
+    decision: 'approved',
+    reasonCode: 'reviewed',
+    principal: {
+      subject: reviewer,
+      authenticationId: `auth-plugin-recovery-e2e-reviewer-${phase}`,
+      authenticatedAtMs: proposedAtMs,
+      expiresAtMs,
+      assurance: 'multi_factor',
+    },
+    decidedAtMs,
+    authorizationFence: fence,
+  };
+  const decided = decideApprovalRequest(request, decision);
+  const consumption = {
+    expectedVersion: 2,
+    consumptionId: `consume-plugin-recovery-e2e-${phase}`,
+    dispatchId: `dispatch-plugin-recovery-e2e-${phase}`,
+    action,
+    requestedBy: requester,
+    consumedBy: consumer,
+    consumedAtMs,
+    authorizationFence: fence,
+  };
+  const consumed = consumeApprovalRequest(decided, consumption);
+  const audit = (
+    offset,
+    requestId,
+    operationId,
+    subject,
+    authenticationId,
+    outcome,
+    reasons,
+    occurredAtMs,
+  ) => ({
+    eventId: `10000000-0000-4000-8000-${String(
+      eventBase + offset,
+    ).padStart(12, '0')}`,
+    requestId,
+    operationId,
+    projectId: proposal.projectId,
+    subject,
+    authenticationId,
+    outcome,
+    reasons,
+    fence,
+    occurredAtMs,
+  });
+  return Object.freeze({
+    requester,
+    reviewer,
+    consumer,
+    fence,
+    proposalCommand: {
+      proposal,
+      audit: audit(
+        0,
+        proposal.actionRef,
+        'plugin_package.propose',
+        requester,
+        `auth-plugin-recovery-e2e-owner-${phase}`,
+        'allowed',
+        ['package_proposal'],
+        proposedAtMs,
+      ),
+    },
+    requestCommand: {
+      request,
+      audit: audit(
+        1,
+        `request-plugin-recovery-e2e-${phase}`,
+        'approval.request',
+        requester,
+        `auth-plugin-recovery-e2e-owner-${phase}`,
+        'approval_required',
+        ['package_review'],
+        requestedAtMs,
+      ),
+    },
+    decisionCommand: {
+      requestId: request.id,
+      ...decision,
+      audit: audit(
+        2,
+        `decision-plugin-recovery-e2e-${phase}`,
+        'approval.decide',
+        reviewer,
+        decision.principal.authenticationId,
+        'allowed',
+        ['role_grant'],
+        decidedAtMs,
+      ),
+    },
+    consumptionCommand: {
+      requestId: request.id,
+      ...consumption,
+      audit: audit(
+        3,
+        `consume-plugin-recovery-e2e-${phase}`,
+        'approval.consume',
+        consumer,
+        `auth-plugin-recovery-e2e-dispatcher-${phase}`,
+        'allowed',
+        ['role_grant'],
+        consumedAtMs,
+      ),
+    },
+    dispatch: consumed.dispatch,
+    lock: resolvePluginPackageInstallProposal(
+      proposal,
+      consumed.dispatch,
+      lockCreatedAtMs,
+    ),
+    admissionAuditEventId: `10000000-0000-4000-8000-${String(
+      eventBase + 4,
+    ).padStart(12, '0')}`,
+  });
+}
+
 function createFixture({ registry, architecture, createdAtMs = Date.now() }) {
   if (
     typeof registry !== 'string' ||
@@ -356,11 +522,6 @@ function createFixture({ registry, architecture, createdAtMs = Date.now() }) {
   const { planPluginPackageInstall } = ql3Require(
     '@qinglong/runtime-core/plugin-package',
   );
-  const {
-    createPluginPackageLock,
-    pluginPackageInstallActionDigest,
-    pluginPackageInstallPlanDigest,
-  } = ql3Require('@qinglong/runtime-core/plugin-package-install');
   const { createPluginPackageResourceGenerationFromReferences } = ql3Require(
     '@qinglong/runtime-core/plugin-package-resource-generation',
   );
@@ -386,22 +547,14 @@ function createFixture({ registry, architecture, createdAtMs = Date.now() }) {
     deploymentProfile: 'cluster-control',
     targetGeneration: 1,
   };
-  const initialLock = createPluginPackageLock({
-    ...initialAction,
-    approval: {
-      requestId: 'approval-plugin-recovery-e2e-initial',
-      requestVersion: 1,
-      dispatchId: 'dispatch-plugin-recovery-e2e-initial',
-      actionDigest: pluginPackageInstallActionDigest(initialAction),
-      previewDigest: pluginPackageInstallPlanDigest(initialPlan),
-      approvedBy: { type: 'user', id: 'e2e-owner' },
-      approvedAtMs: createdAtMs - 1,
-      expiresAtMs: createdAtMs + 60 * 60 * 1000,
-      fence: { projectVersion: 1, bindingVersion: 1 },
-    },
+  const initialAuthority = createInstallAuthority(
+    initialAction,
+    'initial',
     createdAtMs,
-  });
-  const upgradeCreatedAtMs = createdAtMs + 10;
+    1,
+  );
+  const initialLock = initialAuthority.lock;
+  const upgradeCreatedAtMs = initialLock.createdAtMs + 10;
   const upgradeManifest = pluginManifest(architecture, '2.0.0', true);
   const upgradeMaterial = packageMaterial(
     registry,
@@ -426,21 +579,13 @@ function createFixture({ registry, architecture, createdAtMs = Date.now() }) {
     targetGeneration: 2,
     previousLockDigest: initialLock.lockDigest,
   };
-  const upgradeLock = createPluginPackageLock({
-    ...upgradeAction,
-    approval: {
-      requestId: 'approval-plugin-recovery-e2e-upgrade',
-      requestVersion: 1,
-      dispatchId: 'dispatch-plugin-recovery-e2e-upgrade',
-      actionDigest: pluginPackageInstallActionDigest(upgradeAction),
-      previewDigest: pluginPackageInstallPlanDigest(upgradePlan),
-      approvedBy: { type: 'user', id: 'e2e-owner' },
-      approvedAtMs: upgradeCreatedAtMs - 1,
-      expiresAtMs: upgradeCreatedAtMs + 60 * 60 * 1000,
-      fence: { projectVersion: 1, bindingVersion: 1 },
-    },
-    createdAtMs: upgradeCreatedAtMs,
-  });
+  const upgradeAuthority = createInstallAuthority(
+    upgradeAction,
+    'upgrade',
+    upgradeCreatedAtMs,
+    11,
+  );
+  const upgradeLock = upgradeAuthority.lock;
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const publicKeyPem = publicKey.export({ format: 'pem', type: 'spki' });
   const trust = {
@@ -467,6 +612,7 @@ function createFixture({ registry, architecture, createdAtMs = Date.now() }) {
     privateKey,
   );
   const initial = Object.freeze({
+    authority: initialAuthority,
     installationId: 'install-plugin-recovery-e2e-initial',
     manifest: initialManifest,
     lock: initialLock,
@@ -483,6 +629,7 @@ function createFixture({ registry, architecture, createdAtMs = Date.now() }) {
     routes: initialRoutes,
   });
   const upgrade = Object.freeze({
+    authority: upgradeAuthority,
     installationId: 'install-plugin-recovery-e2e-upgrade',
     manifest: upgradeManifest,
     lock: upgradeLock,
@@ -518,8 +665,12 @@ function readFixture(filePath) {
     value.schema !== FIXTURE_SCHEMA ||
     !Array.isArray(value.routes) ||
     !value.initial?.lock ||
+    !value.initial?.authority?.proposalCommand?.proposal ||
+    !value.initial?.authority?.dispatch ||
     !value.initial?.generation ||
     !value.upgrade?.lock ||
+    !value.upgrade?.authority?.proposalCommand?.proposal ||
+    !value.upgrade?.authority?.dispatch ||
     !value.upgrade?.generation ||
     !value.trust
   ) {
@@ -624,32 +775,31 @@ async function runSeed() {
     assertPostgresPackageExecutorSchemaReady,
     createPostgresDatabaseOpener,
     loadPostgresConnectionEnvironment,
-    PostgresPluginPackageSecretBindingTransitionRepository,
+    PostgresApprovedActionExecutionRepository,
   } = ql3Require('@qinglong/cluster-postgres/package-executor');
   const {
     assertPostgresPackageManagerSchemaReady,
+    PostgresApprovalRequestRepository,
     PostgresPluginPackagePublisherTrustAuthorityRepository,
   } = ql3Require('@qinglong/cluster-postgres/package-manager');
+  const { PostgresProjectPolicyRepository } = ql3Require(
+    '@qinglong/cluster-postgres/project-policy',
+  );
   const { PostgresPluginPackageInstallRepository } = ql3Require(
     '@qinglong/cluster-postgres/plugin-package-install',
   );
-  const {
-    createPluginPackageInstall,
-    normalizePluginPackageLock,
-    pluginPackageInstallCreate,
-  } = ql3Require('@qinglong/runtime-core/plugin-package-install');
-  const { createPluginPackageSecretBindingTarget } = ql3Require(
-    '@qinglong/runtime-core/plugin-package-secret-binding',
+  const { PostgresPluginPackageInstallProposalRepository } = ql3Require(
+    '@qinglong/cluster-postgres/plugin-package-proposal',
   );
-  const { createPluginPackageSecretBindingTransitionPlan } = ql3Require(
-    '@qinglong/runtime-core/plugin-package-secret-binding-transition-plan',
+  const { normalizePluginPackageLock } = ql3Require(
+    '@qinglong/runtime-core/plugin-package-install',
   );
   const { createPluginPackagePublisherTrustSnapshot } = ql3Require(
     '@qinglong/runtime-core/plugin-package-publisher-trust',
   );
   const fixture = readFixture(process.env.QL3_E2E_FIXTURE_FILE);
   const mode = process.env.QL3_E2E_MODE;
-  if (!['seed-initial', 'seed-upgrade', 'commit-transition'].includes(mode)) {
+  if (!['seed-initial', 'seed-upgrade'].includes(mode)) {
     throw new Error('Plugin Package E2E seed mode is invalid');
   }
   const connection = loadPostgresConnectionEnvironment(process.env, {
@@ -671,72 +821,82 @@ async function runSeed() {
   })();
   try {
     await assertPostgresPackageExecutorSchemaReady(database.pool);
-    if (mode === 'commit-transition') {
-      const plannedAtMs = Date.now();
-      const transitionPlan = createPluginPackageSecretBindingTransitionPlan({
-        previousTarget: createPluginPackageSecretBindingTarget(
-          fixture.initial.generation,
-          fixture.initial.manifest,
-        ),
-        previousBinding: null,
-        previousAttemptGeneration: 1,
-        nextGeneration: fixture.upgrade.generation,
-        nextManifest: fixture.upgrade.manifest,
-        assignments: [],
-        plannedAtMs,
-      });
-      const result =
-        await new PostgresPluginPackageSecretBindingTransitionRepository(
-          database.pool,
-        ).apply({
-          transitionPlan,
-          evidenceDigest: transitionPlan.transitionDigest,
-          committedAtMs: plannedAtMs + 1,
-        });
-      process.stdout.write(
-        `${JSON.stringify({
-          schema: 'qinglong/plugin-package-recovery-e2e-transition-result@v1',
-          event: 'transition_completed',
-          status: result.status,
-          generationDigest: transitionPlan.nextTarget.generationDigest,
-          transitionDigest: transitionPlan.transitionDigest,
-          bindingDigest: result.receipt.bindingDigest,
-          receiptDigest: result.receipt.receiptDigest,
-        })}\n`,
-      );
-      return;
-    }
     const selected =
       mode === 'seed-initial' ? fixture.initial : fixture.upgrade;
-    let publisherTrustStatus = null;
-    if (mode === 'seed-initial') {
-      const packageManagerConnection = loadPostgresConnectionEnvironment(
-        process.env,
-        {
-          host: 'QL3_E2E_POSTGRES_HOST',
-          port: 'QL3_E2E_POSTGRES_PORT',
-          database: 'QL3_E2E_POSTGRES_DATABASE',
-          user: 'QL3_E2E_POSTGRES_PACKAGE_MANAGER_USER',
-          password: 'QL3_E2E_POSTGRES_PACKAGE_MANAGER_PASSWORD',
-        },
+    const runtimeConnection = loadPostgresConnectionEnvironment(process.env, {
+      host: 'QL3_E2E_POSTGRES_HOST',
+      port: 'QL3_E2E_POSTGRES_PORT',
+      database: 'QL3_E2E_POSTGRES_DATABASE',
+      user: 'QL3_E2E_POSTGRES_RUNTIME_USER',
+      password: 'QL3_E2E_POSTGRES_RUNTIME_PASSWORD',
+    });
+    const runtimeDatabase = await createPostgresDatabaseOpener({
+      role: 'runtime',
+      connection: { ...runtimeConnection, tls: { mode: 'disable' } },
+      pool: {
+        applicationName: 'qinglong3-plugin-package-e2e-policy-seed',
+        maxConnections: 1,
+        connectionTimeoutMs: 15_000,
+      },
+      onPoolError() {},
+    })();
+    try {
+      const policies = new PostgresProjectPolicyRepository(
+        runtimeDatabase.pool,
       );
-      const packageManagerDatabase = await createPostgresDatabaseOpener({
-        role: 'package-manager',
-        connection: {
-          ...packageManagerConnection,
-          tls: { mode: 'disable' },
-        },
-        pool: {
-          applicationName: 'qinglong3-plugin-package-e2e-trust-seed',
-          maxConnections: 1,
-          connectionTimeoutMs: 15_000,
-        },
-        onPoolError() {},
-      })();
-      try {
-        await assertPostgresPackageManagerSchemaReady(
-          packageManagerDatabase.pool,
-        );
+      for (const [subject, role] of [
+        [selected.authority.requester, 'owner'],
+        [selected.authority.reviewer, 'admin'],
+      ]) {
+        const policy = await policies.append({
+          expectedCurrentVersion: 0,
+          binding: {
+            projectId: selected.lock.projectId,
+            subject,
+            version: 1,
+            state: 'active',
+            role,
+            mutationId: `plugin-recovery-e2e-grant-${role}`,
+            changedBy: { type: 'system', id: 'plugin-recovery-e2e-bootstrap' },
+            createdAtMs: 1,
+          },
+        });
+        if (!['inserted', 'existing'].includes(policy.status)) {
+          throw new Error('Plugin Package E2E policy seed was not durable');
+        }
+      }
+    } finally {
+      await runtimeDatabase.close();
+    }
+    let publisherTrustStatus = null;
+    const packageManagerConnection = loadPostgresConnectionEnvironment(
+      process.env,
+      {
+        host: 'QL3_E2E_POSTGRES_HOST',
+        port: 'QL3_E2E_POSTGRES_PORT',
+        database: 'QL3_E2E_POSTGRES_DATABASE',
+        user: 'QL3_E2E_POSTGRES_PACKAGE_MANAGER_USER',
+        password: 'QL3_E2E_POSTGRES_PACKAGE_MANAGER_PASSWORD',
+      },
+    );
+    const packageManagerDatabase = await createPostgresDatabaseOpener({
+      role: 'package-manager',
+      connection: {
+        ...packageManagerConnection,
+        tls: { mode: 'disable' },
+      },
+      pool: {
+        applicationName: 'qinglong3-plugin-package-e2e-management-seed',
+        maxConnections: 1,
+        connectionTimeoutMs: 15_000,
+      },
+      onPoolError() {},
+    })();
+    try {
+      await assertPostgresPackageManagerSchemaReady(
+        packageManagerDatabase.pool,
+      );
+      if (mode === 'seed-initial') {
         const observed =
           await new PostgresPluginPackagePublisherTrustAuthorityRepository(
             packageManagerDatabase.pool,
@@ -754,9 +914,17 @@ async function runSeed() {
           );
         }
         publisherTrustStatus = observed.status;
-      } finally {
-        await packageManagerDatabase.close();
       }
+      await new PostgresPluginPackageInstallProposalRepository(
+        packageManagerDatabase.pool,
+      ).createProposal(selected.authority.proposalCommand);
+      const approvals = new PostgresApprovalRequestRepository(
+        packageManagerDatabase.pool,
+      );
+      await approvals.create(selected.authority.requestCommand);
+      await approvals.decide(selected.authority.decisionCommand);
+    } finally {
+      await packageManagerDatabase.close();
     }
     const lock = normalizePluginPackageLock(selected.lock);
     const repository = new PostgresPluginPackageInstallRepository(
@@ -772,16 +940,68 @@ async function runSeed() {
     ) {
       throw new Error('Plugin Package E2E previous install head is invalid');
     }
-    const record = createPluginPackageInstall(lock, {
+    const consumed = await new PostgresApprovalRequestRepository(
+      database.pool,
+    ).consume(selected.authority.consumptionCommand);
+    if (
+      JSON.stringify(consumed.dispatch) !==
+      JSON.stringify(selected.authority.dispatch)
+    ) {
+      throw new Error('Plugin Package E2E durable dispatch drifted');
+    }
+    const executions = new PostgresApprovedActionExecutionRepository(
+      database.pool,
+    );
+    const executionAtMs = Date.now();
+    const owner = 'plugin_recovery_e2e_dispatcher';
+    const leaseToken = `lease-plugin-recovery-e2e-${
+      mode === 'seed-initial' ? 'initial' : 'upgrade'
+    }`;
+    const claimed = await executions.claimExecution({
+      dispatchId: consumed.dispatch.id,
+      owner,
+      leaseToken,
+      nowMs: executionAtMs,
+      leaseDurationMs: 60_000,
+    });
+    if (claimed.status !== 'claimed') {
+      throw new Error('Plugin Package E2E execution was not claimable');
+    }
+    const started = await executions.startExecution({
+      dispatchId: consumed.dispatch.id,
+      approvalRequestId: consumed.dispatch.approvalRequestId,
+      actionDigest: consumed.dispatch.action.actionDigest,
+      owner,
+      leaseToken,
+      expectedVersion: claimed.snapshot.execution.version,
+      startedAtMs: executionAtMs + 1,
+    });
+    const admittedAtMs = executionAtMs + 2;
+    const result = await repository.admit({
+      lock,
+      proposalDigest:
+        selected.authority.proposalCommand.proposal.proposalDigest,
+      execution: started.execution,
       installationId: selected.installationId,
       mutationId: `mutation-plugin-recovery-e2e-${
         mode === 'seed-initial' ? 'initial' : 'upgrade'
-      }-create`,
-      occurredAtMs: lock.createdAtMs + 1,
+      }-admit`,
+      admittedAtMs,
+      audit: {
+        eventId: selected.authority.admissionAuditEventId,
+        requestId: consumed.dispatch.id,
+        operationId: 'plugin_package.admit',
+        projectId: lock.projectId,
+        subject: selected.authority.consumer,
+        authenticationId: `auth-plugin-recovery-e2e-dispatcher-${
+          mode === 'seed-initial' ? 'initial' : 'upgrade'
+        }`,
+        outcome: 'allowed',
+        reasons: ['approved_action'],
+        fence: selected.authority.fence,
+        occurredAtMs: admittedAtMs,
+      },
     });
-    const result = await repository.create(
-      pluginPackageInstallCreate(lock, record, previous),
-    );
     process.stdout.write(
       `${JSON.stringify({
         schema: 'qinglong/plugin-package-recovery-e2e-seed-result@v1',
@@ -806,15 +1026,13 @@ async function main() {
     return;
   }
   if (
-    ['seed-initial', 'seed-upgrade', 'commit-transition'].includes(
-      process.env.QL3_E2E_MODE,
-    )
+    ['seed-initial', 'seed-upgrade'].includes(process.env.QL3_E2E_MODE)
   ) {
     await runSeed();
     return;
   }
   throw new Error(
-    'QL3_E2E_MODE must be registry, seed-initial, seed-upgrade or commit-transition',
+    'QL3_E2E_MODE must be registry, seed-initial or seed-upgrade',
   );
 }
 

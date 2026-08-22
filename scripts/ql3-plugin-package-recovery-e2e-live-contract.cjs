@@ -38,13 +38,11 @@ const POSTGRES_RUNTIME_IMAGE =
 const DEFAULT_ADMIN_IMAGE = 'qinglong3-cluster-admin:ql3-plugin-recovery-e2e';
 const DEFAULT_CONTROL_IMAGE =
   'qinglong3-cluster-control:ql3-plugin-recovery-e2e';
-const REPORT_SCHEMA = 'qinglong/plugin-package-recovery-e2e-live-contract@v2';
+const REPORT_SCHEMA = 'qinglong/plugin-package-recovery-e2e-live-contract@v3';
 const INITIAL_SEED_JOB = 'ql3-plugin-package-e2e-seed-initial';
 const INITIAL_RECOVERY_JOB = 'ql3-plugin-package-recovery-initial';
 const UPGRADE_SEED_JOB = 'ql3-plugin-package-e2e-seed-upgrade';
-const UPGRADE_STAGE_JOB = 'ql3-plugin-package-recovery-stage-upgrade';
-const TRANSITION_JOB = 'ql3-plugin-package-e2e-transition';
-const UPGRADE_REJECTION_JOB = 'ql3-plugin-package-recovery-reject-upgrade';
+const UPGRADE_RECOVERY_JOB = 'ql3-plugin-package-recovery-reject-upgrade';
 const SAFE_CLUSTER =
   /^ql3-plugin-recovery-e2e(?:-[a-z0-9](?:[-a-z0-9]{0,24}[a-z0-9])?)?$/;
 
@@ -880,6 +878,19 @@ function seedJob(name, mode) {
                 { name: 'QL3_E2E_POSTGRES_PORT', value: '5432' },
                 { name: 'QL3_E2E_POSTGRES_DATABASE', value: 'qinglong' },
                 {
+                  name: 'QL3_E2E_POSTGRES_RUNTIME_USER',
+                  value: 'ql3_runtime',
+                },
+                {
+                  name: 'QL3_E2E_POSTGRES_RUNTIME_PASSWORD',
+                  valueFrom: {
+                    secretKeyRef: {
+                      name: 'ql3-e2e-postgres-auth',
+                      key: 'runtime-password',
+                    },
+                  },
+                },
+                {
                   name: 'QL3_E2E_POSTGRES_PACKAGE_MANAGER_USER',
                   value: 'ql3_package_manager',
                 },
@@ -1179,67 +1190,6 @@ function canI(verb, resource) {
   return result.stdout === 'yes';
 }
 
-function upgradeStageEvidence(fixture, transitionReceiptCount) {
-  const generationDigest = fixture.upgrade.generation.generationDigest;
-  assert.match(generationDigest, /^[0-9a-f]{64}$/);
-  const sql = `
-SELECT json_build_object(
-  'state', (
-    SELECT state FROM ql3.plugin_package_installs
-    WHERE installation_id = '${fixture.upgrade.installationId}'
-  ),
-  'previousActiveLockDigest', (
-    SELECT previous_active_lock_digest FROM ql3.plugin_package_installs
-    WHERE installation_id = '${fixture.upgrade.installationId}'
-  ),
-  'activeLockDigest', (
-    SELECT active_lock_digest FROM ql3.plugin_package_installs
-    WHERE installation_id = '${fixture.upgrade.installationId}'
-  ),
-  'mutationCount', (
-    SELECT count(*) FROM ql3.plugin_package_install_mutations
-    WHERE installation_id = '${fixture.upgrade.installationId}'
-  ),
-  'transitionReceiptCount', (
-    SELECT count(*)
-    FROM ql3.plugin_package_secret_binding_transition_receipts
-    WHERE generation_digest = '${generationDigest}'
-  ),
-  'candidateRevisionCount', (
-    SELECT count(*) FROM ql3.plugin_package_materialized_revisions
-    WHERE generation_digest = '${generationDigest}'
-  )
-)::text;
-`.trim();
-  const output = kubectl(
-    [
-      '-n',
-      NAMESPACE,
-      'exec',
-      POSTGRES_NAME,
-      '--',
-      'psql',
-      '--username',
-      'postgres',
-      '--dbname',
-      'qinglong',
-      '--tuples-only',
-      '--no-align',
-      '--command',
-      sql,
-    ],
-    { capture: true, quiet: true },
-  ).stdout;
-  const value = JSON.parse(output);
-  assert.equal(value.state, 'staged');
-  assert.equal(value.previousActiveLockDigest, fixture.initial.lock.lockDigest);
-  assert.equal(value.activeLockDigest, fixture.initial.lock.lockDigest);
-  assert.equal(value.mutationCount, 2);
-  assert.equal(value.transitionReceiptCount, transitionReceiptCount);
-  assert.equal(value.candidateRevisionCount, 0);
-  return value;
-}
-
 function databaseEvidence(fixture) {
   const initialGenerationDigest = fixture.initial.generation.generationDigest;
   const upgradeGenerationDigest = fixture.upgrade.generation.generationDigest;
@@ -1298,11 +1248,6 @@ SELECT json_build_object(
     FROM ql3.plugin_package_install_heads
     WHERE project_id = 'default' AND package_name = 'e2e-monitor'
   ),
-  'transitionReceiptCount', (
-    SELECT count(*)
-    FROM ql3.plugin_package_secret_binding_transition_receipts
-    WHERE generation_digest = '${upgradeGenerationDigest}'
-  ),
   'initialRevisionCount', (
     SELECT count(*) FROM ql3.plugin_package_materialized_revisions
     WHERE generation_digest = '${initialGenerationDigest}'
@@ -1352,7 +1297,6 @@ SELECT json_build_object(
   assert.equal(value.initialMutationCount, 4);
   assert.equal(value.upgradeMutationCount, 3);
   assert.equal(value.headInstallationId, fixture.upgrade.installationId);
-  assert.equal(value.transitionReceiptCount, 1);
   assert.equal(value.initialRevisionCount, 1);
   assert.equal(value.upgradeRevisionCount, 0);
   assert.equal(value.recoverableCount, 0);
@@ -1411,10 +1355,7 @@ function registryEvidence(fixture) {
   const packageRequests = events.filter((event) => event.path !== '/v2/');
   const expectedPaths = [
     ...fixture.initial.routes.map((routeValue) => routeValue.path),
-    ...fixture.upgrade.routes.flatMap((routeValue) => [
-      routeValue.path,
-      routeValue.path,
-    ]),
+    ...fixture.upgrade.routes.map((routeValue) => routeValue.path),
   ].sort();
   assert.equal(packageRequests.length, expectedPaths.length);
   assert.deepEqual(
@@ -1430,7 +1371,7 @@ function registryEvidence(fixture) {
     requestCount: packageRequests.length,
     uniquePaths: new Set(packageRequests.map((event) => event.path)).size,
     initialRequestCount: fixture.initial.routes.length,
-    upgradeRequestCount: fixture.upgrade.routes.length * 2,
+    upgradeRequestCount: fixture.upgrade.routes.length,
     redirects: 0,
   });
 }
@@ -1874,7 +1815,7 @@ async function main(argv = process.argv.slice(2)) {
       (value) => value.event === 'seed_completed',
     );
     assert.equal(initialSeed.phase, 'initial');
-    assert.equal(initialSeed.status, 'created');
+    assert.equal(initialSeed.status, 'admitted');
     assert.equal(initialSeed.state, 'queued');
     assert.equal(initialSeed.lockDigest, fixture.initial.lock.lockDigest);
 
@@ -1901,52 +1842,16 @@ async function main(argv = process.argv.slice(2)) {
       (value) => value.event === 'seed_completed',
     );
     assert.equal(upgradeSeed.phase, 'upgrade');
-    assert.equal(upgradeSeed.status, 'created');
+    assert.equal(upgradeSeed.status, 'admitted');
     assert.equal(upgradeSeed.state, 'queued');
     assert.equal(upgradeSeed.lockDigest, fixture.upgrade.lock.lockDigest);
 
-    for (const resource of recoveryResources(fixture, UPGRADE_STAGE_JOB)) {
-      apply(resource, `apply upgrade staging recovery ${resource.kind}`);
-    }
-    const stagedUpgrade = waitForJob(UPGRADE_STAGE_JOB, 'failed');
-    const stagedFailureCondition = stagedUpgrade.status.conditions.find(
-      (condition) => condition.type === 'Failed' && condition.status === 'True',
-    );
-    assert.ok(stagedFailureCondition?.lastTransitionTime);
-    const stageFailure = lastJsonLine(
-      jobLog(UPGRADE_STAGE_JOB),
-      (value) => value.event === 'recovery_failed',
-    );
-    assert.equal(
-      stageFailure.name,
-      'ClusterPluginPackageRecoveryRequiredError',
-    );
-    const stagedDatabase = upgradeStageEvidence(fixture, 0);
-    assert.deepEqual(activePointerEvidence(fixture), pointerBeforeUpgrade);
-
-    apply(
-      seedJob(TRANSITION_JOB, 'commit-transition'),
-      'commit durable no-secret binding transition receipt',
-    );
-    const committedTransition = waitForJob(TRANSITION_JOB);
-    const transition = lastJsonLine(
-      jobLog(TRANSITION_JOB),
-      (value) => value.event === 'transition_completed',
-    );
-    assert.equal(transition.status, 'created');
-    assert.equal(
-      transition.generationDigest,
-      fixture.upgrade.generation.generationDigest,
-    );
-    assert.equal(transition.bindingDigest, null);
-    upgradeStageEvidence(fixture, 1);
-
-    for (const resource of recoveryResources(fixture, UPGRADE_REJECTION_JOB)) {
+    for (const resource of recoveryResources(fixture, UPGRADE_RECOVERY_JOB)) {
       apply(resource, `apply upgrade rejection recovery ${resource.kind}`);
     }
-    const rejectedUpgrade = waitForJob(UPGRADE_REJECTION_JOB);
+    const rejectedUpgrade = waitForJob(UPGRADE_RECOVERY_JOB);
     const rejectionCompleted = lastJsonLine(
-      jobLog(UPGRADE_REJECTION_JOB),
+      jobLog(UPGRADE_RECOVERY_JOB),
       (value) => value.event === 'recovery_completed',
     );
     assert.equal(rejectionCompleted.recovery.safeToAdmit, true);
@@ -1965,8 +1870,7 @@ async function main(argv = process.argv.slice(2)) {
       secrets,
     );
     const initialRecoveryImageId = jobImageId(INITIAL_RECOVERY_JOB);
-    const stageRecoveryImageId = jobImageId(UPGRADE_STAGE_JOB);
-    const rejectionRecoveryImageId = jobImageId(UPGRADE_REJECTION_JOB);
+    const upgradeRecoveryImageId = jobImageId(UPGRADE_RECOVERY_JOB);
     const migrationImageId = jobImageId('ql3-cluster-migration');
     const postgresPod = kubectlJson([
       '-n',
@@ -1991,8 +1895,7 @@ async function main(argv = process.argv.slice(2)) {
         postgresRepositoryDigest: POSTGRES_REPOSITORY_DIGEST,
         migrationImageId,
         initialRecoveryImageId,
-        stageRecoveryImageId,
-        rejectionRecoveryImageId,
+        upgradeRecoveryImageId,
         postgresImageId: postgresPod.status.containerStatuses[0].imageID,
       }),
       ordering: Object.freeze({
@@ -2000,22 +1903,13 @@ async function main(argv = process.argv.slice(2)) {
         migrationCompletedAt: migrated.status.completionTime,
         initialRecoveryJobUid: initialRecovered.metadata.uid,
         initialRecoveryCompletedAt: initialRecovered.status.completionTime,
-        upgradeStageJobUid: stagedUpgrade.metadata.uid,
-        upgradeStageFailedAt: stagedFailureCondition.lastTransitionTime,
-        transitionJobUid: committedTransition.metadata.uid,
-        transitionCompletedAt: committedTransition.status.completionTime,
-        rejectionRecoveryJobUid: rejectedUpgrade.metadata.uid,
-        rejectionRecoveryCompletedAt: rejectedUpgrade.status.completionTime,
+        upgradeRecoveryJobUid: rejectedUpgrade.metadata.uid,
+        upgradeRecoveryCompletedAt: rejectedUpgrade.status.completionTime,
         runtimeCreatedAt: runtime.creationTimestamp,
         runtimeBoundRecoveryJobUid: runtime.recoveryJobUid,
       }),
       failedUpgrade: Object.freeze({
-        stageFailure: Object.freeze({
-          jobUid: stagedUpgrade.metadata.uid,
-          reason: stageFailure.name,
-          durableState: stagedDatabase.state,
-        }),
-        transitionReceiptDigest: transition.receiptDigest,
+        recoveryJobUid: rejectedUpgrade.metadata.uid,
         rejectionReason: database.upgradeFailureReason,
         candidateRevisionCount: database.upgradeRevisionCount,
         activePointerUnchanged: true,
@@ -2029,7 +1923,6 @@ async function main(argv = process.argv.slice(2)) {
       runtime,
       gates: Object.freeze({
         healthyInitialActivation: true,
-        missingTransitionFailedClosed: true,
         invalidUpgradeRejectedBeforeActivation: true,
         activePointerUidUnchanged: true,
         activePointerResourceVersionUnchanged: true,

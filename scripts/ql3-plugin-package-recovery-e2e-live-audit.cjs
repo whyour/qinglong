@@ -5,7 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const FIXTURE = 'qinglong/plugin-package-recovery-e2e-live-contract@v2';
+const FIXTURE = 'qinglong/plugin-package-recovery-e2e-live-contract@v3';
 const LIMITATIONS = Object.freeze([
   'isolated PostgreSQL uses explicit TLS disable; production manifests remain verify-full',
   'the authenticated HTTPS OCI Distribution fixture implements the immutable GET/referrers surface used by the resolver, not a production registry storage implementation',
@@ -13,7 +13,6 @@ const LIMITATIONS = Object.freeze([
 ]);
 const GATE_KEYS = Object.freeze([
   'healthyInitialActivation',
-  'missingTransitionFailedClosed',
   'invalidUpgradeRejectedBeforeActivation',
   'activePointerUidUnchanged',
   'activePointerResourceVersionUnchanged',
@@ -119,8 +118,8 @@ function validRuntime(report) {
     ]) &&
     runtime.replicas === 2 &&
     runtime.creationTimestamp === ordering?.runtimeCreatedAt &&
-    runtime.recoveryJobUid === ordering?.rejectionRecoveryJobUid &&
-    runtime.recoveryCompletedAt === ordering?.rejectionRecoveryCompletedAt &&
+    runtime.recoveryJobUid === ordering?.upgradeRecoveryJobUid &&
+    runtime.recoveryCompletedAt === ordering?.upgradeRecoveryCompletedAt &&
     Array.isArray(runtime.nodes) &&
     runtime.nodes.length === 2 &&
     new Set(runtime.nodes).size === 2 &&
@@ -179,8 +178,7 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
       'postgresRepositoryDigest',
       'migrationImageId',
       'initialRecoveryImageId',
-      'stageRecoveryImageId',
-      'rejectionRecoveryImageId',
+      'upgradeRecoveryImageId',
       'postgresImageId',
     ]) ||
     !SHA256_ID.test(images?.adminBuildId ?? '') ||
@@ -192,9 +190,7 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
     !imageDigest(images?.migrationImageId) ||
     imageDigest(images?.initialRecoveryImageId) !==
       imageDigest(images?.migrationImageId) ||
-    imageDigest(images?.stageRecoveryImageId) !==
-      imageDigest(images?.migrationImageId) ||
-    imageDigest(images?.rejectionRecoveryImageId) !==
+    imageDigest(images?.upgradeRecoveryImageId) !==
       imageDigest(images?.migrationImageId) ||
     !imageDigest(images?.postgresImageId)
   ) {
@@ -207,17 +203,13 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
   const timeKeys = [
     'migrationCompletedAt',
     'initialRecoveryCompletedAt',
-    'upgradeStageFailedAt',
-    'transitionCompletedAt',
-    'rejectionRecoveryCompletedAt',
+    'upgradeRecoveryCompletedAt',
     'runtimeCreatedAt',
   ];
   const uidKeys = [
     'migrationJobUid',
     'initialRecoveryJobUid',
-    'upgradeStageJobUid',
-    'transitionJobUid',
-    'rejectionRecoveryJobUid',
+    'upgradeRecoveryJobUid',
     'runtimeBoundRecoveryJobUid',
   ];
   const times = timeKeys.map((key) => Date.parse(ordering?.[key]));
@@ -225,7 +217,7 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
     !exactKeys(ordering, [...uidKeys, ...timeKeys]) ||
     uidKeys.some((key) => !UUID.test(ordering?.[key] ?? '')) ||
     ordering?.runtimeBoundRecoveryJobUid !==
-      ordering?.rejectionRecoveryJobUid ||
+      ordering?.upgradeRecoveryJobUid ||
     timeKeys.some((key) => !validIso(ordering?.[key])) ||
     times.some((value, index) => index > 0 && value < times[index - 1])
   ) {
@@ -240,18 +232,12 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
   const failed = report?.failedUpgrade;
   if (
     !exactKeys(failed, [
-      'stageFailure',
-      'transitionReceiptDigest',
+      'recoveryJobUid',
       'rejectionReason',
       'candidateRevisionCount',
       'activePointerUnchanged',
     ]) ||
-    !exactKeys(failed?.stageFailure, ['jobUid', 'reason', 'durableState']) ||
-    failed?.stageFailure?.jobUid !== ordering?.upgradeStageJobUid ||
-    failed?.stageFailure?.reason !==
-      'ClusterPluginPackageRecoveryRequiredError' ||
-    failed?.stageFailure?.durableState !== 'staged' ||
-    !SHA256.test(failed?.transitionReceiptDigest ?? '') ||
+    failed?.recoveryJobUid !== ordering?.upgradeRecoveryJobUid ||
     failed?.rejectionReason !== 'activation_fact_conflict' ||
     failed?.candidateRevisionCount !== 0 ||
     failed?.activePointerUnchanged !== true
@@ -277,7 +263,6 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
     'initialMutationCount',
     'upgradeMutationCount',
     'headInstallationId',
-    'transitionReceiptCount',
     'initialRevisionCount',
     'upgradeRevisionCount',
     'recoverableCount',
@@ -296,7 +281,6 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
     database?.initialMutationCount !== 4 ||
     database?.upgradeMutationCount !== 3 ||
     database?.headInstallationId !== 'install-plugin-recovery-e2e-upgrade' ||
-    database?.transitionReceiptCount !== 1 ||
     database?.initialRevisionCount !== 1 ||
     database?.upgradeRevisionCount !== 0 ||
     database?.recoverableCount !== 0
@@ -323,11 +307,11 @@ function validatePluginPackageRecoveryE2ELiveReport(report) {
     ]) ||
     oci?.https !== true ||
     oci?.authentication !== 'exact-registry-basic' ||
-    oci?.authenticatedRequestCount !== 18 ||
-    oci?.requestCount !== 18 ||
+    oci?.authenticatedRequestCount !== 12 ||
+    oci?.requestCount !== 12 ||
     oci?.uniquePaths !== 12 ||
     oci?.initialRequestCount !== 6 ||
-    oci?.upgradeRequestCount !== 12 ||
+    oci?.upgradeRequestCount !== 6 ||
     oci?.redirects !== 0
   ) {
     findings.push(
