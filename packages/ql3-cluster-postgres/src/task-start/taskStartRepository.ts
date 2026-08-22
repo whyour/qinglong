@@ -6,7 +6,6 @@ import {
   TaskStartUnavailableError,
   normalizeTaskStartCommand,
   normalizeTaskStartResult,
-  type TaskStartAllowedRole,
   type TaskStartCommand,
   type TaskStartRepository,
   type TaskStartResult,
@@ -31,12 +30,6 @@ import {
 } from '../repository/definitionRepositorySupport';
 
 type Row = Record<string, unknown>;
-
-const ALLOWED_ROLES = new Set<TaskStartAllowedRole>([
-  'owner',
-  'admin',
-  'operator',
-]);
 
 function unavailable(options?: ErrorOptions): TaskStartUnavailableError {
   return new TaskStartUnavailableError(options);
@@ -193,34 +186,30 @@ export class PostgresTaskStartRepository implements TaskStartRepository {
       try {
         await configurePostgresDefinitionTransaction(client);
         began = true;
-        const project = await client.query<Row>(`
-          SELECT status AS "projectStatus", version AS "projectVersion"
-          FROM "ql3"."projects" WHERE id = $1 FOR UPDATE
-        `, [command.projectId]);
-        if (project.rows.length === 0) throw new TaskStartNotFoundError();
-        if (project.rows.length !== 1) throw unavailable();
-        const binding = await client.query<Row>(`
-          SELECT version AS "bindingVersion", state AS "bindingState",
-                 role AS "bindingRole"
-          FROM "ql3"."project_role_bindings"
-          WHERE project_id = $1 AND subject_type = $2 AND subject_id = $3
-          ORDER BY version DESC LIMIT 1
-          FOR SHARE
-        `, [command.projectId, command.subject.type, command.subject.id]);
-        const currentProject = project.rows[0]!;
-        const currentBinding = binding.rows[0];
-        if (
-          text(currentProject, 'projectStatus') !== 'active' ||
-          integer(currentProject, 'projectVersion') !==
-            command.policyFence.projectVersion ||
-          !currentBinding ||
-          integer(currentBinding, 'bindingVersion') !==
-            command.policyFence.bindingVersion ||
-          text(currentBinding, 'bindingState') !== 'active' ||
-          !ALLOWED_ROLES.has(
-            text(currentBinding, 'bindingRole') as TaskStartAllowedRole,
-          )
-        ) {
+        const authorization = await client.query<Row>(
+          `SELECT "ql3"."lock_run_management_policy_fence"(
+             $1::varchar, $2::varchar, $3::varchar, $4::integer, $5::integer
+           ) AS "matches"`,
+          [
+            command.projectId,
+            command.subject.type,
+            command.subject.id,
+            command.policyFence.projectVersion,
+            command.policyFence.bindingVersion,
+          ],
+        );
+        if (authorization.rows.length !== 1) throw unavailable();
+        if (authorization.rows[0]?.matches !== true) {
+          const project = await client.query<Row>(
+            `SELECT EXISTS (
+               SELECT 1 FROM "ql3"."projects" WHERE id = $1
+             ) AS "exists"`,
+            [command.projectId],
+          );
+          if (project.rows.length !== 1) throw unavailable();
+          if (!postgresRequiredBoolean(project.rows[0]!.exists, unavailable)) {
+            throw new TaskStartNotFoundError();
+          }
           throw new TaskStartFenceRejectedError('authorization_changed');
         }
 
@@ -261,7 +250,6 @@ export class PostgresTaskStartRepository implements TaskStartRepository {
            AND revision.task_id = head.task_id
            AND revision.revision = head.current_revision
           WHERE head.project_id = $1 AND head.task_id = $2
-          FOR UPDATE OF head
         `, [command.projectId, command.taskId]);
         if (task.rows.length === 0) throw new TaskStartNotFoundError();
         if (task.rows.length !== 1) throw unavailable();

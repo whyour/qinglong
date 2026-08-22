@@ -338,6 +338,7 @@ function publisherProvenanceInstallRepository(repository, provenance) {
     findLock: (...args) => repository.findLock(...args),
     create: (...args) => repository.create(...args),
     listRecoveryPage: (...args) => repository.listRecoveryPage(...args),
+    listCurrentPage: (...args) => repository.listCurrentPage(...args),
     async commit(command) {
       if (command.record.state !== 'staged') {
         return repository.commit(command);

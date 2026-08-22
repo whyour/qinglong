@@ -16,6 +16,7 @@ const QL3_VERSION = readReleaseIdentity(DEFAULT_ROOT).version;
 const OCI_INDEX_MEDIA_TYPE = 'application/vnd.oci.image.index.v1+json';
 const OCI_MANIFEST_MEDIA_TYPE = 'application/vnd.oci.image.manifest.v1+json';
 const OCI_CONFIG_MEDIA_TYPE = 'application/vnd.oci.image.config.v1+json';
+const OCI_EMPTY_CONFIG_MEDIA_TYPE = 'application/vnd.oci.empty.v1+json';
 const OCI_LAYER_MEDIA_TYPE = 'application/vnd.oci.image.layer.v1.tar+gzip';
 const IN_TOTO_MEDIA_TYPE = 'application/vnd.in-toto+json';
 const SPDX_PREDICATE_TYPE = 'https://spdx.dev/Document';
@@ -447,23 +448,39 @@ function auditAttestation(
     OCI_MANIFEST_MEDIA_TYPE,
     MAX_INDEX_BYTES,
   );
-  const config = blobReader.readJson(
-    manifest.config,
-    OCI_CONFIG_MEDIA_TYPE,
-    MAX_CONFIG_BYTES,
-  );
-  if (
-    config.architecture !== 'unknown' ||
-    config.os !== 'unknown' ||
-    JSON.stringify(config.config) !== JSON.stringify({}) ||
-    !Array.isArray(config.rootfs?.diff_ids) ||
-    !Array.isArray(manifest.layers) ||
-    JSON.stringify(config.rootfs.diff_ids) !==
-      JSON.stringify(manifest.layers.map((layer) => layer.digest))
-  ) {
-    throw new Error(
-      'OCI attestation config must bind an empty unknown platform',
+  if (manifest.config?.mediaType === OCI_EMPTY_CONFIG_MEDIA_TYPE) {
+    normalizeDescriptor(
+      manifest.config,
+      OCI_EMPTY_CONFIG_MEDIA_TYPE,
+      MAX_CONFIG_BYTES,
     );
+    const emptyConfig = blobReader.read(
+      manifest.config,
+      MAX_CONFIG_BYTES,
+      true,
+    );
+    if (emptyConfig.toString('utf8') !== '{}') {
+      throw new Error('OCI attestation empty config must be canonical');
+    }
+  } else {
+    const config = blobReader.readJson(
+      manifest.config,
+      OCI_CONFIG_MEDIA_TYPE,
+      MAX_CONFIG_BYTES,
+    );
+    if (
+      config.architecture !== 'unknown' ||
+      config.os !== 'unknown' ||
+      JSON.stringify(config.config) !== JSON.stringify({}) ||
+      !Array.isArray(config.rootfs?.diff_ids) ||
+      !Array.isArray(manifest.layers) ||
+      JSON.stringify(config.rootfs.diff_ids) !==
+        JSON.stringify(manifest.layers.map((layer) => layer.digest))
+    ) {
+      throw new Error(
+        'OCI attestation config must bind an empty unknown platform',
+      );
+    }
   }
   if (!Array.isArray(manifest.layers) || manifest.layers.length !== 2) {
     throw new Error('OCI attestation must contain exactly SBOM and provenance');

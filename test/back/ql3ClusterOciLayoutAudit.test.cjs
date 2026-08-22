@@ -248,18 +248,20 @@ function createFixture(t, options = {}) {
     const attestationLayers = options.omitProvenance
       ? [spdx]
       : [spdx, provenance];
-    const attestationConfig = blob(
-      {
-        architecture: 'unknown',
-        os: 'unknown',
-        config: {},
-        rootfs: {
-          type: 'layers',
-          diff_ids: attestationLayers.map((layer) => layer.digest),
-        },
-      },
-      'application/vnd.oci.image.config.v1+json',
-    );
+    const attestationConfig = options.modernAttestationConfig
+      ? blob({}, 'application/vnd.oci.empty.v1+json')
+      : blob(
+          {
+            architecture: 'unknown',
+            os: 'unknown',
+            config: {},
+            rootfs: {
+              type: 'layers',
+              diff_ids: attestationLayers.map((layer) => layer.digest),
+            },
+          },
+          'application/vnd.oci.image.config.v1+json',
+        );
     const attestationManifest = blob(
       {
         schemaVersion: 2,
@@ -323,6 +325,15 @@ test('accepts two exact images with bound SBOM and provenance', (t) => {
     report.platforms.map((entry) => entry.spdxApplicationPackages),
     [46, 46],
   );
+});
+
+test('accepts OCI 1.1 empty attestation configs emitted by current BuildKit', (t) => {
+  const report = auditClusterOciLayout({
+    root,
+    layoutRoot: createFixture(t, { modernAttestationConfig: true }),
+    expectedRevision: revision,
+  });
+  assert.equal(report.platforms.length, 2);
 });
 
 test('accepts the independent cluster-admin image and attestation closure', (t) => {

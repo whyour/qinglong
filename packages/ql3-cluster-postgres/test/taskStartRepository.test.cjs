@@ -136,19 +136,12 @@ function fixture(options = {}) {
         normalized.startsWith('SELECT set_config') ||
         normalized.startsWith('INSERT INTO')
       ) return { rows: [], rowCount: normalized.startsWith('INSERT') ? 1 : 0 };
-      if (normalized.includes('FROM "ql3"."projects"')) {
-        const rows = options.projectRows ?? [{
-          projectStatus: 'active',
-          projectVersion: 2,
-        }];
+      if (normalized.includes('lock_run_management_policy_fence')) {
+        const rows = options.authorizationRows ?? [{ matches: true }];
         return { rows, rowCount: rows.length };
       }
-      if (normalized.includes('FROM "ql3"."project_role_bindings"')) {
-        const rows = options.bindingRows ?? [{
-          bindingVersion: 3,
-          bindingState: 'active',
-          bindingRole: 'operator',
-        }];
+      if (normalized.includes('SELECT EXISTS')) {
+        const rows = options.projectExistenceRows ?? [{ exists: true }];
         return { rows, rowCount: rows.length };
       }
       if (normalized.includes('FROM "ql3"."runs"')) {
@@ -203,11 +196,11 @@ test('revalidates Policy and Task/execution digests before one atomic Run aggreg
     executionRevisionDigest: EXECUTION.contentDigest,
     createdAtMs: 1_000,
   });
-  const project = calls.findIndex(({ sql }) => sql.includes('FROM "ql3"."projects"'));
-  const binding = calls.findIndex(({ sql }) => sql.includes('project_role_bindings'));
+  const authorization = calls.findIndex(({ sql }) =>
+    sql.includes('lock_run_management_policy_fence'));
   const task = calls.findIndex(({ sql }) => sql.includes('task_definitions'));
   const execution = calls.findIndex(({ sql }) => sql.includes('task_execution_revisions'));
-  assert.ok(project < binding && binding < task && task < execution);
+  assert.ok(authorization < task && task < execution);
   assert.equal(calls.filter(({ sql }) => sql.startsWith('INSERT INTO')).length, 4);
   assert.equal(calls.some(({ sql }) => sql === 'COMMIT'), true);
 });
@@ -273,15 +266,17 @@ test('returns the original durable identities for an exact replay', async () => 
 
 test('rejects missing, authorization, definition and disabled fences', async () => {
   await assert.rejects(
-    fixture({ projectRows: [] }).repository.startTask(command()),
+    fixture({
+      authorizationRows: [{ matches: null }],
+      projectExistenceRows: [{ exists: false }],
+    }).repository.startTask(command()),
     TaskStartNotFoundError,
   );
   await assert.rejects(
-    fixture({ bindingRows: [{
-      bindingVersion: 4,
-      bindingState: 'revoked',
-      bindingRole: null,
-    }] }).repository.startTask(command()),
+    fixture({
+      authorizationRows: [{ matches: false }],
+      projectExistenceRows: [{ exists: true }],
+    }).repository.startTask(command()),
     (error) =>
       error instanceof TaskStartFenceRejectedError &&
       error.reason === 'authorization_changed',

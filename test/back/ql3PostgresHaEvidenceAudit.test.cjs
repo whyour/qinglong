@@ -6,7 +6,7 @@ const {
   auditPostgresHaEvidence,
 } = require('../../scripts/ql3-postgres-ha-evidence-audit.cjs');
 
-function fixture() {
+function fixture(architecture = 'arm64') {
   const gates = { passed: true };
   for (let index = 0; index < 100; index += 1) gates[`gate${index}`] = true;
   return {
@@ -16,7 +16,7 @@ function fixture() {
       image: 'postgres:18',
       imageId: `sha256:${'a'.repeat(64)}`,
       repoDigests: [`postgres@sha256:${'b'.repeat(64)}`],
-      architecture: 'arm64',
+      architecture,
       version: '18.4',
       versionNumber: 180004,
     },
@@ -85,6 +85,7 @@ test('accepts complete PostgreSQL HA evidence', () => {
     compatible: true,
     findings: [],
   });
+  assert.equal(auditPostgresHaEvidence(fixture('amd64')).compatible, true);
 });
 
 test('rejects false gates, promotion drift and hidden private material', () => {

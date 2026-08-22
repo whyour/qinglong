@@ -81,6 +81,7 @@ const ROLE_NAMES = Object.freeze([
   'ql3_package_executor',
   'ql3_automation_manager',
   'ql3_approval_manager',
+  'ql3_run_manager',
   'ql3_worker_credential_manager',
   'ql3_worker_credential_executor',
   'ql3_worker_ingress',

@@ -31,6 +31,7 @@ const KIND_NODE_IMAGE =
 const POSTGRES_IMAGE = 'postgres:18.4-bookworm';
 const POSTGRES_INDEX_DIGEST =
   'sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296';
+const POSTGRES_IMAGE_REFERENCE = `${POSTGRES_IMAGE}@${POSTGRES_INDEX_DIGEST}`;
 const POSTGRES_REPOSITORY_DIGEST = `postgres@${POSTGRES_INDEX_DIGEST}`;
 const DEFAULT_ADMIN_IMAGE = 'qinglong3-cluster-admin:ql3-plugin-recovery-e2e';
 const DEFAULT_CONTROL_IMAGE =
@@ -277,13 +278,13 @@ function buildImages(revision) {
 }
 
 function ensurePostgresImage() {
-  if (!imageExists(POSTGRES_IMAGE)) {
-    run(DOCKER, ['pull', `${POSTGRES_IMAGE}@${POSTGRES_INDEX_DIGEST}`], {
+  if (!imageExists(POSTGRES_IMAGE_REFERENCE)) {
+    run(DOCKER, ['pull', POSTGRES_IMAGE_REFERENCE], {
       label: 'pull digest-pinned PostgreSQL 18.4 fixture image',
     });
   }
   const inspection = JSON.parse(
-    run(DOCKER, ['image', 'inspect', POSTGRES_IMAGE], {
+    run(DOCKER, ['image', 'inspect', POSTGRES_IMAGE_REFERENCE], {
       capture: true,
       quiet: true,
     }).stdout,
@@ -485,7 +486,7 @@ createdb --username "$POSTGRES_USER" --owner ql3_migration qinglong
         containers: [
           {
             name: 'postgres',
-            image: POSTGRES_IMAGE,
+            image: POSTGRES_IMAGE_REFERENCE,
             imagePullPolicy: 'Never',
             env: [
               { name: 'POSTGRES_USER', value: 'postgres' },
@@ -1726,7 +1727,11 @@ async function main(argv = process.argv.slice(2)) {
       },
     );
     created = true;
-    for (const image of [ADMIN_IMAGE, CONTROL_IMAGE, POSTGRES_IMAGE]) {
+    for (const image of [
+      ADMIN_IMAGE,
+      CONTROL_IMAGE,
+      POSTGRES_IMAGE_REFERENCE,
+    ]) {
       kind(
         [
           'load',

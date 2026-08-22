@@ -170,6 +170,7 @@ test('accepts timeout only when starting ACK supplied a durable deadline', async
   }));
   assert.equal(result.status, 'started');
   assert.equal(barriers, 1);
+  await waitForReceipt(roots.receiptRoot);
 });
 
 test('propagates unknown outcome when durable identity capture fails after spawn', async (t) => {

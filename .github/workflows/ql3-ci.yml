@@ -140,6 +140,10 @@ jobs:
         run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
       - name: Install workspace dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Initialize the public test environment
+        run: |
+          cp .env.example .env
+          mkdir -p data/db
       - name: Rebuild the reviewed native SQLite binding
         run: pnpm rebuild @whyour/sqlite3
       - name: Build benchmark targets once
@@ -855,9 +859,7 @@ jobs:
           --volume "${{ github.workspace }}:/workspace:ro"
           --workdir /workspace
           node:24.18.0-bookworm-slim
-          node --test --test-concurrency=1
-          packages/ql3-local-command-file/test/*.test.cjs
-          packages/ql3-local-owner-*/test/*.test.cjs
+          node scripts/ql3-local-owner-readonly-contract.cjs --mode=root
       - name: Exercise Owner authorities as non-root in a read-only container
         run: >-
           docker run --rm --read-only
@@ -870,9 +872,7 @@ jobs:
           --volume "${{ github.workspace }}:/workspace:ro"
           --workdir /workspace
           node:24.18.0-bookworm-slim
-          node --test --test-concurrency=1
-          packages/ql3-local-command-file/test/*.test.cjs
-          packages/ql3-local-owner-*/test/*.test.cjs
+          node scripts/ql3-local-owner-readonly-contract.cjs --mode=nonroot
       - name: Build and audit production-only local Profile artifacts
         run: |
           pnpm audit:artifact:edge:ql3
@@ -963,18 +963,21 @@ jobs:
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER DATABASE ql3_contract OWNER TO ql3_migration"
       - name: Create schema and exact grants through the reviewed migration stream
         env:
-          QL3_TEST_POSTGRES_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract
-        run: node --test packages/ql3-cluster-postgres/test/postgres.integration.test.cjs
+          QL3_POSTGRES_MIGRATION_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract
+          QL3_POSTGRES_TLS_MODE: disable
+          QL3_POSTGRES_ALLOW_INSECURE: 'true'
+        run: node packages/ql3-cluster-postgres/dist/migration/migrationCli.js
       - name: Test readiness, isolated roles, shared Repositories, rollback and SQLSTATE mapping
         env:
           QL3_TEST_POSTGRES_MIGRATION_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract
           QL3_TEST_POSTGRES_RUNTIME_URL: postgresql://ql3_runtime:ql3_runtime_test@127.0.0.1:5432/ql3_contract
           QL3_TEST_POSTGRES_ADMIN_URL: postgresql://ql3_admin:ql3_admin_test@127.0.0.1:5432/ql3_contract
           QL3_TEST_POSTGRES_AUTOMATION_MANAGER_URL: postgresql://ql3_automation_manager:ql3_automation_manager_test@127.0.0.1:5432/ql3_contract
+          QL3_TEST_POSTGRES_RUN_MANAGER_URL: postgresql://ql3_run_manager:ql3_run_manager_test@127.0.0.1:5432/ql3_contract
           QL3_TEST_POSTGRES_PACKAGE_MANAGER_URL: postgresql://ql3_package_manager:ql3_package_manager_test@127.0.0.1:5432/ql3_contract
           QL3_TEST_POSTGRES_PACKAGE_EXECUTOR_URL: postgresql://ql3_package_executor:ql3_package_executor_test@127.0.0.1:5432/ql3_contract
           QL3_TEST_POSTGRES_WORKER_INGRESS_URL: postgresql://ql3_worker_ingress:ql3_worker_ingress_test@127.0.0.1:5432/ql3_contract
-        run: node --test packages/ql3-cluster-postgres/test/postgres.integration.test.cjs
+        run: node --test --test-concurrency=1 packages/ql3-cluster-postgres/test/postgres.integration.test.cjs
       - name: Test automation management concurrency and post-commit response loss over mTLS
         env:
           QL3_TEST_POSTGRES_URL: postgresql://ql3_migration:ql3_migration_test@127.0.0.1:5432/ql3_contract

@@ -117,7 +117,7 @@ function auditPostgresHaEvidence(report) {
       'POSTGRES_REPO_DIGESTS_MISSING',
     );
     add(
-      postgres.architecture === 'x64' || postgres.architecture === 'arm64',
+      postgres.architecture === 'amd64' || postgres.architecture === 'arm64',
       'POSTGRES_ARCHITECTURE_INVALID',
     );
     add(

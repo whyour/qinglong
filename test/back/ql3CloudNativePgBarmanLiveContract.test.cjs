@@ -47,6 +47,7 @@ const POSTGRES_ROLES = [
   'ql3_migration',
   'ql3_package_executor',
   'ql3_package_manager',
+  'ql3_run_manager',
   'ql3_runtime',
   'ql3_worker_credential_executor',
   'ql3_worker_credential_manager',

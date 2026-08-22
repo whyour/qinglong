@@ -626,6 +626,8 @@ const adminConnectionString =
 const automationManagerConnectionString =
   process.env.QL3_TEST_POSTGRES_AUTOMATION_MANAGER_URL ??
   migrationConnectionString;
+const runManagerConnectionString =
+  process.env.QL3_TEST_POSTGRES_RUN_MANAGER_URL ?? migrationConnectionString;
 const packageManagerConnectionString =
   process.env.QL3_TEST_POSTGRES_PACKAGE_MANAGER_URL ??
   migrationConnectionString;
@@ -678,6 +680,8 @@ if (!migrationConnectionString) {
         ? adminConnectionString
         : role === 'automation-manager'
         ? automationManagerConnectionString
+        : role === 'run-manager'
+        ? runManagerConnectionString
         : role === 'package-manager'
         ? packageManagerConnectionString
         : role === 'package-executor'
@@ -1045,7 +1049,7 @@ if (!migrationConnectionString) {
     const taskId = 'task-start-command';
     const subjectId = 'usr_task_start_integration';
     const migrationDatabase = await open('migration');
-    let runtimeDatabase;
+    let runManagerDatabase;
     try {
       await runPostgresMigrations({ pool: migrationDatabase.pool });
       await migrationDatabase.pool.query(
@@ -1102,11 +1106,13 @@ if (!migrationConnectionString) {
         })
       ).definition;
 
-      runtimeDatabase =
-        runtimeConnectionString === migrationConnectionString
+      runManagerDatabase =
+        runManagerConnectionString === migrationConnectionString
           ? migrationDatabase
-          : await open('runtime');
-      const repository = new PostgresTaskStartRepository(runtimeDatabase.pool);
+          : await open('run-manager');
+      const repository = new PostgresTaskStartRepository(
+        runManagerDatabase.pool,
+      );
       const command = {
         projectId,
         taskId,
@@ -1158,8 +1164,8 @@ if (!migrationConnectionString) {
         },
       ]);
     } finally {
-      if (runtimeDatabase && runtimeDatabase !== migrationDatabase) {
-        await runtimeDatabase.close();
+      if (runManagerDatabase && runManagerDatabase !== migrationDatabase) {
+        await runManagerDatabase.close();
       }
       await migrationDatabase.close();
     }
@@ -2193,6 +2199,9 @@ if (!migrationConnectionString) {
     const migrationDatabase = await open('migration');
     try {
       await runPostgresMigrations({ pool: migrationDatabase.pool });
+      await migrationDatabase.pool.query(
+        'TRUNCATE TABLE "ql3"."runs" CASCADE',
+      );
       await observeContractPublisherTrust(migrationDatabase.pool);
       await migrationDatabase.pool.query(
         `INSERT INTO "ql3"."projects" (
@@ -2577,6 +2586,9 @@ if (!migrationConnectionString) {
       const migrationDatabase = await open('migration');
       try {
         await runPostgresMigrations({ pool: migrationDatabase.pool });
+        await migrationDatabase.pool.query(
+          'TRUNCATE TABLE "ql3"."plugin_package_installs" CASCADE',
+        );
         await observeContractPublisherTrust(migrationDatabase.pool);
         await migrationDatabase.pool.query(
           `INSERT INTO "ql3"."projects" (
@@ -2589,7 +2601,7 @@ if (!migrationConnectionString) {
         await migrationDatabase.close();
       }
       const executorDatabase = await open('package-executor');
-      const adminDatabase = await open('admin');
+      const automationManagerDatabase = await open('automation-manager');
       return {
         repository: new PostgresPluginPackageTaskReconciliationRepository(
           executorDatabase.pool,
@@ -2607,11 +2619,14 @@ if (!migrationConnectionString) {
           ),
         ),
         taskRepository: new PostgresTaskDefinitionRepository(
-          adminDatabase.pool,
+          automationManagerDatabase.pool,
           fixture.registry,
         ),
         close: async () => {
-          await Promise.all([executorDatabase.close(), adminDatabase.close()]);
+          await Promise.all([
+            executorDatabase.close(),
+            automationManagerDatabase.close(),
+          ]);
         },
       };
     },
