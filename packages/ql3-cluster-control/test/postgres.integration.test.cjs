@@ -1014,9 +1014,14 @@ if (!migrationConnectionString || !runtimeConnectionString) {
       await runtimeA.close();
       runtimeA = undefined;
       await migration.pool.query(
-        `UPDATE "ql3"."trigger_schedules"
-              SET updated_at_ms = updated_at_ms - 2,
-                  claim_expires_at_ms = updated_at_ms - 1
+        `WITH observation AS MATERIALIZED (
+           SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint
+                    AS observed_at_ms
+         )
+         UPDATE "ql3"."trigger_schedules"
+              SET updated_at_ms = observation.observed_at_ms - 2,
+                  claim_expires_at_ms = observation.observed_at_ms - 1
+             FROM observation
             WHERE project_id = 'default' AND trigger_id = $1`,
         [takeoverTrigger.triggerId],
       );
