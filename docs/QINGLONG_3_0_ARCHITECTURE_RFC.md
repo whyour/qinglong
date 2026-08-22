@@ -75,7 +75,7 @@
   `44 total / 42 pass / 2 conditional Docker skip / 0 fail`，但成功场景现在额外覆盖首次 apply、mutation replay、不同 reviewer 拒绝、六个
   backup/apply/rollback response-loss 窗口、content-free CLI verify、identity-preserving rollback 与 rollback replay。完整 Local Owner 在受限沙箱为
   `266 total / 256 pass / 7 conditional skip / 3 loopback-listen EPERM`，两个对应文件在沙箱外 `15/15` 通过；package/dependency boundary 为
-  `69/69`。workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为
+  `70/70`。workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为
   `168 source / 167 nested / 1 root binary entry`，没有新增 package、production dependency、daemon、listener、timer 或 `src/` 根平铺。
   D-393 仍未代表完整 reconciliation：Automation 之外的 Secret、Plugin、Identity、history 等领域 adapter 尚未 apply，target service 也未获得 restart
   authority；后续必须先完成 apply-root 的 retention/seal 策略和跨领域 completion fence，再进入 target restart/readiness。

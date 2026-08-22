@@ -2029,6 +2029,21 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/automation/applyCoordinator.ts' &&
+          [
+            '@qinglong/local-admin/reconciliation-automation-decision',
+            '@qinglong/local-owner-console/authenticated-command',
+            '@qinglong/local-sqlite/authentication-read',
+            '@qinglong/local-sqlite/rollout-safety',
+          ].includes(specifier)
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/automation/applyEvidence.ts' &&
+          specifier === '@qinglong/local-sqlite/rollout-safety'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/deployment/reconciliation/application/automation/planReader.ts' &&
           specifier ===
             '@qinglong/local-admin/reconciliation-automation-decision'
@@ -2690,6 +2705,14 @@ function auditSourceImports(root, packagePath, findings) {
           {
             file: 'src/deployment/reconciliation/review/issuerKeyring.ts',
             specifiers: ['@qinglong/runtime-core/local-secret'],
+          },
+          {
+            file: 'src/deployment/reconciliation/application/automation/decisionCoordinator.ts',
+            specifiers: ['@qinglong/runtime-core/security'],
+          },
+          {
+            file: 'src/deployment/reconciliation/application/automation/applyCoordinator.ts',
+            specifiers: ['@qinglong/runtime-core/security'],
           },
         ].some(
           ({ file, specifiers }) =>

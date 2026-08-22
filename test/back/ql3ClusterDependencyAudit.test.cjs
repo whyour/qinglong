@@ -2150,6 +2150,84 @@ test('confines reconciliation review authentication to exact read-only owners', 
   );
 });
 
+test('confines reconciliation automation apply authority to exact coordinators', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-reconciliation-automation-apply-boundary-'),
+  );
+  const automationDirectory = path.join(
+    root,
+    'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/automation',
+  );
+  fs.mkdirSync(automationDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(automationDirectory, 'decisionCoordinator.ts'),
+    [
+      "import { decide } from '@qinglong/local-admin/reconciliation-automation-decision';",
+      "import { authenticate } from '@qinglong/local-owner-console/authenticated-command';",
+      "import { database } from '@qinglong/local-sqlite/authentication-read';",
+      "import type { Principal } from '@qinglong/runtime-core/security';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(automationDirectory, 'applyCoordinator.ts'),
+    [
+      "import { apply } from '@qinglong/local-admin/reconciliation-automation-decision';",
+      "import { authenticate } from '@qinglong/local-owner-console/authenticated-command';",
+      "import { database } from '@qinglong/local-sqlite/authentication-read';",
+      "import { backup } from '@qinglong/local-sqlite/rollout-safety';",
+      "import type { Principal } from '@qinglong/runtime-core/security';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(automationDirectory, 'applyEvidence.ts'),
+    "import type { Evidence } from '@qinglong/local-sqlite/rollout-safety';",
+  );
+  fs.writeFileSync(
+    path.join(automationDirectory, 'neighbor.ts'),
+    [
+      "import { apply } from '@qinglong/local-admin/reconciliation-automation-decision';",
+      "import { authenticate } from '@qinglong/local-owner-console/authenticated-command';",
+      "import { database } from '@qinglong/local-sqlite/authentication-read';",
+      "import { backup } from '@qinglong/local-sqlite/rollout-safety';",
+      "import type { Principal } from '@qinglong/runtime-core/security';",
+    ].join('\n'),
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-owner-cli', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/automation/neighbor.ts',
+        specifier: '@qinglong/local-admin/reconciliation-automation-decision',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/automation/neighbor.ts',
+        specifier: '@qinglong/local-owner-console/authenticated-command',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/automation/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/authentication-read',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/automation/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/rollout-safety',
+      },
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/automation/neighbor.ts',
+        specifier: '@qinglong/runtime-core/security',
+      },
+    ],
+  );
+});
+
 test('deleted Owner ceremony package names remain dependency tombstones', (t) => {
   const root = fixture(
     t,
