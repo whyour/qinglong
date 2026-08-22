@@ -26,9 +26,35 @@
   与十四档 artifact audit 全通过。workspace 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Admin/Owner 分别为
   `46/45/1` 与 `161/160/1`（source/nested/root entry）。基础 Edge/Standalone 精确保持 `2,611,978 / 2,612,056 bytes`、319 files、58 modules，
   GitNexus staged audit 为 `15 files / 56 symbols / 0 flows / LOW`；`next` 相对 `develop` 的 269-flow CRITICAL 差异继续作为 3.0 累计风险保留。因此
-  ADR-0486 的行级计划切片已接受。D-393 整体仍在进行；下一切片必须继续完成 row-plan-bound signed decision、再次强认证、同 write fence
-  写前 backup、幂等 transaction/replay、post-apply evidence 与 rollback，当前状态不代表 applied、restart-ready 或 reconciliation-complete。本切片无
-  SQL/Cluster 变更，未重复占有 PostgreSQL HA 证明；进入 apply 写语义时必须重新选择数据库门禁。
+  ADR-0486 的行级计划切片已接受。
+
+  同一 ADR 的第二切片已继续实现 row-plan-bound signed decision，而没有把签名本身冒充 DML authority。既有 Local Owner 新增
+  `reconciliation-automation-decision-prepare|commit|verify`，以
+  `reconciliation_automation_planned → reconciliation_automation_decision_prepared → reconciliation_automation_reviewed` CAS 建立唯一
+  decision fence。commit 重新打开 exact sealed Legacy SQLite、automation plan 和原始 owner-private decision file；每条 decision 必须与
+  row ordinal/source digest 精确同序，`review_skip_conflict|manual_required` 只能 `skip`，不能通过 recompute 外层 digest 把冲突或人工行提升为
+  adopt。签发前必须把 D-391 的同一 reviewer 重新认证为最多 5 分钟的 hardware/local-console/multi-factor User，authorization 最长 30 分钟，
+  并在 no-replace publication 前再次确认 credential、prepared head、review file、plan、sealed source 与 issuer authority。authorization/receipt/
+  intent、signed decision-set、review file 与 instance head 全部互相绑定；response loss 可以从 authorization、receipt、seal 或 head 任一窗口 exact
+  收敛且不重复认证。terminal file/root 分别封存为 `0400/0500`；通用 authorization verifier 的发布默认仍为 `0600/0700`，只允许调用者显式声明
+  readonly terminal mode。verify 会完整重放 HMAC、receipt、source row 与 plan row binding，但不打开 target、不执行 SQL 写入、backup、restore、
+  service、Docker 或 network，也不授予 restart/completion。实现内聚在既有 `local-admin/legacy-adoption` 与
+  `local-owner-cli/deployment/reconciliation/application/automation`，没有新增 workspace package、production dependency、daemon、listener、timer
+  或 `src/` 根平铺；Edge/Standalone sealed SQLite cache 仍固定为 2/8 MiB，decision/plan 采用流式有界消费。
+
+  第二切片聚焦套件为 `44 total / 42 pass / 2 conditional Docker skip / 0 fail`，完整 Local Admin 为 `91/91`。完整 Local Owner 在受限本地沙箱为
+  `266 total / 256 pass / 7 conditional skip / 3 loopback-listen EPERM`，对应两个 loopback 文件在沙箱外 `15/15` 通过；package boundary、Edge
+  import 与 exact dependency audit 均 compatible。workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local
+  Admin/Owner 分别为 `47/46/1` 与 `165/164/1`（source/nested/root entry），GitNexus staged audit 为
+  `15 files / 165 symbols / 0 flows / LOW`。核心 head parser/advance 因覆盖 11/10 个模块保持 CRITICAL 提示，本切片只增加两个合法状态且未改既有迁移
+  语义；阶段提交为 `e6615c70`，package-boundary 快照修复为 `2638df29`。PostgreSQL 18 x64 的旧 claim 故障注入另以数据库自身
+  `clock_timestamp()` 采样消除 runner wall-clock 回退竞态，提交为 `a82b7fb9`。三次修复后的远程主门禁
+  [32569385320](https://github.com/whyour/qinglong/actions/runs/32569385320) 已完整通过，覆盖 Backend、Local Profiles、PostgreSQL 16/18 x64/arm64、
+  PostgreSQL physical promotion、Local application images、Worker runtime、OCI/SBOM/resource evidence 等全部 37 jobs；同源 Kubernetes live 门禁
+  [32569385321](https://github.com/whyour/qinglong/actions/runs/32569385321) 同样通过。D-393 整体仍在进行；下一切片必须在同一 stopped/write fence 下消费
+  signed decision，完成 target 写前可恢复 backup 证明、Project Policy/credential 复验、幂等原子 transaction/replay、post-apply evidence 与显式
+  rollback。当前状态仍不代表 applied、restart-ready 或 reconciliation-complete。进入 apply 写语义时必须重新选择 SQLite/Docker 数据门禁，不能
+  复用本切片只读证明。
 - D-392/ADR-0485（已接受）：D-391 的 signed review 不能直接获得通用 DML authority；表级 `adopt_legacy/retain_both` 也不能证明
   Automation 行级 command/trigger 兼容，更不能覆盖 Secret custody、append-only history、Plugin/AI 外部资产与 Identity/Policy 语义。
   因此既有 Local Owner 新增 `reconciliation.application.prepare|commit|verify`，以
