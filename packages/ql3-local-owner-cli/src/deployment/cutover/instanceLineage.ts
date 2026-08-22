@@ -37,6 +37,7 @@ export type LocalCutoverInstanceHeadState =
   | 'reconciliation_automation_apply_prepared'
   | 'reconciliation_automation_applied'
   | 'reconciliation_automation_rolled_back'
+  | 'reconciliation_completed'
   | 'rollback_prepared'
   | 'legacy_restart_requested'
   | 'legacy_running'
@@ -182,6 +183,7 @@ function parseHead(value: unknown): Readonly<LocalCutoverInstanceHead> {
       head.state !== 'reconciliation_automation_apply_prepared' &&
       head.state !== 'reconciliation_automation_applied' &&
       head.state !== 'reconciliation_automation_rolled_back' &&
+      head.state !== 'reconciliation_completed' &&
       head.state !== 'rollback_prepared' &&
       head.state !== 'legacy_restart_requested' &&
       head.state !== 'legacy_running' &&
@@ -362,6 +364,7 @@ export function advanceLocalCutoverInstanceHead(
     | 'reconciliation_automation_apply_prepared'
     | 'reconciliation_automation_applied'
     | 'reconciliation_automation_rolled_back'
+    | 'reconciliation_completed'
     | 'rollback_prepared'
     | 'legacy_restart_requested'
     | 'legacy_running'
@@ -414,6 +417,7 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_automation_apply_prepared' ||
       current.state === 'reconciliation_automation_applied' ||
       current.state === 'reconciliation_automation_rolled_back' ||
+      current.state === 'reconciliation_completed' ||
       current.state === 'legacy_restart_requested' ||
       current.state === 'legacy_running' ||
       current.state === 'legacy_ready')
@@ -427,7 +431,8 @@ export function advanceLocalCutoverInstanceHead(
     (state === 'legacy_stopped' && current.state === 'legacy_stop_requested') ||
     (state === 'target_active' &&
       (current.state === 'legacy_stopped' ||
-        current.state === 'target_active')) ||
+        current.state === 'target_active' ||
+        current.state === 'reconciliation_completed')) ||
     (state === 'target_stopped' && current.state === 'target_active') ||
     (state === 'reconciliation_capture_prepared' &&
       current.state === 'target_stopped') ||
@@ -457,6 +462,9 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_automation_apply_prepared') ||
     (state === 'reconciliation_automation_rolled_back' &&
       current.state === 'reconciliation_automation_applied') ||
+    (state === 'reconciliation_completed' &&
+      (current.state === 'reconciliation_application_planned' ||
+        current.state === 'reconciliation_automation_applied')) ||
     (state === 'rollback_prepared' && current.state === 'target_stopped') ||
     (state === 'legacy_restart_requested' &&
       current.state === 'rollback_prepared') ||
@@ -497,6 +505,7 @@ export function assertLocalCutoverTargetHead(
     head.activationDigest !== identity.request.expectedActivationDigest ||
     (head.state !== 'legacy_stopped' &&
       head.state !== 'target_active' &&
+      head.state !== 'reconciliation_completed' &&
       head.state !== 'manual_required')
   ) {
     configurationError(

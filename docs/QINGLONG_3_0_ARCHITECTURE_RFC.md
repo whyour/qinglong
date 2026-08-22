@@ -92,6 +92,23 @@
   `shallowSourcePackages=[]`；Local Owner 为 `169 source / 168 nested / 1 root binary entry`。D-393 仍未代表完整 reconciliation：Automation 之外的
   Secret、Plugin、Identity、history 等领域 adapter 尚未 apply，target service 也未获得 restart authority；下一切片是跨领域 completion fence，完成后才可进入
   target restart/readiness。
+- D-394/ADR-0488（已接受）：跨领域 completion 不再由某个 adapter 状态或调用方自报列表推断。既有 Local Owner 在同一包内新增
+  `deployment/reconciliation/completion/{contract,evidence,coordinator}` 与
+  `reconciliation-complete|reconciliation-complete-verify`，重新打开 D-392 sealed application terminal 并按固定顺序推导全部八项证据。V1 只允许八域全
+  `no_effect`，或仅 Automation 为 `adapter_required` 且 decision/apply/current target/head 完整一致、其余七域全 `no_effect`；任何 manual、其他 adapter、
+  rolled-back 或 drift 都失败关闭。真实完整迁移库当前仍会在 Secret/Config、Run History、Identity/Policy/Audit、Unknown 等领域产生受保护的
+  `manual_external`，因此 Automation applied 不会被冒充为全局完成，rollback backup 和 target-stop 状态均保持不变。
+
+  mutation 固定为 receipt no-replace publish → `0400/0500` seal → instance head CAS 到 `reconciliation_completed` → 可选 Automation backup collection；
+  只有 completed head durable 后才删除数据库等量 backup，四个 crash/response-loss 窗口均可 exact replay。target runner 与 Service Manager 继续共享
+  `assertLocalCutoverTargetHead`：application-planned、automation-applied、manual 和 rolled-back 都不能重启，只有 completed 可进入下一 generation 的
+  `target_active`。Service Manager v1 intent 仍只有 prior service journal digest，没有独立 completion-head digest，因此 systemd/OpenRC 路径在后续
+  compare-and-swap 中继续失败关闭；不得仅放宽共享 assertion 来伪装支持，后续必须以 v2 intent 同时绑定两条 lineage。verify 只读且不修复。实现未新增
+  package、dependency、SQL、daemon、timer、watcher、listener、Pool 或 Cluster workload；workspace
+  仍为 18 packages，Local Owner 为 `172 source / 171 nested / 1 root binary entry`。focused completion `2/2`、完整 Local Owner
+  `268 total / 261 pass / 7 conditional skip / 0 fail`、18-package clean build/逐包测试、dependency/package boundary `70/70` 和 122-module Edge
+  import audit 已通过；其余六个领域的 terminal adapter、Service Manager v2 binding、完整 target readiness/restart 演练和 Cluster 自有 completion
+  authority 仍是后续门禁。
 - D-392/ADR-0485（已接受）：D-391 的 signed review 不能直接获得通用 DML authority；表级 `adopt_legacy/retain_both` 也不能证明
   Automation 行级 command/trigger 兼容，更不能覆盖 Secret custody、append-only history、Plugin/AI 外部资产与 Identity/Policy 语义。
   因此既有 Local Owner 新增 `reconciliation.application.prepare|commit|verify`，以

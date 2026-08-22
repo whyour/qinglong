@@ -96,4 +96,4 @@ Applied backup 在尚未 rollback 时不得自动删除。跨 Automation、Secre
 - 完整 Local Owner 在真实 loopback 环境 `266 total / 259 pass / 7 conditional skip / 0 fail`；18-package clean build/逐包测试退出 0；真实 stopped-target Docker reconciliation `2/2`。
 - cluster dependency 与 package boundary 组合门 `70/70`，workspace 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Local Owner 为 `169 source / 168 nested / 1 root binary entry`。
 - 不新增 workspace package、production dependency、daemon、timer、watcher、listener、SQL migration、PostgreSQL role/ACL、Pool 或 cluster workload。
-- D-393 仍未完成：下一切片必须建立跨领域 completion fence；Secret、Plugin、Identity、history 等 adapter 及 target restart/readiness authority 仍关闭。
+- 后续 ADR-0488 已建立跨领域 completion fence：八域全 `no_effect` 可进入 `reconciliation_completed` 并获得 target generation 2 重启 authority；Automation apply 只有在其余七域同样 `no_effect` 时才能完成并回收 backup。当前完整迁移库仍有 Secret、Identity、history 等 manual 领域时会失败关闭并继续保留 rollback authority。

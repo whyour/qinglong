@@ -2158,7 +2158,12 @@ test('confines reconciliation automation apply authority to exact coordinators',
     root,
     'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/automation',
   );
+  const completionDirectory = path.join(
+    root,
+    'packages/ql3-local-owner-cli/src/deployment/reconciliation/completion',
+  );
   fs.mkdirSync(automationDirectory, { recursive: true });
+  fs.mkdirSync(completionDirectory, { recursive: true });
   fs.writeFileSync(
     path.join(automationDirectory, 'decisionCoordinator.ts'),
     [
@@ -2181,6 +2186,14 @@ test('confines reconciliation automation apply authority to exact coordinators',
   fs.writeFileSync(
     path.join(automationDirectory, 'applyEvidence.ts'),
     "import type { Evidence } from '@qinglong/local-sqlite/rollout-safety';",
+  );
+  fs.writeFileSync(
+    path.join(completionDirectory, 'coordinator.ts'),
+    "import { inspect } from '@qinglong/local-sqlite/rollout-safety';",
+  );
+  fs.writeFileSync(
+    path.join(completionDirectory, 'neighbor.ts'),
+    "import { backup } from '@qinglong/local-sqlite/rollout-safety';",
   );
   fs.writeFileSync(
     path.join(automationDirectory, 'neighbor.ts'),
@@ -2223,6 +2236,11 @@ test('confines reconciliation automation apply authority to exact coordinators',
         code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
         file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/automation/neighbor.ts',
         specifier: '@qinglong/runtime-core/security',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/completion/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/rollout-safety',
       },
     ],
   );

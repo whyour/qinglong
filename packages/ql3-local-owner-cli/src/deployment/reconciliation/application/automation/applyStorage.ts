@@ -503,6 +503,55 @@ export function validateLocalReconciliationAutomationAppliedStorage(
   validateBackup(selected, intent, uid, [0o400]);
 }
 
+/**
+ * Collects the rollback copy only after the cross-domain completion head is
+ * durable. The operation accepts its own partially collected layout so a
+ * response loss or process crash can be replayed without restoring authority.
+ */
+export function collectLocalReconciliationAutomationCompletedStorage(
+  selected: Readonly<LocalReconciliationAutomationApplyPaths>,
+  intent: Readonly<LocalReconciliationAutomationApplyIntent>,
+  uid: number,
+): void {
+  directoryMode(selected.root, uid, [0o500], 'root');
+  directoryMode(selected.backupRoot, uid, [0o700, 0o500], 'backup root');
+  directoryMode(
+    selected.rollbackRoot,
+    uid,
+    [0o700, 0o500],
+    'rollback work root',
+  );
+  validateLocalReconciliationAutomationApplyCatalog(selected);
+  emptyDirectory(selected.rollbackRoot, 'rollback work root');
+  stableJson(selected.intent, uid, [0o400], 'intent', [1n]);
+  stableJson(selected.receipt, uid, [0o400], 'receipt', [1n]);
+  if (fs.existsSync(selected.backup)) {
+    validateBackup(selected, intent, uid, [0o400]);
+    if ((fs.statSync(selected.backupRoot).mode & 0o777) !== 0o700) {
+      fs.chmodSync(selected.backupRoot, 0o700);
+      syncDirectory(selected.root);
+    }
+    unlinkIfPresent(selected.backup);
+  }
+  sealDirectory(selected.backupRoot, uid, 'backup root');
+  sealDirectory(selected.rollbackRoot, uid, 'rollback work root');
+  validateLocalReconciliationAutomationCompletedStorage(selected, uid);
+}
+
+export function validateLocalReconciliationAutomationCompletedStorage(
+  selected: Readonly<LocalReconciliationAutomationApplyPaths>,
+  uid: number,
+): void {
+  directoryMode(selected.root, uid, [0o500], 'root');
+  directoryMode(selected.backupRoot, uid, [0o500], 'backup root');
+  directoryMode(selected.rollbackRoot, uid, [0o500], 'rollback work root');
+  validateLocalReconciliationAutomationApplyCatalog(selected);
+  emptyDirectory(selected.backupRoot, 'backup root');
+  emptyDirectory(selected.rollbackRoot, 'rollback work root');
+  stableJson(selected.intent, uid, [0o400], 'intent', [1n]);
+  stableJson(selected.receipt, uid, [0o400], 'receipt', [1n]);
+}
+
 export function prepareLocalReconciliationAutomationRollbackSource(
   selected: Readonly<LocalReconciliationAutomationApplyPaths>,
   intent: Readonly<LocalReconciliationAutomationApplyIntent>,

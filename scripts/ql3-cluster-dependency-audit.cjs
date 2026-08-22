@@ -2044,6 +2044,11 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/completion/coordinator.ts' &&
+          specifier === '@qinglong/local-sqlite/rollout-safety'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/deployment/reconciliation/application/automation/planReader.ts' &&
           specifier ===
             '@qinglong/local-admin/reconciliation-automation-decision'

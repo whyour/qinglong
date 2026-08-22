@@ -154,6 +154,12 @@ import {
   verifyLocalReconciliationAutomationApply,
   verifyLocalReconciliationAutomationApplyCommandFile,
 } from './reconciliation/application/automation/applyCoordinator';
+import {
+  completeLocalReconciliation,
+  completeLocalReconciliationCommandFile,
+  verifyLocalReconciliationCompletion,
+  verifyLocalReconciliationCompletionCommandFile,
+} from './reconciliation/completion/coordinator';
 
 export {
   commitLocalReconciliationPlan,
@@ -193,7 +199,28 @@ export {
   verifyLocalReconciliationAutomationApplyCommandFile,
   rollbackLocalReconciliationAutomationApply,
   rollbackLocalReconciliationAutomationApplyCommandFile,
+  completeLocalReconciliation,
+  completeLocalReconciliationCommandFile,
+  verifyLocalReconciliationCompletion,
+  verifyLocalReconciliationCompletionCommandFile,
 };
+
+export {
+  normalizeLocalReconciliationCompleteCommand,
+  normalizeLocalReconciliationCompletionVerifyCommand,
+  type LocalReconciliationCompleteCommand,
+  type LocalReconciliationCompletionAutomationBinding,
+  type LocalReconciliationCompletionAutomationOptions,
+  type LocalReconciliationCompletionOptions,
+  type LocalReconciliationCompletionResult,
+  type LocalReconciliationCompletionVerifyCommand,
+} from './reconciliation/completion/contract';
+export { type LocalReconciliationCompletionDependencies } from './reconciliation/completion/coordinator';
+export {
+  normalizeLocalReconciliationCompletionReceipt,
+  type LocalReconciliationCompletionDomainEvidence,
+  type LocalReconciliationCompletionReceipt,
+} from './reconciliation/completion/evidence';
 
 export {
   normalizeLocalReconciliationAutomationApplyCommand,

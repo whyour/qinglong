@@ -11,6 +11,7 @@ const {
   commitLocalReconciliationCapture,
   commitLocalReconciliationApplication,
   commitLocalReconciliationAutomationDecision,
+  completeLocalReconciliation,
   applyLocalReconciliationAutomation,
   commitLocalReconciliationPlan,
   commitLocalReconciliationReview,
@@ -27,6 +28,7 @@ const {
   verifyLocalReconciliationAutomationDecision,
   verifyLocalReconciliationAutomationApply,
   verifyLocalReconciliationAutomationPlan,
+  verifyLocalReconciliationCompletion,
   verifyLocalReconciliationPlan,
   verifyLocalReconciliationReview,
   writeLocalReconciliationReviewDiagnostics,
@@ -42,6 +44,7 @@ const {
 } = require('@qinglong/local-sqlite/data-directory-application-commit');
 const {
   advanceLocalCutoverInstanceHead,
+  assertLocalCutoverTargetHead,
   claimLocalCutoverInstance,
   readLocalCutoverInstanceHead,
 } = require('../dist/deployment/cutover/instanceLineage.js');
@@ -1353,6 +1356,108 @@ function automationDecisionCommitFixture(
     authenticationCount: () => authentications,
     confirmationCount: () => confirmations,
     databaseCloseCount: () => databaseCloses,
+  };
+}
+
+async function appliedAutomationFixture(t, options = {}) {
+  const state = await plannedAutomationFixture(t, {
+    suffix: options.suffix ?? 'completion-applied',
+    planId: options.planId ?? '00000000-0000-4000-8000-000000000481',
+    reviewId: options.reviewId ?? '00000000-0000-4000-8000-000000000482',
+    applicationId:
+      options.applicationId ?? '00000000-0000-4000-8000-000000000483',
+    automationId:
+      options.automationId ?? '00000000-0000-4000-8000-000000000484',
+    readyTarget: true,
+  });
+  assert.equal(state.application.outcome, 'adapter_and_manual_required');
+  const decisionId =
+    options.decisionId ?? '019b0000-0000-7000-8000-000000000481';
+  const review = automationDecisionReviewFile(
+    state,
+    decisionId,
+    'adopt',
+    'reviewed_lossless',
+    options.suffix ?? 'completion-applied',
+  );
+  const prepareCommand = automationDecisionPrepareCommand(state, decisionId);
+  const prepared = await prepareLocalReconciliationAutomationDecision(
+    prepareCommand,
+  );
+  const commit = automationDecisionCommitFixture(
+    state,
+    { result: prepared, commandOptions: prepareCommand.options },
+    review.filePath,
+  );
+  const decision = await commitLocalReconciliationAutomationDecision(
+    commit.command,
+    commit.dependencies,
+  );
+  const automationApplyRoot = path.join(
+    path.dirname(state.captureRoot),
+    `automation-apply-${options.suffix ?? 'completion-applied'}`,
+  );
+  fs.mkdirSync(automationApplyRoot, { mode: 0o700 });
+  const applyOptions = {
+    ...prepareCommand.options,
+    automationApplyRoot,
+    targetDatabasePath: state.targetDatabasePath,
+    ownerPepperKeyringDirectory:
+      state.command.options.ownerPepperKeyringDirectory,
+    credentialFilePath: state.command.options.credentialFilePath,
+  };
+  const appliedAtMs = commit.command.request.committedAtMs + 1;
+  const applyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.apply',
+    options: applyOptions,
+    request: {
+      decisionId,
+      automationId: state.automationCommand.request.automationId,
+      expectedDecisionDigest: decision.decisionDigest,
+      expectedHeadDigest: decision.instanceHeadDigest,
+      mutationId: options.mutationId ?? '00000000-0000-4000-8000-000000000485',
+      requestId: `automation-apply-${options.suffix ?? 'completion-applied'}`,
+      appliedAtMs,
+    },
+  };
+  const applyDependencies = {
+    async openAuthenticationDatabase() {
+      return { async close() {} };
+    },
+    async authenticate(_database, authenticateOptions) {
+      const authenticatedAtMs = authenticateOptions.now();
+      return {
+        principal: {
+          subject: { type: 'user', id: 'review-owner' },
+          authenticationId: 'local_reconciliation_automation_apply:test',
+          authenticatedAtMs,
+          expiresAtMs: authenticatedAtMs + 60 * 60 * 1_000,
+          assurance: 'local_console',
+        },
+        databaseFence: {
+          credentialId: 'review-owner',
+          credentialVersion: 1,
+          pepperKeyId: 'review-owner-v1',
+          pepperVersion: 1,
+        },
+        async confirm() {},
+      };
+    },
+  };
+  const applied = await applyLocalReconciliationAutomation(
+    applyCommand,
+    applyDependencies,
+  );
+  return {
+    ...state,
+    decisionId,
+    decision,
+    automationApplyRoot,
+    applyOptions,
+    applyCommand,
+    applyDependencies,
+    applied,
   };
 }
 
@@ -2906,6 +3011,237 @@ test('application coordinator plans eight content-free domains and verifies with
   assert.equal(cli.stdout.includes(state.applicationRoot), false);
   assert.equal(cli.stdout.includes('review-owner'), false);
   assert.equal(cli.stdout.includes('Crontabs'), false);
+});
+
+test('completion fence seals all eight no-effect domains before target restart', async (t) => {
+  const state = await reviewedApplicationFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000421',
+    reviewId: '00000000-0000-4000-8000-000000000422',
+    applicationId: '00000000-0000-4000-8000-000000000423',
+    reviewSuffix: 'completion-no-effect',
+    createDefaultSidecars: false,
+    initializeDatabases: automationDatabaseInitializer(),
+    mutateTarget(paths) {
+      return mutateAutomationTarget(paths);
+    },
+  });
+  const prepared = await prepareLocalReconciliationApplication(
+    state.prepareApplicationCommand,
+  );
+  const application = await commitLocalReconciliationApplication(
+    applicationCommitCommand(state, prepared),
+  );
+  assert.equal(application.outcome, 'no_effect_ready');
+  const completionRoot = path.join(
+    path.dirname(state.captureRoot),
+    'completion-no-effect',
+  );
+  fs.mkdirSync(completionRoot, { mode: 0o700 });
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.complete',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      completionRoot,
+      automation: null,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      completionId: '00000000-0000-4000-8000-000000000424',
+      applicationId: state.prepareApplicationCommand.request.applicationId,
+      expectedApplicationPlanDigest: application.applicationPlanDigest,
+      expectedHeadDigest: application.instanceHeadDigest,
+      automation: null,
+      completedAtMs: state.prepareApplicationCommand.request.preparedAtMs + 4,
+    },
+  };
+  for (const boundary of [
+    'afterReceiptPublished',
+    'afterTerminalSealed',
+    'afterHeadAdvanced',
+  ]) {
+    await assert.rejects(
+      completeLocalReconciliation(command, {
+        [boundary]() {
+          throw new Error(`completion ${boundary} response loss`);
+        },
+      }),
+      new RegExp(`completion ${boundary} response loss`),
+    );
+  }
+  const completed = await completeLocalReconciliation(command);
+  assert.equal(completed.status, 'existing');
+  assert.equal(completed.state, 'reconciliation_completed');
+  assert.equal(completed.domainCount, 8);
+  assert.equal(completed.adapterCount, 0);
+  const completionDirectory = path.join(
+    completionRoot,
+    command.request.completionId,
+  );
+  assert.deepEqual(fs.readdirSync(completionDirectory), ['receipt.json']);
+  assert.equal(fs.statSync(completionDirectory).mode & 0o777, 0o500);
+  assert.equal(
+    fs.statSync(path.join(completionDirectory, 'receipt.json')).mode & 0o777,
+    0o400,
+  );
+  const receipt = JSON.parse(
+    fs.readFileSync(path.join(completionDirectory, 'receipt.json'), 'utf8'),
+  );
+  assert.equal(receipt.domains.length, 8);
+  assert.equal(
+    receipt.domains.every(
+      (domain) =>
+        domain.action === 'no_effect' &&
+        domain.evidenceKind === 'application_summary',
+    ),
+    true,
+  );
+  const verifyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.complete.verify',
+    options: command.options,
+    request: {
+      completionId: command.request.completionId,
+      applicationId: command.request.applicationId,
+      expectedCompletionDigest: completed.completionDigest,
+      automation: null,
+    },
+  };
+  const verified = await verifyLocalReconciliationCompletion(verifyCommand);
+  assert.equal(verified.status, 'verified');
+  const commandPath = path.join(state.deploymentRoot, 'completion-verify.json');
+  fs.writeFileSync(commandPath, `${JSON.stringify(verifyCommand)}\n`, {
+    mode: 0o600,
+  });
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-complete-verify',
+      '--command-file',
+      commandPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).status, 'verified');
+  assert.equal(cli.stdout.includes(completionRoot), false);
+  const identity = {
+    options: { deploymentRoot: state.deploymentRoot },
+    request: {
+      cutoverId: state.captureCommand.request.cutoverId,
+      profile: state.captureCommand.request.profile,
+      instanceId: state.captureCommand.request.instanceId,
+      expectedActivationDigest:
+        state.captureCommand.request.expectedActivationDigest,
+      requestedAtMs: command.request.completedAtMs + 1,
+    },
+  };
+  const restartHead = assertLocalCutoverTargetHead(identity, state.uid);
+  assert.equal(restartHead.state, 'reconciliation_completed');
+  const activeHead = advanceLocalCutoverInstanceHead(
+    identity,
+    state.uid,
+    'target_active',
+    2,
+    'e'.repeat(64),
+  );
+  assert.equal(activeHead.state, 'target_active');
+  assert.equal(activeHead.generation, 2);
+});
+
+test('completion fence retains automation rollback backup while other domains remain manual', async (t) => {
+  const state = await appliedAutomationFixture(t, {
+    suffix: 'completion-fence',
+    planId: '00000000-0000-4000-8000-000000000491',
+    reviewId: '00000000-0000-4000-8000-000000000492',
+    applicationId: '00000000-0000-4000-8000-000000000493',
+    automationId: '00000000-0000-4000-8000-000000000494',
+    decisionId: '019b0000-0000-7000-8000-000000000491',
+    mutationId: '00000000-0000-4000-8000-000000000495',
+  });
+  const completionRoot = path.join(
+    path.dirname(state.captureRoot),
+    'completion-automation-applied',
+  );
+  fs.mkdirSync(completionRoot, { mode: 0o700 });
+  const automation = {
+    automationId: state.automationCommand.request.automationId,
+    decisionId: state.decisionId,
+    expectedApplyDigest: state.applied.applyDigest,
+  };
+  const completionOptions = {
+    deploymentRoot: state.deploymentRoot,
+    applicationRoot: state.applicationRoot,
+    completionRoot,
+    automation: {
+      automationRoot: state.automationRoot,
+      automationDecisionRoot: state.automationDecisionRoot,
+      automationApplyRoot: state.automationApplyRoot,
+      targetDatabasePath: state.targetDatabasePath,
+    },
+    allowRootService: rootAcknowledgement(),
+  };
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.complete',
+    options: completionOptions,
+    request: {
+      completionId: '00000000-0000-4000-8000-000000000496',
+      applicationId: state.application.applicationId,
+      expectedApplicationPlanDigest: state.application.applicationPlanDigest,
+      expectedHeadDigest: state.applied.instanceHeadDigest,
+      automation,
+      completedAtMs: state.applyCommand.request.appliedAtMs + 1,
+    },
+  };
+  const applyRoot = path.join(
+    state.automationApplyRoot,
+    state.automationCommand.request.automationId,
+  );
+  const backupRoot = path.join(applyRoot, 'backup');
+  const backupPath = path.join(backupRoot, 'before.sqlite');
+  const rollbackRoot = path.join(applyRoot, 'rollback-work');
+  assert.equal(fs.existsSync(backupPath), true);
+  await assert.rejects(
+    completeLocalReconciliation(command),
+    /secret_and_config is not terminally reconciled/,
+  );
+  assert.equal(fs.existsSync(backupPath), true);
+  assert.deepEqual(fs.readdirSync(backupRoot), ['before.sqlite']);
+  assert.deepEqual(fs.readdirSync(rollbackRoot), []);
+  assert.equal(fs.statSync(backupRoot).mode & 0o777, 0o500);
+  assert.equal(fs.statSync(rollbackRoot).mode & 0o777, 0o700);
+  assert.equal(
+    fs.existsSync(path.join(completionRoot, command.request.completionId)),
+    false,
+  );
+  const head = readLocalCutoverInstanceHead(
+    state.deploymentRoot,
+    state.captureCommand.request.instanceId,
+    state.uid,
+  );
+  assert.equal(head.state, 'reconciliation_automation_applied');
+  assert.equal(head.sourceRecordDigest, state.applied.applyDigest);
+  assert.throws(
+    () =>
+      assertLocalCutoverTargetHead(
+        {
+          options: { deploymentRoot: state.deploymentRoot },
+          request: {
+            cutoverId: state.captureCommand.request.cutoverId,
+            profile: state.captureCommand.request.profile,
+            instanceId: state.captureCommand.request.instanceId,
+            expectedActivationDigest:
+              state.captureCommand.request.expectedActivationDigest,
+            requestedAtMs: command.request.completedAtMs + 1,
+          },
+        },
+        state.uid,
+      ),
+    /not bound to the instance lineage head/,
+  );
 });
 
 test('automation adapter builds a sealed row plan with bounded conflict evidence', async (t) => {
