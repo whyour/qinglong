@@ -29,6 +29,7 @@ const {
   reviewedOperatorManifest,
 } = require('./ql3-cloudnativepg-live-contract.cjs');
 const {
+  AI_MIGRATION_COUNT,
   FIXTURE,
   LIMITATIONS,
   validateProviderCredentialTestKubernetesLiveReport,
@@ -1453,7 +1454,7 @@ async function main() {
       ),
     );
     assert.equal(databaseFacts.postgresVersionNumber, 180004);
-    assert.equal(databaseFacts.aiMigrationCount, 15);
+    assert.equal(databaseFacts.aiMigrationCount, AI_MIGRATION_COUNT);
 
     psql(
       fixture,

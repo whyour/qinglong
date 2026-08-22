@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
+  AI_MIGRATION_COUNT,
   FIXTURE,
   LIMITATIONS,
   validateProviderCredentialTestKubernetesLiveReport,
@@ -36,7 +37,7 @@ function report() {
       managerRole: 'ql3_ai_credential_manager',
       testerRole: 'ql3_ai_credential_tester',
       migrationCount: 54,
-      aiMigrationCount: 15,
+      aiMigrationCount: AI_MIGRATION_COUNT,
       tlsVerified: true,
       primaryChangedDuringFailover: true,
     },

@@ -132,9 +132,12 @@ test('provisions the fail-closed worker ingress identity and derives all role ev
   );
   assert.match(source, /const roleList = ROLE_NAMES\.map/);
   assert.match(source, /WHERE rolname IN \(\$\{roleList\}\)/);
-  assert.match(source, /assert\.deepEqual\(schema, \['53', '52'\]\)/);
-  assert.match(source, /migrationCount: 54/);
-  assert.match(source, /contractVersion: 53/);
+  assert.match(
+    source,
+    /assert\.deepEqual\(schema, \[String\(MIGRATION_COUNT\), String\(CONTRACT_VERSION\)\]\)/,
+  );
+  assert.match(source, /migrationCount: MIGRATION_COUNT/);
+  assert.match(source, /contractVersion: CONTRACT_VERSION/);
   assert.match(source, /createWorkerIngressTls\(tempDirectory\)/);
   for (const key of [
     'worker-credential-pepper',

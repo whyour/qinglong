@@ -9,6 +9,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
+const {
+  postgresqlControlSchemaContract,
+  postgresqlMainMigrationStream,
+} = require('../packages/ql3-cluster-postgres/dist/migration/migration.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const QL3_VERSION = readReleaseIdentity(ROOT).version;
@@ -59,6 +63,8 @@ const ROLE_NAMES = Object.freeze([
   'ql3_worker_credential_manager',
   'ql3_worker_ingress',
 ]);
+const MIGRATION_COUNT = postgresqlMainMigrationStream.migrations.length;
+const CONTRACT_VERSION = postgresqlControlSchemaContract.contractVersion;
 
 function fail(message) {
   throw new Error(message);
@@ -385,13 +391,13 @@ function roleEvidence(podName) {
           FROM ql3.schema_capabilities
          WHERE contract_name = 'control-core')`,
   ).split('\t');
-  assert.deepEqual(schema, ['53', '52']);
+  assert.deepEqual(schema, [String(MIGRATION_COUNT), String(CONTRACT_VERSION)]);
   return {
     roles: rows.map((row) => row[0]),
     login: true,
     elevatedAttributes: false,
-    migrationCount: 54,
-    contractVersion: 53,
+    migrationCount: MIGRATION_COUNT,
+    contractVersion: CONTRACT_VERSION,
   };
 }
 

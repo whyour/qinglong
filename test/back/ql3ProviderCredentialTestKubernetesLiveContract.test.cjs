@@ -15,6 +15,19 @@ const {
   providerServerSource,
   terminalJobSnapshot,
 } = require('../../scripts/ql3-provider-credential-test-kubernetes-live-contract.cjs');
+const {
+  AI_MIGRATION_COUNT,
+} = require('../../scripts/ql3-provider-credential-test-kubernetes-live-audit.cjs');
+const {
+  postgresModelInvocationMigrationDefinition,
+} = require('../../packages/ql3-ai/dist/migration/modelInvocationMigration.js');
+
+test('binds live evidence to the complete reviewed AI migration stream', () => {
+  assert.equal(
+    AI_MIGRATION_COUNT,
+    postgresModelInvocationMigrationDefinition.migrations.length,
+  );
+});
 
 function template() {
   return {

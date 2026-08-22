@@ -33,6 +33,8 @@ const POSTGRES_INDEX_DIGEST =
   'sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296';
 const POSTGRES_IMAGE_REFERENCE = `${POSTGRES_IMAGE}@${POSTGRES_INDEX_DIGEST}`;
 const POSTGRES_REPOSITORY_DIGEST = `postgres@${POSTGRES_INDEX_DIGEST}`;
+const POSTGRES_RUNTIME_IMAGE =
+  'postgres:18.4-bookworm-ql3-plugin-recovery-e2e';
 const DEFAULT_ADMIN_IMAGE = 'qinglong3-cluster-admin:ql3-plugin-recovery-e2e';
 const DEFAULT_CONTROL_IMAGE =
   'qinglong3-cluster-control:ql3-plugin-recovery-e2e';
@@ -293,6 +295,10 @@ function ensurePostgresImage() {
     inspection.RepoDigests.includes(POSTGRES_REPOSITORY_DIGEST),
     `${POSTGRES_IMAGE} does not match ${POSTGRES_REPOSITORY_DIGEST}`,
   );
+  run(DOCKER, ['image', 'tag', POSTGRES_IMAGE_REFERENCE, POSTGRES_RUNTIME_IMAGE], {
+    label: 'bind verified PostgreSQL fixture digest to its Kind-local tag',
+  });
+  assert.equal(imageId(POSTGRES_RUNTIME_IMAGE), inspection.Id);
 }
 
 function imageId(image) {
@@ -486,7 +492,7 @@ createdb --username "$POSTGRES_USER" --owner ql3_migration qinglong
         containers: [
           {
             name: 'postgres',
-            image: POSTGRES_IMAGE_REFERENCE,
+            image: POSTGRES_RUNTIME_IMAGE,
             imagePullPolicy: 'Never',
             env: [
               { name: 'POSTGRES_USER', value: 'postgres' },
@@ -1730,7 +1736,7 @@ async function main(argv = process.argv.slice(2)) {
     for (const image of [
       ADMIN_IMAGE,
       CONTROL_IMAGE,
-      POSTGRES_IMAGE_REFERENCE,
+      POSTGRES_RUNTIME_IMAGE,
     ]) {
       kind(
         [

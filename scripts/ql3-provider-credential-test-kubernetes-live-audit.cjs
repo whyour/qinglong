@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const FIXTURE = 'qinglong/provider-credential-test-kubernetes-live-contract@v1';
+const AI_MIGRATION_COUNT = 21;
 const LIMITATIONS = Object.freeze([
   'three privileged K3s Docker nodes with fixture-only prebound hostPath volumes are not production infrastructure, dynamic storage or control-plane HA evidence',
   'the private HTTPS provider is a deterministic in-cluster fixture rather than an external SaaS provider',
@@ -186,7 +187,7 @@ function validateProviderCredentialTestKubernetesLiveReport(report) {
     database?.managerRole !== 'ql3_ai_credential_manager' ||
     database?.testerRole !== 'ql3_ai_credential_tester' ||
     database?.migrationCount < 50 ||
-    database?.aiMigrationCount !== 15 ||
+    database?.aiMigrationCount !== AI_MIGRATION_COUNT ||
     database?.tlsVerified !== true ||
     database?.primaryChangedDuringFailover !== true
   ) {
@@ -438,6 +439,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  AI_MIGRATION_COUNT,
   FIXTURE,
   LIMITATIONS,
   validateProviderCredentialTestKubernetesLiveReport,

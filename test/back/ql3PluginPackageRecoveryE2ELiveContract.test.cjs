@@ -31,6 +31,12 @@ test('E2E live gate is opt-in and owns only one exact disposable Kind cluster', 
   assert.match(live, /kindest\/node:v1\.32\.8@sha256:/);
   assert.match(
     live,
+    /image', 'tag', POSTGRES_IMAGE_REFERENCE, POSTGRES_RUNTIME_IMAGE/,
+  );
+  assert.match(live, /image: POSTGRES_RUNTIME_IMAGE/);
+  assert.match(live, /imagePullPolicy: 'Never'/);
+  assert.match(
+    live,
     /condition\.type === 'Failed' && condition\.status === 'True'/,
   );
 });
