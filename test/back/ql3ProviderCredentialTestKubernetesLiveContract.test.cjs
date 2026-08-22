@@ -330,6 +330,25 @@ test('reloads the local admin image after node recovery before convergence', () 
   assert.ok(postFailoverConvergence > imageReload);
 });
 
+test('reads provider evidence from the exact ready Pod with trusted TLS SNI', () => {
+  const source = fs.readFileSync(
+    path.join(
+      __dirname,
+      '../../scripts/ql3-provider-credential-test-kubernetes-live-contract.cjs',
+    ),
+    'utf8',
+  );
+
+  assert.match(source, /providerPodIp: pod\.status\.podIP/);
+  assert.match(source, /host:process\.argv\[1\]/);
+  assert.match(source, /servername:process\.argv\[3\]/);
+  assert.match(source, /ca:fs\.readFileSync\('\/var\/run\/provider-ca\/ca\.crt'\)/);
+  assert.doesNotMatch(
+    source,
+    /fetch\('https:\/\/'\+process\.argv\[1\].*\/evidence/,
+  );
+});
+
 test('provider fixture logs only generation and authorization decision', () => {
   const source = providerServerSource();
   assert.match(source, /event:'provider_request',generation,allowed/);

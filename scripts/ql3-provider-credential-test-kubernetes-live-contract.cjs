@@ -942,12 +942,23 @@ async function runExecutor({
   return result;
 }
 
-async function providerEvidence({ fixture, adminImage, name, nodeName }) {
+async function providerEvidence({
+  fixture,
+  adminImage,
+  name,
+  nodeName,
+  providerPodIp,
+}) {
   assert.match(nodeName, /^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$/);
+  assert.match(
+    providerPodIp,
+    /^(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}$/,
+  );
   const source = String.raw`
-const fs=require('node:fs');
-const finish=(error,value)=>{if(error){const nested=error&&typeof error==='object'&&error.cause&&typeof error.cause==='object'?error.cause:error;const code=typeof nested.code==='string'?nested.code:(typeof error.name==='string'?error.name:'Error');fs.writeFileSync('/dev/termination-log',JSON.stringify({schemaVersion:1,error:'unavailable',code}),{encoding:'utf8',mode:0o600});process.exitCode=1;return;}fs.writeFileSync('/dev/termination-log',value,{encoding:'utf8',mode:0o600});process.stdout.write(value+'\\n');};
-(async()=>{try{const response=await fetch('https://'+process.argv[1]+':'+process.argv[2]+'/evidence',{signal:AbortSignal.timeout(3000)});if(!response.ok)throw Object.assign(new Error('status'),{code:'HTTP_'+response.status});const reader=response.body.getReader();const chunks=[];let total=0;while(true){const part=await reader.read();if(part.done)break;total+=part.value.byteLength;if(total>4096)throw Object.assign(new Error('oversize'),{code:'OVERSIZE'});chunks.push(part.value);}const body=Buffer.concat(chunks.map((chunk)=>Buffer.from(chunk)),total).toString('utf8');finish(null,body);}catch(error){finish(error,'');}})();`;
+const fs=require('node:fs');const https=require('node:https');let finished=false;
+const finish=(error,value)=>{if(finished)return;finished=true;if(error){const nested=error&&typeof error==='object'&&error.cause&&typeof error.cause==='object'?error.cause:error;const code=typeof nested.code==='string'?nested.code:(typeof error.name==='string'?error.name:'Error');fs.writeFileSync('/dev/termination-log',JSON.stringify({schemaVersion:1,error:'unavailable',code}),{encoding:'utf8',mode:0o600});process.exitCode=1;return;}fs.writeFileSync('/dev/termination-log',value,{encoding:'utf8',mode:0o600});process.stdout.write(value+'\\n');};
+const request=https.get({host:process.argv[1],port:Number(process.argv[2]),path:'/evidence',servername:process.argv[3],ca:fs.readFileSync('/var/run/provider-ca/ca.crt'),rejectUnauthorized:true,timeout:3000},(response)=>{if(response.statusCode!==200){response.resume();finish(Object.assign(new Error('status'),{code:'HTTP_'+response.statusCode}),'');return;}const chunks=[];let total=0;response.on('data',(chunk)=>{total+=chunk.byteLength;if(total>4096){request.destroy(Object.assign(new Error('oversize'),{code:'OVERSIZE'}));return;}chunks.push(chunk);});response.on('end',()=>finish(null,Buffer.concat(chunks,total).toString('utf8')));response.on('error',(error)=>finish(error,''));});
+request.on('timeout',()=>request.destroy(Object.assign(new Error('timeout'),{code:'TIMEOUT'})));request.on('error',(error)=>finish(error,''));`;
   fixture.create({
     apiVersion: 'batch/v1',
     kind: 'Job',
@@ -992,8 +1003,9 @@ const finish=(error,value)=>{if(error){const nested=error&&typeof error==='objec
                 'node',
                 '-e',
                 source,
-                PROVIDER_SERVERNAME,
+                providerPodIp,
                 String(PROVIDER_PORT),
+                PROVIDER_SERVERNAME,
               ],
               securityContext: {
                 allowPrivilegeEscalation: false,
@@ -1589,6 +1601,7 @@ async function main() {
         adminImage,
         name: `ql3-provider-evidence-${evidenceSequence}`,
         nodeName: sourceNodeName,
+        providerPodIp: pod.status.podIP,
       });
       const count = evidence.requestCount;
       const previous = requestObservations.get(pod.metadata.uid) ?? 0;
