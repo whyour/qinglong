@@ -428,6 +428,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \\
   --set=migration_password="$QL3_MIGRATION_PASSWORD" \\
   --set=runtime_password="$QL3_RUNTIME_PASSWORD" \\
   --set=admin_password="$QL3_ADMIN_PASSWORD" \\
+  --set=automation_manager_password="$QL3_AUTOMATION_MANAGER_PASSWORD" \\
+  --set=approval_manager_password="$QL3_APPROVAL_MANAGER_PASSWORD" \\
+  --set=run_manager_password="$QL3_RUN_MANAGER_PASSWORD" \\
   --set=package_manager_password="$QL3_PACKAGE_MANAGER_PASSWORD" \\
   --set=package_executor_password="$QL3_PACKAGE_EXECUTOR_PASSWORD" \\
   --set=worker_credential_manager_password="$QL3_WORKER_CREDENTIAL_MANAGER_PASSWORD" \\
@@ -436,6 +439,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \\
 CREATE ROLE ql3_migration LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'migration_password';
 CREATE ROLE ql3_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'runtime_password';
 CREATE ROLE ql3_admin LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'admin_password';
+CREATE ROLE ql3_automation_manager LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'automation_manager_password';
+CREATE ROLE ql3_approval_manager LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'approval_manager_password';
+CREATE ROLE ql3_run_manager LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'run_manager_password';
 CREATE ROLE ql3_package_manager LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'package_manager_password';
 CREATE ROLE ql3_package_executor LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'package_executor_password';
 CREATE ROLE ql3_worker_credential_manager LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD :'worker_credential_manager_password';
@@ -455,6 +461,9 @@ createdb --username "$POSTGRES_USER" --owner ql3_migration qinglong
         'migration-password': secrets.migration,
         'runtime-password': secrets.runtime,
         'admin-password': secrets.admin,
+        'automation-manager-password': secrets.automationManager,
+        'approval-manager-password': secrets.approvalManager,
+        'run-manager-password': secrets.runManager,
         'package-manager-password': secrets.packageManager,
         'package-executor-password': secrets.packageExecutor,
         'worker-credential-manager-password': secrets.workerCredentialManager,
@@ -530,6 +539,33 @@ createdb --username "$POSTGRES_USER" --owner ql3_migration qinglong
                   secretKeyRef: {
                     name: 'ql3-e2e-postgres-auth',
                     key: 'admin-password',
+                  },
+                },
+              },
+              {
+                name: 'QL3_AUTOMATION_MANAGER_PASSWORD',
+                valueFrom: {
+                  secretKeyRef: {
+                    name: 'ql3-e2e-postgres-auth',
+                    key: 'automation-manager-password',
+                  },
+                },
+              },
+              {
+                name: 'QL3_APPROVAL_MANAGER_PASSWORD',
+                valueFrom: {
+                  secretKeyRef: {
+                    name: 'ql3-e2e-postgres-auth',
+                    key: 'approval-manager-password',
+                  },
+                },
+              },
+              {
+                name: 'QL3_RUN_MANAGER_PASSWORD',
+                valueFrom: {
+                  secretKeyRef: {
+                    name: 'ql3-e2e-postgres-auth',
+                    key: 'run-manager-password',
                   },
                 },
               },
@@ -1664,6 +1700,9 @@ async function main(argv = process.argv.slice(2)) {
     migration: randomSecret(),
     runtime: randomSecret(),
     admin: randomSecret(),
+    automationManager: randomSecret(),
+    approvalManager: randomSecret(),
+    runManager: randomSecret(),
     packageManager: randomSecret(),
     packageExecutor: randomSecret(),
     workerCredentialManager: randomSecret(),

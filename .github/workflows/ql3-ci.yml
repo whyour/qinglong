@@ -952,6 +952,9 @@ jobs:
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_migration LOGIN PASSWORD 'ql3_migration_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_runtime LOGIN PASSWORD 'ql3_runtime_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_admin LOGIN PASSWORD 'ql3_admin_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_ai_maintenance LOGIN PASSWORD 'ql3_ai_maintenance_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_ai_credential_manager LOGIN PASSWORD 'ql3_ai_credential_manager_test'"
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_ai_credential_tester LOGIN PASSWORD 'ql3_ai_credential_tester_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_automation_manager LOGIN PASSWORD 'ql3_automation_manager_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_approval_manager LOGIN PASSWORD 'ql3_approval_manager_test'"
           docker exec ${{ job.services.postgres.id }} psql -U postgres -d ql3_contract -v ON_ERROR_STOP=1 -c "CREATE ROLE ql3_run_manager LOGIN PASSWORD 'ql3_run_manager_test'"
@@ -1085,6 +1088,8 @@ jobs:
           chmod +x kubectl
       - name: Install workspace dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build migration evidence dependency
+        run: pnpm run build:packages:ql3
       - name: Audit the locked CloudNativePG deployment contract
         run: |
           pnpm audit:cloudnativepg:ql3

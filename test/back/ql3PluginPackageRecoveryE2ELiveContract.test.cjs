@@ -55,6 +55,18 @@ test('fixture uses a real HTTPS and content-addressed OCI Distribution surface',
 
 test('gate runs migration, healthy activation and a durable rejected upgrade', () => {
   assert.match(live, /operations\/base\/migrate-job\.yaml/);
+  assert.match(
+    live,
+    /CREATE ROLE ql3_automation_manager LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS/,
+  );
+  assert.match(
+    live,
+    /CREATE ROLE ql3_approval_manager LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS/,
+  );
+  assert.match(
+    live,
+    /CREATE ROLE ql3_run_manager LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS/,
+  );
   assert.match(live, /plugin-package-recovery\/base\/recover-job\.yaml/);
   assert.match(fixture, /PostgresPluginPackageInstallRepository/);
   assert.match(

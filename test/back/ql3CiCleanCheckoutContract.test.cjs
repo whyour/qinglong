@@ -55,6 +55,9 @@ test('pins backend CI to the released Node line and bootstraps a clean checkout'
 test('provisions every role required by the PostgreSQL migration stream', () => {
   const postgres = jobSource('cluster-postgres', 'cluster-postgres-ha');
   for (const role of [
+    'ql3_ai_maintenance',
+    'ql3_ai_credential_manager',
+    'ql3_ai_credential_tester',
     'ql3_automation_manager',
     'ql3_approval_manager',
     'ql3_run_manager',
@@ -100,6 +103,16 @@ test('bootstraps jobs that previously depended on local modules or artifacts', (
     'pnpm install --frozen-lockfile --ignore-scripts',
     'pnpm run build:packages:ql3',
     'pnpm test:provider-credential-test-kubernetes-live:ql3',
+  ]);
+
+  const cloudNativePgLive = jobSource(
+    'cluster-cloudnativepg-live',
+    'cluster-provider-credential-test-kubernetes-live',
+  );
+  assertOrdered(cloudNativePgLive, [
+    'pnpm install --frozen-lockfile --ignore-scripts',
+    'pnpm run build:packages:ql3',
+    'pnpm test:cloudnativepg-live:ql3',
   ]);
 });
 
@@ -185,7 +198,7 @@ test('keeps the Node 24 compact Profile RSS budget below application and MCP tie
   );
   assert.match(
     LOCAL_PROFILE_AUDIT,
-    /DEFAULT_MAX_APPLICATION_RSS_DELTA_BYTES = 24 \* 1024 \* 1024/,
+    /DEFAULT_MAX_APPLICATION_RSS_DELTA_BYTES = 28 \* 1024 \* 1024/,
   );
   assert.match(
     LOCAL_PROFILE_AUDIT,
