@@ -1098,6 +1098,36 @@ function recoveryResources(fixture, jobName) {
   ];
 }
 
+function waitForPostgresService(timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastFact = 'probe not started';
+  while (Date.now() < deadline) {
+    const probe = kubectl(
+      [
+        '-n',
+        NAMESPACE,
+        'exec',
+        `pod/${POSTGRES_NAME}`,
+        '--',
+        'pg_isready',
+        '--host',
+        POSTGRES_NAME,
+        '--port',
+        '5432',
+        '--username',
+        'postgres',
+        '--dbname',
+        'qinglong',
+      ],
+      { capture: true, quiet: true, allowFailure: true },
+    );
+    if (probe.status === 0) return;
+    lastFact = (probe.stderr || probe.stdout || `status ${probe.status}`).trim();
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1_000);
+  }
+  fail(`PostgreSQL Service was not ready after ${timeoutMs}ms: ${lastFact}`);
+}
+
 function waitForJob(
   name,
   expectedStatus = 'complete',
@@ -1795,6 +1825,7 @@ async function main(argv = process.argv.slice(2)) {
       ],
       { capture: true, quiet: true },
     );
+    waitForPostgresService();
     kubectl(
       [
         '-n',

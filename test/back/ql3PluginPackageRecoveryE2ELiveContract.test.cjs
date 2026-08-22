@@ -72,6 +72,16 @@ test('report migration evidence follows the complete PostgreSQL stream', () => {
   );
 });
 
+test('waits for PostgreSQL Service connectivity before migration', () => {
+  const readyProbe = live.indexOf('waitForPostgresService();');
+  const migration = live.indexOf(
+    "apply(migrationJob(), 'create reviewed migration Job')",
+  );
+  assert.ok(readyProbe > 0);
+  assert.ok(migration > readyProbe);
+  assert.match(live, /'pg_isready',[\s\S]*'--host',[\s\S]*POSTGRES_NAME/);
+});
+
 test('fixture locks are bound to durable version-three approval dispatches', () => {
   const value = createFixture({
     registry: 'registry.fixture.test',

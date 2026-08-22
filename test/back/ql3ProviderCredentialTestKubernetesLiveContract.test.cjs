@@ -14,6 +14,7 @@ const {
   executorJob,
   providerObservationKey,
   providerServerSource,
+  retryProviderEvidence,
   terminalJobSnapshot,
 } = require('../../scripts/ql3-provider-credential-test-kubernetes-live-contract.cjs');
 const {
@@ -361,6 +362,29 @@ test('starts a fresh provider request baseline after a container restart', () =>
   assert.equal(providerObservationKey(pod), 'provider-uid:0');
   pod.status.containerStatuses[0].restartCount = 1;
   assert.equal(providerObservationKey(pod), 'provider-uid:1');
+});
+
+test('retries only bounded transient provider evidence failures', async () => {
+  let attempts = 0;
+  const evidence = await retryProviderEvidence(
+    async () => {
+      attempts += 1;
+      if (attempts < 3) throw new Error('{"code":"ECONNREFUSED"}');
+      return { requestCount: 1 };
+    },
+    async () => {},
+  );
+  assert.deepEqual(evidence, { requestCount: 1 });
+  assert.equal(attempts, 3);
+  await assert.rejects(
+    retryProviderEvidence(
+      async () => {
+        throw new Error('invalid evidence schema');
+      },
+      async () => {},
+    ),
+    /invalid evidence schema/,
+  );
 });
 
 test('provider fixture logs only generation and authorization decision', () => {

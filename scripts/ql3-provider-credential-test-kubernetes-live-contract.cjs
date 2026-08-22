@@ -1074,6 +1074,30 @@ request.on('timeout',()=>request.destroy(Object.assign(new Error('timeout'),{cod
   return evidence;
 }
 
+async function retryProviderEvidence(read, pause = undefined) {
+  assert.equal(typeof read, 'function');
+  assert.ok(pause === undefined || typeof pause === 'function');
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await read();
+    } catch (error) {
+      lastError = error;
+      if (
+        !/\b(?:ECONNREFUSED|ECONNRESET|ETIMEDOUT|TIMEOUT)\b/.test(
+          error instanceof Error ? error.message : String(error),
+        ) ||
+        attempt === 3
+      ) {
+        throw error;
+      }
+      await (pause ??
+        (() => new Promise((resolve) => setTimeout(resolve, 500))))();
+    }
+  }
+  throw lastError;
+}
+
 async function waitForExecutorProviderEgress({
   fixture,
   adminImage,
@@ -1606,14 +1630,16 @@ async function main() {
     let observedProviderRequests = 0;
     let evidenceSequence = 0;
     const observeProvider = async (pod, sourceNodeName) => {
-      evidenceSequence += 1;
       applyExecutorNetworkPolicy(fixture, pod.status.podIP);
-      const evidence = await providerEvidence({
-        fixture,
-        adminImage,
-        name: `ql3-provider-evidence-${evidenceSequence}`,
-        nodeName: sourceNodeName,
-        providerPodIp: pod.status.podIP,
+      const evidence = await retryProviderEvidence(async () => {
+        evidenceSequence += 1;
+        return providerEvidence({
+          fixture,
+          adminImage,
+          name: `ql3-provider-evidence-${evidenceSequence}`,
+          nodeName: sourceNodeName,
+          providerPodIp: pod.status.podIP,
+        });
       });
       const count = evidence.requestCount;
       const observationKey = providerObservationKey(pod);
@@ -2064,5 +2090,6 @@ module.exports = {
   executorJob,
   providerObservationKey,
   providerServerSource,
+  retryProviderEvidence,
   terminalJobSnapshot,
 };
