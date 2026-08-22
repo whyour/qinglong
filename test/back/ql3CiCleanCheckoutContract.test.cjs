@@ -11,6 +11,10 @@ const WORKFLOW = fs.readFileSync(
 const MANIFEST = JSON.parse(
   fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'),
 );
+const LOCAL_PROFILE_AUDIT = fs.readFileSync(
+  path.join(ROOT, 'scripts/ql3-local-profile-artifact-audit.cjs'),
+  'utf8',
+);
 
 function jobSource(name, nextName) {
   const source = WORKFLOW.match(
@@ -172,4 +176,19 @@ test('pins patched transitive versions for the QL3 importer audit', () => {
     '4.3.1',
   );
   assert.equal(MANIFEST.pnpm.overrides['socks>ip-address'], '10.3.1');
+});
+
+test('keeps the Node 24 compact Profile RSS budget below application and MCP tiers', () => {
+  assert.match(
+    LOCAL_PROFILE_AUDIT,
+    /DEFAULT_MAX_RSS_DELTA_BYTES = 20 \* 1024 \* 1024/,
+  );
+  assert.match(
+    LOCAL_PROFILE_AUDIT,
+    /DEFAULT_MAX_APPLICATION_RSS_DELTA_BYTES = 24 \* 1024 \* 1024/,
+  );
+  assert.match(
+    LOCAL_PROFILE_AUDIT,
+    /DEFAULT_MAX_MCP_RSS_DELTA_BYTES = 48 \* 1024 \* 1024/,
+  );
 });
