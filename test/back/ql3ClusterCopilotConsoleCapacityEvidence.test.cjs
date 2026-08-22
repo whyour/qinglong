@@ -397,6 +397,8 @@ test('live source freezes native cgroup v2, isolation and assertion rotation mec
   ]) {
     assert.ok(scriptSource.includes(contract), `missing ${contract}`);
   }
+  assert.equal(scriptSource.match(/'--interactive'/g)?.length, 2);
+  assert.equal(scriptSource.match(/'--cap-add',\n      'CHOWN'/g)?.length, 2);
   assert.doesNotMatch(scriptSource, /run\.cancellation\.(?:rearm|stop|retry)/);
   assert.doesNotMatch(scriptSource, /--privileged|--network[= ]host/);
 });
