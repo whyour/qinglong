@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import path from 'node:path';
 
 import { applyReconciliationAutomationDecision } from '@qinglong/local-admin/reconciliation-automation-decision';
 import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
@@ -18,7 +17,6 @@ import type { SecurityPrincipal } from '@qinglong/runtime-core/security';
 import { currentIdentity } from '../../../foundation/contract';
 import { LocalDeploymentConfigurationError } from '../../../foundation/error';
 import {
-  ensurePrivateDirectory,
   preflightPublishedFile,
   publishExactFile,
   validatePrivateDirectory,
@@ -48,27 +46,27 @@ import {
   buildLocalReconciliationAutomationApplyReceipt,
   buildLocalReconciliationAutomationRollbackReceipt,
   localReconciliationAutomationApplyEvidenceContents,
-  normalizeLocalReconciliationAutomationApplyIntent,
-  normalizeLocalReconciliationAutomationApplyReceipt,
-  normalizeLocalReconciliationAutomationRollbackReceipt,
   type LocalReconciliationAutomationApplyIntent,
   type LocalReconciliationAutomationApplyReceipt,
 } from './applyEvidence';
 import { readLocalReconciliationAutomationDecisionTerminal } from './decisionCoordinator';
 import { createLocalReconciliationAutomationRequirementFactory } from './planReader';
+import {
+  ensureLocalReconciliationAutomationApplyLayout,
+  localReconciliationAutomationApplyPaths,
+  prepareLocalReconciliationAutomationRollbackSource,
+  readLocalReconciliationAutomationApplyIntent,
+  readLocalReconciliationAutomationApplyReceipt,
+  readLocalReconciliationAutomationRollbackReceipt,
+  sealLocalReconciliationAutomationAppliedStorage,
+  sealLocalReconciliationAutomationRolledBackStorage,
+  validateLocalReconciliationAutomationAppliedStorage,
+  validateLocalReconciliationAutomationApplyCatalog,
+  validateLocalReconciliationAutomationApplyLayout,
+  validateLocalReconciliationAutomationRolledBackStorage,
+} from './applyStorage';
 
 const MAX_AUTHENTICATION_AGE_MS = 5 * 60 * 1_000;
-
-interface ApplyPaths {
-  root: string;
-  backupRoot: string;
-  intent: string;
-  backup: string;
-  receipt: string;
-  rollback: string;
-  restoreStage: string;
-  replaced: string;
-}
 
 type AuthenticationDatabase = Awaited<
   ReturnType<typeof openLocalSqliteAuthenticationReadDatabase>
@@ -85,8 +83,11 @@ export interface LocalReconciliationAutomationApplyDependencies {
   readonly afterDatabaseCommit?: () => void;
   readonly afterReceiptPublished?: () => void;
   readonly afterAppliedHead?: () => void;
+  readonly afterAppliedSeal?: () => void;
   readonly afterRestore?: () => void;
   readonly afterRollbackReceipt?: () => void;
+  readonly afterRollbackHead?: () => void;
+  readonly afterRollbackSeal?: () => void;
 }
 
 function fail(message: string, cause?: unknown): never {
@@ -94,21 +95,6 @@ function fail(message: string, cause?: unknown): never {
     `reconciliation automation apply ${message}`,
     { cause },
   );
-}
-
-function paths(root: string, automationId: string): Readonly<ApplyPaths> {
-  const selected = path.join(root, automationId);
-  const backupRoot = path.join(selected, 'backup');
-  return Object.freeze({
-    root: selected,
-    backupRoot,
-    intent: path.join(selected, 'intent.json'),
-    backup: path.join(backupRoot, 'before.sqlite'),
-    receipt: path.join(selected, 'receipt.json'),
-    rollback: path.join(selected, 'rollback.json'),
-    restoreStage: path.join(backupRoot, 'restore-stage.sqlite'),
-    replaced: path.join(backupRoot, 'replaced.sqlite'),
-  });
 }
 
 function decisionOptions(
@@ -121,50 +107,6 @@ function decisionOptions(
     automationDecisionRoot: options.automationDecisionRoot,
     allowRootService: options.allowRootService,
   });
-}
-
-function readIntent(
-  selected: Readonly<ApplyPaths>,
-): Readonly<LocalReconciliationAutomationApplyIntent> {
-  return normalizeLocalReconciliationAutomationApplyIntent(
-    readPrivateLocalCommandFile(selected.intent),
-  );
-}
-
-function readReceipt(
-  selected: Readonly<ApplyPaths>,
-): Readonly<LocalReconciliationAutomationApplyReceipt> {
-  return normalizeLocalReconciliationAutomationApplyReceipt(
-    readPrivateLocalCommandFile(selected.receipt),
-  );
-}
-
-function validateCatalog(selected: Readonly<ApplyPaths>): void {
-  const allowed = new Set([
-    'backup',
-    'intent.json',
-    'receipt.json',
-    'rollback.json',
-    '.intent.json.ql3-deploy-stage',
-    '.receipt.json.ql3-deploy-stage',
-    '.rollback.json.ql3-deploy-stage',
-  ]);
-  for (const entry of fs.readdirSync(selected.root, { withFileTypes: true })) {
-    if (!allowed.has(entry.name) || entry.isSymbolicLink())
-      fail('apply root contains unknown material');
-  }
-  const backupAllowed = new Set([
-    'before.sqlite',
-    '.before.sqlite.ql3-backup-stage',
-    'restore-stage.sqlite',
-    'replaced.sqlite',
-  ]);
-  for (const entry of fs.readdirSync(selected.backupRoot, {
-    withFileTypes: true,
-  })) {
-    if (!backupAllowed.has(entry.name) || entry.isSymbolicLink())
-      fail('backup root contains unknown material');
-  }
 }
 
 function advance(
@@ -333,17 +275,12 @@ export async function applyLocalReconciliationAutomation(
     [command.options.automationApplyRoot, 'automationApplyRoot'],
   ] as const)
     validatePrivateDirectory(directory, uid, label);
-  const selected = paths(
+  const selected = localReconciliationAutomationApplyPaths(
     command.options.automationApplyRoot,
     command.request.automationId,
   );
-  ensurePrivateDirectory(selected.root, uid, 'automation apply root');
-  ensurePrivateDirectory(
-    selected.backupRoot,
-    uid,
-    'automation apply backup root',
-  );
-  validateCatalog(selected);
+  ensureLocalReconciliationAutomationApplyLayout(selected, uid);
+  validateLocalReconciliationAutomationApplyCatalog(selected);
 
   const terminal = await readLocalReconciliationAutomationDecisionTerminal(
     decisionOptions(command.options),
@@ -374,7 +311,7 @@ export async function applyLocalReconciliationAutomation(
     uid,
   );
   if (fs.existsSync(selected.intent)) {
-    intent = readIntent(selected);
+    intent = readLocalReconciliationAutomationApplyIntent(selected, uid);
     verifyIntentCommand(intent, command);
   } else {
     if (
@@ -427,7 +364,10 @@ export async function applyLocalReconciliationAutomation(
   }
 
   if (fs.existsSync(selected.receipt)) {
-    const receipt = readReceipt(selected);
+    const receipt = readLocalReconciliationAutomationApplyReceipt(
+      selected,
+      uid,
+    );
     const current = await (
       dependencies.inspectSnapshot ?? inspectLocalSqliteSnapshot
     )({
@@ -453,6 +393,13 @@ export async function applyLocalReconciliationAutomation(
       receipt.applyDigest !== head.sourceRecordDigest
     )
       fail('terminal apply receipt drifted');
+    sealLocalReconciliationAutomationAppliedStorage(
+      selected,
+      intent,
+      receipt,
+      uid,
+    );
+    dependencies.afterAppliedSeal?.();
     return result(command.operation, 'existing', receipt, intent, head);
   }
   if (
@@ -586,6 +533,13 @@ export async function applyLocalReconciliationAutomation(
     command.request.appliedAtMs,
   );
   dependencies.afterAppliedHead?.();
+  sealLocalReconciliationAutomationAppliedStorage(
+    selected,
+    intent,
+    receipt,
+    uid,
+  );
+  dependencies.afterAppliedSeal?.();
   return result(
     command.operation,
     publication.status === 'existing' ? 'existing' : 'applied',
@@ -601,7 +555,7 @@ export async function verifyLocalReconciliationAutomationApply(
   const command =
     normalizeLocalReconciliationAutomationApplyVerifyCommand(value);
   const uid = currentIdentity().uid;
-  const selected = paths(
+  const selected = localReconciliationAutomationApplyPaths(
     command.options.automationApplyRoot,
     command.request.automationId,
   );
@@ -610,15 +564,10 @@ export async function verifyLocalReconciliationAutomationApply(
     uid,
     'automationApplyRoot',
   );
-  validatePrivateDirectory(selected.root, uid, 'automation apply root');
-  validatePrivateDirectory(
-    selected.backupRoot,
-    uid,
-    'automation apply backup root',
-  );
-  validateCatalog(selected);
-  const intent = readIntent(selected);
-  const receipt = readReceipt(selected);
+  validateLocalReconciliationAutomationApplyLayout(selected, uid);
+  validateLocalReconciliationAutomationApplyCatalog(selected);
+  const intent = readLocalReconciliationAutomationApplyIntent(selected, uid);
+  const receipt = readLocalReconciliationAutomationApplyReceipt(selected, uid);
   if (
     intent.command.request.decisionId !== command.request.decisionId ||
     receipt.decisionId !== command.request.decisionId ||
@@ -637,6 +586,7 @@ export async function verifyLocalReconciliationAutomationApply(
     uid,
   );
   if (head.state === 'reconciliation_automation_applied') {
+    validateLocalReconciliationAutomationAppliedStorage(selected, intent, uid);
     if (head.sourceRecordDigest !== receipt.applyDigest)
       fail('applied head drifted');
     const current = await inspectLocalSqliteSnapshot({
@@ -649,10 +599,12 @@ export async function verifyLocalReconciliationAutomationApply(
   }
   if (
     head.state === 'reconciliation_automation_rolled_back' &&
-    fs.existsSync(selected.rollback)
+    fs.existsSync(selected.rollbackReceipt)
   ) {
-    const rollback = normalizeLocalReconciliationAutomationRollbackReceipt(
-      readPrivateLocalCommandFile(selected.rollback),
+    validateLocalReconciliationAutomationRolledBackStorage(selected, uid);
+    const rollback = readLocalReconciliationAutomationRollbackReceipt(
+      selected,
+      uid,
     );
     if (
       rollback.applyDigest !== receipt.applyDigest ||
@@ -680,7 +632,7 @@ export async function rollbackLocalReconciliationAutomationApply(
   const command =
     normalizeLocalReconciliationAutomationApplyRollbackCommand(value);
   const uid = currentIdentity().uid;
-  const selected = paths(
+  const selected = localReconciliationAutomationApplyPaths(
     command.options.automationApplyRoot,
     command.request.automationId,
   );
@@ -689,15 +641,10 @@ export async function rollbackLocalReconciliationAutomationApply(
     uid,
     'automationApplyRoot',
   );
-  validatePrivateDirectory(selected.root, uid, 'automation apply root');
-  validatePrivateDirectory(
-    selected.backupRoot,
-    uid,
-    'automation apply backup root',
-  );
-  validateCatalog(selected);
-  const intent = readIntent(selected);
-  const receipt = readReceipt(selected);
+  validateLocalReconciliationAutomationApplyLayout(selected, uid);
+  validateLocalReconciliationAutomationApplyCatalog(selected);
+  const intent = readLocalReconciliationAutomationApplyIntent(selected, uid);
+  const receipt = readLocalReconciliationAutomationApplyReceipt(selected, uid);
   if (
     receipt.decisionId !== command.request.decisionId ||
     receipt.automationId !== command.request.automationId ||
@@ -714,9 +661,10 @@ export async function rollbackLocalReconciliationAutomationApply(
     intent.instanceId,
     uid,
   );
-  if (fs.existsSync(selected.rollback)) {
-    const rollback = normalizeLocalReconciliationAutomationRollbackReceipt(
-      readPrivateLocalCommandFile(selected.rollback),
+  if (fs.existsSync(selected.rollbackReceipt)) {
+    const rollback = readLocalReconciliationAutomationRollbackReceipt(
+      selected,
+      uid,
     );
     const current = await (
       dependencies.inspectSnapshot ?? inspectLocalSqliteSnapshot
@@ -737,11 +685,20 @@ export async function rollbackLocalReconciliationAutomationApply(
         rollback.rollbackDigest,
         rollback.rolledBackAtMs,
       );
+      dependencies.afterRollbackHead?.();
     } else if (
       head.state !== 'reconciliation_automation_rolled_back' ||
       head.sourceRecordDigest !== rollback.rollbackDigest
     )
       fail('rollback replay drifted');
+    sealLocalReconciliationAutomationRolledBackStorage(
+      selected,
+      intent,
+      receipt,
+      rollback,
+      uid,
+    );
+    dependencies.afterRollbackSeal?.();
     return result(command.operation, 'existing', receipt, intent, head);
   }
   if (
@@ -765,7 +722,7 @@ export async function rollbackLocalReconciliationAutomationApply(
       rolledBackAtMs: command.request.rolledBackAtMs,
     });
     publishExactFile(
-      selected.rollback,
+      selected.rollbackReceipt,
       localReconciliationAutomationApplyEvidenceContents(rollback),
       0o600,
       uid,
@@ -779,10 +736,25 @@ export async function rollbackLocalReconciliationAutomationApply(
       rollback.rollbackDigest,
       command.request.rolledBackAtMs,
     );
+    dependencies.afterRollbackHead?.();
+    sealLocalReconciliationAutomationRolledBackStorage(
+      selected,
+      intent,
+      receipt,
+      rollback,
+      uid,
+    );
+    dependencies.afterRollbackSeal?.();
     return result(command.operation, 'existing', receipt, intent, head);
   }
   if (current.sha256 !== receipt.targetAfter.sha256)
     fail('rollback current target drifted');
+  sealLocalReconciliationAutomationAppliedStorage(
+    selected,
+    intent,
+    receipt,
+    uid,
+  );
 
   const authenticatedScope = await authenticate(
     command.options,
@@ -855,11 +827,12 @@ export async function rollbackLocalReconciliationAutomationApply(
   } finally {
     await authenticatedScope.database.close();
   }
+  prepareLocalReconciliationAutomationRollbackSource(selected, intent, uid);
   const restored = await (
     dependencies.restoreSnapshot ?? restoreLocalSqliteSnapshot
   )({
     databasePath: command.options.targetDatabasePath,
-    sourceSnapshotPath: selected.backup,
+    sourceSnapshotPath: selected.rollbackSource,
     restoreStagePath: selected.restoreStage,
     replacedDatabasePath: selected.replaced,
     expectedCurrentSha256: receipt.targetAfter.sha256,
@@ -885,7 +858,7 @@ export async function rollbackLocalReconciliationAutomationApply(
     rolledBackAtMs: command.request.rolledBackAtMs,
   });
   publishExactFile(
-    selected.rollback,
+    selected.rollbackReceipt,
     localReconciliationAutomationApplyEvidenceContents(rollback),
     0o600,
     uid,
@@ -899,6 +872,15 @@ export async function rollbackLocalReconciliationAutomationApply(
     rollback.rollbackDigest,
     command.request.rolledBackAtMs,
   );
+  dependencies.afterRollbackHead?.();
+  sealLocalReconciliationAutomationRolledBackStorage(
+    selected,
+    intent,
+    receipt,
+    rollback,
+    uid,
+  );
+  dependencies.afterRollbackSeal?.();
   return result(command.operation, 'rolled_back', receipt, intent, head);
 }
 

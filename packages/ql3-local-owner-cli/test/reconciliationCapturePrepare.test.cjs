@@ -3288,7 +3288,12 @@ test('automation decision reauthenticates the same reviewer, seals exact row dec
     }),
     /current reviewer authentication is not strong or identical/,
   );
-  for (const boundary of ['afterDatabaseCommit', 'afterReceiptPublished']) {
+  for (const boundary of [
+    'afterDatabaseCommit',
+    'afterReceiptPublished',
+    'afterAppliedHead',
+    'afterAppliedSeal',
+  ]) {
     await assert.rejects(
       applyLocalReconciliationAutomation(applyCommand, {
         ...applyDependencies,
@@ -3307,6 +3312,34 @@ test('automation decision reauthenticates the same reviewer, seals exact row dec
   assert.equal(applied.state, 'reconciliation_automation_applied');
   assert.equal(applied.adoptedTaskCount, 1);
   assert.equal(fs.statSync(state.targetDatabasePath).ino, targetIdentity.ino);
+  const applyEvidenceRoot = path.join(
+    automationApplyRoot,
+    state.automationCommand.request.automationId,
+  );
+  const applyBackupRoot = path.join(applyEvidenceRoot, 'backup');
+  const rollbackWorkRoot = path.join(applyEvidenceRoot, 'rollback-work');
+  assert.equal(fs.statSync(applyEvidenceRoot).mode & 0o777, 0o500);
+  assert.equal(fs.statSync(applyBackupRoot).mode & 0o777, 0o500);
+  assert.equal(fs.statSync(rollbackWorkRoot).mode & 0o777, 0o700);
+  assert.equal(
+    fs.statSync(path.join(applyEvidenceRoot, 'intent.json')).mode & 0o777,
+    0o400,
+  );
+  assert.equal(
+    fs.statSync(path.join(applyEvidenceRoot, 'receipt.json')).mode & 0o777,
+    0o400,
+  );
+  assert.equal(
+    fs.statSync(path.join(applyBackupRoot, 'before.sqlite')).mode & 0o777,
+    0o400,
+  );
+  assert.deepEqual(fs.readdirSync(applyEvidenceRoot).sort(), [
+    'backup',
+    'intent.json',
+    'receipt.json',
+    'rollback-work',
+  ]);
+  assert.deepEqual(fs.readdirSync(rollbackWorkRoot), []);
   const applyReplay = await applyLocalReconciliationAutomation(
     applyCommand,
     applyDependencies,
@@ -3335,7 +3368,12 @@ test('automation decision reauthenticates the same reviewer, seals exact row dec
       rolledBackAtMs: appliedAtMs + 1,
     },
   };
-  for (const boundary of ['afterRestore', 'afterRollbackReceipt']) {
+  for (const boundary of [
+    'afterRestore',
+    'afterRollbackReceipt',
+    'afterRollbackHead',
+    'afterRollbackSeal',
+  ]) {
     await assert.rejects(
       rollbackLocalReconciliationAutomationApply(rollbackCommand, {
         ...applyDependencies,
@@ -3353,6 +3391,15 @@ test('automation decision reauthenticates the same reviewer, seals exact row dec
   assert.equal(rolledBack.status, 'existing');
   assert.equal(rolledBack.state, 'reconciliation_automation_rolled_back');
   assert.equal(fs.statSync(state.targetDatabasePath).ino, targetIdentity.ino);
+  assert.equal(fs.statSync(applyEvidenceRoot).mode & 0o777, 0o500);
+  assert.equal(fs.statSync(applyBackupRoot).mode & 0o777, 0o500);
+  assert.equal(fs.statSync(rollbackWorkRoot).mode & 0o777, 0o500);
+  assert.deepEqual(fs.readdirSync(applyBackupRoot), []);
+  assert.deepEqual(fs.readdirSync(rollbackWorkRoot), ['receipt.json']);
+  assert.equal(
+    fs.statSync(path.join(rollbackWorkRoot, 'receipt.json')).mode & 0o777,
+    0o400,
+  );
   assert.equal(
     (
       await rollbackLocalReconciliationAutomationApply(

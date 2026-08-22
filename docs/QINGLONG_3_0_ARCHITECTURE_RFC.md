@@ -11,7 +11,7 @@
 
 最新增量证据（2026-08-22）：
 
-- D-393/ADR-0486（进行中）：首个 Automation adapter 已先建立独立的有界逐行 plan fence，而没有提前取得 DML authority。既有
+- D-393/ADR-0486/ADR-0487（进行中）：首个 Automation adapter 已先建立独立的有界逐行 plan fence，而没有提前取得 DML authority。既有
   Legacy Crontab classifier 被复用于 exact sealed Legacy source；每行只记录 source/candidate digest、classification/reasons、proposed
   Task ID、trigger count，以及 captured target 当前 Task revision/content digest 的 `absent|occupied` 冲突证据，不保存 command/spec、Task
   name、reviewer、credential、Secret、路径或 target row body。planner 重新验证 D-392 application terminal、D-391 signed review 所绑定的原始
@@ -70,15 +70,28 @@
   apply receipt 绑定 publication digest、adopted Task/Trigger/skipped counters、写后完整 SQLite snapshot 和写前 backup；verify 同时检查 signed
   decision、instance head 与当前 target snapshot，stdout 不返回 reviewer、路径、row digest 或 command。rollback 不是裸文件覆盖：它先以当前 reviewer
   强认证和当前 Project Policy 重放已存在 publication，再要求 target 精确等于 apply snapshot，最后调用 `preserveDatabaseIdentity=true` 的 restore，
-  保持 activation 所绑定的 SQLite inode。restore、rollback receipt 和 rollback head 的 response-loss 同样可恢复；可恢复 backup authority 因仍需支持
-  apply 后显式 rollback，保持 current-UID `0700/0600`，不伪装成已经归档的 `0500/0400` terminal。聚焦 reconciliation 套件仍为
+  保持 activation 所绑定的 SQLite inode。restore、rollback receipt 和 rollback head 的 response-loss 同样可恢复；该切片当时为继续支持显式
+  rollback，暂将可恢复 backup authority 保持为 current-UID `0700/0600`，尚未声称 terminal retention 已完成。聚焦 reconciliation 套件仍为
   `44 total / 42 pass / 2 conditional Docker skip / 0 fail`，但成功场景现在额外覆盖首次 apply、mutation replay、不同 reviewer 拒绝、六个
   backup/apply/rollback response-loss 窗口、content-free CLI verify、identity-preserving rollback 与 rollback replay。完整 Local Owner 在受限沙箱为
   `266 total / 256 pass / 7 conditional skip / 3 loopback-listen EPERM`，两个对应文件在沙箱外 `15/15` 通过；package/dependency boundary 为
   `70/70`。workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为
   `168 source / 167 nested / 1 root binary entry`，没有新增 package、production dependency、daemon、listener、timer 或 `src/` 根平铺。
-  D-393 仍未代表完整 reconciliation：Automation 之外的 Secret、Plugin、Identity、history 等领域 adapter 尚未 apply，target service 也未获得 restart
-  authority；后续必须先完成 apply-root 的 retention/seal 策略和跨领域 completion fence，再进入 target restart/readiness。
+  第四切片以 ADR-0487 收敛 apply-root 的 retention/seal，而没有引入后台 GC。每个 apply 现在把 immutable evidence 与 mutable
+  `rollback-work/` 分离：apply receipt 与 applied head 完成后，root/backup 和 intent/receipt/backup 分别封为 `0500/0400`，只保留一个空的
+  current-UID `0700` rollback workspace。rollback 先把只读 backup 复制到该隔离工作区，以固定 64 KiB buffer 复算 SHA-256，再复用
+  identity-preserving restore；restore response loss 会先由当前 target snapshot 裁决，不会因临时副本残留错误退回 applied 路径。rollback receipt/head
+  收敛后，同步删除 restore 临时材料和数据库等量 backup，只保留三个 `0400` receipt/intent 证据，并把三层目录封为 `0500`。Applied backup 在跨领域
+  completion fence 接受前仍禁止自动删除，因此 rollback safety 与低配设备空间回收没有互相冒充。
+
+  新增实现是既有 Automation 目录中的 `applyStorage.ts`，没有新增 package、production dependency、daemon、timer、watcher、listener、SQL migration、
+  PostgreSQL ACL/Pool 或 cluster workload；hash/read/copy 均为固定内存。聚焦 reconciliation 为
+  `44 total / 42 pass / 2 conditional Docker skip / 0 fail`，覆盖 apply head/seal 与 rollback restore/receipt/head/seal 共十个 response-loss 窗口、
+  mode/catalog、backup 回收和 terminal replay；完整 Local Owner 在真实 loopback 环境为 `266 total / 259 pass / 7 conditional skip / 0 fail`，18-package
+  clean build/逐包测试退出 0，真实 Docker reconciliation `2/2`，package/dependency boundary `70/70`。workspace 仍为 18 packages、`singleSourcePackages=[]`、
+  `shallowSourcePackages=[]`；Local Owner 为 `169 source / 168 nested / 1 root binary entry`。D-393 仍未代表完整 reconciliation：Automation 之外的
+  Secret、Plugin、Identity、history 等领域 adapter 尚未 apply，target service 也未获得 restart authority；下一切片是跨领域 completion fence，完成后才可进入
+  target restart/readiness。
 - D-392/ADR-0485（已接受）：D-391 的 signed review 不能直接获得通用 DML authority；表级 `adopt_legacy/retain_both` 也不能证明
   Automation 行级 command/trigger 兼容，更不能覆盖 Secret custody、append-only history、Plugin/AI 外部资产与 Identity/Policy 语义。
   因此既有 Local Owner 新增 `reconciliation.application.prepare|commit|verify`，以
