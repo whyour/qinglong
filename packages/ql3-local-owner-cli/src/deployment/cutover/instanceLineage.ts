@@ -32,6 +32,8 @@ export type LocalCutoverInstanceHeadState =
   | 'reconciliation_application_prepared'
   | 'reconciliation_application_planned'
   | 'reconciliation_automation_planned'
+  | 'reconciliation_automation_decision_prepared'
+  | 'reconciliation_automation_reviewed'
   | 'rollback_prepared'
   | 'legacy_restart_requested'
   | 'legacy_running'
@@ -172,6 +174,8 @@ function parseHead(value: unknown): Readonly<LocalCutoverInstanceHead> {
       head.state !== 'reconciliation_application_prepared' &&
       head.state !== 'reconciliation_application_planned' &&
       head.state !== 'reconciliation_automation_planned' &&
+      head.state !== 'reconciliation_automation_decision_prepared' &&
+      head.state !== 'reconciliation_automation_reviewed' &&
       head.state !== 'rollback_prepared' &&
       head.state !== 'legacy_restart_requested' &&
       head.state !== 'legacy_running' &&
@@ -347,6 +351,8 @@ export function advanceLocalCutoverInstanceHead(
     | 'reconciliation_application_prepared'
     | 'reconciliation_application_planned'
     | 'reconciliation_automation_planned'
+    | 'reconciliation_automation_decision_prepared'
+    | 'reconciliation_automation_reviewed'
     | 'rollback_prepared'
     | 'legacy_restart_requested'
     | 'legacy_running'
@@ -394,6 +400,8 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_application_prepared' ||
       current.state === 'reconciliation_application_planned' ||
       current.state === 'reconciliation_automation_planned' ||
+      current.state === 'reconciliation_automation_decision_prepared' ||
+      current.state === 'reconciliation_automation_reviewed' ||
       current.state === 'legacy_restart_requested' ||
       current.state === 'legacy_running' ||
       current.state === 'legacy_ready')
@@ -427,6 +435,10 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_application_prepared') ||
     (state === 'reconciliation_automation_planned' &&
       current.state === 'reconciliation_application_planned') ||
+    (state === 'reconciliation_automation_decision_prepared' &&
+      current.state === 'reconciliation_automation_planned') ||
+    (state === 'reconciliation_automation_reviewed' &&
+      current.state === 'reconciliation_automation_decision_prepared') ||
     (state === 'rollback_prepared' && current.state === 'target_stopped') ||
     (state === 'legacy_restart_requested' &&
       current.state === 'rollback_prepared') ||

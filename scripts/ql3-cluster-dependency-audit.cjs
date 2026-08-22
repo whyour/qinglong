@@ -2020,6 +2020,21 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/automation/decisionCoordinator.ts' &&
+          [
+            '@qinglong/local-admin/reconciliation-automation-decision',
+            '@qinglong/local-owner-console/authenticated-command',
+            '@qinglong/local-sqlite/authentication-read',
+          ].includes(specifier)
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/automation/planReader.ts' &&
+          specifier ===
+            '@qinglong/local-admin/reconciliation-automation-decision'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/deployment/reconciliation/application/automation/rowPlan.ts' &&
           specifier === '@qinglong/local-admin/adoption-inspection'
         ) &&
@@ -2195,6 +2210,12 @@ function auditSourceImports(root, packagePath, findings) {
           (path.relative(packageDirectory, filePath) ===
             'src/legacy-adoption/legacyCrontabDecisionIssuerKeyring.ts' &&
             specifier === '@qinglong/runtime-core/local-secret') ||
+          (path.relative(packageDirectory, filePath) ===
+            'src/legacy-adoption/reconciliationAutomationDecision.ts' &&
+            [
+              '@qinglong/runtime-core/local-secret',
+              '@qinglong/runtime-core/security',
+            ].includes(specifier)) ||
           (path.relative(packageDirectory, filePath) ===
             'src/plugin-package/pluginPackageStaging.ts' &&
             [

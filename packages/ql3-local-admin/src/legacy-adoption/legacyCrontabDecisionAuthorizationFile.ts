@@ -88,6 +88,8 @@ export interface VerifyLegacyCrontabDecisionAuthorizationFileOptions {
   readonly expectedPlanDigest: string;
   readonly expectedInventoryDigest: string;
   readonly keyProvider: LocalSecretKeyProvider;
+  readonly allowedModes?: readonly (0o400 | 0o600)[];
+  readonly allowedParentModes?: readonly (0o500 | 0o700)[];
   readonly verifyReceipt: (
     receipt: unknown,
     decisions: Iterable<LegacyCrontabAdoptionDecision>,
@@ -218,7 +220,47 @@ function currentUid(): number {
   return uid;
 }
 
-function assertPrivateParent(filePath: string, uid: number): void {
+function verificationModes(
+  value: readonly (0o400 | 0o600)[] | undefined,
+): readonly number[] {
+  if (value === undefined) return Object.freeze([0o600]);
+  if (
+    !Array.isArray(value) ||
+    value.length < 1 ||
+    value.length > 2 ||
+    value.some((mode) => mode !== 0o400 && mode !== 0o600) ||
+    new Set(value).size !== value.length
+  ) {
+    throw new LegacyCrontabDecisionAuthorizationFileError(
+      'allowed file modes are invalid',
+    );
+  }
+  return Object.freeze([...value]);
+}
+
+function verificationParentModes(
+  value: readonly (0o500 | 0o700)[] | undefined,
+): readonly number[] {
+  if (value === undefined) return Object.freeze([0o700]);
+  if (
+    !Array.isArray(value) ||
+    value.length < 1 ||
+    value.length > 2 ||
+    value.some((mode) => mode !== 0o500 && mode !== 0o700) ||
+    new Set(value).size !== value.length
+  ) {
+    throw new LegacyCrontabDecisionAuthorizationFileError(
+      'allowed parent modes are invalid',
+    );
+  }
+  return Object.freeze([...value]);
+}
+
+function assertPrivateParent(
+  filePath: string,
+  uid: number,
+  allowedModes: readonly number[],
+): void {
   let stat: fs.Stats;
   try {
     stat = fs.lstatSync(path.dirname(filePath));
@@ -232,7 +274,7 @@ function assertPrivateParent(filePath: string, uid: number): void {
     !stat.isDirectory() ||
     stat.isSymbolicLink() ||
     stat.uid !== uid ||
-    (stat.mode & 0o777) !== 0o700
+    !allowedModes.includes(stat.mode & 0o777)
   ) {
     throw new LegacyCrontabDecisionAuthorizationFileError(
       'parent must be an owner-only real directory',
@@ -693,7 +735,7 @@ export async function publishLegacyCrontabDecisionAuthorizationFile(
 ): Promise<LegacyCrontabDecisionAuthorizationFileResult> {
   const filePath = authorizationPath(options.filePath);
   const uid = currentUid();
-  assertPrivateParent(filePath, uid);
+  assertPrivateParent(filePath, uid, [0o700]);
   const fileHeader = header(options);
   const temporary = path.join(
     path.dirname(filePath),
@@ -860,7 +902,9 @@ async function verifyLegacyCrontabDecisionAuthorizationFileInternal<T>(
 ): Promise<LegacyCrontabDecisionAuthorizationFileResult | T> {
   const filePath = authorizationPath(options.filePath);
   const uid = currentUid();
-  assertPrivateParent(filePath, uid);
+  const allowedModes = verificationModes(options.allowedModes);
+  const allowedParentModes = verificationParentModes(options.allowedParentModes);
+  assertPrivateParent(filePath, uid, allowedParentModes);
   assertHeaderIdentity({
     decisionId: options.expectedDecisionId,
     profile: options.expectedProfile,
@@ -874,7 +918,7 @@ async function verifyLegacyCrontabDecisionAuthorizationFileInternal<T>(
       !before.isFile() ||
       before.isSymbolicLink() ||
       Number(before.uid) !== uid ||
-      (Number(before.mode) & 0o777) !== 0o600 ||
+      !allowedModes.includes(Number(before.mode) & 0o777) ||
       before.size < 1n ||
       before.size > BigInt(MAX_LEGACY_CRONTAB_DECISION_AUTHORIZATION_FILE_BYTES)
     ) {
@@ -1032,7 +1076,7 @@ async function verifyLegacyCrontabDecisionAuthorizationFileInternal<T>(
         afterPath.mtimeNs !== opened.mtimeNs ||
         afterPath.ctimeNs !== opened.ctimeNs ||
         Number(afterPath.uid) !== uid ||
-        (Number(afterPath.mode) & 0o777) !== 0o600
+        !allowedModes.includes(Number(afterPath.mode) & 0o777)
       ) {
         throw new LegacyCrontabDecisionAuthorizationFileError(
           'file identity changed during verification',

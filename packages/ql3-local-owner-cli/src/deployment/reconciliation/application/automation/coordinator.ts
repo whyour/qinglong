@@ -609,6 +609,33 @@ function validateTerminalBinding(
   }
 }
 
+export interface LocalReconciliationAutomationTerminal {
+  readonly receipt: Readonly<LocalReconciliationAutomationPlanReceipt>;
+  readonly planPath: string;
+}
+
+/**
+ * Re-opens the sealed row plan for the separately authenticated decision
+ * phase. This reader exposes no live database authority and never repairs a
+ * terminal bundle.
+ */
+export function readLocalReconciliationAutomationTerminal(
+  automationRoot: string,
+  automationId: string,
+  uid: number,
+): Readonly<LocalReconciliationAutomationTerminal> {
+  const selected = automationPaths(automationRoot, automationId);
+  validateDirectory(selected.root, uid, [0o500], 'automation plan root');
+  validateDirectory(selected.staging, uid, [0o500], 'automation staging');
+  validateCatalog(selected, true);
+  const receipt = readReceipt(selected.receipt, uid, [0o400]);
+  if (receipt.automationId !== automationId) {
+    configurationError('automation terminal identity drifted');
+  }
+  validatePlanFile(selected.plan, receipt, uid, [0o400]);
+  return Object.freeze({ receipt, planPath: selected.plan });
+}
+
 export async function planLocalReconciliationAutomation(
   value: unknown,
   dependencies: LocalReconciliationAutomationPlanDependencies = {},

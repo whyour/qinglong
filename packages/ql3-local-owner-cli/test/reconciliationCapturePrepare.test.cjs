@@ -10,15 +10,18 @@ const { test } = require('node:test');
 const {
   commitLocalReconciliationCapture,
   commitLocalReconciliationApplication,
+  commitLocalReconciliationAutomationDecision,
   commitLocalReconciliationPlan,
   commitLocalReconciliationReview,
   prepareLocalReconciliationCapture,
   prepareLocalReconciliationApplication,
+  prepareLocalReconciliationAutomationDecision,
   planLocalReconciliationAutomation,
   prepareLocalReconciliationPlan,
   prepareLocalReconciliationReview,
   verifyLocalReconciliationCapture,
   verifyLocalReconciliationApplication,
+  verifyLocalReconciliationAutomationDecision,
   verifyLocalReconciliationAutomationPlan,
   verifyLocalReconciliationPlan,
   verifyLocalReconciliationReview,
@@ -1066,6 +1069,236 @@ function applicationCommitCommand(state, prepared) {
       expectedHeadDigest: prepared.instanceHeadDigest,
       committedAtMs: state.prepareApplicationCommand.request.preparedAtMs + 1,
     },
+  };
+}
+
+async function plannedAutomationFixture(t, options = {}) {
+  const suffix = options.suffix ?? 'decision';
+  const state = await reviewedApplicationFixture(t, {
+    planId: options.planId,
+    reviewId: options.reviewId,
+    applicationId: options.applicationId,
+    reviewSuffix: `automation-decision-${suffix}`,
+    createDefaultSidecars: false,
+    initializeDatabases: automationDatabaseInitializer(),
+    mutateTarget(paths) {
+      return mutateAutomationTarget(paths, options.occupied === true);
+    },
+    mutateDecisions(records) {
+      const selected = records.find(
+        (record) =>
+          record.kind === 'qinglong3-local-reconciliation-review-decision' &&
+          record.database === 'legacy' &&
+          record.domain === 'automation' &&
+          record.factKind === 'table' &&
+          record.disposition === 'exclude_legacy',
+      );
+      assert.ok(selected);
+      selected.disposition = options.occupied === true ? 'retain_both' : 'adopt_legacy';
+      selected.reason = options.occupied === true ? 'preserve_both' : 'prefer_legacy';
+    },
+  });
+  const preparedApplication = await prepareLocalReconciliationApplication(
+    state.prepareApplicationCommand,
+  );
+  const application = await commitLocalReconciliationApplication(
+    applicationCommitCommand(state, preparedApplication),
+  );
+  const automationRoot = path.join(
+    path.dirname(state.captureRoot),
+    `automation-decision-plan-${suffix}`,
+  );
+  const automationDecisionRoot = path.join(
+    path.dirname(state.captureRoot),
+    `automation-decision-authority-${suffix}`,
+  );
+  fs.mkdirSync(automationRoot, { mode: 0o700 });
+  fs.mkdirSync(automationDecisionRoot, { mode: 0o700 });
+  const automationId =
+    options.automationId ?? '00000000-0000-4000-8000-000000000461';
+  const automationCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.plan',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      automationRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      automationId,
+      applicationId: state.prepareApplicationCommand.request.applicationId,
+      expectedApplicationPlanDigest: application.applicationPlanDigest,
+      expectedHeadDigest: application.instanceHeadDigest,
+      decisionFilePath: state.reviewFile.filePath,
+      projectId: 'default',
+      legacyTimezone: 'Asia/Shanghai',
+      preparedAtMs: state.prepareApplicationCommand.request.preparedAtMs + 2,
+    },
+  };
+  const planned = await planLocalReconciliationAutomation(automationCommand);
+  const automationDirectory = path.join(automationRoot, automationId);
+  const planReceipt = JSON.parse(
+    fs.readFileSync(path.join(automationDirectory, 'receipt.json'), 'utf8'),
+  );
+  const planRows = fs
+    .readFileSync(path.join(automationDirectory, 'plan.ndjson'), 'utf8')
+    .trimEnd()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+    .filter(
+      (record) =>
+        record.kind === 'qinglong3-local-reconciliation-automation-plan-row',
+    );
+  return {
+    ...state,
+    application,
+    automationRoot,
+    automationDecisionRoot,
+    automationCommand,
+    automationDirectory,
+    planned,
+    planReceipt,
+    planRows,
+  };
+}
+
+function automationDecisionReviewFile(
+  state,
+  decisionId,
+  disposition,
+  reason,
+  suffix = 'decision',
+) {
+  assert.equal(state.planRows.length, 1);
+  const row = state.planRows[0];
+  const records = [
+    {
+      schemaVersion: 1,
+      kind: 'qinglong3-legacy-crontab-decision-review-file-header',
+      decisionId,
+      profile: state.captureCommand.request.profile,
+      planDigest: state.planned.automationPlanDigest,
+      inventoryDigest: state.planReceipt.legacyInventoryDigest,
+    },
+    {
+      schemaVersion: 1,
+      kind: 'qinglong3-legacy-crontab-decision-review-file-row',
+      decision: {
+        rowOrdinal: row.rowOrdinal,
+        sourceDigest: row.sourceDigest,
+        disposition,
+        reason,
+      },
+    },
+  ];
+  const filePath = path.join(
+    state.diagnosticRoot,
+    `automation-row-decision-${suffix}.ndjson`,
+  );
+  fs.writeFileSync(
+    filePath,
+    `${records.map((record) => JSON.stringify(record)).join('\n')}\n`,
+    { mode: 0o600 },
+  );
+  return { filePath, records };
+}
+
+function automationDecisionPrepareCommand(state, decisionId) {
+  return {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.decision.prepare',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      automationRoot: state.automationRoot,
+      automationDecisionRoot: state.automationDecisionRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      decisionId,
+      automationId: state.automationCommand.request.automationId,
+      expectedAutomationPlanDigest: state.planned.automationPlanDigest,
+      expectedHeadDigest: state.planned.instanceHeadDigest,
+      preparedAtMs: state.automationCommand.request.preparedAtMs + 1,
+    },
+  };
+}
+
+function automationDecisionCommitFixture(
+  state,
+  prepared,
+  decisionFilePath,
+  options = {},
+) {
+  const committedAtMs = options.committedAtMs ?? Date.now();
+  const authorizationLifetimeMs = 10 * 60 * 1_000;
+  let authentications = 0;
+  let confirmations = 0;
+  let databaseCloses = 0;
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.decision.commit',
+    options: {
+      ...prepared.commandOptions,
+      targetDatabasePath: state.targetDatabasePath,
+      ownerPepperKeyringDirectory: state.command.options.ownerPepperKeyringDirectory,
+      credentialFilePath: state.command.options.credentialFilePath,
+    },
+    request: {
+      decisionId: prepared.result.decisionId,
+      automationId: prepared.result.automationId,
+      expectedPreparationDigest: prepared.result.preparationDigest,
+      expectedHeadDigest: prepared.result.instanceHeadDigest,
+      decisionFilePath,
+      committedAtMs,
+      authorizationLifetimeMs,
+    },
+  };
+  const dependencies = {
+    now: () => committedAtMs,
+    async openAuthenticationDatabase() {
+      return {
+        async close() {
+          databaseCloses += 1;
+        },
+      };
+    },
+    async authenticate(_database, authenticateOptions) {
+      authentications += 1;
+      assert.equal(
+        authenticateOptions.authenticationNamespace,
+        'local_reconciliation_automation',
+      );
+      return {
+        principal: {
+          subject: {
+            type: 'user',
+            id: options.reviewerId ?? 'review-owner',
+          },
+          authenticationId: 'local_reconciliation_automation:test',
+          authenticatedAtMs: committedAtMs,
+          expiresAtMs: committedAtMs + authorizationLifetimeMs + 60_000,
+          assurance: options.assurance ?? 'local_console',
+        },
+        databaseFence: {
+          credentialId: options.reviewerId ?? 'review-owner',
+          credentialVersion: 1,
+          pepperKeyId: 'review-owner-v1',
+          pepperVersion: 1,
+        },
+        async confirm() {
+          confirmations += 1;
+        },
+      };
+    },
+  };
+  return {
+    command,
+    dependencies,
+    authenticationCount: () => authentications,
+    confirmationCount: () => confirmations,
+    databaseCloseCount: () => databaseCloses,
   };
 }
 
@@ -2752,6 +2985,429 @@ test('automation adapter builds a sealed row plan with bounded conflict evidence
   assert.equal(cli.status, 0, cli.stderr);
   assert.equal(JSON.parse(cli.stdout).status, 'verified');
   assert.equal(cli.stdout.includes('legacy-cron:1'), false);
+});
+
+test('automation decision reauthenticates the same reviewer, seals exact row decisions and verifies content-free', async (t) => {
+  const state = await plannedAutomationFixture(t, {
+    suffix: 'signed-success',
+    planId: '00000000-0000-4000-8000-000000000461',
+    reviewId: '00000000-0000-4000-8000-000000000462',
+    applicationId: '00000000-0000-4000-8000-000000000463',
+    automationId: '00000000-0000-4000-8000-000000000464',
+  });
+  assert.equal(state.planRows[0].requirement, 'review_adopt');
+  const decisionId = '019b0000-0000-7000-8000-000000000461';
+  const review = automationDecisionReviewFile(
+    state,
+    decisionId,
+    'adopt',
+    'reviewed_lossless',
+    'signed-success',
+  );
+  const prepareCommand = automationDecisionPrepareCommand(state, decisionId);
+  const prepared = await prepareLocalReconciliationAutomationDecision(
+    prepareCommand,
+  );
+  assert.equal(prepared.status, 'prepared');
+  assert.equal(prepared.state, 'reconciliation_automation_decision_prepared');
+  const commit = automationDecisionCommitFixture(
+    state,
+    { result: prepared, commandOptions: prepareCommand.options },
+    review.filePath,
+  );
+  const targetBytes = fs.readFileSync(state.targetDatabasePath);
+  const committed = await commitLocalReconciliationAutomationDecision(
+    commit.command,
+    commit.dependencies,
+  );
+  assert.equal(committed.status, 'prepared');
+  assert.equal(committed.state, 'reconciliation_automation_reviewed');
+  assert.equal(committed.rowCount, 1);
+  assert.equal(committed.adoptedCount, 1);
+  assert.equal(committed.skippedCount, 0);
+  assert.equal(commit.authenticationCount(), 1);
+  assert.equal(commit.confirmationCount(), 1);
+  assert.equal(commit.databaseCloseCount(), 1);
+  assert.equal(
+    fs.readFileSync(state.targetDatabasePath).equals(targetBytes),
+    true,
+  );
+  const decisionDirectory = path.join(
+    state.automationDecisionRoot,
+    state.automationCommand.request.automationId,
+  );
+  assert.deepEqual(fs.readdirSync(decisionDirectory).sort(), [
+    'authorization.ndjson',
+    'intent.json',
+    'receipt.json',
+    'staging',
+  ]);
+  assert.equal(fs.statSync(decisionDirectory).mode & 0o777, 0o500);
+  assert.equal(
+    fs.statSync(path.join(decisionDirectory, 'staging')).mode & 0o777,
+    0o500,
+  );
+  for (const name of ['authorization.ndjson', 'intent.json', 'receipt.json']) {
+    assert.equal(
+      fs.statSync(path.join(decisionDirectory, name)).mode & 0o777,
+      0o400,
+    );
+  }
+  const verifyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.decision.verify',
+    options: prepareCommand.options,
+    request: {
+      decisionId,
+      automationId: state.automationCommand.request.automationId,
+      expectedDecisionDigest: committed.decisionDigest,
+    },
+  };
+  const verified = await verifyLocalReconciliationAutomationDecision(
+    verifyCommand,
+  );
+  assert.equal(verified.status, 'verified');
+  assert.equal(verified.signedDecisionSetDigest, committed.signedDecisionSetDigest);
+  const serialized = JSON.stringify(verified);
+  assert.equal(serialized.includes('review-owner'), false);
+  assert.equal(serialized.includes(state.planRows[0].sourceDigest), false);
+  assert.equal(serialized.includes(review.filePath), false);
+  const commandPath = path.join(
+    state.deploymentRoot,
+    'automation-decision-verify.json',
+  );
+  fs.writeFileSync(commandPath, `${JSON.stringify(verifyCommand)}\n`, {
+    mode: 0o600,
+  });
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-automation-decision-verify',
+      '--command-file',
+      commandPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).status, 'verified');
+  assert.equal(cli.stdout.includes('review-owner'), false);
+  assert.equal(cli.stdout.includes(state.planRows[0].sourceDigest), false);
+});
+
+test('automation decision rejects conflict adoption, another reviewer and weak assurance', async (t) => {
+  const conflict = await plannedAutomationFixture(t, {
+    suffix: 'conflict-reject',
+    occupied: true,
+    planId: '00000000-0000-4000-8000-000000000465',
+    reviewId: '00000000-0000-4000-8000-000000000466',
+    applicationId: '00000000-0000-4000-8000-000000000467',
+    automationId: '00000000-0000-4000-8000-000000000468',
+  });
+  assert.equal(conflict.planRows[0].requirement, 'review_skip_conflict');
+  const conflictDecisionId = '019b0000-0000-7000-8000-000000000465';
+  const conflictReview = automationDecisionReviewFile(
+    conflict,
+    conflictDecisionId,
+    'adopt',
+    'reviewed_lossless',
+    'conflict-reject',
+  );
+  const conflictPrepareCommand = automationDecisionPrepareCommand(
+    conflict,
+    conflictDecisionId,
+  );
+  const conflictPrepared = await prepareLocalReconciliationAutomationDecision(
+    conflictPrepareCommand,
+  );
+  const conflictCommit = automationDecisionCommitFixture(
+    conflict,
+    {
+      result: conflictPrepared,
+      commandOptions: conflictPrepareCommand.options,
+    },
+    conflictReview.filePath,
+  );
+  await assert.rejects(
+    commitLocalReconciliationAutomationDecision(
+      conflictCommit.command,
+      conflictCommit.dependencies,
+    ),
+    (error) => {
+      const messages = [];
+      for (let current = error; current; current = current.cause) {
+        messages.push(String(current.message));
+      }
+      assert.match(
+        messages.join('\n'),
+        /conflict or manual row cannot be adopted/,
+      );
+      return true;
+    },
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(
+        conflict.automationDecisionRoot,
+        conflict.automationCommand.request.automationId,
+        'authorization.ndjson',
+      ),
+    ),
+    false,
+  );
+
+  const identity = await plannedAutomationFixture(t, {
+    suffix: 'identity-reject',
+    planId: '00000000-0000-4000-8000-000000000469',
+    reviewId: '00000000-0000-4000-8000-00000000046a',
+    applicationId: '00000000-0000-4000-8000-00000000046b',
+    automationId: '00000000-0000-4000-8000-00000000046c',
+  });
+  const identityDecisionId = '019b0000-0000-7000-8000-000000000469';
+  const identityReview = automationDecisionReviewFile(
+    identity,
+    identityDecisionId,
+    'adopt',
+    'reviewed_lossless',
+    'identity-reject',
+  );
+  const identityPrepareCommand = automationDecisionPrepareCommand(
+    identity,
+    identityDecisionId,
+  );
+  const identityPrepared = await prepareLocalReconciliationAutomationDecision(
+    identityPrepareCommand,
+  );
+  for (const auth of [
+    { reviewerId: 'another-owner', assurance: 'local_console' },
+    { reviewerId: 'review-owner', assurance: 'password' },
+  ]) {
+    const rejected = automationDecisionCommitFixture(
+      identity,
+      {
+        result: identityPrepared,
+        commandOptions: identityPrepareCommand.options,
+      },
+      identityReview.filePath,
+      auth,
+    );
+    await assert.rejects(
+      commitLocalReconciliationAutomationDecision(
+        rejected.command,
+        rejected.dependencies,
+      ),
+      /requires the same recently strong authenticated User/,
+    );
+    assert.equal(rejected.authenticationCount(), 1);
+    assert.equal(rejected.confirmationCount(), 0);
+    assert.equal(rejected.databaseCloseCount(), 1);
+  }
+});
+
+test('automation decision replays every publication boundary without repeated authentication', async (t) => {
+  const prepareState = await plannedAutomationFixture(t, {
+    suffix: 'prepare-response-loss',
+    automationId: '00000000-0000-4000-8000-00000000046d',
+  });
+  const prepareDecisionId = '019b0000-0000-7000-8000-00000000046d';
+  const prepareCommand = automationDecisionPrepareCommand(
+    prepareState,
+    prepareDecisionId,
+  );
+  await assert.rejects(
+    prepareLocalReconciliationAutomationDecision(prepareCommand, {
+      afterHeadPrepared() {
+        throw new Error('automation decision prepare response loss');
+      },
+    }),
+    /automation decision prepare response loss/,
+  );
+  const prepareReplay = await prepareLocalReconciliationAutomationDecision(
+    prepareCommand,
+  );
+  assert.equal(
+    prepareReplay.state,
+    'reconciliation_automation_decision_prepared',
+  );
+
+  for (const [window, tail] of [
+    ['authorization', '471'],
+    ['receipt', '472'],
+    ['seal', '473'],
+    ['head', '474'],
+  ]) {
+    const state = await plannedAutomationFixture(t, {
+      suffix: `${window}-response-loss`,
+      automationId: `00000000-0000-4000-8000-000000000${tail}`,
+    });
+    const decisionId = `019b0000-0000-7000-8000-000000000${tail}`;
+    const review = automationDecisionReviewFile(
+      state,
+      decisionId,
+      'adopt',
+      'reviewed_lossless',
+      `${window}-response-loss`,
+    );
+    const selectedPrepareCommand = automationDecisionPrepareCommand(
+      state,
+      decisionId,
+    );
+    const prepared = await prepareLocalReconciliationAutomationDecision(
+      selectedPrepareCommand,
+    );
+    const commit = automationDecisionCommitFixture(
+      state,
+      { result: prepared, commandOptions: selectedPrepareCommand.options },
+      review.filePath,
+    );
+    const callback =
+      window === 'authorization'
+        ? 'afterAuthorizationPublished'
+        : window === 'receipt'
+        ? 'afterReceiptPublished'
+        : window === 'seal'
+        ? 'afterTerminalSealed'
+        : 'afterHeadAdvanced';
+    await assert.rejects(
+      commitLocalReconciliationAutomationDecision(commit.command, {
+        ...commit.dependencies,
+        [callback]() {
+          throw new Error(`automation decision ${window} response loss`);
+        },
+      }),
+      new RegExp(`automation decision ${window} response loss`),
+    );
+    const replay = await commitLocalReconciliationAutomationDecision(
+      commit.command,
+      commit.dependencies,
+    );
+    assert.equal(replay.state, 'reconciliation_automation_reviewed');
+    assert.equal(commit.authenticationCount(), 1);
+    assert.equal(commit.confirmationCount(), 1);
+    assert.equal(commit.databaseCloseCount(), 1);
+    if (window === 'head') assert.equal(replay.status, 'existing');
+  }
+});
+
+test('automation decision verification rejects sealed authorization and plan drift', async (t) => {
+  const authorizationState = await plannedAutomationFixture(t, {
+    suffix: 'authorization-drift',
+    automationId: '00000000-0000-4000-8000-000000000475',
+  });
+  const authorizationDecisionId =
+    '019b0000-0000-7000-8000-000000000475';
+  const authorizationReview = automationDecisionReviewFile(
+    authorizationState,
+    authorizationDecisionId,
+    'adopt',
+    'reviewed_lossless',
+    'authorization-drift',
+  );
+  const authorizationPrepareCommand = automationDecisionPrepareCommand(
+    authorizationState,
+    authorizationDecisionId,
+  );
+  const authorizationPrepared =
+    await prepareLocalReconciliationAutomationDecision(
+      authorizationPrepareCommand,
+    );
+  const authorizationCommit = automationDecisionCommitFixture(
+    authorizationState,
+    {
+      result: authorizationPrepared,
+      commandOptions: authorizationPrepareCommand.options,
+    },
+    authorizationReview.filePath,
+  );
+  const committed = await commitLocalReconciliationAutomationDecision(
+    authorizationCommit.command,
+    authorizationCommit.dependencies,
+  );
+  const decisionDirectory = path.join(
+    authorizationState.automationDecisionRoot,
+    authorizationState.automationCommand.request.automationId,
+  );
+  const authorizationPath = path.join(
+    decisionDirectory,
+    'authorization.ndjson',
+  );
+  fs.chmodSync(decisionDirectory, 0o700);
+  fs.chmodSync(authorizationPath, 0o600);
+  fs.appendFileSync(authorizationPath, '{}\n');
+  fs.chmodSync(authorizationPath, 0o400);
+  fs.chmodSync(decisionDirectory, 0o500);
+  await assert.rejects(
+    verifyLocalReconciliationAutomationDecision({
+      schemaVersion: 1,
+      operation: 'local.deployment.reconciliation.automation.decision.verify',
+      options: authorizationPrepareCommand.options,
+      request: {
+        decisionId: authorizationDecisionId,
+        automationId: authorizationState.automationCommand.request.automationId,
+        expectedDecisionDigest: committed.decisionDigest,
+      },
+    }),
+    (error) => {
+      const messages = [];
+      for (let current = error; current; current = current.cause) {
+        messages.push(String(current.message));
+      }
+      assert.match(
+        messages.join('\n'),
+        /authorization verification failed|authorization file/,
+      );
+      return true;
+    },
+  );
+
+  const planState = await plannedAutomationFixture(t, {
+    suffix: 'plan-drift-decision',
+    automationId: '00000000-0000-4000-8000-000000000476',
+  });
+  const planDecisionId = '019b0000-0000-7000-8000-000000000476';
+  const planReview = automationDecisionReviewFile(
+    planState,
+    planDecisionId,
+    'adopt',
+    'reviewed_lossless',
+    'plan-drift-decision',
+  );
+  const planPrepareCommand = automationDecisionPrepareCommand(
+    planState,
+    planDecisionId,
+  );
+  const planPrepared = await prepareLocalReconciliationAutomationDecision(
+    planPrepareCommand,
+  );
+  const planPath = path.join(planState.automationDirectory, 'plan.ndjson');
+  fs.chmodSync(planState.automationDirectory, 0o700);
+  fs.chmodSync(planPath, 0o600);
+  fs.appendFileSync(planPath, '{}\n');
+  fs.chmodSync(planPath, 0o400);
+  fs.chmodSync(planState.automationDirectory, 0o500);
+  const planCommit = automationDecisionCommitFixture(
+    planState,
+    { result: planPrepared, commandOptions: planPrepareCommand.options },
+    planReview.filePath,
+  );
+  await assert.rejects(
+    commitLocalReconciliationAutomationDecision(
+      planCommit.command,
+      planCommit.dependencies,
+    ),
+    (error) => {
+      const messages = [];
+      for (let current = error; current; current = current.cause) {
+        messages.push(String(current.message));
+      }
+      assert.match(
+        messages.join('\n'),
+        /plan file identity is invalid|plan file content drifted/,
+      );
+      return true;
+    },
+  );
+  assert.equal(planCommit.authenticationCount(), 0);
 });
 
 test('automation row plan fails closed to manual review on a target task collision', async (t) => {

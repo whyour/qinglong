@@ -27,6 +27,9 @@ import {
   verifyLocalReconciliationApplicationCommandFile,
   planLocalReconciliationAutomationCommandFile,
   verifyLocalReconciliationAutomationPlanCommandFile,
+  prepareLocalReconciliationAutomationDecisionCommandFile,
+  commitLocalReconciliationAutomationDecisionCommandFile,
+  verifyLocalReconciliationAutomationDecisionCommandFile,
   writeLocalReconciliationReviewDiagnosticsCommandFile,
   prepareLocalDeploymentCommandFile,
   proveLocalDeploymentLegacyReadinessCommandFile,
@@ -42,7 +45,7 @@ import {
 } from './localDeployment';
 
 const USAGE =
-  'Usage: ql3-local-deploy <prepare|adopted-prepare|adopted-verify|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-legacy-readiness-probe|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|reconciliation-capture-prepare|reconciliation-capture-commit|reconciliation-capture-verify|reconciliation-plan-prepare|reconciliation-plan-commit|reconciliation-plan-verify|reconciliation-review-prepare|reconciliation-review-diagnostics|reconciliation-review-commit|reconciliation-review-verify|reconciliation-application-prepare|reconciliation-application-commit|reconciliation-application-verify|reconciliation-automation-plan|reconciliation-automation-verify|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
+  'Usage: ql3-local-deploy <prepare|adopted-prepare|adopted-verify|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-legacy-readiness-probe|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|reconciliation-capture-prepare|reconciliation-capture-commit|reconciliation-capture-verify|reconciliation-plan-prepare|reconciliation-plan-commit|reconciliation-plan-verify|reconciliation-review-prepare|reconciliation-review-diagnostics|reconciliation-review-commit|reconciliation-review-verify|reconciliation-application-prepare|reconciliation-application-commit|reconciliation-application-verify|reconciliation-automation-plan|reconciliation-automation-verify|reconciliation-automation-decision-prepare|reconciliation-automation-decision-commit|reconciliation-automation-decision-verify|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
 
 async function main(argv: readonly string[]): Promise<void> {
   if (argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h')) {
@@ -86,6 +89,9 @@ async function main(argv: readonly string[]): Promise<void> {
       argv[0] !== 'reconciliation-application-verify' &&
       argv[0] !== 'reconciliation-automation-plan' &&
       argv[0] !== 'reconciliation-automation-verify' &&
+      argv[0] !== 'reconciliation-automation-decision-prepare' &&
+      argv[0] !== 'reconciliation-automation-decision-commit' &&
+      argv[0] !== 'reconciliation-automation-decision-verify' &&
       argv[0] !== 'compose-revision' &&
       argv[0] !== 'compose-preflight' &&
       argv[0] !== 'compose-apply' &&
@@ -186,6 +192,12 @@ async function main(argv: readonly string[]): Promise<void> {
       ? planLocalReconciliationAutomationCommandFile(argv[2]!)
       : argv[0] === 'reconciliation-automation-verify'
       ? verifyLocalReconciliationAutomationPlanCommandFile(argv[2]!)
+      : argv[0] === 'reconciliation-automation-decision-prepare'
+      ? prepareLocalReconciliationAutomationDecisionCommandFile(argv[2]!)
+      : argv[0] === 'reconciliation-automation-decision-commit'
+      ? commitLocalReconciliationAutomationDecisionCommandFile(argv[2]!)
+      : argv[0] === 'reconciliation-automation-decision-verify'
+      ? verifyLocalReconciliationAutomationDecisionCommandFile(argv[2]!)
       : argv[0] === 'compose-revision'
       ? switchLocalDeploymentComposeRevisionCommandFile(argv[2]!)
       : argv[0] === 'compose-preflight'

@@ -137,6 +137,14 @@ import {
   verifyLocalReconciliationAutomationPlan,
   verifyLocalReconciliationAutomationPlanCommandFile,
 } from './reconciliation/application/automation/coordinator';
+import {
+  commitLocalReconciliationAutomationDecision,
+  commitLocalReconciliationAutomationDecisionCommandFile,
+  prepareLocalReconciliationAutomationDecision,
+  prepareLocalReconciliationAutomationDecisionCommandFile,
+  verifyLocalReconciliationAutomationDecision,
+  verifyLocalReconciliationAutomationDecisionCommandFile,
+} from './reconciliation/application/automation/decisionCoordinator';
 
 export {
   commitLocalReconciliationPlan,
@@ -163,6 +171,12 @@ export {
   planLocalReconciliationAutomationCommandFile,
   verifyLocalReconciliationAutomationPlan,
   verifyLocalReconciliationAutomationPlanCommandFile,
+  prepareLocalReconciliationAutomationDecision,
+  prepareLocalReconciliationAutomationDecisionCommandFile,
+  commitLocalReconciliationAutomationDecision,
+  commitLocalReconciliationAutomationDecisionCommandFile,
+  verifyLocalReconciliationAutomationDecision,
+  verifyLocalReconciliationAutomationDecisionCommandFile,
 };
 
 export {
@@ -203,6 +217,21 @@ export {
 export {
   type LocalReconciliationAutomationPlanDependencies,
 } from './reconciliation/application/automation/coordinator';
+export {
+  normalizeLocalReconciliationAutomationDecisionCommitCommand,
+  normalizeLocalReconciliationAutomationDecisionPrepareCommand,
+  normalizeLocalReconciliationAutomationDecisionVerifyCommand,
+  type LocalReconciliationAutomationDecisionCommitCommand,
+  type LocalReconciliationAutomationDecisionCommitOptions,
+  type LocalReconciliationAutomationDecisionOptions,
+  type LocalReconciliationAutomationDecisionPrepareCommand,
+  type LocalReconciliationAutomationDecisionPrepareResult,
+  type LocalReconciliationAutomationDecisionTerminalResult,
+  type LocalReconciliationAutomationDecisionVerifyCommand,
+} from './reconciliation/application/automation/decisionContract';
+export {
+  type LocalReconciliationAutomationDecisionDependencies,
+} from './reconciliation/application/automation/decisionCoordinator';
 export {
   MAX_EDGE_LOCAL_RECONCILIATION_AUTOMATION_PLAN_BYTES,
   MAX_STANDALONE_LOCAL_RECONCILIATION_AUTOMATION_PLAN_BYTES,

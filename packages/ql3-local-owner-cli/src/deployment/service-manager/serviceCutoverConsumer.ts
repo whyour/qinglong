@@ -756,7 +756,9 @@ function replayResult(
       head.state === 'reconciliation_reviewed' ||
       head.state === 'reconciliation_application_prepared' ||
       head.state === 'reconciliation_application_planned' ||
-      head.state === 'reconciliation_automation_planned');
+      head.state === 'reconciliation_automation_planned' ||
+      head.state === 'reconciliation_automation_decision_prepared' ||
+      head.state === 'reconciliation_automation_reviewed');
   if (
     record.actionId !== intent.actionId ||
     record.intentDigest !== intent.intentDigest ||

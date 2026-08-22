@@ -337,3 +337,64 @@ export function withLocalReconciliationSealedDatabase<T>(
   }
   return output;
 }
+
+export async function withLocalReconciliationSealedDatabaseAsync<T>(
+  bundle: Readonly<LocalReconciliationSealedBundle>,
+  kind: LocalReconciliationSealedDatabaseKind,
+  uid: number,
+  dependencies: LocalReconciliationSealedBundleReaderDependencies,
+  read: (client: DatabaseSync) => Promise<T>,
+): Promise<T | null> {
+  const current = inspectLocalReconciliationSealedBundle(
+    bundle.captureRoot,
+    bundle.receipt.captureId,
+    uid,
+  );
+  if (
+    current.receipt.bundleDigest !== bundle.receipt.bundleDigest ||
+    current.fingerprintDigest !== bundle.fingerprintDigest
+  ) {
+    configurationError('sealed capture bundle drifted before SQLite open');
+  }
+  const selected = kind === 'target' ? current.target : current.legacy;
+  if (selected.mode === 'manual_required') return null;
+  const cacheKiB = current.manifest.profile === 'edge' ? 2_048 : 8_192;
+  dependencies.beforeDatabaseOpen?.(kind, selected.mode, cacheKiB);
+  const mainPath = databasePath(current, kind);
+  const source =
+    selected.mode === 'main_only_immutable'
+      ? `file:${mainPath}?immutable=1`
+      : mainPath;
+  let client: DatabaseSync | undefined;
+  let output: T;
+  try {
+    client = new DatabaseSync(source, {
+      allowExtension: false,
+      defensive: true,
+      enableDoubleQuotedStringLiterals: false,
+      enableForeignKeyConstraints: true,
+      readOnly: true,
+      timeout: 0,
+    });
+    configureReadOnlyDatabase(client, current.manifest.profile);
+    output = await read(client);
+  } catch (error) {
+    if (error instanceof LocalDeploymentConfigurationError) throw error;
+    return configurationError('sealed SQLite inventory failed', error);
+  } finally {
+    if (client !== undefined) client.close();
+    dependencies.afterDatabaseClose?.(kind);
+  }
+  const after = inspectLocalReconciliationSealedBundle(
+    bundle.captureRoot,
+    bundle.receipt.captureId,
+    uid,
+  );
+  if (
+    after.receipt.bundleDigest !== current.receipt.bundleDigest ||
+    after.fingerprintDigest !== current.fingerprintDigest
+  ) {
+    configurationError('sealed capture bundle drifted after SQLite close');
+  }
+  return output;
+}
