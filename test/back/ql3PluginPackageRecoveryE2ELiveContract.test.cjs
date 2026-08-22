@@ -71,6 +71,16 @@ test('gate runs migration, healthy activation and a durable rejected upgrade', (
   assert.match(fixture, /PostgresPluginPackageInstallRepository/);
   assert.match(
     fixture,
+    /PostgresPluginPackagePublisherTrustAuthorityRepository/,
+  );
+  assert.match(fixture, /createPluginPackagePublisherTrustSnapshot/);
+  assert.match(fixture, /role: 'package-manager'/);
+  assert.match(fixture, /authorityId: 'cluster'/);
+  assert.match(fixture, /publisherTrustStatus/);
+  assert.match(live, /QL3_E2E_POSTGRES_PACKAGE_MANAGER_USER/);
+  assert.match(live, /key: 'package-manager-password'/);
+  assert.match(
+    fixture,
     /PostgresPluginPackageSecretBindingTransitionRepository/,
   );
   assert.match(fixture, /createPluginPackageInstall/);

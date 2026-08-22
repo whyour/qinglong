@@ -626,6 +626,10 @@ async function runSeed() {
     loadPostgresConnectionEnvironment,
     PostgresPluginPackageSecretBindingTransitionRepository,
   } = ql3Require('@qinglong/cluster-postgres/package-executor');
+  const {
+    assertPostgresPackageManagerSchemaReady,
+    PostgresPluginPackagePublisherTrustAuthorityRepository,
+  } = ql3Require('@qinglong/cluster-postgres/package-manager');
   const { PostgresPluginPackageInstallRepository } = ql3Require(
     '@qinglong/cluster-postgres/plugin-package-install',
   );
@@ -639,6 +643,9 @@ async function runSeed() {
   );
   const { createPluginPackageSecretBindingTransitionPlan } = ql3Require(
     '@qinglong/runtime-core/plugin-package-secret-binding-transition-plan',
+  );
+  const { createPluginPackagePublisherTrustSnapshot } = ql3Require(
+    '@qinglong/runtime-core/plugin-package-publisher-trust',
   );
   const fixture = readFixture(process.env.QL3_E2E_FIXTURE_FILE);
   const mode = process.env.QL3_E2E_MODE;
@@ -701,6 +708,56 @@ async function runSeed() {
     }
     const selected =
       mode === 'seed-initial' ? fixture.initial : fixture.upgrade;
+    let publisherTrustStatus = null;
+    if (mode === 'seed-initial') {
+      const packageManagerConnection = loadPostgresConnectionEnvironment(
+        process.env,
+        {
+          host: 'QL3_E2E_POSTGRES_HOST',
+          port: 'QL3_E2E_POSTGRES_PORT',
+          database: 'QL3_E2E_POSTGRES_DATABASE',
+          user: 'QL3_E2E_POSTGRES_PACKAGE_MANAGER_USER',
+          password: 'QL3_E2E_POSTGRES_PACKAGE_MANAGER_PASSWORD',
+        },
+      );
+      const packageManagerDatabase = await createPostgresDatabaseOpener({
+        role: 'package-manager',
+        connection: {
+          ...packageManagerConnection,
+          tls: { mode: 'disable' },
+        },
+        pool: {
+          applicationName: 'qinglong3-plugin-package-e2e-trust-seed',
+          maxConnections: 1,
+          connectionTimeoutMs: 15_000,
+        },
+        onPoolError() {},
+      })();
+      try {
+        await assertPostgresPackageManagerSchemaReady(
+          packageManagerDatabase.pool,
+        );
+        const observed =
+          await new PostgresPluginPackagePublisherTrustAuthorityRepository(
+            packageManagerDatabase.pool,
+          ).observeSnapshot({
+            authorityId: 'cluster',
+            snapshot: createPluginPackagePublisherTrustSnapshot(
+              fixture.trust.keys,
+            ),
+            observedBy: 'plugin-recovery-e2e-package-manager',
+            observedAtMs: selected.lock.createdAtMs,
+          });
+        if (!['created', 'existing'].includes(observed.status)) {
+          throw new Error(
+            'Plugin Package E2E publisher trust authority conflicts with the fixture',
+          );
+        }
+        publisherTrustStatus = observed.status;
+      } finally {
+        await packageManagerDatabase.close();
+      }
+    }
     const lock = normalizePluginPackageLock(selected.lock);
     const repository = new PostgresPluginPackageInstallRepository(
       database.pool,
@@ -732,6 +789,7 @@ async function runSeed() {
         phase: mode === 'seed-initial' ? 'initial' : 'upgrade',
         status: result.status,
         state: result.record.state,
+        publisherTrustStatus,
         installationId: result.record.installationId,
         lockDigest: result.record.lockDigest,
         recordDigest: result.record.recordDigest,

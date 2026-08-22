@@ -880,6 +880,19 @@ function seedJob(name, mode) {
                 { name: 'QL3_E2E_POSTGRES_PORT', value: '5432' },
                 { name: 'QL3_E2E_POSTGRES_DATABASE', value: 'qinglong' },
                 {
+                  name: 'QL3_E2E_POSTGRES_PACKAGE_MANAGER_USER',
+                  value: 'ql3_package_manager',
+                },
+                {
+                  name: 'QL3_E2E_POSTGRES_PACKAGE_MANAGER_PASSWORD',
+                  valueFrom: {
+                    secretKeyRef: {
+                      name: 'ql3-e2e-postgres-auth',
+                      key: 'package-manager-password',
+                    },
+                  },
+                },
+                {
                   name: 'QL3_E2E_POSTGRES_PACKAGE_EXECUTOR_USER',
                   value: 'ql3_package_executor',
                 },
