@@ -75,6 +75,11 @@
       "require": "./dist/adoption/legacyAdoptionDatabase.js",
       "default": "./dist/adoption/legacyAdoptionDatabase.js"
     },
+    "./adoption-provenance": {
+      "types": "./dist/adoption/legacyAdoptionProvenance.d.ts",
+      "require": "./dist/adoption/legacyAdoptionProvenance.js",
+      "default": "./dist/adoption/legacyAdoptionProvenance.js"
+    },
     "./data-directory-adoption": {
       "types": "./dist/adoption/data-directory/dataDirectoryAdoptionDatabase.d.ts",
       "require": "./dist/adoption/data-directory/dataDirectoryAdoptionDatabase.js",

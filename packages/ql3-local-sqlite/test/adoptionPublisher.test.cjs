@@ -158,6 +158,45 @@ test('publishes tasks, execution facts, triggers, audit and ledger atomically', 
     2,
   );
   assert.deepEqual(
+    client
+      .prepare(
+        `SELECT task."row_ordinal" AS rowOrdinal,
+                task."task_id" AS taskId,
+                task."task_revision" AS taskRevision,
+                task."trigger_count" AS triggerCount,
+                trigger."trigger_ordinal" AS triggerOrdinal,
+                trigger."trigger_id" AS triggerId,
+                trigger."trigger_revision" AS triggerRevision
+         FROM "QingLong3LegacyAdoptionTasks" AS task
+         JOIN "QingLong3LegacyAdoptionTriggers" AS trigger
+           ON trigger."adoption_mutation_id" = task."adoption_mutation_id"
+          AND trigger."row_ordinal" = task."row_ordinal"
+         ORDER BY task."row_ordinal", trigger."trigger_ordinal"`,
+      )
+      .all()
+      .map((row) => ({ ...row })),
+    [
+      {
+        rowOrdinal: 1,
+        taskId: 'legacy-cron:1',
+        taskRevision: 1,
+        triggerCount: 1,
+        triggerOrdinal: 1,
+        triggerId: 'legacy-cron:1:cron:1',
+        triggerRevision: 1,
+      },
+      {
+        rowOrdinal: 2,
+        taskId: 'legacy-cron:2',
+        taskRevision: 1,
+        triggerCount: 1,
+        triggerOrdinal: 1,
+        triggerId: 'legacy-cron:2:cron:1',
+        triggerRevision: 1,
+      },
+    ],
+  );
+  assert.deepEqual(
     {
       ...client
         .prepare(
@@ -191,6 +230,8 @@ test('rolls the complete publication back on a later candidate conflict', async 
     'QingLong3Triggers',
     'QingLong3LocalTriggerSchedules',
     'QingLong3LegacyAdoptions',
+    'QingLong3LegacyAdoptionTasks',
+    'QingLong3LegacyAdoptionTriggers',
     'QingLong3SecurityAuditEvents',
   ]) {
     assert.equal(
@@ -235,6 +276,8 @@ test('awaits the final external authority check and rolls back on rejection', as
     'QingLong3Triggers',
     'QingLong3LocalTriggerSchedules',
     'QingLong3LegacyAdoptions',
+    'QingLong3LegacyAdoptionTasks',
+    'QingLong3LegacyAdoptionTriggers',
     'QingLong3SecurityAuditEvents',
   ]) {
     assert.equal(
@@ -263,4 +306,34 @@ test('rejects stale authorization fences before any adoption mutation', async (t
     LocalLegacyAdoptionAuthorizationFenceConflictError,
   );
   await adoption.close();
+});
+
+test('rejects exact replay when durable provenance has drifted', async (t) => {
+  const databasePath = await preparedDatabase(t);
+  const input = command([candidate(1)]);
+  const adoption = await openLocalSqliteAdoptionDatabase({
+    databasePath,
+    profile: 'edge',
+  });
+  await adoption.publisher.publish(input);
+  await adoption.close();
+
+  const client = new DatabaseSync(databasePath);
+  client
+    .prepare(
+      `UPDATE "QingLong3LegacyAdoptionTasks"
+       SET "item_digest" = ? WHERE "adoption_mutation_id" = ?`,
+    )
+    .run('f'.repeat(64), MUTATION_ID);
+  client.close();
+
+  const reopened = await openLocalSqliteAdoptionDatabase({
+    databasePath,
+    profile: 'edge',
+  });
+  await assert.rejects(
+    reopened.publisher.publish(input),
+    LocalLegacyAdoptionConflictError,
+  );
+  await reopened.close();
 });

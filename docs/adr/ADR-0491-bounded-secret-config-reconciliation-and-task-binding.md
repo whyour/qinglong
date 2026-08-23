@@ -1,6 +1,6 @@
 # ADR-0491：有界 Secret/Config Reconciliation 与任务环境绑定
 
-- 状态：Proposed（D-397 已实现 Legacy Env inspection、私有有界 row plan、durable plan publication 与独立 signed decision；原子 application 尚未完成）
+- 状态：Proposed（D-397 已实现 Legacy Env inspection、私有有界 row plan、durable plan publication、独立 signed decision 与逐项 Automation adoption provenance；原子 application 尚未完成）
 - 日期：2026-08-23
 - 决策：D-397
 - 关联：ADR-0073、ADR-0074、ADR-0092、ADR-0094、ADR-0480、ADR-0482、ADR-0483、ADR-0484、ADR-0485、ADR-0486、ADR-0487、ADR-0488、ADR-0490
@@ -29,7 +29,9 @@ application plan
 
 Secret/Config 不消费 Automation decision 作为自身授权。D-391 把 `secret_and_config` facts 标为 `blocked`，其 review action 只能是 `manual_external|defer`；D-397 专用 adapter 只接收每条 fact 都精确选择 `manual_external` 的决策流，把它重新绑定到同一 sealed bundle、D-392 application plan 与当前 target snapshot，任何 `defer` 都继续失败关闭。D-397 使用独立的逐候选 signed decision：只有 `plan.outcome=ready`、候选非空且没有 manual/conflict 才能 prepare；后续 application 必须消费该终态授权。强认证 User、Project Policy、Secret custody 与 Task mutation authority 都要在写事务前及事务内重新验证。
 
-存在 active Env 时，Automation 必须已经完成，且至少一个经 `QingLong3LegacyAdoptions` 证明的 Legacy Task 可绑定；否则不得用“Secret 已保存”冒充行为迁移。只有停用 Env 的场景可以在 Automation `no_effect` 后做纯保全。
+存在 active Env 时，Automation 必须已经完成，且至少一个同时经 `QingLong3LegacyAdoptions` 聚合账本和逐项 provenance 证明的 Legacy Task 可绑定；否则不得用“Secret 已保存”冒充行为迁移。只有停用 Env 的场景可以在 Automation `no_effect` 后做纯保全。
+
+聚合计数不能作为 Task/Trigger 写权限。Local v51 增加 `QingLong3LegacyAdoptionTasks` 与 `QingLong3LegacyAdoptionTriggers`，由 Automation publisher 在原 `BEGIN IMMEDIATE` 中逐项写入 adoption mutation、source digest、Task/Trigger identity、revision、mutation、content digest、ordinal 与 item digest。Task provenance 精确引用 revision 1；Trigger provenance 同时引用 Task provenance、Trigger revision 1 与原 adoption。父 adoption 外键延迟到事务提交检查，使 Edge/Standalone 可以流式发布最多 100,000 个 Task 与 500,000 个 Trigger，无需在内存保留全集。旧 pre-release 数据若只有聚合 ledger 而没有逐项 provenance，只能判定 `missing → manual_required`，不得按 `legacy-cron:*` 扫描、猜测或回填所有权。
 
 ### 2. Legacy Env 的确定性语义
 
@@ -64,7 +66,7 @@ id ASC
 
 实现逐行读取，不把整张 `Envs` 或全部停用值加载到内存；active value 的在途内存由 64 KiB 合同封顶，停用值通过第二次有界扫描逐个交付。它位于既有 `@qinglong/local-admin/src/legacy-adoption/secret-and-config/`，不新增 workspace package、production dependency、daemon、timer、watcher、listener、socket、数据库连接池或 `src` 根平铺文件。
 
-Local Owner 使用私有 NDJSON row plan 记录 header、逐行 content-free disposition、逐 candidate 目标冲突投影与 footer。Edge/Standalone plan 文件分别限制为 8 MiB/32 MiB，单行不超过 64 KiB；超过预算立即失败关闭。公开 plan/receipt 不保存原 Env name/value、目标 ciphertext、key ID 或原始 row body。active 与 disabled candidate 分别使用 `legacy-db-env-*` 和 `legacy-db-env-disabled-*` 命名空间；目标已经存在时只记录 envelope 元数据的组合摘要并进入 `review_skip_conflict`，不得读取明文、覆盖或自动改名。plan 绑定 application、D-391 review authorization、sealed bundle、target projection、Automation adoption ledger 的有界 content-free 投影与 prepared head，并产生可重新计算的 row-set、candidate-set、adoption-set、plan-file 和 receipt digest。
+Local Owner 使用私有 NDJSON row plan 记录 header、逐行 content-free disposition、逐 candidate 目标冲突投影与 footer。Edge/Standalone plan 文件分别限制为 8 MiB/32 MiB，单行不超过 64 KiB；超过预算立即失败关闭。公开 plan/receipt 不保存原 Env name/value、目标 ciphertext、key ID 或原始 row body。active 与 disabled candidate 分别使用 `legacy-db-env-*` 和 `legacy-db-env-disabled-*` 命名空间；目标已经存在时只记录 envelope 元数据的组合摘要并进入 `review_skip_conflict`，不得读取明文、覆盖或自动改名。plan 绑定 application、D-391 review authorization、sealed bundle、target projection、Automation adoption ledger 及逐项 provenance 的有界 content-free 投影与 prepared head，并产生可重新计算的 row-set、candidate-set、adoption-set、plan-file 和 receipt digest。planner 流式复算每个 provenance item digest，并要求当前 Task/Trigger head 仍精确指向记录的 revision、mutation 与 content digest，Trigger schedule 仍精确指向记录的 Trigger revision，且 Task 不属于 Plugin Package。计数缺项形成 `missing`，当前对象、schedule 或 ownership 漂移形成 `drifted`；两者都只能 `manual_required`。投影只在内存保留最多 128/512 条 adoption 聚合记录，不按目标 Task/Trigger 总量建立 Set。
 
 durable publisher 固定写入 `<secretConfigRoot>/<secretConfigId>/{plan.ndjson,receipt.json,staging/}`，使用 no-replace publication、`0400/0500` 权限、文件与目录 `fsync`，并覆盖 plan、receipt、terminal seal、head CAS 四个 response-loss 窗口。只有 Automation 无需 adapter 时的 `reconciliation_application_planned`，或 Automation 已完成时的 `reconciliation_automation_applied`，可以单向推进到 `reconciliation_secret_config_planned`；verify 只读复算 plan/receipt/seal/head 绑定，不修复漂移。active Env 若没有至少一条已采纳 Legacy Task ledger 记录仍为 manual；历史 `Configs` 计入 `unadaptedLegacyConfigCount` 并保持 manual。
 
@@ -135,6 +137,8 @@ Cluster 不得把 Legacy Env 明文写入 PostgreSQL、ConfigMap、Job command�
 
 ## 当前验证与后续门禁
 
-D-397 当前四切片已经实现并测试：absent、unsupported、Edge over-budget、2.x 顺序、同名连接、disabled preservation、保留前缀、异常状态、effective overflow、candidate digest、content-free diagnostics、私有有界 row plan、目标 Secret 冲突、Automation adoption projection、no-effect/manual outcome、durable no-replace publication、terminal seal、head CAS、逐候选独立 signed decision、同一强认证 reviewer、decision/authorization byte bound、`skip → manual_required`、prepare/commit response-loss exact replay、只读 terminal verify 与 plan/receipt/authorization/head drift。调用方 visitor 的预算异常保持原始类型，不再被误报为 SQLite 读取失败。Local Admin 完整测试为 96/96；Local Owner 完整测试为 295/288/7/0；后端完整门为 1564/1562/2/0，18-package clean build/test 为 2942/2920/22/0。package boundary、Cluster dependency 62/62、Edge import 与十四档 Local artifact audit 全部 compatible；基础 Edge/Standalone 仍为 2,611,978 / 2,612,056 bytes、319 files、58 loaded modules，Owner-only authority 没有进入低资源常驻制品。workspace 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`。Local Admin 保持 48/47，Local Owner 随六个职责明确的 decision 嵌套文件增至 184/183；根目录仍只有一个 50 行 binary entry，没有新增平铺源文件。依赖隔离门只允许 exact Secret/Config row planner 导入 inspection subpath，并只允许 decision authorization/coordinator 导入各自最小密钥、principal 与强认证只读 authority；邻接文件继续被拒绝。
+D-397 当前五切片已经实现：absent、unsupported、Edge over-budget、2.x 顺序、同名连接、disabled preservation、保留前缀、异常状态、effective overflow、candidate digest、content-free diagnostics、私有有界 row plan、目标 Secret 冲突、Automation adoption projection、no-effect/manual outcome、durable no-replace publication、terminal seal、head CAS、逐候选独立 signed decision、同一强认证 reviewer、decision/authorization byte bound、`skip → manual_required`、prepare/commit response-loss exact replay、只读 terminal verify，以及 v51 逐 Task/Trigger adoption provenance。新 provenance 与 Automation Task/Trigger/audit/ledger 在同一事务发布并在 replay 时完整流式复算；Secret/Config plan 对 complete、missing、current-revision drift 和 Plugin ownership 失败关闭。
 
-转为 Accepted 前仍必须完成：原子 Secret/Task/Trigger/dispatch publisher、prepared/apply/rollback response-loss、completion schema 演进、18-package/boundary/artifact gates、真实 Edge 空间预算、PostgreSQL HA 与 Cluster Secret provider live gate。
+本切片验证已闭合：Local SQLite `241/241`、Local Admin `96/96`、Local Owner `296 total / 289 pass / 7 conditional skip / 0 fail`，Secret/Config 定向回归 `51/51`；18-package clean build/test 在非沙箱环境全部通过。后端完整门在受限沙箱中仅有 11 个 loopback `listen EPERM`，四个受影响文件在非沙箱环境 `38/38` 通过。package boundary 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，72 项 Cluster dependency/legacy boundary、Edge import、本地镜像与十四档 artifact audit 全 compatible；基础 Edge/Standalone 为 `2,620,531 / 2,620,609 bytes`、321 files、58 modules。fresh Edge readiness 为 contract v51、102 migrations、85 tables、SQLite 3.53.3、`DELETE` journal。PostgreSQL 18.6 arm64 physical HA 以 146 gates、timeline `1 → 2` 通过；两次前置 `initdb` 超时均由本机 Docker 虚拟磁盘 100% 占满导致，释放可重建缓存后同一门成功。
+
+转为 Accepted 前仍必须完成：原子 Secret/Task/Trigger/dispatch publisher、prepared/apply/rollback response-loss、completion schema 演进、在后续原子 application 切片上重新执行 18-package/boundary/artifact gates、真实 Edge 空间预算与 Cluster Secret provider live gate；本切片的 PostgreSQL HA 证据不得冒充后续 Cluster 密钥托管证明。

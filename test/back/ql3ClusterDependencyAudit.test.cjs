@@ -2257,11 +2257,11 @@ test('confines reconciliation Secret and Config inspection to its exact row plan
   fs.mkdirSync(secretConfigDirectory, { recursive: true });
   fs.writeFileSync(
     path.join(secretConfigDirectory, 'rowPlan.ts'),
-    "import { inspect } from '@qinglong/local-admin/reconciliation-secret-and-config-inspection';",
+    "import { inspect } from '@qinglong/local-admin/reconciliation-secret-and-config-inspection';\nimport { digest } from '@qinglong/local-sqlite/adoption-provenance';",
   );
   fs.writeFileSync(
     path.join(secretConfigDirectory, 'neighbor.ts'),
-    "import { inspect } from '@qinglong/local-admin/reconciliation-secret-and-config-inspection';",
+    "import { inspect } from '@qinglong/local-admin/reconciliation-secret-and-config-inspection';\nimport { digest } from '@qinglong/local-sqlite/adoption-provenance';",
   );
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
@@ -2275,6 +2275,11 @@ test('confines reconciliation Secret and Config inspection to its exact row plan
         file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/neighbor.ts',
         specifier:
           '@qinglong/local-admin/reconciliation-secret-and-config-inspection',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/adoption-provenance',
       },
     ],
   );

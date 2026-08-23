@@ -44,6 +44,11 @@ import {
   type LocalSqliteReadinessEvidence,
 } from '../readiness/readiness';
 import { LocalSqliteSecurityAuthorityStore } from '../security/securityAuthorityStore';
+import {
+  LegacyAdoptionPublicationDigest,
+  legacyAdoptionTaskProvenanceDigest,
+  legacyAdoptionTriggerProvenanceDigest,
+} from './legacyAdoptionProvenance';
 
 export const MAX_LOCAL_LEGACY_ADOPTION_TASKS = 100_000;
 export const MAX_LOCAL_LEGACY_ADOPTION_TRIGGERS = 500_000;
@@ -202,6 +207,86 @@ function deterministicMutationId(
   )}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+function assertStoredProvenance(
+  client: DatabaseSync,
+  adoption: Readonly<LocalLegacyAdoptionRecord>,
+): void {
+  const rows = client
+    .prepare(
+      `SELECT task."row_ordinal" AS "rowOrdinal",
+              task."source_digest" AS "sourceDigest",
+              task."task_content_digest" AS "taskContentDigest",
+              task."trigger_count" AS "triggerCount",
+              task."item_digest" AS "taskItemDigest",
+              trigger."trigger_ordinal" AS "triggerOrdinal",
+              trigger."trigger_content_digest" AS "triggerContentDigest",
+              trigger."item_digest" AS "triggerItemDigest"
+       FROM "QingLong3LegacyAdoptionTasks" AS task
+       LEFT JOIN "QingLong3LegacyAdoptionTriggers" AS trigger
+         ON trigger."adoption_mutation_id" = task."adoption_mutation_id"
+        AND trigger."row_ordinal" = task."row_ordinal"
+       WHERE task."adoption_mutation_id" = ?
+       ORDER BY task."row_ordinal" ASC, trigger."trigger_ordinal" ASC`,
+    )
+    .iterate(adoption.mutationId) as Iterable<Row>;
+  const publication = new LegacyAdoptionPublicationDigest(
+    adoption.mutationId,
+  );
+  let taskCount = 0;
+  let triggerCount = 0;
+  let currentRowOrdinal = 0;
+  let expectedTriggerCount = 0;
+  let currentTriggerCount = 0;
+  for (const row of rows) {
+    const rowOrdinal = integer(row, 'rowOrdinal');
+    if (rowOrdinal !== currentRowOrdinal) {
+      if (
+        currentRowOrdinal !== 0 &&
+        currentTriggerCount !== expectedTriggerCount
+      ) {
+        throw new LocalLegacyAdoptionConflictError();
+      }
+      if (rowOrdinal <= currentRowOrdinal) {
+        throw new LocalLegacyAdoptionConflictError();
+      }
+      currentRowOrdinal = rowOrdinal;
+      taskCount += 1;
+      currentTriggerCount = 0;
+      expectedTriggerCount = integer(row, 'triggerCount');
+      publication.appendTask({
+        rowOrdinal,
+        sourceDigest: text(row, 'sourceDigest'),
+        taskContentDigest: text(row, 'taskContentDigest'),
+        itemDigest: text(row, 'taskItemDigest'),
+      });
+    }
+    if (row.triggerOrdinal === null) {
+      if (expectedTriggerCount !== 0) {
+        throw new LocalLegacyAdoptionConflictError();
+      }
+      continue;
+    }
+    const triggerOrdinal = integer(row, 'triggerOrdinal');
+    currentTriggerCount += 1;
+    triggerCount += 1;
+    if (triggerOrdinal !== currentTriggerCount) {
+      throw new LocalLegacyAdoptionConflictError();
+    }
+    publication.appendTrigger({
+      triggerContentDigest: text(row, 'triggerContentDigest'),
+      itemDigest: text(row, 'triggerItemDigest'),
+    });
+  }
+  if (
+    (currentRowOrdinal !== 0 && currentTriggerCount !== expectedTriggerCount) ||
+    taskCount !== adoption.adoptedTaskCount ||
+    triggerCount !== adoption.adoptedTriggerCount ||
+    publication.digest() !== adoption.publicationDigest
+  ) {
+    throw new LocalLegacyAdoptionConflictError();
+  }
+}
+
 function exactReplay(
   existing: LocalLegacyAdoptionRecord,
   command: PublishLocalLegacyAdoptionCommand,
@@ -344,6 +429,7 @@ export class LocalSqliteLegacyAdoptionPublisher {
               if (!exactReplay(existing, input)) {
                 throw new LocalLegacyAdoptionConflictError();
               }
+              assertStoredProvenance(client, existing);
               await input.confirmExternalAuthority();
               client.exec('COMMIT');
               began = false;
@@ -389,9 +475,9 @@ export class LocalSqliteLegacyAdoptionPublisher {
             const taskRegistry = createBuiltInTaskSpecSemanticRegistry();
             const triggerRegistry = createBuiltInTriggerSpecSemanticRegistry();
             const dispatch = new LocalSqliteDispatchDefinitionStore(client);
-            const publication = createHash('sha256')
-              .update('qinglong3.legacy-adoption-publication.v1\0')
-              .update(input.mutationId);
+            const publication = new LegacyAdoptionPublicationDigest(
+              input.mutationId,
+            );
             let adoptedTaskCount = 0;
             let adoptedTriggerCount = 0;
             let previousRowOrdinal = 0;
@@ -488,13 +574,46 @@ export class LocalSqliteLegacyAdoptionPublisher {
                   compileLocalCommandTaskDefinition(task, taskRegistry),
                 );
               }
-              publication
-                .update('\0task\0')
-                .update(String(candidate.rowOrdinal))
-                .update('\0')
-                .update(candidate.sourceDigest)
-                .update('\0')
-                .update(task.contentDigest);
+              const taskProvenance = Object.freeze({
+                adoptionMutationId: input.mutationId,
+                rowOrdinal: candidate.rowOrdinal,
+                projectId: task.projectId,
+                sourceDigest: candidate.sourceDigest,
+                taskId: task.taskId,
+                taskRevision: task.revision,
+                taskMutationId: task.mutationId,
+                taskContentDigest: task.contentDigest,
+                triggerCount: candidate.triggers.length,
+              });
+              const taskItemDigest =
+                legacyAdoptionTaskProvenanceDigest(taskProvenance);
+              client
+                .prepare(
+                  `INSERT INTO "QingLong3LegacyAdoptionTasks" (
+                     "adoption_mutation_id", "row_ordinal", "project_id",
+                     "source_digest", "task_id", "task_revision",
+                     "task_mutation_id", "task_content_digest",
+                     "trigger_count", "item_digest"
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                )
+                .run(
+                  taskProvenance.adoptionMutationId,
+                  taskProvenance.rowOrdinal,
+                  taskProvenance.projectId,
+                  taskProvenance.sourceDigest,
+                  taskProvenance.taskId,
+                  taskProvenance.taskRevision,
+                  taskProvenance.taskMutationId,
+                  taskProvenance.taskContentDigest,
+                  taskProvenance.triggerCount,
+                  taskItemDigest,
+                );
+              publication.appendTask({
+                rowOrdinal: candidate.rowOrdinal,
+                sourceDigest: candidate.sourceDigest,
+                taskContentDigest: task.contentDigest,
+                itemDigest: taskItemDigest,
+              });
 
               for (const [
                 triggerIndex,
@@ -605,13 +724,54 @@ export class LocalSqliteLegacyAdoptionPublisher {
                     trigger.revision,
                     trigger.updatedAtMs,
                   );
-                publication.update('\0trigger\0').update(trigger.contentDigest);
+                const triggerOrdinal = triggerIndex + 1;
+                const triggerProvenance = Object.freeze({
+                  adoptionMutationId: input.mutationId,
+                  rowOrdinal: candidate.rowOrdinal,
+                  triggerOrdinal,
+                  projectId: trigger.projectId,
+                  taskId: trigger.taskId,
+                  taskRevision: trigger.taskRevision,
+                  triggerId: trigger.triggerId,
+                  triggerRevision: trigger.revision,
+                  triggerMutationId: trigger.mutationId,
+                  triggerContentDigest: trigger.contentDigest,
+                });
+                const triggerItemDigest =
+                  legacyAdoptionTriggerProvenanceDigest(triggerProvenance);
+                client
+                  .prepare(
+                    `INSERT INTO "QingLong3LegacyAdoptionTriggers" (
+                       "adoption_mutation_id", "row_ordinal",
+                       "trigger_ordinal", "project_id", "task_id",
+                       "task_revision", "trigger_id", "trigger_revision",
+                       "trigger_mutation_id", "trigger_content_digest",
+                       "item_digest"
+                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  )
+                  .run(
+                    triggerProvenance.adoptionMutationId,
+                    triggerProvenance.rowOrdinal,
+                    triggerProvenance.triggerOrdinal,
+                    triggerProvenance.projectId,
+                    triggerProvenance.taskId,
+                    triggerProvenance.taskRevision,
+                    triggerProvenance.triggerId,
+                    triggerProvenance.triggerRevision,
+                    triggerProvenance.triggerMutationId,
+                    triggerProvenance.triggerContentDigest,
+                    triggerItemDigest,
+                  );
+                publication.appendTrigger({
+                  triggerContentDigest: trigger.contentDigest,
+                  itemDigest: triggerItemDigest,
+                });
               }
             }
             if (adoptedTaskCount + input.skippedCount !== input.rowCount) {
               throw new LocalLegacyAdoptionConflictError();
             }
-            const publicationDigest = publication.digest('hex');
+            const publicationDigest = publication.digest();
             insertAudit(client, audit);
             client
               .prepare(
@@ -650,6 +810,7 @@ export class LocalSqliteLegacyAdoptionPublisher {
                 )
                 .get(input.mutationId) as Row,
             );
+            assertStoredProvenance(client, stored);
             await input.confirmExternalAuthority();
             client.exec('COMMIT');
             began = false;

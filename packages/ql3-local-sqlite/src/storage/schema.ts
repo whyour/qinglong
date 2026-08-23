@@ -3320,11 +3320,155 @@ export const legacyAdoptions = sqliteTable(
     ),
     check('ql3_legacy_adoptions_created_check', sql`${table.createdAtMs} >= 0`),
     uniqueIndex('ql3_legacy_adoptions_decision_uidx').on(table.decisionId),
+    uniqueIndex('ql3_legacy_adoptions_mutation_project_uidx').on(
+      table.mutationId,
+      table.projectId,
+    ),
     index('ql3_legacy_adoptions_project_time_idx').on(
       table.projectId,
       sql`${table.createdAtMs} desc`,
       sql`${table.mutationId} desc`,
     ),
+  ],
+);
+
+export const legacyAdoptionTasks = sqliteTable(
+  'QingLong3LegacyAdoptionTasks',
+  {
+    adoptionMutationId: text('adoption_mutation_id').notNull(),
+    rowOrdinal: integer('row_ordinal').notNull(),
+    projectId: text('project_id').notNull(),
+    sourceDigest: text('source_digest').notNull(),
+    taskId: text('task_id').notNull(),
+    taskRevision: integer('task_revision').notNull(),
+    taskMutationId: text('task_mutation_id').notNull(),
+    taskContentDigest: text('task_content_digest').notNull(),
+    triggerCount: integer('trigger_count').notNull(),
+    itemDigest: text('item_digest').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.adoptionMutationId, table.rowOrdinal] }),
+    foreignKey({
+      columns: [table.adoptionMutationId, table.projectId],
+      foreignColumns: [legacyAdoptions.mutationId, legacyAdoptions.projectId],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [table.projectId, table.taskId, table.taskRevision],
+      foreignColumns: [
+        taskDefinitionRevisions.projectId,
+        taskDefinitionRevisions.taskId,
+        taskDefinitionRevisions.revision,
+      ],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [table.taskMutationId],
+      foreignColumns: [taskDefinitionRevisions.mutationId],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    check(
+      'ql3_legacy_adoption_task_identity_check',
+      sql`${table.rowOrdinal} between 1 and 100000 and length(${table.projectId}) between 1 and 128 and length(${table.taskId}) between 1 and 128 and ${table.taskRevision} = 1 and length(${table.taskMutationId}) = 36 and replace(${table.taskMutationId}, '-', '') not glob '*[^0-9a-f]*' and ${table.triggerCount} between 0 and 500000`,
+    ),
+    check(
+      'ql3_legacy_adoption_task_digest_check',
+      sql`length(${table.sourceDigest}) = 64 and ${table.sourceDigest} not glob '*[^0-9a-f]*' and length(${table.taskContentDigest}) = 64 and ${table.taskContentDigest} not glob '*[^0-9a-f]*' and length(${table.itemDigest}) = 64 and ${table.itemDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    uniqueIndex('ql3_legacy_adoption_tasks_project_task_uidx').on(
+      table.projectId,
+      table.taskId,
+    ),
+    uniqueIndex('ql3_legacy_adoption_tasks_mutation_uidx').on(
+      table.taskMutationId,
+    ),
+    uniqueIndex('ql3_legacy_adoption_tasks_item_uidx').on(table.itemDigest),
+    uniqueIndex('ql3_legacy_adoption_tasks_identity_uidx').on(
+      table.adoptionMutationId,
+      table.rowOrdinal,
+      table.projectId,
+      table.taskId,
+      table.taskRevision,
+    ),
+  ],
+);
+
+export const legacyAdoptionTriggers = sqliteTable(
+  'QingLong3LegacyAdoptionTriggers',
+  {
+    adoptionMutationId: text('adoption_mutation_id').notNull(),
+    rowOrdinal: integer('row_ordinal').notNull(),
+    triggerOrdinal: integer('trigger_ordinal').notNull(),
+    projectId: text('project_id').notNull(),
+    taskId: text('task_id').notNull(),
+    taskRevision: integer('task_revision').notNull(),
+    triggerId: text('trigger_id').notNull(),
+    triggerRevision: integer('trigger_revision').notNull(),
+    triggerMutationId: text('trigger_mutation_id').notNull(),
+    triggerContentDigest: text('trigger_content_digest').notNull(),
+    itemDigest: text('item_digest').notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.adoptionMutationId,
+        table.rowOrdinal,
+        table.triggerOrdinal,
+      ],
+    }),
+    foreignKey({
+      columns: [
+        table.adoptionMutationId,
+        table.rowOrdinal,
+        table.projectId,
+        table.taskId,
+        table.taskRevision,
+      ],
+      foreignColumns: [
+        legacyAdoptionTasks.adoptionMutationId,
+        legacyAdoptionTasks.rowOrdinal,
+        legacyAdoptionTasks.projectId,
+        legacyAdoptionTasks.taskId,
+        legacyAdoptionTasks.taskRevision,
+      ],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [table.projectId, table.triggerId, table.triggerRevision],
+      foreignColumns: [
+        triggerRevisions.projectId,
+        triggerRevisions.triggerId,
+        triggerRevisions.revision,
+      ],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [table.triggerMutationId],
+      foreignColumns: [triggerRevisions.mutationId],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    check(
+      'ql3_legacy_adoption_trigger_identity_check',
+      sql`${table.rowOrdinal} between 1 and 100000 and ${table.triggerOrdinal} between 1 and 500000 and length(${table.projectId}) between 1 and 128 and length(${table.taskId}) between 1 and 128 and ${table.taskRevision} = 1 and length(${table.triggerId}) between 1 and 128 and ${table.triggerRevision} = 1 and length(${table.triggerMutationId}) = 36 and replace(${table.triggerMutationId}, '-', '') not glob '*[^0-9a-f]*'`,
+    ),
+    check(
+      'ql3_legacy_adoption_trigger_digest_check',
+      sql`length(${table.triggerContentDigest}) = 64 and ${table.triggerContentDigest} not glob '*[^0-9a-f]*' and length(${table.itemDigest}) = 64 and ${table.itemDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    uniqueIndex('ql3_legacy_adoption_triggers_project_trigger_uidx').on(
+      table.projectId,
+      table.triggerId,
+    ),
+    uniqueIndex('ql3_legacy_adoption_triggers_mutation_uidx').on(
+      table.triggerMutationId,
+    ),
+    uniqueIndex('ql3_legacy_adoption_triggers_item_uidx').on(table.itemDigest),
   ],
 );
 
@@ -5180,6 +5324,8 @@ export const localSqliteSchema = Object.freeze({
   toolExecutionResultRekeyHeads,
   toolResultKeyRetirementReceipts,
   legacyAdoptions,
+  legacyAdoptionTasks,
+  legacyAdoptionTriggers,
   legacyDataDirectoryAdoptions,
   legacyDataDirectoryAdoptionSecrets,
   localIdentitySubjects,

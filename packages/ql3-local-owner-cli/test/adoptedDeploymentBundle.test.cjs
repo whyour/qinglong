@@ -366,9 +366,9 @@ function adoptedDockerHarness(state, options = {}) {
               '/opt/qinglong/node_modules/@qinglong/local-application/dist/cli.js',
             ],
             Labels: {
-              'io.qinglong.local.sqlite-contract-min': '50',
-              'io.qinglong.local.sqlite-contract-max': '50',
-              'io.qinglong.local.sqlite-write-contract': '50',
+              'io.qinglong.local.sqlite-contract-min': '51',
+              'io.qinglong.local.sqlite-contract-max': '51',
+              'io.qinglong.local.sqlite-write-contract': '51',
               'io.qinglong.local.application-config': '2,3,4',
               'io.qinglong.local.compose-selection': '1',
               'io.qinglong.ai': 'excluded',
@@ -839,7 +839,7 @@ test('preflights adopted Compose identity mounts and rejects mount drift', async
   );
   assert.equal(ready.status, 'ready');
   assert.equal(ready.profile, 'edge');
-  assert.equal(ready.sqlite.contractVersion, 50);
+  assert.equal(ready.sqlite.contractVersion, 51);
   await assert.rejects(
     preflightLocalDeploymentCompose(composePreflightCommand(state, 1), {
       runDocker: adoptedDockerHarness(state, { driftMount: true }).runDocker,

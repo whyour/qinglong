@@ -405,7 +405,11 @@ export function createLocalReconciliationSecretConfigDecisionRequirementFactory(
                 'activeGroupCount',
                 'activeRowCount',
                 'adoptedLegacyTaskCount',
+                'adoptedLegacyTriggerCount',
+                'adoptionProvenanceTaskCount',
+                'adoptionProvenanceTriggerCount',
                 'automationAdoptionRecordCount',
+                'automationAdoptionProvenanceState',
                 'automationAdoptionSetDigest',
                 'bindingReadyCount',
                 'candidateSetDigest',
@@ -441,6 +445,18 @@ export function createLocalReconciliationSecretConfigDecisionRequirementFactory(
               footer.eligiblePreservationCount !==
                 receipt.eligiblePreservationCount ||
               footer.targetConflictCount !== receipt.targetConflictCount ||
+              footer.automationAdoptionRecordCount !==
+                receipt.automationAdoptionRecordCount ||
+              footer.adoptedLegacyTaskCount !==
+                receipt.adoptedLegacyTaskCount ||
+              footer.adoptedLegacyTriggerCount !==
+                receipt.adoptedLegacyTriggerCount ||
+              footer.adoptionProvenanceTaskCount !==
+                receipt.adoptionProvenanceTaskCount ||
+              footer.adoptionProvenanceTriggerCount !==
+                receipt.adoptionProvenanceTriggerCount ||
+              footer.automationAdoptionProvenanceState !==
+                receipt.automationAdoptionProvenanceState ||
               footer.outcome !== receipt.outcome ||
               candidateCount !==
                 receipt.eligibleBindingCount +

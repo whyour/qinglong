@@ -2069,8 +2069,10 @@ function auditSourceImports(root, packagePath, findings) {
         !(
           path.relative(packageDirectory, filePath) ===
             'src/deployment/reconciliation/application/secret-and-config/rowPlan.ts' &&
-          specifier ===
-            '@qinglong/local-admin/reconciliation-secret-and-config-inspection'
+          [
+            '@qinglong/local-admin/reconciliation-secret-and-config-inspection',
+            '@qinglong/local-sqlite/adoption-provenance',
+          ].includes(specifier)
         ) &&
         !(
           [

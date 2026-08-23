@@ -8,6 +8,11 @@ import {
   type LegacyEnvironmentInventory,
   type LegacyEnvironmentRowInspection,
 } from '@qinglong/local-admin/reconciliation-secret-and-config-inspection';
+import {
+  LegacyAdoptionPublicationDigest,
+  legacyAdoptionTaskProvenanceDigest,
+  legacyAdoptionTriggerProvenanceDigest,
+} from '@qinglong/local-sqlite/adoption-provenance';
 
 import { LocalDeploymentConfigurationError } from '../../../foundation/error';
 import { cutoverDigest } from '../../../cutover/targetEvidence';
@@ -26,6 +31,8 @@ const MAX_LINE_BYTES = 64 * 1024;
 const HASH_BUFFER_BYTES = 64 * 1024;
 const MAX_EDGE_AUTOMATION_ADOPTION_RECORDS = 128;
 const MAX_STANDALONE_AUTOMATION_ADOPTION_RECORDS = 512;
+const MAX_AUTOMATION_ADOPTION_TASKS = 100_000;
+const MAX_AUTOMATION_ADOPTION_TRIGGERS = 500_000;
 export const MAX_EDGE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES =
   8 * 1024 * 1024;
 export const MAX_STANDALONE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES =
@@ -104,6 +111,13 @@ export interface LocalReconciliationSecretConfigPlanSummary {
   readonly targetConflictCount: number;
   readonly automationAdoptionRecordCount: number;
   readonly adoptedLegacyTaskCount: number;
+  readonly adoptedLegacyTriggerCount: number;
+  readonly adoptionProvenanceTaskCount: number;
+  readonly adoptionProvenanceTriggerCount: number;
+  readonly automationAdoptionProvenanceState:
+    | 'complete'
+    | 'missing'
+    | 'drifted';
   readonly unadaptedLegacyConfigCount: number;
   readonly outcome: 'ready' | 'manual_required' | 'no_effect';
 }
@@ -248,6 +262,10 @@ function targetAutomationAdoptionProjection(
 ): Readonly<{
   recordCount: number;
   adoptedTaskCount: number;
+  adoptedTriggerCount: number;
+  provenanceTaskCount: number;
+  provenanceTriggerCount: number;
+  provenanceState: 'complete' | 'missing' | 'drifted';
   setDigest: string;
 }> {
   const maximumRecords =
@@ -257,8 +275,23 @@ function targetAutomationAdoptionProjection(
   const hash = createHash('sha256').update(
     'qinglong3.local-reconciliation-secret-config-automation-adoption-set.v1\0',
   );
+  const records = new Map<
+    string,
+    {
+      readonly expectedTaskCount: number;
+      readonly expectedTriggerCount: number;
+      readonly expectedPublicationDigest: string;
+      readonly publication: LegacyAdoptionPublicationDigest;
+      taskCount: number;
+      triggerCount: number;
+    }
+  >();
   let recordCount = 0;
   let adoptedTaskCount = 0;
+  let adoptedTriggerCount = 0;
+  let provenanceTaskCount = 0;
+  let provenanceTriggerCount = 0;
+  let drifted = false;
   try {
     const rows = target
       .prepare(
@@ -300,6 +333,15 @@ function targetAutomationAdoptionProjection(
       if (!Number.isSafeInteger(adoptedTaskCount)) {
         fail('target Automation adoption task count overflowed');
       }
+      const selectedAdoptedTriggerCount = adoptionCount(
+        row,
+        'adoptedTriggerCount',
+        500_000,
+      );
+      adoptedTriggerCount += selectedAdoptedTriggerCount;
+      if (!Number.isSafeInteger(adoptedTriggerCount)) {
+        fail('target Automation adoption trigger count overflowed');
+      }
       const payload = Object.freeze({
         mutationId: adoptionText(row, 'mutationId', UUID_V4_PATTERN),
         decisionId: adoptionText(
@@ -327,11 +369,7 @@ function targetAutomationAdoptionProjection(
         ),
         rowCount,
         adoptedTaskCount: selectedAdoptedTaskCount,
-        adoptedTriggerCount: adoptionCount(
-          row,
-          'adoptedTriggerCount',
-          500_000,
-        ),
+        adoptedTriggerCount: selectedAdoptedTriggerCount,
         skippedCount,
         auditEventId: adoptionText(row, 'auditEventId', UUID_V4_PATTERN),
         createdAtMs: adoptionCount(
@@ -343,15 +381,366 @@ function targetAutomationAdoptionProjection(
       if (payload.auditEventId !== payload.mutationId) {
         fail('target Automation adoption audit binding drifted');
       }
+      if (records.has(payload.mutationId)) {
+        fail('target Automation adoption identity is duplicated');
+      }
+      records.set(payload.mutationId, {
+        expectedTaskCount: selectedAdoptedTaskCount,
+        expectedTriggerCount: selectedAdoptedTriggerCount,
+        expectedPublicationDigest: payload.publicationDigest,
+        publication: new LegacyAdoptionPublicationDigest(payload.mutationId),
+        taskCount: 0,
+        triggerCount: 0,
+      });
       hash.update('\0').update(JSON.stringify(payload));
+    }
+
+    const tasks = target
+      .prepare(
+        `SELECT provenance."adoption_mutation_id" AS "adoptionMutationId",
+                provenance."row_ordinal" AS "rowOrdinal",
+                provenance."project_id" AS "projectId",
+                provenance."source_digest" AS "sourceDigest",
+                provenance."task_id" AS "taskId",
+                provenance."task_revision" AS "taskRevision",
+                provenance."task_mutation_id" AS "taskMutationId",
+                provenance."task_content_digest" AS "taskContentDigest",
+                provenance."trigger_count" AS "triggerCount",
+                provenance."item_digest" AS "itemDigest",
+                head."current_revision" AS "currentRevision",
+                revision."mutation_id" AS "storedMutationId",
+                revision."content_digest" AS "storedContentDigest",
+                ownership."package_name" AS "packageName"
+         FROM "QingLong3LegacyAdoptionTasks" AS provenance
+         JOIN "QingLong3LegacyAdoptions" AS adoption
+           ON adoption."mutation_id" = provenance."adoption_mutation_id"
+          AND adoption."project_id" = provenance."project_id"
+         LEFT JOIN "QingLong3TaskDefinitions" AS head
+           ON head."project_id" = provenance."project_id"
+          AND head."task_id" = provenance."task_id"
+         LEFT JOIN "QingLong3TaskDefinitionRevisions" AS revision
+           ON revision."project_id" = provenance."project_id"
+          AND revision."task_id" = provenance."task_id"
+          AND revision."revision" = provenance."task_revision"
+         LEFT JOIN "QingLong3PluginPackageTaskOwnerships" AS ownership
+           ON ownership."project_id" = provenance."project_id"
+          AND ownership."task_id" = provenance."task_id"
+         WHERE adoption."project_id" = ?
+         ORDER BY adoption."created_at_ms" ASC,
+                  adoption."mutation_id" ASC,
+                  provenance."row_ordinal" ASC`,
+      )
+      .iterate(projectId) as Iterable<Readonly<Record<string, unknown>>>;
+    for (const row of tasks) {
+      provenanceTaskCount += 1;
+      if (provenanceTaskCount > MAX_AUTOMATION_ADOPTION_TASKS) {
+        fail('target Automation adoption Task provenance exceeds budget');
+      }
+      const adoptionMutationId = adoptionText(
+        row,
+        'adoptionMutationId',
+        UUID_V4_PATTERN,
+      );
+      const selected = records.get(adoptionMutationId);
+      const rowOrdinal = adoptionCount(
+        row,
+        'rowOrdinal',
+        MAX_AUTOMATION_ADOPTION_TASKS,
+      );
+      const triggerCount = adoptionCount(
+        row,
+        'triggerCount',
+        MAX_AUTOMATION_ADOPTION_TRIGGERS,
+      );
+      const payload = Object.freeze({
+        adoptionMutationId,
+        rowOrdinal,
+        projectId: adoptionText(row, 'projectId'),
+        sourceDigest: adoptionText(row, 'sourceDigest', DIGEST_PATTERN),
+        taskId: adoptionText(row, 'taskId'),
+        taskRevision: adoptionCount(row, 'taskRevision', 1),
+        taskMutationId: adoptionText(row, 'taskMutationId', UUID_V4_PATTERN),
+        taskContentDigest: adoptionText(
+          row,
+          'taskContentDigest',
+          DIGEST_PATTERN,
+        ),
+        triggerCount,
+      });
+      const itemDigest = adoptionText(row, 'itemDigest', DIGEST_PATTERN);
+      selected && (selected.taskCount += 1);
+      const currentState = Object.freeze({
+        currentRevision: row.currentRevision,
+        storedMutationId: row.storedMutationId,
+        storedContentDigest: row.storedContentDigest,
+        pluginOwned: row.packageName !== null,
+      });
+      if (
+        !selected ||
+        payload.projectId !== projectId ||
+        payload.rowOrdinal < 1 ||
+        payload.taskRevision !== 1 ||
+        legacyAdoptionTaskProvenanceDigest(payload) !== itemDigest ||
+        currentState.currentRevision !== payload.taskRevision ||
+        currentState.storedMutationId !== payload.taskMutationId ||
+        currentState.storedContentDigest !== payload.taskContentDigest ||
+        currentState.pluginOwned
+      ) {
+        drifted = true;
+      }
+      hash.update('\0task\0').update(
+        JSON.stringify({
+          ...payload,
+          itemDigest,
+          currentState,
+        }),
+      );
+    }
+
+    const triggers = target
+      .prepare(
+        `SELECT provenance."adoption_mutation_id" AS "adoptionMutationId",
+                provenance."row_ordinal" AS "rowOrdinal",
+                provenance."trigger_ordinal" AS "triggerOrdinal",
+                provenance."project_id" AS "projectId",
+                provenance."task_id" AS "taskId",
+                provenance."task_revision" AS "taskRevision",
+                provenance."trigger_id" AS "triggerId",
+                provenance."trigger_revision" AS "triggerRevision",
+                provenance."trigger_mutation_id" AS "triggerMutationId",
+                provenance."trigger_content_digest" AS "triggerContentDigest",
+                provenance."item_digest" AS "itemDigest",
+                head."current_revision" AS "currentRevision",
+                revision."mutation_id" AS "storedMutationId",
+                revision."content_digest" AS "storedContentDigest",
+                schedule."trigger_revision" AS "scheduleRevision"
+         FROM "QingLong3LegacyAdoptionTriggers" AS provenance
+         JOIN "QingLong3LegacyAdoptions" AS adoption
+           ON adoption."mutation_id" = provenance."adoption_mutation_id"
+          AND adoption."project_id" = provenance."project_id"
+         LEFT JOIN "QingLong3Triggers" AS head
+           ON head."project_id" = provenance."project_id"
+          AND head."trigger_id" = provenance."trigger_id"
+          AND head."task_id" = provenance."task_id"
+         LEFT JOIN "QingLong3TriggerRevisions" AS revision
+           ON revision."project_id" = provenance."project_id"
+          AND revision."trigger_id" = provenance."trigger_id"
+          AND revision."revision" = provenance."trigger_revision"
+         LEFT JOIN "QingLong3LocalTriggerSchedules" AS schedule
+           ON schedule."project_id" = provenance."project_id"
+          AND schedule."trigger_id" = provenance."trigger_id"
+         WHERE adoption."project_id" = ?
+         ORDER BY adoption."created_at_ms" ASC,
+                  adoption."mutation_id" ASC,
+                  provenance."row_ordinal" ASC,
+                  provenance."trigger_ordinal" ASC`,
+      )
+      .iterate(projectId) as Iterable<Readonly<Record<string, unknown>>>;
+    let previousTaskKey = '';
+    let previousTriggerOrdinal = 0;
+    for (const row of triggers) {
+      provenanceTriggerCount += 1;
+      if (provenanceTriggerCount > MAX_AUTOMATION_ADOPTION_TRIGGERS) {
+        fail('target Automation adoption Trigger provenance exceeds budget');
+      }
+      const adoptionMutationId = adoptionText(
+        row,
+        'adoptionMutationId',
+        UUID_V4_PATTERN,
+      );
+      const selected = records.get(adoptionMutationId);
+      const rowOrdinal = adoptionCount(
+        row,
+        'rowOrdinal',
+        MAX_AUTOMATION_ADOPTION_TASKS,
+      );
+      const triggerOrdinal = adoptionCount(
+        row,
+        'triggerOrdinal',
+        MAX_AUTOMATION_ADOPTION_TRIGGERS,
+      );
+      const taskKey = `${adoptionMutationId}\0${rowOrdinal}`;
+      if (taskKey !== previousTaskKey) {
+        previousTaskKey = taskKey;
+        previousTriggerOrdinal = 0;
+      }
+      previousTriggerOrdinal += 1;
+      const payload = Object.freeze({
+        adoptionMutationId,
+        rowOrdinal,
+        triggerOrdinal,
+        projectId: adoptionText(row, 'projectId'),
+        taskId: adoptionText(row, 'taskId'),
+        taskRevision: adoptionCount(row, 'taskRevision', 1),
+        triggerId: adoptionText(row, 'triggerId'),
+        triggerRevision: adoptionCount(row, 'triggerRevision', 1),
+        triggerMutationId: adoptionText(
+          row,
+          'triggerMutationId',
+          UUID_V4_PATTERN,
+        ),
+        triggerContentDigest: adoptionText(
+          row,
+          'triggerContentDigest',
+          DIGEST_PATTERN,
+        ),
+      });
+      const itemDigest = adoptionText(row, 'itemDigest', DIGEST_PATTERN);
+      selected && (selected.triggerCount += 1);
+      const currentState = Object.freeze({
+        currentRevision: row.currentRevision,
+        storedMutationId: row.storedMutationId,
+        storedContentDigest: row.storedContentDigest,
+        scheduleRevision: row.scheduleRevision,
+      });
+      if (
+        !selected ||
+        payload.projectId !== projectId ||
+        payload.rowOrdinal < 1 ||
+        payload.triggerOrdinal !== previousTriggerOrdinal ||
+        payload.taskRevision !== 1 ||
+        payload.triggerRevision !== 1 ||
+        legacyAdoptionTriggerProvenanceDigest(payload) !== itemDigest ||
+        currentState.currentRevision !== payload.triggerRevision ||
+        currentState.storedMutationId !== payload.triggerMutationId ||
+        currentState.storedContentDigest !== payload.triggerContentDigest ||
+        currentState.scheduleRevision !== payload.triggerRevision
+      ) {
+        drifted = true;
+      }
+      hash.update('\0trigger\0').update(
+        JSON.stringify({
+          ...payload,
+          itemDigest,
+          currentState,
+        }),
+      );
+    }
+
+    const publicationRows = target
+      .prepare(
+        `SELECT adoption."mutation_id" AS "adoptionMutationId",
+                task."row_ordinal" AS "rowOrdinal",
+                task."source_digest" AS "sourceDigest",
+                task."task_content_digest" AS "taskContentDigest",
+                task."trigger_count" AS "expectedTriggerCount",
+                task."item_digest" AS "taskItemDigest",
+                trigger."trigger_ordinal" AS "triggerOrdinal",
+                trigger."trigger_content_digest" AS "triggerContentDigest",
+                trigger."item_digest" AS "triggerItemDigest"
+         FROM "QingLong3LegacyAdoptions" AS adoption
+         LEFT JOIN "QingLong3LegacyAdoptionTasks" AS task
+           ON task."adoption_mutation_id" = adoption."mutation_id"
+          AND task."project_id" = adoption."project_id"
+         LEFT JOIN "QingLong3LegacyAdoptionTriggers" AS trigger
+           ON trigger."adoption_mutation_id" = task."adoption_mutation_id"
+          AND trigger."row_ordinal" = task."row_ordinal"
+         WHERE adoption."project_id" = ?
+         ORDER BY adoption."created_at_ms" ASC,
+                  adoption."mutation_id" ASC,
+                  task."row_ordinal" ASC,
+                  trigger."trigger_ordinal" ASC`,
+      )
+      .iterate(projectId) as Iterable<Readonly<Record<string, unknown>>>;
+    let publicationTaskKey = '';
+    let publicationExpectedTriggerCount = 0;
+    let publicationTriggerCount = 0;
+    for (const row of publicationRows) {
+      const adoptionMutationId = adoptionText(
+        row,
+        'adoptionMutationId',
+        UUID_V4_PATTERN,
+      );
+      const selected = records.get(adoptionMutationId);
+      if (!selected) {
+        drifted = true;
+        continue;
+      }
+      if (row.rowOrdinal === null) continue;
+      const rowOrdinal = adoptionCount(
+        row,
+        'rowOrdinal',
+        MAX_AUTOMATION_ADOPTION_TASKS,
+      );
+      const taskKey = `${adoptionMutationId}\0${rowOrdinal}`;
+      if (taskKey !== publicationTaskKey) {
+        if (
+          publicationTaskKey !== '' &&
+          publicationTriggerCount !== publicationExpectedTriggerCount
+        ) {
+          drifted = true;
+        }
+        publicationTaskKey = taskKey;
+        publicationTriggerCount = 0;
+        publicationExpectedTriggerCount = adoptionCount(
+          row,
+          'expectedTriggerCount',
+          MAX_AUTOMATION_ADOPTION_TRIGGERS,
+        );
+        selected.publication.appendTask({
+          rowOrdinal,
+          sourceDigest: adoptionText(row, 'sourceDigest', DIGEST_PATTERN),
+          taskContentDigest: adoptionText(
+            row,
+            'taskContentDigest',
+            DIGEST_PATTERN,
+          ),
+          itemDigest: adoptionText(row, 'taskItemDigest', DIGEST_PATTERN),
+        });
+      }
+      if (row.triggerOrdinal === null) continue;
+      publicationTriggerCount += 1;
+      if (
+        adoptionCount(
+          row,
+          'triggerOrdinal',
+          MAX_AUTOMATION_ADOPTION_TRIGGERS,
+        ) !== publicationTriggerCount
+      ) {
+        drifted = true;
+      }
+      selected.publication.appendTrigger({
+        triggerContentDigest: adoptionText(
+          row,
+          'triggerContentDigest',
+          DIGEST_PATTERN,
+        ),
+        itemDigest: adoptionText(row, 'triggerItemDigest', DIGEST_PATTERN),
+      });
+    }
+    if (
+      publicationTaskKey !== '' &&
+      publicationTriggerCount !== publicationExpectedTriggerCount
+    ) {
+      drifted = true;
     }
   } catch (error) {
     if (error instanceof LocalDeploymentConfigurationError) throw error;
     return fail('target Automation adoption projection is unavailable', error);
   }
+  const missing = [...records.values()].some(
+    (record) =>
+      record.taskCount !== record.expectedTaskCount ||
+      record.triggerCount !== record.expectedTriggerCount,
+  );
+  if (!missing) {
+    for (const record of records.values()) {
+      if (record.publication.digest() !== record.expectedPublicationDigest) {
+        drifted = true;
+      }
+    }
+  }
   return Object.freeze({
     recordCount,
     adoptedTaskCount,
+    adoptedTriggerCount,
+    provenanceTaskCount,
+    provenanceTriggerCount,
+    provenanceState: drifted
+      ? ('drifted' as const)
+      : missing
+      ? ('missing' as const)
+      : ('complete' as const),
     setDigest: hash.digest('hex'),
   });
 }
@@ -578,6 +967,10 @@ export function writeLocalReconciliationSecretConfigPlan(
     targetConflictCount,
     automationAdoptionRecordCount: automationAdoption.recordCount,
     adoptedLegacyTaskCount: automationAdoption.adoptedTaskCount,
+    adoptedLegacyTriggerCount: automationAdoption.adoptedTriggerCount,
+    adoptionProvenanceTaskCount: automationAdoption.provenanceTaskCount,
+    adoptionProvenanceTriggerCount: automationAdoption.provenanceTriggerCount,
+    automationAdoptionProvenanceState: automationAdoption.provenanceState,
     unadaptedLegacyConfigCount: header.unadaptedLegacyConfigCount,
     outcome:
       (inventory.tableState === 'absent' || inventory.rowCount === 0) &&
@@ -586,6 +979,7 @@ export function writeLocalReconciliationSecretConfigPlan(
         : !inventory.mutationReady ||
           targetConflictCount > 0 ||
           header.unadaptedLegacyConfigCount > 0 ||
+          automationAdoption.provenanceState !== 'complete' ||
           (eligibleBindingCount > 0 && automationAdoption.adoptedTaskCount < 1)
         ? ('manual_required' as const)
         : ('ready' as const),
@@ -651,6 +1045,11 @@ export function buildLocalReconciliationSecretConfigPlanReceipt(
     targetConflictCount: footer.targetConflictCount,
     automationAdoptionRecordCount: footer.automationAdoptionRecordCount,
     adoptedLegacyTaskCount: footer.adoptedLegacyTaskCount,
+    adoptedLegacyTriggerCount: footer.adoptedLegacyTriggerCount,
+    adoptionProvenanceTaskCount: footer.adoptionProvenanceTaskCount,
+    adoptionProvenanceTriggerCount: footer.adoptionProvenanceTriggerCount,
+    automationAdoptionProvenanceState:
+      footer.automationAdoptionProvenanceState,
     unadaptedLegacyConfigCount: footer.unadaptedLegacyConfigCount,
     outcome: footer.outcome,
     preparedAtMs: header.preparedAtMs,
@@ -667,9 +1066,13 @@ export function normalizeLocalReconciliationSecretConfigPlanReceipt(
       'activeGroupCount',
       'activeRowCount',
       'adoptedLegacyTaskCount',
+      'adoptedLegacyTriggerCount',
+      'adoptionProvenanceTaskCount',
+      'adoptionProvenanceTriggerCount',
       'applicationId',
       'applicationPlanDigest',
       'automationAdoptionRecordCount',
+      'automationAdoptionProvenanceState',
       'automationAdoptionSetDigest',
       'bindingReadyCount',
       'candidateSetDigest',
@@ -736,6 +1139,9 @@ export function normalizeLocalReconciliationSecretConfigPlanReceipt(
       receipt.targetConflictCount,
       receipt.automationAdoptionRecordCount,
       receipt.adoptedLegacyTaskCount,
+      receipt.adoptedLegacyTriggerCount,
+      receipt.adoptionProvenanceTaskCount,
+      receipt.adoptionProvenanceTriggerCount,
       receipt.unadaptedLegacyConfigCount,
       receipt.planFileBytes,
       receipt.preparedAtMs,
@@ -745,6 +1151,9 @@ export function normalizeLocalReconciliationSecretConfigPlanReceipt(
     ) ||
     !['ready', 'manual_required', 'no_effect'].includes(
       receipt.outcome as string,
+    ) ||
+    !['complete', 'missing', 'drifted'].includes(
+      receipt.automationAdoptionProvenanceState as string,
     ) ||
     cutoverDigest(payload) !== receiptDigest
   ) {

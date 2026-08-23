@@ -32,10 +32,17 @@
   prepared head/bundle/reviewer/time。Edge/Standalone decision 与 authorization 文件上限分别为 1/4 MiB，沿用 owner-only、sealed、no-replace 与 `fsync`；
   lineage 仅允许 `reconciliation_secret_config_planned → reconciliation_secret_config_decision_prepared → reconciliation_secret_config_reviewed`，prepare/commit
   的 publication response-loss 可精确重放而不重复认证，terminal verify 只读复算 sealed decision、authorization、receipt 与 reviewed head。
-  全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。Local Admin 完整测试 `96/96`，Local Owner 完整测试 `295/288/7/0`；
-  后端完整门 `1564/1562/2/0`，18-package clean build/test `2942/2920/22/0`；package boundary、Cluster dependency `62/62`、Edge import 与十四档
-  Local artifact audit 全部 compatible，基础 Edge/Standalone 仍为 `2,611,978 / 2,612,056 bytes`、319 files、58 loaded modules，Owner-only authority
-  没有进入低资源常驻制品。
+  第五切片补上此前聚合 adoption ledger 无法安全定位 Task/Trigger 的架构缺口：Local SQLite contract v51 新增
+  `QingLong3LegacyAdoptionTasks` 与 `QingLong3LegacyAdoptionTriggers`，Automation publisher 在原子事务内流式写入逐项 identity/revision/mutation/content/item
+  digest。Secret/Config planner 不再扫描 `legacy-cron:*` 或相信聚合计数，而是流式复算 provenance，并验证当前 Task/Trigger head、Trigger schedule 与非
+  Plugin ownership。旧记录缺少逐项 provenance 为 `missing`，current revision/schedule/ownership 漂移为 `drifted`，两者都强制
+  `manual_required`；不得猜测或自动回填。聚合 adoption 记录仍只保留 Edge/Standalone 128/512 条有界 Map，Task/Trigger 逐行读取，无目标规模 Set。
+  全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。Local SQLite、Local Admin 与 Local Owner 完整测试分别为 `241/241`、
+  `96/96` 与 `296 total / 289 pass / 7 conditional skip / 0 fail`；18-package clean build/test 在非沙箱环境全部通过。后端完整门在受限沙箱中为
+  `1544 total / 1531 pass / 11 loopback EPERM / 2 conditional skip`，四个受影响文件随后在非沙箱环境 `38/38` 通过，未发现代码失败。package
+  boundary、72 项 Cluster dependency/legacy boundary、Edge import、本地镜像与十四档 Local artifact audit 全部 compatible；基础 Edge/Standalone 为
+  `2,620,531 / 2,620,609 bytes`、321 files、58 loaded modules，Owner-only authority 没有进入低资源常驻制品。fresh Edge readiness 为 contract v51、
+  102 migrations、85 tables、SQLite 3.53.3、`DELETE` journal；PostgreSQL 18.6 arm64 physical HA 以 timeline `1 → 2`、146 gates 通过。
   Local Admin 保持 48/47，Local Owner 因六个职责明确的 decision 嵌套文件增至 184/183，根目录仍只有一个 50 行 binary entry；workspace 仍为 18 packages、
   `singleSourcePackages=[]`、`shallowSourcePackages=[]`，且只允许 exact Secret/Config row planner 导入 inspection subpath。
 

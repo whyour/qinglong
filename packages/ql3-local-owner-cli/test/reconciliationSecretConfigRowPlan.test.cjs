@@ -4,6 +4,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const { test } = require('node:test');
+const {
+  LegacyAdoptionPublicationDigest,
+  legacyAdoptionTaskProvenanceDigest,
+} = require('@qinglong/local-sqlite/adoption-provenance');
 
 const {
   buildLocalReconciliationSecretConfigPlanReceipt,
@@ -78,11 +82,85 @@ function databases() {
       audit_event_id TEXT NOT NULL,
       created_at_ms INTEGER NOT NULL
     );
+    CREATE TABLE "QingLong3TaskDefinitions" (
+      project_id TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      current_revision INTEGER NOT NULL,
+      created_at_ms INTEGER NOT NULL,
+      updated_at_ms INTEGER NOT NULL,
+      PRIMARY KEY (project_id, task_id)
+    );
+    CREATE TABLE "QingLong3TaskDefinitionRevisions" (
+      project_id TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      revision INTEGER NOT NULL,
+      mutation_id TEXT NOT NULL,
+      content_digest TEXT NOT NULL,
+      PRIMARY KEY (project_id, task_id, revision)
+    );
+    CREATE TABLE "QingLong3PluginPackageTaskOwnerships" (
+      project_id TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      package_name TEXT NOT NULL,
+      PRIMARY KEY (project_id, task_id)
+    );
+    CREATE TABLE "QingLong3Triggers" (
+      project_id TEXT NOT NULL,
+      trigger_id TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      current_revision INTEGER NOT NULL,
+      PRIMARY KEY (project_id, trigger_id)
+    );
+    CREATE TABLE "QingLong3TriggerRevisions" (
+      project_id TEXT NOT NULL,
+      trigger_id TEXT NOT NULL,
+      revision INTEGER NOT NULL,
+      mutation_id TEXT NOT NULL,
+      content_digest TEXT NOT NULL,
+      PRIMARY KEY (project_id, trigger_id, revision)
+    );
+    CREATE TABLE "QingLong3LocalTriggerSchedules" (
+      project_id TEXT NOT NULL,
+      trigger_id TEXT NOT NULL,
+      trigger_revision INTEGER NOT NULL,
+      PRIMARY KEY (project_id, trigger_id)
+    );
+    CREATE TABLE "QingLong3LegacyAdoptionTasks" (
+      adoption_mutation_id TEXT NOT NULL,
+      row_ordinal INTEGER NOT NULL,
+      project_id TEXT NOT NULL,
+      source_digest TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      task_revision INTEGER NOT NULL,
+      task_mutation_id TEXT NOT NULL,
+      task_content_digest TEXT NOT NULL,
+      trigger_count INTEGER NOT NULL,
+      item_digest TEXT NOT NULL,
+      PRIMARY KEY (adoption_mutation_id, row_ordinal)
+    );
+    CREATE TABLE "QingLong3LegacyAdoptionTriggers" (
+      adoption_mutation_id TEXT NOT NULL,
+      row_ordinal INTEGER NOT NULL,
+      trigger_ordinal INTEGER NOT NULL,
+      project_id TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      task_revision INTEGER NOT NULL,
+      trigger_id TEXT NOT NULL,
+      trigger_revision INTEGER NOT NULL,
+      trigger_mutation_id TEXT NOT NULL,
+      trigger_content_digest TEXT NOT NULL,
+      item_digest TEXT NOT NULL,
+      PRIMARY KEY (adoption_mutation_id, row_ordinal, trigger_ordinal)
+    );
   `);
   return { legacy, target };
 }
 
-function insertAutomationAdoption(target, adoptedTaskCount = 1) {
+function insertAutomationAdoption(
+  target,
+  adoptedTaskCount = 1,
+  withProvenance = true,
+) {
   const mutationId = '30000000-0000-4000-8000-000000000003';
   target
     .prepare(
@@ -106,6 +184,70 @@ function insertAutomationAdoption(target, adoptedTaskCount = 1) {
       mutationId,
       HEADER.preparedAtMs,
     );
+  if (!withProvenance) return;
+  const publication = new LegacyAdoptionPublicationDigest(mutationId);
+  for (let rowOrdinal = 1; rowOrdinal <= adoptedTaskCount; rowOrdinal += 1) {
+    const taskId = `legacy-cron:${rowOrdinal}`;
+    const taskMutationId = `31000000-0000-4000-8000-${String(rowOrdinal).padStart(12, '0')}`;
+    const sourceDigest = String(rowOrdinal % 10).repeat(64);
+    const taskContentDigest = String((rowOrdinal + 1) % 10).repeat(64);
+    const payload = {
+      adoptionMutationId: mutationId,
+      rowOrdinal,
+      projectId: HEADER.projectId,
+      sourceDigest,
+      taskId,
+      taskRevision: 1,
+      taskMutationId,
+      taskContentDigest,
+      triggerCount: 0,
+    };
+    const itemDigest = legacyAdoptionTaskProvenanceDigest(payload);
+    target
+      .prepare(
+        `INSERT INTO "QingLong3TaskDefinitions" VALUES (?, ?, 1, ?, ?)`
+      )
+      .run(
+        HEADER.projectId,
+        taskId,
+        HEADER.preparedAtMs,
+        HEADER.preparedAtMs,
+      );
+    target
+      .prepare(
+        `INSERT INTO "QingLong3TaskDefinitionRevisions" VALUES
+         (?, ?, 1, ?, ?)`
+      )
+      .run(HEADER.projectId, taskId, taskMutationId, taskContentDigest);
+    target
+      .prepare(
+        `INSERT INTO "QingLong3LegacyAdoptionTasks" VALUES
+         (?, ?, ?, ?, ?, 1, ?, ?, 0, ?)`
+      )
+      .run(
+        mutationId,
+        rowOrdinal,
+        HEADER.projectId,
+        sourceDigest,
+        taskId,
+        taskMutationId,
+        taskContentDigest,
+        itemDigest,
+      );
+    publication.appendTask({
+      rowOrdinal,
+      sourceDigest,
+      taskContentDigest,
+      itemDigest,
+    });
+  }
+  target
+    .prepare(
+      `UPDATE "QingLong3LegacyAdoptions"
+       SET publication_digest = ?
+       WHERE mutation_id = ?`,
+    )
+    .run(publication.digest(), mutationId);
 }
 
 function writePlan(
@@ -167,6 +309,10 @@ test('writes a content-free Env plan with separate active and disabled candidate
   assert.equal(result.footer.targetConflictCount, 0);
   assert.equal(result.footer.automationAdoptionRecordCount, 1);
   assert.equal(result.footer.adoptedLegacyTaskCount, 1);
+  assert.equal(result.footer.adoptedLegacyTriggerCount, 0);
+  assert.equal(result.footer.adoptionProvenanceTaskCount, 1);
+  assert.equal(result.footer.adoptionProvenanceTriggerCount, 0);
+  assert.equal(result.footer.automationAdoptionProvenanceState, 'complete');
   assert.match(result.footer.automationAdoptionSetDigest, /^[0-9a-f]{64}$/);
   const candidates = records.filter((record) =>
     record.kind.endsWith('-candidate'),
@@ -217,6 +363,60 @@ test('writes a content-free Env plan with separate active and disabled candidate
         eligibleBindingCount: 2,
       }),
     /receipt drifted/,
+  );
+
+  const tamperedPayload = {
+    adoptionMutationId: '30000000-0000-4000-8000-000000000003',
+    rowOrdinal: 1,
+    projectId: HEADER.projectId,
+    sourceDigest: '9'.repeat(64),
+    taskId: 'legacy-cron:1',
+    taskRevision: 1,
+    taskMutationId: '31000000-0000-4000-8000-000000000001',
+    taskContentDigest: '2'.repeat(64),
+    triggerCount: 0,
+  };
+  target
+    .prepare(
+      `UPDATE "QingLong3LegacyAdoptionTasks"
+       SET source_digest = ?, item_digest = ?
+       WHERE adoption_mutation_id = ? AND row_ordinal = 1`,
+    )
+    .run(
+      tamperedPayload.sourceDigest,
+      legacyAdoptionTaskProvenanceDigest(tamperedPayload),
+      tamperedPayload.adoptionMutationId,
+    );
+  const resealedItem = writePlan(t, legacy, target);
+  assert.equal(resealedItem.result.footer.outcome, 'manual_required');
+  assert.equal(
+    resealedItem.result.footer.automationAdoptionProvenanceState,
+    'drifted',
+  );
+
+  const originalPayload = { ...tamperedPayload, sourceDigest: '1'.repeat(64) };
+  target
+    .prepare(
+      `UPDATE "QingLong3LegacyAdoptionTasks"
+       SET source_digest = ?, item_digest = ?
+       WHERE adoption_mutation_id = ? AND row_ordinal = 1`,
+    )
+    .run(
+      originalPayload.sourceDigest,
+      legacyAdoptionTaskProvenanceDigest(originalPayload),
+      originalPayload.adoptionMutationId,
+    );
+
+  target.exec(
+    `UPDATE "QingLong3TaskDefinitions"
+     SET current_revision = 2
+     WHERE project_id = 'project-1' AND task_id = 'legacy-cron:1'`,
+  );
+  const drifted = writePlan(t, legacy, target);
+  assert.equal(drifted.result.footer.outcome, 'manual_required');
+  assert.equal(
+    drifted.result.footer.automationAdoptionProvenanceState,
+    'drifted',
   );
 });
 
@@ -308,6 +508,23 @@ test('keeps active Env and historical Configs manual without adoption authority'
   });
   assert.equal(withConfigs.result.footer.outcome, 'manual_required');
   assert.equal(withConfigs.result.footer.unadaptedLegacyConfigCount, 1);
+});
+
+test('keeps pre-provenance Automation adoption records manual', (t) => {
+  const { legacy, target } = databases();
+  t.after(() => legacy.close());
+  t.after(() => target.close());
+  legacy.exec(
+    `INSERT INTO "Envs" VALUES
+       (1, 'TOKEN', 'private-value', 0, 1, 0, '2026-01-01')`,
+  );
+  insertAutomationAdoption(target, 1, false);
+
+  const planned = writePlan(t, legacy, target);
+  assert.equal(planned.result.footer.outcome, 'manual_required');
+  assert.equal(planned.result.footer.automationAdoptionProvenanceState, 'missing');
+  assert.equal(planned.result.footer.adoptionProvenanceTaskCount, 0);
+  assert.equal(planned.serialized.includes('private-value'), false);
 });
 
 test('fails closed before exceeding the plan byte budget', (t) => {
