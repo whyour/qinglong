@@ -155,6 +155,13 @@ import {
   verifyLocalReconciliationAutomationApplyCommandFile,
 } from './reconciliation/application/automation/applyCoordinator';
 import {
+  planLocalReconciliationSecretConfig,
+  planLocalReconciliationSecretConfigCommandFile,
+  readLocalReconciliationSecretConfigTerminal,
+  verifyLocalReconciliationSecretConfigPlan,
+  verifyLocalReconciliationSecretConfigPlanCommandFile,
+} from './reconciliation/application/secret-and-config/coordinator';
+import {
   preserveLocalReconciliationRunHistory,
   preserveLocalReconciliationRunHistoryCommandFile,
   readLocalReconciliationRunHistoryTerminal,
@@ -206,6 +213,11 @@ export {
   verifyLocalReconciliationAutomationApplyCommandFile,
   rollbackLocalReconciliationAutomationApply,
   rollbackLocalReconciliationAutomationApplyCommandFile,
+  planLocalReconciliationSecretConfig,
+  planLocalReconciliationSecretConfigCommandFile,
+  readLocalReconciliationSecretConfigTerminal,
+  verifyLocalReconciliationSecretConfigPlan,
+  verifyLocalReconciliationSecretConfigPlanCommandFile,
   preserveLocalReconciliationRunHistory,
   preserveLocalReconciliationRunHistoryCommandFile,
   readLocalReconciliationRunHistoryTerminal,
@@ -325,6 +337,31 @@ export {
   type LocalReconciliationAutomationPlanSummary,
   type LocalReconciliationAutomationRowRequirement,
 } from './reconciliation/application/automation/rowPlan';
+export {
+  normalizeLocalReconciliationSecretConfigPlanCommand,
+  normalizeLocalReconciliationSecretConfigVerifyCommand,
+  type LocalReconciliationSecretConfigOptions,
+  type LocalReconciliationSecretConfigPlanCommand,
+  type LocalReconciliationSecretConfigPlanResult,
+  type LocalReconciliationSecretConfigVerifyCommand,
+} from './reconciliation/application/secret-and-config/contract';
+export {
+  type LocalReconciliationSecretConfigPlanDependencies,
+  type LocalReconciliationSecretConfigTerminal,
+} from './reconciliation/application/secret-and-config/coordinator';
+export {
+  MAX_EDGE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES,
+  MAX_STANDALONE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES,
+  normalizeLocalReconciliationSecretConfigPlanReceipt,
+  type LocalReconciliationSecretConfigCandidateRequirement,
+  type LocalReconciliationSecretConfigPlanCandidate,
+  type LocalReconciliationSecretConfigPlanFooter,
+  type LocalReconciliationSecretConfigPlanHeader,
+  type LocalReconciliationSecretConfigPlanReceipt,
+  type LocalReconciliationSecretConfigPlanRow,
+  type LocalReconciliationSecretConfigPlanSummary,
+  type LocalReconciliationSecretConfigTarget,
+} from './reconciliation/application/secret-and-config/rowPlan';
 
 export {
   LocalDeploymentConfigurationError,

@@ -22,11 +22,15 @@
   diagnostics 不含 Env name/value/row body。absent、unsupported schema、Edge over-budget、旧顺序、同名连接、disabled、保留 `QL3_`、异常状态与
   overflow 均已覆盖。第二切片在既有 Local Owner reconciliation application 子目录增加私有 NDJSON row plan：Edge/Standalone 文件上限为 8/32 MiB，
   单行上限 64 KiB；active/disabled candidate 使用不同 `legacy-db-env-*` 命名空间，目标 Secret 占用只记录 envelope 元数据组合摘要并强制
-  `review_skip_conflict`。plan/receipt 绑定 application、独立 review authorization、sealed bundle、prepared head、row/candidate set 与文件摘要，且不含原
-  Env name/value、目标 ciphertext/key ID 或 row body。Local Admin 完整测试 `96/96`，Local Owner 完整测试 `277/270/7/0`；受限沙箱中的 3 个
-  loopback `EPERM` 用例已在沙箱外对应测试文件 `15/15` 通过。后端完整门 `1563/1561/2/0`，18-package clean build/test
-  `2924/2902/22/0`；package boundary、Cluster dependency、Edge import 与十四档 Local artifact audit 全部 compatible。远程第一切片 x64/arm64
-  backend 失败的共因是新增 Local Admin 嵌套文件后结构快照仍为 47/46，现已同步为 48/47；Local Owner 同步为 176/175，workspace 仍为 18 packages、
+  `review_skip_conflict`。第三切片将该 plan 绑定 D-391 `manual_external` review、sealed bundle、application、target projection、Automation adoption ledger
+  的有界 content-free 投影与当前 head；`defer`、active Env 无已采纳 Legacy Task、历史 `Configs` 或 target 冲突都继续 manual。publisher 以 no-replace、
+  `0400/0500`、文件/目录 `fsync` 发布 `plan.ndjson` 与 `receipt.json`，覆盖 plan、receipt、terminal seal、head CAS 四个 response-loss 窗口，并只允许
+  `reconciliation_application_planned|reconciliation_automation_applied → reconciliation_secret_config_planned` 的合法单向推进；独立 verify 只读复算，不修复漂移。
+  全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。Local Admin 完整测试 `96/96`，Local Owner 完整测试 `287/280/7/0`；
+  后端完整门 `1563/1561/2/0`，18-package clean build/test `2934/2912/22/0`；package boundary、Cluster dependency、Edge import 与十四档
+  Local artifact audit 全部 compatible，基础 Edge/Standalone 仍为 `2,611,978 / 2,612,056 bytes`、319 files、58 loaded modules，Owner-only authority
+  没有进入低资源常驻制品。
+  Local Admin 保持 48/47，Local Owner 因两个职责明确的嵌套文件增至 178/177，根目录仍只有一个 50 行 binary entry；workspace 仍为 18 packages、
   `singleSourcePackages=[]`、`shallowSourcePackages=[]`，且只允许 exact Secret/Config row planner 导入 inspection subpath。
 
   D-385～D-388 的 `config.sh`/Keyv/SSH data-directory lineage 与 SQLite `Envs` 保持分离；当前无稳定生产 schema 的历史 `Configs` 表继续 sealed+manual，

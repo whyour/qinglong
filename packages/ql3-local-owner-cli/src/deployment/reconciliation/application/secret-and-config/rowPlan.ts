@@ -24,6 +24,8 @@ const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const MAX_LINE_BYTES = 64 * 1024;
 const HASH_BUFFER_BYTES = 64 * 1024;
+const MAX_EDGE_AUTOMATION_ADOPTION_RECORDS = 128;
+const MAX_STANDALONE_AUTOMATION_ADOPTION_RECORDS = 512;
 export const MAX_EDGE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES =
   8 * 1024 * 1024;
 export const MAX_STANDALONE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES =
@@ -43,7 +45,8 @@ export interface LocalReconciliationSecretConfigPlanHeader {
   readonly bundleFingerprintDigest: string;
   readonly profile: 'edge' | 'standalone';
   readonly projectId: string;
-  readonly tableDisposition: 'adopt_legacy' | 'retain_both';
+  readonly tableDisposition: 'absent' | 'manual_external';
+  readonly unadaptedLegacyConfigCount: number;
   readonly preparedHeadDigest: string;
   readonly preparedAtMs: number;
   readonly headerDigest: string;
@@ -99,6 +102,9 @@ export interface LocalReconciliationSecretConfigPlanSummary {
   readonly eligibleBindingCount: number;
   readonly eligiblePreservationCount: number;
   readonly targetConflictCount: number;
+  readonly automationAdoptionRecordCount: number;
+  readonly adoptedLegacyTaskCount: number;
+  readonly unadaptedLegacyConfigCount: number;
   readonly outcome: 'ready' | 'manual_required' | 'no_effect';
 }
 
@@ -110,6 +116,7 @@ export interface LocalReconciliationSecretConfigPlanFooter
   readonly legacyInventoryDigest: string;
   readonly rowSetDigest: string;
   readonly candidateSetDigest: string;
+  readonly automationAdoptionSetDigest: string;
   readonly secretConfigPlanDigest: string;
 }
 
@@ -125,6 +132,7 @@ export interface LocalReconciliationSecretConfigPlanReceipt
   readonly legacyInventoryDigest: string;
   readonly rowSetDigest: string;
   readonly candidateSetDigest: string;
+  readonly automationAdoptionSetDigest: string;
   readonly secretConfigPlanDigest: string;
   readonly planFileBytes: number;
   readonly planFileDigest: string;
@@ -198,6 +206,154 @@ function bytesDigest(value: unknown, length: number, label: string): string {
     fail(`target ${label} is invalid`);
   }
   return createHash('sha256').update(value).digest('hex');
+}
+
+function adoptionText(
+  row: Readonly<Record<string, unknown>>,
+  key: string,
+  pattern?: RegExp,
+): string {
+  const value = row[key];
+  if (
+    typeof value !== 'string' ||
+    value.length < 1 ||
+    value.length > 128 ||
+    (pattern !== undefined && !pattern.test(value))
+  ) {
+    fail(`target Automation adoption ${key} drifted`);
+  }
+  return value;
+}
+
+function adoptionCount(
+  row: Readonly<Record<string, unknown>>,
+  key: string,
+  maximum: number,
+): number {
+  const value = row[key];
+  if (
+    !Number.isSafeInteger(value) ||
+    (value as number) < 0 ||
+    (value as number) > maximum
+  ) {
+    fail(`target Automation adoption ${key} drifted`);
+  }
+  return value as number;
+}
+
+function targetAutomationAdoptionProjection(
+  target: DatabaseSync,
+  projectId: string,
+  profile: 'edge' | 'standalone',
+): Readonly<{
+  recordCount: number;
+  adoptedTaskCount: number;
+  setDigest: string;
+}> {
+  const maximumRecords =
+    profile === 'edge'
+      ? MAX_EDGE_AUTOMATION_ADOPTION_RECORDS
+      : MAX_STANDALONE_AUTOMATION_ADOPTION_RECORDS;
+  const hash = createHash('sha256').update(
+    'qinglong3.local-reconciliation-secret-config-automation-adoption-set.v1\0',
+  );
+  let recordCount = 0;
+  let adoptedTaskCount = 0;
+  try {
+    const rows = target
+      .prepare(
+        `SELECT "mutation_id" AS "mutationId",
+                "decision_id" AS "decisionId",
+                "plan_digest" AS "planDigest",
+                "inventory_digest" AS "inventoryDigest",
+                "decision_digest" AS "decisionDigest",
+                "receipt_digest" AS "receiptDigest",
+                "authorization_file_digest" AS "authorizationFileDigest",
+                "publication_digest" AS "publicationDigest",
+                "row_count" AS "rowCount",
+                "adopted_task_count" AS "adoptedTaskCount",
+                "adopted_trigger_count" AS "adoptedTriggerCount",
+                "skipped_count" AS "skippedCount",
+                "audit_event_id" AS "auditEventId",
+                "created_at_ms" AS "createdAtMs"
+         FROM "QingLong3LegacyAdoptions"
+         WHERE "project_id" = ?
+         ORDER BY "created_at_ms" ASC, "mutation_id" ASC`,
+      )
+      .iterate(projectId) as Iterable<Readonly<Record<string, unknown>>>;
+    for (const row of rows) {
+      recordCount += 1;
+      if (recordCount > maximumRecords) {
+        fail('target Automation adoption projection exceeds profile budget');
+      }
+      const rowCount = adoptionCount(row, 'rowCount', 100_000);
+      const selectedAdoptedTaskCount = adoptionCount(
+        row,
+        'adoptedTaskCount',
+        rowCount,
+      );
+      const skippedCount = adoptionCount(row, 'skippedCount', rowCount);
+      if (selectedAdoptedTaskCount + skippedCount !== rowCount) {
+        fail('target Automation adoption row accounting drifted');
+      }
+      adoptedTaskCount += selectedAdoptedTaskCount;
+      if (!Number.isSafeInteger(adoptedTaskCount)) {
+        fail('target Automation adoption task count overflowed');
+      }
+      const payload = Object.freeze({
+        mutationId: adoptionText(row, 'mutationId', UUID_V4_PATTERN),
+        decisionId: adoptionText(
+          row,
+          'decisionId',
+          /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+        ),
+        planDigest: adoptionText(row, 'planDigest', DIGEST_PATTERN),
+        inventoryDigest: adoptionText(
+          row,
+          'inventoryDigest',
+          DIGEST_PATTERN,
+        ),
+        decisionDigest: adoptionText(row, 'decisionDigest', DIGEST_PATTERN),
+        receiptDigest: adoptionText(row, 'receiptDigest', DIGEST_PATTERN),
+        authorizationFileDigest: adoptionText(
+          row,
+          'authorizationFileDigest',
+          DIGEST_PATTERN,
+        ),
+        publicationDigest: adoptionText(
+          row,
+          'publicationDigest',
+          DIGEST_PATTERN,
+        ),
+        rowCount,
+        adoptedTaskCount: selectedAdoptedTaskCount,
+        adoptedTriggerCount: adoptionCount(
+          row,
+          'adoptedTriggerCount',
+          500_000,
+        ),
+        skippedCount,
+        auditEventId: adoptionText(row, 'auditEventId', UUID_V4_PATTERN),
+        createdAtMs: adoptionCount(
+          row,
+          'createdAtMs',
+          Number.MAX_SAFE_INTEGER,
+        ),
+      });
+      if (payload.auditEventId !== payload.mutationId) {
+        fail('target Automation adoption audit binding drifted');
+      }
+      hash.update('\0').update(JSON.stringify(payload));
+    }
+  } catch (error) {
+    if (error instanceof LocalDeploymentConfigurationError) throw error;
+    return fail('target Automation adoption projection is unavailable', error);
+  }
+  return Object.freeze({
+    recordCount,
+    adoptedTaskCount,
+    setDigest: hash.digest('hex'),
+  });
 }
 
 function targetSecret(
@@ -402,6 +558,11 @@ export function writeLocalReconciliationSecretConfigPlan(
       append(candidate, 'candidate');
     },
   });
+  const automationAdoption = targetAutomationAdoptionProjection(
+    options.target,
+    header.projectId,
+    header.profile,
+  );
   const summary: LocalReconciliationSecretConfigPlanSummary = Object.freeze({
     tableState: inventory.tableState,
     rowCount: inventory.rowCount,
@@ -415,10 +576,17 @@ export function writeLocalReconciliationSecretConfigPlan(
     eligibleBindingCount,
     eligiblePreservationCount,
     targetConflictCount,
+    automationAdoptionRecordCount: automationAdoption.recordCount,
+    adoptedLegacyTaskCount: automationAdoption.adoptedTaskCount,
+    unadaptedLegacyConfigCount: header.unadaptedLegacyConfigCount,
     outcome:
-      inventory.tableState === 'absent' || inventory.rowCount === 0
+      (inventory.tableState === 'absent' || inventory.rowCount === 0) &&
+      header.unadaptedLegacyConfigCount === 0
         ? ('no_effect' as const)
-        : !inventory.mutationReady || targetConflictCount > 0
+        : !inventory.mutationReady ||
+          targetConflictCount > 0 ||
+          header.unadaptedLegacyConfigCount > 0 ||
+          (eligibleBindingCount > 0 && automationAdoption.adoptedTaskCount < 1)
         ? ('manual_required' as const)
         : ('ready' as const),
   });
@@ -430,6 +598,7 @@ export function writeLocalReconciliationSecretConfigPlan(
     legacyInventoryDigest: inventory.inventoryDigest,
     rowSetDigest: rowHash.digest('hex'),
     candidateSetDigest: candidateHash.digest('hex'),
+    automationAdoptionSetDigest: automationAdoption.setDigest,
   });
   const footer = Object.freeze({
     ...footerPayload,
@@ -464,6 +633,7 @@ export function buildLocalReconciliationSecretConfigPlanReceipt(
     legacyInventoryDigest: footer.legacyInventoryDigest,
     rowSetDigest: footer.rowSetDigest,
     candidateSetDigest: footer.candidateSetDigest,
+    automationAdoptionSetDigest: footer.automationAdoptionSetDigest,
     secretConfigPlanDigest: footer.secretConfigPlanDigest,
     planFileBytes,
     planFileDigest,
@@ -479,6 +649,9 @@ export function buildLocalReconciliationSecretConfigPlanReceipt(
     eligibleBindingCount: footer.eligibleBindingCount,
     eligiblePreservationCount: footer.eligiblePreservationCount,
     targetConflictCount: footer.targetConflictCount,
+    automationAdoptionRecordCount: footer.automationAdoptionRecordCount,
+    adoptedLegacyTaskCount: footer.adoptedLegacyTaskCount,
+    unadaptedLegacyConfigCount: footer.unadaptedLegacyConfigCount,
     outcome: footer.outcome,
     preparedAtMs: header.preparedAtMs,
   });
@@ -493,8 +666,11 @@ export function normalizeLocalReconciliationSecretConfigPlanReceipt(
     [
       'activeGroupCount',
       'activeRowCount',
+      'adoptedLegacyTaskCount',
       'applicationId',
       'applicationPlanDigest',
+      'automationAdoptionRecordCount',
+      'automationAdoptionSetDigest',
       'bindingReadyCount',
       'candidateSetDigest',
       'disabledRowCount',
@@ -519,6 +695,7 @@ export function normalizeLocalReconciliationSecretConfigPlanReceipt(
       'state',
       'tableState',
       'targetConflictCount',
+      'unadaptedLegacyConfigCount',
     ],
     'receipt',
   );
@@ -537,6 +714,7 @@ export function normalizeLocalReconciliationSecretConfigPlanReceipt(
       receipt.legacyInventoryDigest,
       receipt.rowSetDigest,
       receipt.candidateSetDigest,
+      receipt.automationAdoptionSetDigest,
       receipt.secretConfigPlanDigest,
       receipt.planFileDigest,
       receiptDigest,
@@ -556,6 +734,9 @@ export function normalizeLocalReconciliationSecretConfigPlanReceipt(
       receipt.eligibleBindingCount,
       receipt.eligiblePreservationCount,
       receipt.targetConflictCount,
+      receipt.automationAdoptionRecordCount,
+      receipt.adoptedLegacyTaskCount,
+      receipt.unadaptedLegacyConfigCount,
       receipt.planFileBytes,
       receipt.preparedAtMs,
     ].every((count) => Number.isSafeInteger(count) && (count as number) >= 0) ||

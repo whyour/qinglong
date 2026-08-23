@@ -22,6 +22,7 @@ const {
   readLocalReconciliationAutomationDecisionTerminal,
   rollbackLocalReconciliationAutomationApply,
   planLocalReconciliationAutomation,
+  planLocalReconciliationSecretConfig,
   prepareLocalReconciliationPlan,
   prepareLocalReconciliationReview,
   verifyLocalReconciliationCapture,
@@ -29,6 +30,7 @@ const {
   verifyLocalReconciliationAutomationDecision,
   verifyLocalReconciliationAutomationApply,
   verifyLocalReconciliationAutomationPlan,
+  verifyLocalReconciliationSecretConfigPlan,
   verifyLocalReconciliationCompletion,
   verifyLocalReconciliationPlan,
   verifyLocalReconciliationReview,
@@ -791,6 +793,58 @@ function automationReadyDatabaseInitializer() {
   };
 }
 
+function secretConfigDatabaseInitializer({
+  active = false,
+  configs = false,
+} = {}) {
+  return ({ legacySourcePath, recoveryPath, targetDatabasePath }) => {
+    const legacy = new DatabaseSync(legacySourcePath);
+    legacy.exec(`
+      CREATE TABLE "Envs" (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        value TEXT,
+        status INTEGER,
+        position REAL,
+        "isPinned" INTEGER,
+        "createdAt" TEXT
+      );
+      INSERT INTO "Envs" VALUES (
+        1,
+        '${active ? 'ACTIVE_TOKEN' : 'DISABLED_TOKEN'}',
+        'private-secret-value',
+        ${active ? 0 : 1},
+        1,
+        0,
+        '2026-01-01'
+      );
+      ${
+        configs
+          ? 'CREATE TABLE "Configs" (id INTEGER PRIMARY KEY, value TEXT); INSERT INTO "Configs" VALUES (1, \'private-config-value\');'
+          : ''
+      }
+    `);
+    legacy.close();
+    fs.chmodSync(legacySourcePath, 0o600);
+    fs.copyFileSync(legacySourcePath, recoveryPath);
+    fs.chmodSync(recoveryPath, 0o600);
+
+    const migration = spawnSync(
+      process.execPath,
+      [
+        '-e',
+        `require('@qinglong/local-sqlite/migration')
+          .migrateLocalSqlitePath({ databasePath: process.argv[1], profile: 'edge' })
+          .catch((error) => { console.error(error); process.exitCode = 1; });`,
+        targetDatabasePath,
+      ],
+      { encoding: 'utf8', cwd: path.join(__dirname, '..') },
+    );
+    assert.equal(migration.status, 0, migration.stderr);
+    fs.chmodSync(targetDatabasePath, 0o600);
+  };
+}
+
 function mutateAutomationTarget({ targetDatabasePath }, occupied = false) {
   const target = new DatabaseSync(targetDatabasePath);
   if (occupied) {
@@ -1164,6 +1218,69 @@ function applicationCommitCommand(state, prepared) {
       expectedHeadDigest: prepared.instanceHeadDigest,
       committedAtMs: state.prepareApplicationCommand.request.preparedAtMs + 1,
     },
+  };
+}
+
+async function secretConfigPlanFixture(t, options = {}) {
+  const suffix = options.suffix ?? 'plan';
+  const state = await reviewedApplicationFixture(t, {
+    planId:
+      options.planId ?? '00000000-0000-4000-8000-000000000421',
+    reviewId:
+      options.reviewId ?? '00000000-0000-4000-8000-000000000422',
+    applicationId:
+      options.applicationId ?? '00000000-0000-4000-8000-000000000423',
+    reviewSuffix: `secret-config-${suffix}`,
+    createDefaultSidecars: false,
+    initializeDatabases: secretConfigDatabaseInitializer({
+      active: options.active === true,
+      configs: options.configs === true,
+    }),
+    mutateTarget({ targetDatabasePath }) {
+      const target = new DatabaseSync(targetDatabasePath);
+      target.exec('PRAGMA user_version=1');
+      target.close();
+      return Object.freeze({});
+    },
+  });
+  const preparedApplication = await prepareLocalReconciliationApplication(
+    state.prepareApplicationCommand,
+  );
+  const application = await commitLocalReconciliationApplication(
+    applicationCommitCommand(state, preparedApplication),
+  );
+  const secretConfigRoot = path.join(
+    path.dirname(state.captureRoot),
+    `secret-config-plan-${suffix}`,
+  );
+  fs.mkdirSync(secretConfigRoot, { mode: 0o700 });
+  const secretConfigId =
+    options.secretConfigId ?? '00000000-0000-4000-8000-000000000424';
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.plan',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      secretConfigRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      secretConfigId,
+      applicationId: application.applicationId,
+      expectedApplicationPlanDigest: application.applicationPlanDigest,
+      expectedHeadDigest: application.instanceHeadDigest,
+      decisionFilePath: state.reviewFile.filePath,
+      projectId: 'default',
+      preparedAtMs: state.prepareApplicationCommand.request.preparedAtMs + 2,
+    },
+  };
+  return {
+    ...state,
+    application,
+    secretConfigRoot,
+    secretConfigId,
+    secretConfigCommand: command,
   };
 }
 
@@ -3195,6 +3312,186 @@ test('completion fence seals all eight no-effect domains before target restart',
   );
   assert.equal(activeHead.state, 'target_active');
   assert.equal(activeHead.generation, 2);
+});
+
+test('Secret/Config plan publishes, seals, verifies and stays content-free', async (t) => {
+  const state = await secretConfigPlanFixture(t, { suffix: 'terminal' });
+  const opened = [];
+  const closed = [];
+  const planned = await planLocalReconciliationSecretConfig(
+    state.secretConfigCommand,
+    {
+      beforeDatabaseOpen(kind, mode, cacheKiB) {
+        opened.push({ kind, mode, cacheKiB });
+      },
+      afterDatabaseClose(kind) {
+        closed.push(kind);
+      },
+    },
+  );
+  assert.equal(planned.status, 'prepared');
+  assert.equal(planned.state, 'reconciliation_secret_config_planned');
+  assert.equal(planned.outcome, 'ready');
+  assert.equal(planned.rowCount, 1);
+  assert.equal(planned.eligibleBindingCount, 0);
+  assert.equal(planned.eligiblePreservationCount, 1);
+  assert.equal(planned.adoptedLegacyTaskCount, 0);
+  assert.deepEqual(opened, [
+    { kind: 'legacy', mode: 'main_only_immutable', cacheKiB: 2048 },
+    { kind: 'target', mode: 'main_only_immutable', cacheKiB: 2048 },
+    { kind: 'target', mode: 'main_only_immutable', cacheKiB: 2048 },
+    { kind: 'legacy', mode: 'main_only_immutable', cacheKiB: 2048 },
+  ]);
+  assert.deepEqual(closed, ['legacy', 'target', 'legacy', 'target']);
+
+  const root = path.join(state.secretConfigRoot, state.secretConfigId);
+  assert.deepEqual(fs.readdirSync(root).sort(), [
+    'plan.ndjson',
+    'receipt.json',
+    'staging',
+  ]);
+  assert.equal(fs.statSync(root).mode & 0o777, 0o500);
+  assert.equal(fs.statSync(path.join(root, 'staging')).mode & 0o777, 0o500);
+  assert.equal(fs.statSync(path.join(root, 'plan.ndjson')).mode & 0o777, 0o400);
+  assert.equal(fs.statSync(path.join(root, 'receipt.json')).mode & 0o777, 0o400);
+  const serialized = fs.readFileSync(path.join(root, 'plan.ndjson'), 'utf8');
+  for (const privateValue of [
+    'DISABLED_TOKEN',
+    'private-secret-value',
+    state.targetDatabasePath,
+    state.reviewFile.filePath,
+  ]) {
+    assert.equal(serialized.includes(privateValue), false);
+  }
+  const receipt = JSON.parse(
+    fs.readFileSync(path.join(root, 'receipt.json'), 'utf8'),
+  );
+  assert.equal(receipt.unadaptedLegacyConfigCount, 0);
+  assert.match(receipt.automationAdoptionSetDigest, /^[0-9a-f]{64}$/);
+  const head = readLocalCutoverInstanceHead(
+    state.deploymentRoot,
+    state.captureCommand.request.instanceId,
+    state.uid,
+  );
+  assert.equal(head.state, 'reconciliation_secret_config_planned');
+  assert.equal(head.sourceRecordDigest, planned.secretConfigPlanDigest);
+
+  const verifyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.verify',
+    options: state.secretConfigCommand.options,
+    request: {
+      secretConfigId: state.secretConfigId,
+      expectedSecretConfigPlanDigest: planned.secretConfigPlanDigest,
+    },
+  };
+  const verified = await verifyLocalReconciliationSecretConfigPlan(
+    verifyCommand,
+  );
+  assert.equal(verified.status, 'verified');
+  assert.equal(
+    (await planLocalReconciliationSecretConfig(state.secretConfigCommand))
+      .status,
+    'existing',
+  );
+
+  const commandPath = path.join(
+    state.deploymentRoot,
+    'secret-config-verify-command.json',
+  );
+  fs.writeFileSync(commandPath, `${JSON.stringify(verifyCommand)}\n`, {
+    mode: 0o600,
+  });
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-secret-config-verify',
+      '--command-file',
+      commandPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).status, 'verified');
+  assert.equal(cli.stdout.includes(state.secretConfigRoot), false);
+  assert.equal(cli.stdout.includes('DISABLED_TOKEN'), false);
+  assert.equal(cli.stderr, '');
+});
+
+test('Secret/Config plan recovers exact publication response loss windows', async (t) => {
+  for (const [hook, finalStatus] of [
+    ['afterPlanPublished', 'prepared'],
+    ['afterReceiptPublished', 'prepared'],
+    ['afterTerminalSealed', 'prepared'],
+    ['afterHeadAdvanced', 'existing'],
+  ]) {
+    await t.test(hook, async (subtest) => {
+      const state = await secretConfigPlanFixture(subtest, { suffix: hook });
+      let fault = true;
+      await assert.rejects(
+        planLocalReconciliationSecretConfig(state.secretConfigCommand, {
+          [hook]() {
+            if (fault) {
+              fault = false;
+              throw new Error(`secret-config-${hook}-fault`);
+            }
+          },
+        }),
+        new RegExp(`secret-config-${hook}-fault`),
+      );
+      const recovered = await planLocalReconciliationSecretConfig(
+        state.secretConfigCommand,
+      );
+      assert.equal(recovered.status, finalStatus);
+      assert.equal(recovered.outcome, 'ready');
+      const verified = await verifyLocalReconciliationSecretConfigPlan({
+        schemaVersion: 1,
+        operation: 'local.deployment.reconciliation.secret-config.verify',
+        options: state.secretConfigCommand.options,
+        request: {
+          secretConfigId: state.secretConfigId,
+          expectedSecretConfigPlanDigest: recovered.secretConfigPlanDigest,
+        },
+      });
+      assert.equal(verified.status, 'verified');
+    });
+  }
+});
+
+test('Secret/Config plan keeps active Env and unknown Configs manual', async (t) => {
+  await t.test('active without adopted task', async (subtest) => {
+    const state = await secretConfigPlanFixture(subtest, {
+      suffix: 'active-manual',
+      active: true,
+    });
+    const planned = await planLocalReconciliationSecretConfig(
+      state.secretConfigCommand,
+    );
+    assert.equal(planned.outcome, 'manual_required');
+    assert.equal(planned.eligibleBindingCount, 1);
+    assert.equal(planned.adoptedLegacyTaskCount, 0);
+  });
+  await t.test('historical Configs', async (subtest) => {
+    const state = await secretConfigPlanFixture(subtest, {
+      suffix: 'configs-manual',
+      configs: true,
+    });
+    const planned = await planLocalReconciliationSecretConfig(
+      state.secretConfigCommand,
+    );
+    assert.equal(planned.outcome, 'manual_required');
+    assert.equal(planned.unadaptedLegacyConfigCount, 1);
+    const serialized = fs.readFileSync(
+      path.join(
+        state.secretConfigRoot,
+        state.secretConfigId,
+        'plan.ndjson',
+      ),
+      'utf8',
+    );
+    assert.equal(serialized.includes('private-config-value'), false);
+  });
 });
 
 test('completion fence retains automation rollback backup while other domains remain manual', async (t) => {
