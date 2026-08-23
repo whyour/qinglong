@@ -1019,8 +1019,8 @@ if (!migrationConnectionString || !runtimeConnectionString) {
                     AS observed_at_ms
          )
          UPDATE "ql3"."trigger_schedules"
-              SET updated_at_ms = observation.observed_at_ms - 2,
-                  claim_expires_at_ms = observation.observed_at_ms - 1
+              SET updated_at_ms = observation.observed_at_ms - 30002,
+                  claim_expires_at_ms = observation.observed_at_ms - 30001
              FROM observation
             WHERE project_id = 'default' AND trigger_id = $1`,
         [takeoverTrigger.triggerId],
