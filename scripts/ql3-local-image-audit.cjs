@@ -285,6 +285,7 @@ function auditWorkflow(contents, findings) {
     'pnpm audit:local-image:ql3',
     'docker build',
     '--file deploy/containers/ql3-local-application/Dockerfile',
+    'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 51 51 51 1',
     'actual="$(docker image inspect --format \'{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.local.application-config"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-min"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-max"}} {{index .Config.Labels "io.qinglong.local.sqlite-write-contract"}} {{index .Config.Labels "io.qinglong.local.compose-selection"}}\' "${IMAGE}")"',
     'io.qinglong.local.application-config',
     'io.qinglong.local.sqlite-contract-min',

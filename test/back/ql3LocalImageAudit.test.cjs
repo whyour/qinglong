@@ -255,3 +255,29 @@ test('rejects removal of either Profile from the native image CI gate', () => {
     current.close();
   }
 });
+
+test('rejects a stale SQLite contract expectation in the native image CI gate', () => {
+  const current = fixture();
+  try {
+    const workflowPath = path.join(
+      current.root,
+      '.github/workflows/ql3-ci.yml',
+    );
+    const workflow = fs
+      .readFileSync(workflowPath, 'utf8')
+      .replace(
+        'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 51 51 51 1',
+        'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 50 50 50 1',
+      );
+    fs.writeFileSync(workflowPath, workflow);
+    const report = auditLocalImageContract(current.root);
+    assert.equal(report.compatible, false);
+    assert.ok(
+      report.findings.some(
+        ({ code }) => code === 'LOCAL_IMAGE_CI_CONTRACT_DRIFT',
+      ),
+    );
+  } finally {
+    current.close();
+  }
+});
