@@ -31,6 +31,7 @@ export type LocalReconciliationDiagnosticReason =
   | 'reviewable_fact'
   | 'unknown_schema'
   | 'secret_custody_required'
+  | 'historical_preservation_required'
   | 'historical_integrity_required'
   | 'identity_custody_required';
 
@@ -89,7 +90,83 @@ function quotedIdentifier(name: string): string {
   return `"${name.replaceAll('"', '""')}"`;
 }
 
-function requirement(domain: LocalReconciliationPlanDomain): Readonly<{
+function targetRunHistoryIsTerminal(client: DatabaseSync): boolean {
+  const tables = new Map<string, Set<string>>();
+  for (const tableName of ['Runs', 'RunAttempts', 'StepRuns'] as const) {
+    const table = client
+      .prepare(
+        `SELECT 1 AS present
+         FROM sqlite_schema
+         WHERE type = 'table' AND name = ?
+         LIMIT 1`,
+      )
+      .get(tableName) as { readonly present?: unknown } | undefined;
+    if (table?.present !== 1) continue;
+    const columns = new Set<string>();
+    const rows = client
+      .prepare(`SELECT name FROM pragma_table_info(?) ORDER BY cid LIMIT 257`)
+      .iterate(tableName) as IterableIterator<{ readonly name?: unknown }>;
+    let count = 0;
+    for (const row of rows) {
+      count += 1;
+      if (
+        count > 256 ||
+        typeof row.name !== 'string' ||
+        Buffer.byteLength(row.name, 'utf8') > MAX_NAME_BYTES
+      ) {
+        return false;
+      }
+      columns.add(row.name);
+    }
+    tables.set(tableName, columns);
+  }
+  const runs = tables.get('Runs');
+  if (!runs?.has('status') || !runs.has('finished_at_ms')) return false;
+  const activeRun = client
+    .prepare(
+      `SELECT 1 AS present
+       FROM "Runs"
+       WHERE status NOT IN ('succeeded','failed','cancelled','timed_out')
+          OR finished_at_ms IS NULL
+       LIMIT 1`,
+    )
+    .get() as { readonly present?: unknown } | undefined;
+  if (activeRun?.present === 1) return false;
+  const attempts = tables.get('RunAttempts');
+  if (attempts !== undefined) {
+    if (!attempts.has('status')) return false;
+    const activeAttempt = client
+      .prepare(
+        `SELECT 1 AS present
+         FROM "RunAttempts"
+         WHERE status IN ('claimed','starting','running')
+         LIMIT 1`,
+      )
+      .get() as { readonly present?: unknown } | undefined;
+    if (activeAttempt?.present === 1) return false;
+  }
+  const steps = tables.get('StepRuns');
+  if (steps !== undefined) {
+    if (!steps.has('status') || !steps.has('finished_at_ms')) return false;
+    const activeStep = client
+      .prepare(
+        `SELECT 1 AS present
+         FROM "StepRuns"
+         WHERE status NOT IN ('succeeded','failed','skipped','cancelled','timed_out')
+            OR finished_at_ms IS NULL
+         LIMIT 1`,
+      )
+      .get() as { readonly present?: unknown } | undefined;
+    if (activeStep?.present === 1) return false;
+  }
+  return true;
+}
+
+function requirement(
+  client: DatabaseSync,
+  database: LocalReconciliationSealedDatabaseKind,
+  domain: LocalReconciliationPlanDomain,
+): Readonly<{
   decisionRequirement: LocalReconciliationDiagnosticDecisionRequirement;
   reason: LocalReconciliationDiagnosticReason;
 }> {
@@ -106,6 +183,12 @@ function requirement(domain: LocalReconciliationPlanDomain): Readonly<{
     });
   }
   if (domain === 'run_history') {
+    if (database === 'legacy' || targetRunHistoryIsTerminal(client)) {
+      return Object.freeze({
+        decisionRequirement: 'required' as const,
+        reason: 'historical_preservation_required' as const,
+      });
+    }
     return Object.freeze({
       decisionRequirement: 'blocked' as const,
       reason: 'historical_integrity_required' as const,
@@ -161,8 +244,11 @@ function fact(
   name: string,
   tableName: string,
   count: string | null,
+  review: Readonly<{
+    decisionRequirement: LocalReconciliationDiagnosticDecisionRequirement;
+    reason: LocalReconciliationDiagnosticReason;
+  }>,
 ): Readonly<LocalReconciliationDiagnosticFact> {
-  const review = requirement(domain);
   const payload = Object.freeze({
     schema: FACT_SCHEMA,
     schemaVersion: 1 as const,
@@ -190,6 +276,7 @@ function schemaFacts(
   records: readonly Readonly<LocalReconciliationDiagnosticFact>[];
   complete: boolean;
 }> {
+  const review = requirement(client, database, domain);
   const rows = client
     .prepare(
       `SELECT type, name, tbl_name AS tableName
@@ -240,6 +327,7 @@ function schemaFacts(
         row.name,
         row.tableName,
         null,
+        review,
       ),
     );
   }
@@ -256,6 +344,7 @@ function tableFacts(
   records: readonly Readonly<LocalReconciliationDiagnosticFact>[];
   complete: boolean;
 }> {
+  const review = requirement(client, database, domain);
   const rows = client
     .prepare(
       `SELECT name, type
@@ -302,6 +391,7 @@ function tableFacts(
         row.name,
         row.name,
         rowCount(client, domain, row.name, row.type),
+        review,
       ),
     );
   }

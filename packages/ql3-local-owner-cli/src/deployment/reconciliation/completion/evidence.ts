@@ -13,13 +13,16 @@ const UUID_V4 =
 export interface LocalReconciliationCompletionDomainEvidence {
   readonly domain: LocalReconciliationPlanDomain;
   readonly action: 'no_effect' | 'adapter_required';
-  readonly evidenceKind: 'application_summary' | 'automation_apply';
+  readonly evidenceKind:
+    | 'application_summary'
+    | 'automation_apply'
+    | 'run_history_preservation';
   readonly evidenceDigest: string;
 }
 
 export interface LocalReconciliationCompletionReceipt {
   readonly schema: typeof RECEIPT_SCHEMA;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly state: 'reconciliation_completed';
   readonly completionId: string;
   readonly applicationId: string;
@@ -31,7 +34,7 @@ export interface LocalReconciliationCompletionReceipt {
   readonly applicationPlanDigest: string;
   readonly sourceHeadDigest: string;
   readonly domains: readonly Readonly<LocalReconciliationCompletionDomainEvidence>[];
-  readonly adapterCount: 0 | 1;
+  readonly adapterCount: 0 | 1 | 2;
   readonly completedAtMs: number;
   readonly completionDigest: string;
 }
@@ -65,6 +68,7 @@ function exact(
 function domainEvidence(
   value: unknown,
   expectedDomain: LocalReconciliationPlanDomain,
+  schemaVersion: 1 | 2,
 ): Readonly<LocalReconciliationCompletionDomainEvidence> {
   const selected = exact(
     value,
@@ -78,9 +82,14 @@ function domainEvidence(
     expectedDomain === 'automation' &&
     selected.action === 'adapter_required' &&
     selected.evidenceKind === 'automation_apply';
+  const runHistory =
+    schemaVersion === 2 &&
+    expectedDomain === 'run_history' &&
+    selected.action === 'adapter_required' &&
+    selected.evidenceKind === 'run_history_preservation';
   if (
     selected.domain !== expectedDomain ||
-    (!noEffect && !automation) ||
+    (!noEffect && !automation && !runHistory) ||
     typeof selected.evidenceDigest !== 'string' ||
     !DIGEST.test(selected.evidenceDigest)
   ) {
@@ -100,9 +109,14 @@ export function buildLocalReconciliationCompletionReceipt(
     'schema' | 'schemaVersion' | 'state' | 'completionDigest'
   >,
 ): Readonly<LocalReconciliationCompletionReceipt> {
+  const schemaVersion = input.domains.some(
+    (domain) => domain.evidenceKind === 'run_history_preservation',
+  )
+    ? (2 as const)
+    : (1 as const);
   const payload = Object.freeze({
     schema: RECEIPT_SCHEMA,
-    schemaVersion: 1 as const,
+    schemaVersion,
     state: 'reconciliation_completed' as const,
     ...input,
   });
@@ -140,10 +154,14 @@ export function normalizeLocalReconciliationCompletionReceipt(
   if (!Array.isArray(selected.domains) || selected.domains.length !== 8) {
     fail('receipt domain catalog is invalid');
   }
+  if (selected.schemaVersion !== 1 && selected.schemaVersion !== 2) {
+    fail('receipt schema version is invalid');
+  }
+  const schemaVersion = selected.schemaVersion;
   const rawDomains = selected.domains as unknown[];
   const domains = Object.freeze(
     LOCAL_RECONCILIATION_PLAN_DOMAINS.map((domain, index) =>
-      domainEvidence(rawDomains[index], domain),
+      domainEvidence(rawDomains[index], domain, schemaVersion),
     ),
   );
   const adapterCount = domains.filter(
@@ -153,7 +171,10 @@ export function normalizeLocalReconciliationCompletionReceipt(
   const normalized = Object.freeze({ ...raw, domains });
   if (
     selected.schema !== RECEIPT_SCHEMA ||
-    selected.schemaVersion !== 1 ||
+    (schemaVersion === 2) !==
+      domains.some(
+        (domain) => domain.evidenceKind === 'run_history_preservation',
+      ) ||
     selected.state !== 'reconciliation_completed' ||
     typeof selected.completionId !== 'string' ||
     !UUID_V4.test(selected.completionId) ||
@@ -174,7 +195,7 @@ export function normalizeLocalReconciliationCompletionReceipt(
     ].every(
       (candidate) => typeof candidate === 'string' && DIGEST.test(candidate),
     ) ||
-    (selected.adapterCount !== 0 && selected.adapterCount !== 1) ||
+    ![0, 1, 2].includes(selected.adapterCount as number) ||
     selected.adapterCount !== adapterCount ||
     !Number.isSafeInteger(selected.completedAtMs) ||
     (selected.completedAtMs as number) < 0 ||

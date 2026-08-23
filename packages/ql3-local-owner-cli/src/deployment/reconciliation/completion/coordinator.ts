@@ -33,6 +33,11 @@ import type {
   LocalReconciliationAutomationApplyReceipt,
 } from '../application/automation/applyEvidence';
 import { readLocalReconciliationAutomationDecisionTerminal } from '../application/automation/decisionCoordinator';
+import {
+  readLocalReconciliationRunHistoryTerminal,
+  type LocalReconciliationRunHistoryDependencies,
+} from '../application/run-history/coordinator';
+import type { LocalReconciliationRunHistoryPreservationReceipt } from '../application/run-history/evidence';
 import type { LocalReconciliationCompletionDomainEvidence } from './evidence';
 import {
   buildLocalReconciliationCompletionReceipt,
@@ -63,12 +68,73 @@ interface AutomationProof {
   readonly paths: ReturnType<typeof localReconciliationAutomationApplyPaths>;
 }
 
-export interface LocalReconciliationCompletionDependencies {
+interface RunHistoryProof {
+  readonly receipt: Readonly<LocalReconciliationRunHistoryPreservationReceipt>;
+}
+
+export interface LocalReconciliationCompletionDependencies
+  extends LocalReconciliationRunHistoryDependencies {
   readonly inspectSnapshot?: typeof inspectLocalSqliteSnapshot;
   readonly afterReceiptPublished?: () => void;
   readonly afterTerminalSealed?: () => void;
   readonly afterHeadAdvanced?: () => void;
   readonly afterBackupCollected?: () => void;
+}
+
+async function runHistoryProof(
+  command: Readonly<LocalReconciliationCompleteCommand>,
+  terminal: Readonly<LocalReconciliationApplicationTerminal>,
+  uid: number,
+  dependencies: LocalReconciliationCompletionDependencies,
+): Promise<Readonly<RunHistoryProof> | null> {
+  const domain = terminal.plan.domains.find(
+    (selected) => selected.domain === 'run_history',
+  );
+  if (!domain) fail('run history domain is absent');
+  if (domain.action === 'no_effect') {
+    if (
+      command.options.runHistory !== null ||
+      command.request.runHistory !== null
+    ) {
+      fail('no-effect completion must not carry run history authority');
+    }
+    return null;
+  }
+  if (
+    domain.action !== 'adapter_required' ||
+    command.options.runHistory === null ||
+    command.request.runHistory === null
+  ) {
+    fail('run history domain is not terminally provable');
+  }
+  validatePrivateDirectory(
+    command.options.runHistory.runHistoryRoot,
+    uid,
+    'runHistoryRoot',
+  );
+  const history = await readLocalReconciliationRunHistoryTerminal(
+    {
+      deploymentRoot: command.options.deploymentRoot,
+      applicationRoot: command.options.applicationRoot,
+      runHistoryRoot: command.options.runHistory.runHistoryRoot,
+      allowRootService: command.options.allowRootService,
+    },
+    command.request.runHistory.preservationId,
+    command.request.applicationId,
+    command.options.runHistory.decisionFilePath,
+    uid,
+    dependencies,
+  );
+  if (
+    history.receipt.preservationDigest !==
+      command.request.runHistory.expectedPreservationDigest ||
+    history.receipt.applicationPlanDigest !==
+      terminal.plan.applicationPlanDigest ||
+    history.receipt.sourceHeadDigest !== command.request.expectedHeadDigest
+  ) {
+    fail('run history preservation evidence is detached');
+  }
+  return Object.freeze({ receipt: history.receipt });
 }
 
 function fail(message: string, cause?: unknown): never {
@@ -393,6 +459,7 @@ async function automationProof(
 function domainEvidence(
   terminal: Readonly<LocalReconciliationApplicationTerminal>,
   automation: Readonly<AutomationProof> | null,
+  runHistory: Readonly<RunHistoryProof> | null,
 ): readonly Readonly<LocalReconciliationCompletionDomainEvidence>[] {
   return Object.freeze(
     terminal.plan.domains.map((domain) => {
@@ -414,6 +481,18 @@ function domainEvidence(
           action: 'adapter_required' as const,
           evidenceKind: 'automation_apply' as const,
           evidenceDigest: automation.receipt.applyDigest,
+        });
+      }
+      if (
+        domain.domain === 'run_history' &&
+        domain.action === 'adapter_required' &&
+        runHistory !== null
+      ) {
+        return Object.freeze({
+          domain: domain.domain,
+          action: 'adapter_required' as const,
+          evidenceKind: 'run_history_preservation' as const,
+          evidenceDigest: runHistory.receipt.preservationDigest,
         });
       }
       return fail(`${domain.domain} is not terminally reconciled`);
@@ -539,7 +618,13 @@ export async function completeLocalReconciliation(
     uid,
     dependencies,
   );
-  const domains = domainEvidence(terminal, automation);
+  const runHistory = await runHistoryProof(
+    command,
+    terminal,
+    uid,
+    dependencies,
+  );
+  const domains = domainEvidence(terminal, automation, runHistory);
   const selected = ensureCompletionDirectory(
     command.options.completionRoot,
     command.request.completionId,
@@ -572,10 +657,11 @@ export async function completeLocalReconciliation(
     assertSourceHead(head, command.request.expectedHeadDigest, automation);
     const adapterCount = domains.filter(
       (domain) => domain.action === 'adapter_required',
-    ).length as 0 | 1;
+    ).length as 0 | 1 | 2;
     const latestEvidenceAtMs = Math.max(
       terminal.plan.committedAtMs,
       automation?.receipt.appliedAtMs ?? 0,
+      runHistory?.receipt.preservedAtMs ?? 0,
     );
     if (command.request.completedAtMs < latestEvidenceAtMs) {
       fail('completion timestamp precedes terminal evidence');
@@ -682,7 +768,7 @@ export async function verifyLocalReconciliationCompletion(
     command.options.applicationRoot,
   );
   const syntheticCompleteCommand = Object.freeze({
-    schemaVersion: 1 as const,
+    schemaVersion: receipt.schemaVersion,
     operation: 'local.deployment.reconciliation.complete' as const,
     options: command.options,
     request: Object.freeze({
@@ -691,6 +777,7 @@ export async function verifyLocalReconciliationCompletion(
       expectedApplicationPlanDigest: receipt.applicationPlanDigest,
       expectedHeadDigest: receipt.sourceHeadDigest,
       automation: command.request.automation,
+      runHistory: command.request.runHistory,
       completedAtMs: receipt.completedAtMs,
     }),
   });
@@ -700,7 +787,13 @@ export async function verifyLocalReconciliationCompletion(
     uid,
     dependencies,
   );
-  const domains = domainEvidence(terminal, automation);
+  const runHistory = await runHistoryProof(
+    syntheticCompleteCommand,
+    terminal,
+    uid,
+    dependencies,
+  );
+  const domains = domainEvidence(terminal, automation, runHistory);
   validateReceiptBinding(
     receipt,
     terminal,

@@ -155,6 +155,13 @@ import {
   verifyLocalReconciliationAutomationApplyCommandFile,
 } from './reconciliation/application/automation/applyCoordinator';
 import {
+  preserveLocalReconciliationRunHistory,
+  preserveLocalReconciliationRunHistoryCommandFile,
+  readLocalReconciliationRunHistoryTerminal,
+  verifyLocalReconciliationRunHistory,
+  verifyLocalReconciliationRunHistoryCommandFile,
+} from './reconciliation/application/run-history/coordinator';
+import {
   completeLocalReconciliation,
   completeLocalReconciliationCommandFile,
   verifyLocalReconciliationCompletion,
@@ -199,6 +206,11 @@ export {
   verifyLocalReconciliationAutomationApplyCommandFile,
   rollbackLocalReconciliationAutomationApply,
   rollbackLocalReconciliationAutomationApplyCommandFile,
+  preserveLocalReconciliationRunHistory,
+  preserveLocalReconciliationRunHistoryCommandFile,
+  readLocalReconciliationRunHistoryTerminal,
+  verifyLocalReconciliationRunHistory,
+  verifyLocalReconciliationRunHistoryCommandFile,
   completeLocalReconciliation,
   completeLocalReconciliationCommandFile,
   verifyLocalReconciliationCompletion,
@@ -212,6 +224,8 @@ export {
   type LocalReconciliationCompletionAutomationBinding,
   type LocalReconciliationCompletionAutomationOptions,
   type LocalReconciliationCompletionOptions,
+  type LocalReconciliationCompletionRunHistoryBinding,
+  type LocalReconciliationCompletionRunHistoryOptions,
   type LocalReconciliationCompletionResult,
   type LocalReconciliationCompletionVerifyCommand,
 } from './reconciliation/completion/contract';
@@ -233,6 +247,23 @@ export {
   type LocalReconciliationAutomationApplyVerifyCommand,
 } from './reconciliation/application/automation/applyContract';
 export { type LocalReconciliationAutomationApplyDependencies } from './reconciliation/application/automation/applyCoordinator';
+
+export {
+  normalizeLocalReconciliationRunHistoryPreserveCommand,
+  normalizeLocalReconciliationRunHistoryVerifyCommand,
+  type LocalReconciliationRunHistoryOptions,
+  type LocalReconciliationRunHistoryPreserveCommand,
+  type LocalReconciliationRunHistoryResult,
+  type LocalReconciliationRunHistoryVerifyCommand,
+} from './reconciliation/application/run-history/contract';
+export {
+  type LocalReconciliationRunHistoryDependencies,
+  type LocalReconciliationRunHistoryTerminal,
+} from './reconciliation/application/run-history/coordinator';
+export {
+  normalizeLocalReconciliationRunHistoryPreservationReceipt,
+  type LocalReconciliationRunHistoryPreservationReceipt,
+} from './reconciliation/application/run-history/evidence';
 
 export {
   normalizeLocalReconciliationApplicationCommitCommand,

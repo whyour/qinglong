@@ -22,7 +22,13 @@ export interface LocalReconciliationCompletionOptions {
   readonly applicationRoot: string;
   readonly completionRoot: string;
   readonly automation: Readonly<LocalReconciliationCompletionAutomationOptions> | null;
+  readonly runHistory: Readonly<LocalReconciliationCompletionRunHistoryOptions> | null;
   readonly allowRootService: boolean;
+}
+
+export interface LocalReconciliationCompletionRunHistoryOptions {
+  readonly runHistoryRoot: string;
+  readonly decisionFilePath: string;
 }
 
 export interface LocalReconciliationCompletionAutomationBinding {
@@ -31,8 +37,13 @@ export interface LocalReconciliationCompletionAutomationBinding {
   readonly expectedApplyDigest: string;
 }
 
+export interface LocalReconciliationCompletionRunHistoryBinding {
+  readonly preservationId: string;
+  readonly expectedPreservationDigest: string;
+}
+
 export interface LocalReconciliationCompleteCommand {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly operation: 'local.deployment.reconciliation.complete';
   readonly options: Readonly<LocalReconciliationCompletionOptions>;
   readonly request: Readonly<{
@@ -41,12 +52,13 @@ export interface LocalReconciliationCompleteCommand {
     expectedApplicationPlanDigest: string;
     expectedHeadDigest: string;
     automation: Readonly<LocalReconciliationCompletionAutomationBinding> | null;
+    runHistory: Readonly<LocalReconciliationCompletionRunHistoryBinding> | null;
     completedAtMs: number;
   }>;
 }
 
 export interface LocalReconciliationCompletionVerifyCommand {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly operation: 'local.deployment.reconciliation.complete.verify';
   readonly options: Readonly<LocalReconciliationCompletionOptions>;
   readonly request: Readonly<{
@@ -54,6 +66,7 @@ export interface LocalReconciliationCompletionVerifyCommand {
     applicationId: string;
     expectedCompletionDigest: string;
     automation: Readonly<LocalReconciliationCompletionAutomationBinding> | null;
+    runHistory: Readonly<LocalReconciliationCompletionRunHistoryBinding> | null;
   }>;
 }
 
@@ -68,7 +81,7 @@ export interface LocalReconciliationCompletionResult {
   readonly applicationId: string;
   readonly completionDigest: string;
   readonly domainCount: 8;
-  readonly adapterCount: 0 | 1;
+  readonly adapterCount: 0 | 1 | 2;
   readonly instanceHeadDigest: string;
 }
 
@@ -169,17 +182,27 @@ function normalizeAutomationOptions(
 
 function normalizeOptions(
   value: unknown,
+  schemaVersion: 1 | 2,
 ): Readonly<LocalReconciliationCompletionOptions> {
   const selected = record(value, 'options');
   exact(
     selected,
-    [
-      'allowRootService',
-      'applicationRoot',
-      'automation',
-      'completionRoot',
-      'deploymentRoot',
-    ],
+    schemaVersion === 1
+      ? [
+          'allowRootService',
+          'applicationRoot',
+          'automation',
+          'completionRoot',
+          'deploymentRoot',
+        ]
+      : [
+          'allowRootService',
+          'applicationRoot',
+          'automation',
+          'completionRoot',
+          'deploymentRoot',
+          'runHistory',
+        ],
     'options',
   );
   if (
@@ -189,11 +212,16 @@ function normalizeOptions(
     fail('command identity is invalid');
   }
   const automation = normalizeAutomationOptions(selected.automation);
+  const runHistory =
+    schemaVersion === 1
+      ? null
+      : normalizeRunHistoryOptions(selected.runHistory);
   const normalized = Object.freeze({
     deploymentRoot: safePath(selected.deploymentRoot, 'deploymentRoot'),
     applicationRoot: safePath(selected.applicationRoot, 'applicationRoot'),
     completionRoot: safePath(selected.completionRoot, 'completionRoot'),
     automation,
+    runHistory,
     allowRootService: selected.allowRootService,
   }) as Readonly<LocalReconciliationCompletionOptions>;
   const roots = [
@@ -207,6 +235,7 @@ function normalizeOptions(
           automation.automationDecisionRoot,
           automation.automationApplyRoot,
         ]),
+    ...(runHistory === null ? [] : [runHistory.runHistoryRoot]),
   ];
   for (let left = 0; left < roots.length; left += 1) {
     for (let right = left + 1; right < roots.length; right += 1) {
@@ -228,7 +257,32 @@ function normalizeOptions(
   ) {
     fail('targetDatabasePath overlaps an authority root');
   }
+  if (
+    runHistory !== null &&
+    roots.some(
+      (root) =>
+        overlaps(root, runHistory.decisionFilePath) ||
+        overlaps(runHistory.decisionFilePath, root),
+    )
+  ) {
+    fail('decisionFilePath overlaps an authority root');
+  }
   return normalized;
+}
+
+function normalizeRunHistoryOptions(
+  value: unknown,
+): Readonly<LocalReconciliationCompletionRunHistoryOptions> {
+  const selected = record(value, 'run history options');
+  exact(
+    selected,
+    ['decisionFilePath', 'runHistoryRoot'],
+    'run history options',
+  );
+  return Object.freeze({
+    runHistoryRoot: safePath(selected.runHistoryRoot, 'runHistoryRoot'),
+    decisionFilePath: safePath(selected.decisionFilePath, 'decisionFilePath'),
+  });
 }
 
 function normalizeAutomationBinding(
@@ -251,6 +305,28 @@ function normalizeAutomationBinding(
   });
 }
 
+function normalizeRunHistoryBinding(
+  value: unknown,
+): Readonly<LocalReconciliationCompletionRunHistoryBinding> {
+  const selected = record(value, 'run history binding');
+  exact(
+    selected,
+    ['expectedPreservationDigest', 'preservationId'],
+    'run history binding',
+  );
+  return Object.freeze({
+    preservationId: identifier(
+      selected.preservationId,
+      UUID_V4,
+      'preservationId',
+    ),
+    expectedPreservationDigest: digest(
+      selected.expectedPreservationDigest,
+      'expectedPreservationDigest',
+    ),
+  });
+}
+
 function command(value: unknown, operation: string) {
   const selected = record(value, 'command');
   exact(
@@ -258,11 +334,15 @@ function command(value: unknown, operation: string) {
     ['operation', 'options', 'request', 'schemaVersion'],
     'command',
   );
-  if (selected.schemaVersion !== 1 || selected.operation !== operation) {
+  if (
+    (selected.schemaVersion !== 1 && selected.schemaVersion !== 2) ||
+    selected.operation !== operation
+  ) {
     fail('command version or operation is invalid');
   }
   return Object.freeze({
-    options: normalizeOptions(selected.options),
+    schemaVersion: selected.schemaVersion,
+    options: normalizeOptions(selected.options, selected.schemaVersion),
     request: record(selected.request, 'request'),
   });
 }
@@ -273,14 +353,24 @@ export function normalizeLocalReconciliationCompleteCommand(
   const selected = command(value, 'local.deployment.reconciliation.complete');
   exact(
     selected.request,
-    [
-      'applicationId',
-      'automation',
-      'completedAtMs',
-      'completionId',
-      'expectedApplicationPlanDigest',
-      'expectedHeadDigest',
-    ],
+    selected.schemaVersion === 1
+      ? [
+          'applicationId',
+          'automation',
+          'completedAtMs',
+          'completionId',
+          'expectedApplicationPlanDigest',
+          'expectedHeadDigest',
+        ]
+      : [
+          'applicationId',
+          'automation',
+          'completedAtMs',
+          'completionId',
+          'expectedApplicationPlanDigest',
+          'expectedHeadDigest',
+          'runHistory',
+        ],
     'request',
   );
   if (
@@ -290,7 +380,7 @@ export function normalizeLocalReconciliationCompleteCommand(
     fail('completedAtMs is invalid');
   }
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: selected.schemaVersion,
     operation: 'local.deployment.reconciliation.complete',
     options: selected.options,
     request: Object.freeze({
@@ -313,6 +403,10 @@ export function normalizeLocalReconciliationCompleteCommand(
         'expectedHeadDigest',
       ),
       automation: normalizeAutomationBinding(selected.request.automation),
+      runHistory:
+        selected.schemaVersion === 1
+          ? null
+          : normalizeRunHistoryBinding(selected.request.runHistory),
       completedAtMs: selected.request.completedAtMs as number,
     }),
   });
@@ -327,11 +421,24 @@ export function normalizeLocalReconciliationCompletionVerifyCommand(
   );
   exact(
     selected.request,
-    ['applicationId', 'automation', 'completionId', 'expectedCompletionDigest'],
+    selected.schemaVersion === 1
+      ? [
+          'applicationId',
+          'automation',
+          'completionId',
+          'expectedCompletionDigest',
+        ]
+      : [
+          'applicationId',
+          'automation',
+          'completionId',
+          'expectedCompletionDigest',
+          'runHistory',
+        ],
     'request',
   );
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: selected.schemaVersion,
     operation: 'local.deployment.reconciliation.complete.verify',
     options: selected.options,
     request: Object.freeze({
@@ -350,6 +457,10 @@ export function normalizeLocalReconciliationCompletionVerifyCommand(
         'expectedCompletionDigest',
       ),
       automation: normalizeAutomationBinding(selected.request.automation),
+      runHistory:
+        selected.schemaVersion === 1
+          ? null
+          : normalizeRunHistoryBinding(selected.request.runHistory),
     }),
   });
 }

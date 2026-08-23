@@ -18,6 +18,7 @@ const {
   prepareLocalReconciliationCapture,
   prepareLocalReconciliationApplication,
   prepareLocalReconciliationAutomationDecision,
+  preserveLocalReconciliationRunHistory,
   readLocalReconciliationAutomationDecisionTerminal,
   rollbackLocalReconciliationAutomationApply,
   planLocalReconciliationAutomation,
@@ -31,6 +32,7 @@ const {
   verifyLocalReconciliationCompletion,
   verifyLocalReconciliationPlan,
   verifyLocalReconciliationReview,
+  verifyLocalReconciliationRunHistory,
   writeLocalReconciliationReviewDiagnostics,
 } = require('../dist/deployment/localDeployment.js');
 const {
@@ -708,6 +710,50 @@ function automationDatabaseInitializer() {
     target.close();
     fs.chmodSync(targetDatabasePath, 0o600);
   };
+}
+
+function runHistoryDatabaseInitializer() {
+  return ({ legacySourcePath, recoveryPath, targetDatabasePath }) => {
+    const legacy = new DatabaseSync(legacySourcePath);
+    legacy.exec(`
+      CREATE TABLE "CrontabStats" (
+        id INTEGER PRIMARY KEY,
+        timestamp INTEGER NOT NULL,
+        status INTEGER NOT NULL
+      );
+      INSERT INTO "CrontabStats" (id, timestamp, status)
+      VALUES (1, 1000, 0);
+    `);
+    legacy.close();
+    fs.chmodSync(legacySourcePath, 0o600);
+    fs.copyFileSync(legacySourcePath, recoveryPath);
+    fs.chmodSync(recoveryPath, 0o600);
+
+    const target = new DatabaseSync(targetDatabasePath);
+    target.exec(`
+      CREATE TABLE "Runs" (
+        id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        finished_at_ms INTEGER
+      );
+      INSERT INTO "Runs" (id, status, finished_at_ms)
+      VALUES ('baseline', 'succeeded', 1000);
+    `);
+    target.close();
+    fs.chmodSync(targetDatabasePath, 0o600);
+  };
+}
+
+function mutateRunHistoryTarget({ targetDatabasePath }, status = 'failed') {
+  const target = new DatabaseSync(targetDatabasePath);
+  target
+    .prepare(
+      `INSERT INTO "Runs" (id, status, finished_at_ms)
+       VALUES (?, ?, ?)`,
+    )
+    .run('captured', status, status === 'running' ? null : 2000);
+  target.close();
+  return Object.freeze({});
 }
 
 function automationReadyDatabaseInitializer() {
@@ -3241,6 +3287,303 @@ test('completion fence retains automation rollback backup while other domains re
         state.uid,
       ),
     /not bound to the instance lineage head/,
+  );
+});
+
+test('run history preservation seals terminal histories and completes through v2 evidence', async (t) => {
+  const state = await reviewedApplicationFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000501',
+    reviewId: '00000000-0000-4000-8000-000000000502',
+    applicationId: '00000000-0000-4000-8000-000000000503',
+    reviewSuffix: 'run-history-preservation',
+    createDefaultSidecars: false,
+    initializeDatabases: runHistoryDatabaseInitializer(),
+    mutateTarget(paths) {
+      return mutateRunHistoryTarget(paths);
+    },
+    mutateDecisions(records) {
+      const selected = records.filter(
+        (record) =>
+          record.kind === 'qinglong3-local-reconciliation-review-decision' &&
+          record.database === 'legacy' &&
+          record.domain === 'run_history',
+      );
+      assert.ok(selected.length > 0);
+      for (const record of selected) {
+        record.disposition = 'retain_both';
+        record.reason = 'preserve_both';
+      }
+    },
+  });
+  const prepared = await prepareLocalReconciliationApplication(
+    state.prepareApplicationCommand,
+  );
+  const application = await commitLocalReconciliationApplication(
+    applicationCommitCommand(state, prepared),
+  );
+  assert.equal(application.outcome, 'adapter_required');
+  const applicationPlan = JSON.parse(
+    fs.readFileSync(
+      path.join(state.applicationRoot, application.applicationId, 'plan.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(
+    applicationPlan.domains.find((domain) => domain.domain === 'run_history')
+      .action,
+    'adapter_required',
+  );
+
+  const runHistoryRoot = path.join(
+    path.dirname(state.captureRoot),
+    'run-history-preservation-root',
+  );
+  fs.mkdirSync(runHistoryRoot, { mode: 0o700 });
+  const preservationCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.run-history.preserve',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      runHistoryRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      preservationId: '00000000-0000-4000-8000-000000000504',
+      applicationId: application.applicationId,
+      expectedApplicationPlanDigest: application.applicationPlanDigest,
+      expectedHeadDigest: application.instanceHeadDigest,
+      decisionFilePath: state.reviewFile.filePath,
+      preservedAtMs: state.prepareApplicationCommand.request.preparedAtMs + 3,
+    },
+  };
+  for (const boundary of ['afterReceiptPublished', 'afterTerminalSealed']) {
+    await assert.rejects(
+      preserveLocalReconciliationRunHistory(preservationCommand, {
+        [boundary]() {
+          throw new Error(`run history ${boundary} response loss`);
+        },
+      }),
+      new RegExp(`run history ${boundary} response loss`),
+    );
+  }
+  const preserved = await preserveLocalReconciliationRunHistory(
+    preservationCommand,
+  );
+  assert.equal(preserved.status, 'existing');
+  assert.ok(preserved.legacyFactCount > 0);
+  assert.ok(preserved.targetFactCount > 0);
+  const preservationDirectory = path.join(
+    runHistoryRoot,
+    preservationCommand.request.preservationId,
+  );
+  assert.deepEqual(fs.readdirSync(preservationDirectory), ['receipt.json']);
+  assert.equal(fs.statSync(preservationDirectory).mode & 0o777, 0o500);
+  assert.equal(
+    fs.statSync(path.join(preservationDirectory, 'receipt.json')).mode & 0o777,
+    0o400,
+  );
+  const preservationReceiptText = fs.readFileSync(
+    path.join(preservationDirectory, 'receipt.json'),
+    'utf8',
+  );
+  assert.equal(preservationReceiptText.includes('CrontabStats'), false);
+  assert.equal(preservationReceiptText.includes('captured'), false);
+  assert.equal(
+    preservationReceiptText.includes(state.reviewFile.filePath),
+    false,
+  );
+
+  const preservationVerifyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.run-history.verify',
+    options: preservationCommand.options,
+    request: {
+      preservationId: preservationCommand.request.preservationId,
+      applicationId: preservationCommand.request.applicationId,
+      expectedPreservationDigest: preserved.preservationDigest,
+      decisionFilePath: state.reviewFile.filePath,
+    },
+  };
+  const preservationVerified = await verifyLocalReconciliationRunHistory(
+    preservationVerifyCommand,
+  );
+  assert.equal(preservationVerified.status, 'verified');
+
+  const completionRoot = path.join(
+    path.dirname(state.captureRoot),
+    'completion-run-history',
+  );
+  fs.mkdirSync(completionRoot, { mode: 0o700 });
+  const runHistory = {
+    preservationId: preservationCommand.request.preservationId,
+    expectedPreservationDigest: preserved.preservationDigest,
+  };
+  const completionCommand = {
+    schemaVersion: 2,
+    operation: 'local.deployment.reconciliation.complete',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      completionRoot,
+      automation: null,
+      runHistory: {
+        runHistoryRoot,
+        decisionFilePath: state.reviewFile.filePath,
+      },
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      completionId: '00000000-0000-4000-8000-000000000505',
+      applicationId: application.applicationId,
+      expectedApplicationPlanDigest: application.applicationPlanDigest,
+      expectedHeadDigest: application.instanceHeadDigest,
+      automation: null,
+      runHistory,
+      completedAtMs: preservationCommand.request.preservedAtMs + 1,
+    },
+  };
+  const completed = await completeLocalReconciliation(completionCommand);
+  assert.equal(completed.adapterCount, 1);
+  const completionReceipt = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        completionRoot,
+        completionCommand.request.completionId,
+        'receipt.json',
+      ),
+      'utf8',
+    ),
+  );
+  assert.equal(completionReceipt.schemaVersion, 2);
+  assert.deepEqual(
+    completionReceipt.domains.find((domain) => domain.domain === 'run_history'),
+    {
+      domain: 'run_history',
+      action: 'adapter_required',
+      evidenceKind: 'run_history_preservation',
+      evidenceDigest: preserved.preservationDigest,
+    },
+  );
+  const completionVerified = await verifyLocalReconciliationCompletion({
+    schemaVersion: 2,
+    operation: 'local.deployment.reconciliation.complete.verify',
+    options: completionCommand.options,
+    request: {
+      completionId: completionCommand.request.completionId,
+      applicationId: completionCommand.request.applicationId,
+      expectedCompletionDigest: completed.completionDigest,
+      automation: null,
+      runHistory,
+    },
+  });
+  assert.equal(completionVerified.status, 'verified');
+
+  const commandPath = path.join(
+    state.deploymentRoot,
+    'run-history-verify.json',
+  );
+  fs.writeFileSync(
+    commandPath,
+    `${JSON.stringify(preservationVerifyCommand)}\n`,
+    { mode: 0o600 },
+  );
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-run-history-verify',
+      '--command-file',
+      commandPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).status, 'verified');
+  assert.equal(cli.stdout.includes(runHistoryRoot), false);
+  assert.equal(cli.stdout.includes('CrontabStats'), false);
+
+  const preservationReceiptPath = path.join(
+    preservationDirectory,
+    'receipt.json',
+  );
+  const tamperedReceipt = JSON.parse(
+    fs.readFileSync(preservationReceiptPath, 'utf8'),
+  );
+  tamperedReceipt.legacyFactCount += 1;
+  fs.chmodSync(preservationDirectory, 0o700);
+  fs.chmodSync(preservationReceiptPath, 0o600);
+  fs.writeFileSync(
+    preservationReceiptPath,
+    `${JSON.stringify(tamperedReceipt, null, 2)}\n`,
+  );
+  fs.chmodSync(preservationReceiptPath, 0o400);
+  fs.chmodSync(preservationDirectory, 0o500);
+  await assert.rejects(
+    verifyLocalReconciliationRunHistory(preservationVerifyCommand),
+    /receipt binding is invalid/,
+  );
+});
+
+test('run history preservation rejects active target runs and review escalation', async (t) => {
+  const state = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000511',
+    reviewId: '00000000-0000-4000-8000-000000000512',
+    reviewSuffix: 'run-history-active',
+    createDefaultSidecars: false,
+    initializeDatabases: runHistoryDatabaseInitializer(),
+    mutateTarget(paths) {
+      return mutateRunHistoryTarget(paths, 'running');
+    },
+  });
+  const pageCommand = diagnosticCommand(state, state.prepared, {
+    database: 'target',
+    domain: 'run_history',
+    factKind: 'table',
+    outputName: 'active-run-history.json',
+  });
+  writeLocalReconciliationReviewDiagnostics(pageCommand);
+  const page = JSON.parse(
+    fs.readFileSync(pageCommand.request.outputPath, 'utf8'),
+  );
+  assert.ok(page.records.length > 0);
+  assert.equal(
+    page.records.every(
+      (fact) =>
+        fact.decisionRequirement === 'blocked' &&
+        fact.reason === 'historical_integrity_required',
+    ),
+    true,
+  );
+  const selected = state.reviewFile.records.find(
+    (record) =>
+      record.kind === 'qinglong3-local-reconciliation-review-decision' &&
+      record.database === 'target' &&
+      record.domain === 'run_history',
+  );
+  assert.ok(selected);
+  selected.disposition = 'retain_target';
+  selected.reason = 'preserve_target';
+  fs.writeFileSync(
+    state.reviewFile.filePath,
+    `${state.reviewFile.records
+      .map((record) => JSON.stringify(record))
+      .join('\n')}\n`,
+    { mode: 0o600 },
+  );
+  await assert.rejects(
+    commitLocalReconciliationReview(state.command, state.dependencies),
+    /decision disposition is not allowed for canonical fact/,
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(
+        state.reviewRoot,
+        state.reviewCommand.request.reviewId,
+        'review.json',
+      ),
+    ),
+    false,
   );
 });
 

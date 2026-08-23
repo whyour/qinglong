@@ -33,6 +33,8 @@ import {
   applyLocalReconciliationAutomationCommandFile,
   verifyLocalReconciliationAutomationApplyCommandFile,
   rollbackLocalReconciliationAutomationApplyCommandFile,
+  preserveLocalReconciliationRunHistoryCommandFile,
+  verifyLocalReconciliationRunHistoryCommandFile,
   completeLocalReconciliationCommandFile,
   verifyLocalReconciliationCompletionCommandFile,
   writeLocalReconciliationReviewDiagnosticsCommandFile,
@@ -50,7 +52,7 @@ import {
 } from './localDeployment';
 
 const USAGE =
-  'Usage: ql3-local-deploy <prepare|adopted-prepare|adopted-verify|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-legacy-readiness-probe|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|reconciliation-capture-prepare|reconciliation-capture-commit|reconciliation-capture-verify|reconciliation-plan-prepare|reconciliation-plan-commit|reconciliation-plan-verify|reconciliation-review-prepare|reconciliation-review-diagnostics|reconciliation-review-commit|reconciliation-review-verify|reconciliation-application-prepare|reconciliation-application-commit|reconciliation-application-verify|reconciliation-automation-plan|reconciliation-automation-verify|reconciliation-automation-decision-prepare|reconciliation-automation-decision-commit|reconciliation-automation-decision-verify|reconciliation-automation-apply|reconciliation-automation-apply-verify|reconciliation-automation-apply-rollback|reconciliation-complete|reconciliation-complete-verify|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
+  'Usage: ql3-local-deploy <prepare|adopted-prepare|adopted-verify|status|service-intent-prepare|service-outcome-consume|service-cutover-consume|service-legacy-rollback-prepare|service-legacy-rollback-authorize|service-legacy-rollback-consume|cutover-legacy-stop|cutover-target-start|cutover-target-restart|cutover-target-stop|cutover-legacy-rollback-prepare|cutover-legacy-rollback-commit|cutover-legacy-readiness-probe|cutover-manual-diagnose|cutover-manual-resolution-prepare|cutover-manual-resolution-commit|reconciliation-capture-prepare|reconciliation-capture-commit|reconciliation-capture-verify|reconciliation-plan-prepare|reconciliation-plan-commit|reconciliation-plan-verify|reconciliation-review-prepare|reconciliation-review-diagnostics|reconciliation-review-commit|reconciliation-review-verify|reconciliation-application-prepare|reconciliation-application-commit|reconciliation-application-verify|reconciliation-automation-plan|reconciliation-automation-verify|reconciliation-automation-decision-prepare|reconciliation-automation-decision-commit|reconciliation-automation-decision-verify|reconciliation-automation-apply|reconciliation-automation-apply-verify|reconciliation-automation-apply-rollback|reconciliation-run-history-preserve|reconciliation-run-history-verify|reconciliation-complete|reconciliation-complete-verify|compose-revision|compose-preflight|compose-apply|compose-restore-prepare|compose-restore-commit|compose-evidence-collect-prepare|compose-evidence-collect-commit> --command-file /absolute/private-command.json';
 
 async function main(argv: readonly string[]): Promise<void> {
   if (argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h')) {
@@ -100,6 +102,8 @@ async function main(argv: readonly string[]): Promise<void> {
       argv[0] !== 'reconciliation-automation-apply' &&
       argv[0] !== 'reconciliation-automation-apply-verify' &&
       argv[0] !== 'reconciliation-automation-apply-rollback' &&
+      argv[0] !== 'reconciliation-run-history-preserve' &&
+      argv[0] !== 'reconciliation-run-history-verify' &&
       argv[0] !== 'reconciliation-complete' &&
       argv[0] !== 'reconciliation-complete-verify' &&
       argv[0] !== 'compose-revision' &&
@@ -214,6 +218,10 @@ async function main(argv: readonly string[]): Promise<void> {
       ? verifyLocalReconciliationAutomationApplyCommandFile(argv[2]!)
       : argv[0] === 'reconciliation-automation-apply-rollback'
       ? rollbackLocalReconciliationAutomationApplyCommandFile(argv[2]!)
+      : argv[0] === 'reconciliation-run-history-preserve'
+      ? preserveLocalReconciliationRunHistoryCommandFile(argv[2]!)
+      : argv[0] === 'reconciliation-run-history-verify'
+      ? verifyLocalReconciliationRunHistoryCommandFile(argv[2]!)
       : argv[0] === 'reconciliation-complete'
       ? completeLocalReconciliationCommandFile(argv[2]!)
       : argv[0] === 'reconciliation-complete-verify'
