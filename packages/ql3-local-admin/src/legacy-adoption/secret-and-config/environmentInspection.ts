@@ -232,6 +232,31 @@ function selectSql(schema: ReadonlySet<string>): string {
     ORDER BY ${pinned} DESC, ${position} DESC, ${createdAt} ASC, "id" ASC`;
 }
 
+function* iterateRows(
+  client: DatabaseSync,
+  schema: ReadonlySet<string>,
+): Iterable<LegacyRow> {
+  let iterator: Iterator<Record<string, unknown>>;
+  try {
+    iterator = client
+      .prepare(selectSql(schema))
+      .iterate()
+      [Symbol.iterator]() as Iterator<Record<string, unknown>>;
+  } catch (error) {
+    throw new LegacyEnvironmentInspectionError('rows are unavailable', error);
+  }
+  for (;;) {
+    let next: IteratorResult<Record<string, unknown>>;
+    try {
+      next = iterator.next();
+    } catch (error) {
+      throw new LegacyEnvironmentInspectionError('rows cannot be read', error);
+    }
+    if (next.done) return;
+    yield next.value as LegacyRow;
+  }
+}
+
 function reasons(row: LegacyRow): readonly LegacyEnvironmentRowReason[] {
   const selected: LegacyEnvironmentRowReason[] = [];
   if (!Number.isSafeInteger(row.id) || (row.id as number) < 1) {
@@ -361,86 +386,76 @@ export function visitLegacyEnvironmentAdoption(
   let preservationReadyCount = 0;
   let activeValueBytes = 0;
 
-  try {
-    for (const raw of client
-      .prepare(selectSql(schema))
-      .iterate() as Iterable<LegacyRow>) {
-      rowOrdinal += 1;
-      const digestValue = sourceDigest(raw);
-      const rowReasons = reasons(raw);
-      let disposition: LegacyEnvironmentRowDisposition = 'manual_required';
-      if (rowReasons.length === 0 && raw.status === 0) {
-        disposition = 'active_member';
-        activeRowCount += 1;
-      } else if (rowReasons.length === 0 && raw.status === 1) {
-        disposition = 'preserve_disabled';
-        disabledRowCount += 1;
-        preservationReadyCount += 1;
-      } else {
-        manualRowCount += 1;
-        if (raw.status === 0) activeRowCount += 1;
-        if (raw.status === 1) disabledRowCount += 1;
-      }
-      const inspection = Object.freeze({
-        rowOrdinal,
-        sourceDigest: digestValue,
-        disposition,
-        reasons: rowReasons,
-      });
-      options.visitRow?.(inspection);
-      inventoryHash.update('\0row\0').update(JSON.stringify(inspection));
-
-      if (raw.status !== 0) continue;
-      if (
-        typeof raw.name !== 'string' ||
-        !ENVIRONMENT_NAME.test(raw.name) ||
-        raw.name.startsWith('QL3_')
-      ) {
-        invalidActiveGroupDigests.add(
-          digest(
-            'qinglong3.legacy-environment-invalid-name.v1',
-            scalarEvidence(raw.name),
-          ),
-        );
-        continue;
-      }
-      let group = groups.get(raw.name);
-      if (!group) {
-        group = {
-          name: raw.name,
-          rowDigests: [],
-          values: [],
-          valueBytes: 0,
-          valid: true,
-        };
-        groups.set(raw.name, group);
-      }
-      group.rowDigests.push(digestValue);
-      if (rowReasons.length > 0 || typeof raw.value !== 'string') {
-        group.valid = false;
-        group.values.length = 0;
-        continue;
-      }
-      const valueBytes = Buffer.byteLength(raw.value, 'utf8');
-      const separatorBytes = group.values.length === 0 ? 0 : 1;
-      group.valueBytes += valueBytes + separatorBytes;
-      activeValueBytes += valueBytes + separatorBytes;
-      if (
-        group.valueBytes > MAX_LEGACY_ENVIRONMENT_VALUE_BYTES ||
-        activeValueBytes > MAX_LEGACY_ENVIRONMENT_EFFECTIVE_BYTES
-      ) {
-        group.valid = false;
-        group.values.length = 0;
-      } else if (group.valid) {
-        group.values.push(raw.value);
-      }
+  for (const raw of iterateRows(client, schema)) {
+    rowOrdinal += 1;
+    const digestValue = sourceDigest(raw);
+    const rowReasons = reasons(raw);
+    let disposition: LegacyEnvironmentRowDisposition = 'manual_required';
+    if (rowReasons.length === 0 && raw.status === 0) {
+      disposition = 'active_member';
+      activeRowCount += 1;
+    } else if (rowReasons.length === 0 && raw.status === 1) {
+      disposition = 'preserve_disabled';
+      disabledRowCount += 1;
+      preservationReadyCount += 1;
+    } else {
+      manualRowCount += 1;
+      if (raw.status === 0) activeRowCount += 1;
+      if (raw.status === 1) disabledRowCount += 1;
     }
-  } catch (error) {
-    if (error instanceof LegacyEnvironmentInspectionError) throw error;
-    throw new LegacyEnvironmentInspectionError(
-      'rows cannot be inspected',
-      error,
-    );
+    const inspection = Object.freeze({
+      rowOrdinal,
+      sourceDigest: digestValue,
+      disposition,
+      reasons: rowReasons,
+    });
+    options.visitRow?.(inspection);
+    inventoryHash.update('\0row\0').update(JSON.stringify(inspection));
+
+    if (raw.status !== 0) continue;
+    if (
+      typeof raw.name !== 'string' ||
+      !ENVIRONMENT_NAME.test(raw.name) ||
+      raw.name.startsWith('QL3_')
+    ) {
+      invalidActiveGroupDigests.add(
+        digest(
+          'qinglong3.legacy-environment-invalid-name.v1',
+          scalarEvidence(raw.name),
+        ),
+      );
+      continue;
+    }
+    let group = groups.get(raw.name);
+    if (!group) {
+      group = {
+        name: raw.name,
+        rowDigests: [],
+        values: [],
+        valueBytes: 0,
+        valid: true,
+      };
+      groups.set(raw.name, group);
+    }
+    group.rowDigests.push(digestValue);
+    if (rowReasons.length > 0 || typeof raw.value !== 'string') {
+      group.valid = false;
+      group.values.length = 0;
+      continue;
+    }
+    const valueBytes = Buffer.byteLength(raw.value, 'utf8');
+    const separatorBytes = group.values.length === 0 ? 0 : 1;
+    group.valueBytes += valueBytes + separatorBytes;
+    activeValueBytes += valueBytes + separatorBytes;
+    if (
+      group.valueBytes > MAX_LEGACY_ENVIRONMENT_VALUE_BYTES ||
+      activeValueBytes > MAX_LEGACY_ENVIRONMENT_EFFECTIVE_BYTES
+    ) {
+      group.valid = false;
+      group.values.length = 0;
+    } else if (group.valid) {
+      group.values.push(raw.value);
+    }
   }
   if (rowOrdinal !== count) {
     throw new LegacyEnvironmentInspectionError('row count drifted');
@@ -488,9 +503,7 @@ export function visitLegacyEnvironmentAdoption(
 
   if (!globalBudgetExceeded && preservationReadyCount > 0) {
     rowOrdinal = 0;
-    for (const raw of client
-      .prepare(selectSql(schema))
-      .iterate() as Iterable<LegacyRow>) {
+    for (const raw of iterateRows(client, schema)) {
       rowOrdinal += 1;
       if (raw.status !== 1 || reasons(raw).length !== 0) continue;
       const digestValue = sourceDigest(raw);

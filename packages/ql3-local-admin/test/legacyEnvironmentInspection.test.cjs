@@ -212,3 +212,34 @@ test('rejects unsupported schemas and over-budget Edge tables without scanning r
     overBudget.close();
   }
 });
+
+test('preserves a visitor failure instead of disguising it as a SQLite read error', () => {
+  const database = memoryDatabase(`
+    CREATE TABLE "Envs" (
+      id INTEGER PRIMARY KEY,
+      name TEXT,
+      value TEXT,
+      status INTEGER,
+      position REAL,
+      "isPinned" INTEGER,
+      "createdAt" TEXT
+    );
+    INSERT INTO "Envs" VALUES
+      (1, 'TOKEN', 'private-value', 0, 1, 0, '2026-01-01');
+  `);
+  const expected = new Error('caller byte budget exceeded');
+  try {
+    assert.throws(
+      () =>
+        visitLegacyEnvironmentAdoption(database, {
+          profile: 'edge',
+          visitRow() {
+            throw expected;
+          },
+        }),
+      (error) => error === expected,
+    );
+  } finally {
+    database.close();
+  }
+});

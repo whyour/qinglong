@@ -1,6 +1,6 @@
 # ADR-0491：有界 Secret/Config Reconciliation 与任务环境绑定
 
-- 状态：Proposed（D-397 第一切片已实现 Legacy Env inspection，原子 application 尚未完成）
+- 状态：Proposed（D-397 已实现 Legacy Env inspection 与私有有界 row plan，原子 application 尚未完成）
 - 日期：2026-08-23
 - 决策：D-397
 - 关联：ADR-0073、ADR-0074、ADR-0092、ADR-0094、ADR-0480、ADR-0482、ADR-0483、ADR-0484、ADR-0485、ADR-0486、ADR-0487、ADR-0488、ADR-0490
@@ -52,7 +52,7 @@ id ASC
 
 ### 3. Edge 与 Standalone 预算
 
-第一切片固定：
+当前 inspection 与 row-plan 切片固定：
 
 | 预算 | Edge | Standalone |
 | --- | ---: | ---: |
@@ -63,6 +63,8 @@ id ASC
 | 全部 active effective values | 64 KiB | 64 KiB |
 
 实现逐行读取，不把整张 `Envs` 或全部停用值加载到内存；active value 的在途内存由 64 KiB 合同封顶，停用值通过第二次有界扫描逐个交付。它位于既有 `@qinglong/local-admin/src/legacy-adoption/secret-and-config/`，不新增 workspace package、production dependency、daemon、timer、watcher、listener、socket、数据库连接池或 `src` 根平铺文件。
+
+Local Owner 使用私有 NDJSON row plan 记录 header、逐行 content-free disposition、逐 candidate 目标冲突投影与 footer。Edge/Standalone plan 文件分别限制为 8 MiB/32 MiB，单行不超过 64 KiB；超过预算立即失败关闭。公开 plan/receipt 不保存原 Env name/value、目标 ciphertext、key ID 或原始 row body。active 与 disabled candidate 分别使用 `legacy-db-env-*` 和 `legacy-db-env-disabled-*` 命名空间；目标已经存在时只记录 envelope 元数据的组合摘要并进入 `review_skip_conflict`，不得读取明文、覆盖或自动改名。plan 绑定 application、独立 review authorization、sealed bundle、target projection 与 prepared head，并产生可重新计算的 row-set、candidate-set、plan-file 和 receipt digest。
 
 ### 4. 原子 application 必须同时完成 custody 与行为绑定
 
@@ -129,6 +131,6 @@ Cluster 不得把 Legacy Env 明文写入 PostgreSQL、ConfigMap、Job command�
 
 ## 当前验证与后续门禁
 
-D-397 第一切片已经实现并测试：absent、unsupported、Edge over-budget、2.x 顺序、同名连接、disabled preservation、保留前缀、异常状态、effective overflow、candidate digest 与 content-free diagnostics。Local Admin 完整测试为 95/95。
+D-397 当前两切片已经实现并测试：absent、unsupported、Edge over-budget、2.x 顺序、同名连接、disabled preservation、保留前缀、异常状态、effective overflow、candidate digest、content-free diagnostics、私有有界 row plan、目标 Secret 冲突、no-effect/manual outcome、plan/receipt drift 与 plan 字节预算。调用方 visitor 的预算异常保持原始类型，不再被误报为 SQLite 读取失败。Local Admin 完整测试为 96/96；Local Owner 完整测试为 277/270/7/0；后端完整门为 1563/1561/2/0，18-package clean build/test 为 2924/2902/22/0。package boundary、Cluster dependency、Edge import 与十四档 Local artifact audit 全部 compatible；workspace 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`。第一切片远程 x64/arm64 backend 失败已定位为新增嵌套 Local Admin 文件后审阅计数仍停留在 47/46，本切片已同步 Local Admin 48/47、Local Owner 176/175，并以精确文件 + subpath 规则允许 Secret/Config planner 读取 inspection；相邻文件继续被依赖隔离门拒绝。
 
-转为 Accepted 前仍必须完成：私有 row plan 与 signed decision、原子 Secret/Task/Trigger/dispatch publisher、prepared/apply/rollback response-loss、completion schema 演进、完整 Local Owner/18-package/boundary/artifact gates、真实 Edge 空间预算、PostgreSQL HA 与 Cluster Secret provider live gate。
+转为 Accepted 前仍必须完成：独立 signed decision、原子 Secret/Task/Trigger/dispatch publisher、prepared/apply/rollback response-loss、completion schema 演进、18-package/boundary/artifact gates、真实 Edge 空间预算、PostgreSQL HA 与 Cluster Secret provider live gate。

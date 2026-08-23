@@ -16,11 +16,18 @@
   Secret 后续必须在同一事务中绑定到经 Automation adoption ledger 证明的全部 Legacy Task 新修订，并同步追加指向新 Task revision 的 Trigger/dispatch
   修订。disabled 行逐行加密保全但不激活；非法/保留名称、异常 status/ordering、单值或总字节超限、部分组失败均进入 manual，不能静默丢行。
 
-  第一切片已在既有 `@qinglong/local-admin/src/legacy-adoption/secret-and-config/` 落地 content-free inspection 与精确私有 subpath，没有新增 package、
+  inspection 已在既有 `@qinglong/local-admin/src/legacy-adoption/secret-and-config/` 落地 content-free inspection 与精确私有 subpath，没有新增 package、
   dependency、daemon 或 `src` 根平铺。Edge/Standalone 行数上限分别为 10,000/100,000，disabled preservation 为 128/512；共同受 256 个 active
   binding、单值 16 KiB 与总 effective 64 KiB 限制。实现逐行扫描，active 在途 value 有固定内存上限，disabled 以第二遍逐项交付；inventory/row
   diagnostics 不含 Env name/value/row body。absent、unsupported schema、Edge over-budget、旧顺序、同名连接、disabled、保留 `QL3_`、异常状态与
-  overflow 均已覆盖，Local Admin 完整测试 `95/95`。
+  overflow 均已覆盖。第二切片在既有 Local Owner reconciliation application 子目录增加私有 NDJSON row plan：Edge/Standalone 文件上限为 8/32 MiB，
+  单行上限 64 KiB；active/disabled candidate 使用不同 `legacy-db-env-*` 命名空间，目标 Secret 占用只记录 envelope 元数据组合摘要并强制
+  `review_skip_conflict`。plan/receipt 绑定 application、独立 review authorization、sealed bundle、prepared head、row/candidate set 与文件摘要，且不含原
+  Env name/value、目标 ciphertext/key ID 或 row body。Local Admin 完整测试 `96/96`，Local Owner 完整测试 `277/270/7/0`；受限沙箱中的 3 个
+  loopback `EPERM` 用例已在沙箱外对应测试文件 `15/15` 通过。后端完整门 `1563/1561/2/0`，18-package clean build/test
+  `2924/2902/22/0`；package boundary、Cluster dependency、Edge import 与十四档 Local artifact audit 全部 compatible。远程第一切片 x64/arm64
+  backend 失败的共因是新增 Local Admin 嵌套文件后结构快照仍为 47/46，现已同步为 48/47；Local Owner 同步为 176/175，workspace 仍为 18 packages、
+  `singleSourcePackages=[]`、`shallowSourcePackages=[]`，且只允许 exact Secret/Config row planner 导入 inspection subpath。
 
   D-385～D-388 的 `config.sh`/Keyv/SSH data-directory lineage 与 SQLite `Envs` 保持分离；当前无稳定生产 schema 的历史 `Configs` 表继续 sealed+manual，
   不猜字段。后续切片必须完成独立 signed decision、Secret envelope + audit + Task/Trigger/dispatch + receipt ledger 的单事务发布、prepared/apply/rollback

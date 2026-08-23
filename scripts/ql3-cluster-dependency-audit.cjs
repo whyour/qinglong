@@ -2059,6 +2059,12 @@ function auditSourceImports(root, packagePath, findings) {
           specifier === '@qinglong/local-admin/adoption-inspection'
         ) &&
         !(
+          path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/secret-and-config/rowPlan.ts' &&
+          specifier ===
+            '@qinglong/local-admin/reconciliation-secret-and-config-inspection'
+        ) &&
+        !(
           [
             'src/deployment/compose/composeApply.ts',
             'src/deployment/compose/composeEvidenceCollection.ts',

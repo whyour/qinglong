@@ -2246,6 +2246,40 @@ test('confines reconciliation automation apply authority to exact coordinators',
   );
 });
 
+test('confines reconciliation Secret and Config inspection to its exact row planner', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-reconciliation-secret-config-boundary-'),
+  );
+  const secretConfigDirectory = path.join(
+    root,
+    'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config',
+  );
+  fs.mkdirSync(secretConfigDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(secretConfigDirectory, 'rowPlan.ts'),
+    "import { inspect } from '@qinglong/local-admin/reconciliation-secret-and-config-inspection';",
+  );
+  fs.writeFileSync(
+    path.join(secretConfigDirectory, 'neighbor.ts'),
+    "import { inspect } from '@qinglong/local-admin/reconciliation-secret-and-config-inspection';",
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-owner-cli', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/neighbor.ts',
+        specifier:
+          '@qinglong/local-admin/reconciliation-secret-and-config-inspection',
+      },
+    ],
+  );
+});
+
 test('deleted Owner ceremony package names remain dependency tombstones', (t) => {
   const root = fixture(
     t,

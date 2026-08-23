@@ -1,0 +1,597 @@
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import type { DatabaseSync } from 'node:sqlite';
+
+import {
+  visitLegacyEnvironmentAdoption,
+  type LegacyEnvironmentCandidate,
+  type LegacyEnvironmentInventory,
+  type LegacyEnvironmentRowInspection,
+} from '@qinglong/local-admin/reconciliation-secret-and-config-inspection';
+
+import { LocalDeploymentConfigurationError } from '../../../foundation/error';
+import { cutoverDigest } from '../../../cutover/targetEvidence';
+
+const HEADER_KIND = 'qinglong3-local-reconciliation-secret-config-plan-header';
+const ROW_KIND = 'qinglong3-local-reconciliation-secret-config-plan-row';
+const CANDIDATE_KIND =
+  'qinglong3-local-reconciliation-secret-config-plan-candidate';
+const FOOTER_KIND = 'qinglong3-local-reconciliation-secret-config-plan-footer';
+const RECEIPT_SCHEMA =
+  'qinglong3-local-reconciliation-secret-config-plan-receipt';
+const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const MAX_LINE_BYTES = 64 * 1024;
+const HASH_BUFFER_BYTES = 64 * 1024;
+export const MAX_EDGE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES =
+  8 * 1024 * 1024;
+export const MAX_STANDALONE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES =
+  32 * 1024 * 1024;
+
+export interface LocalReconciliationSecretConfigPlanHeader {
+  readonly schemaVersion: 1;
+  readonly kind: typeof HEADER_KIND;
+  readonly secretConfigId: string;
+  readonly applicationId: string;
+  readonly applicationPlanDigest: string;
+  readonly reviewDigest: string;
+  readonly reviewAuthorizationDigest: string;
+  readonly reviewDecisionSetDigest: string;
+  readonly reviewDecisionFileDigest: string;
+  readonly bundleDigest: string;
+  readonly bundleFingerprintDigest: string;
+  readonly profile: 'edge' | 'standalone';
+  readonly projectId: string;
+  readonly tableDisposition: 'adopt_legacy' | 'retain_both';
+  readonly preparedHeadDigest: string;
+  readonly preparedAtMs: number;
+  readonly headerDigest: string;
+}
+
+export interface LocalReconciliationSecretConfigPlanRow {
+  readonly schemaVersion: 1;
+  readonly kind: typeof ROW_KIND;
+  readonly rowOrdinal: number;
+  readonly sourceDigest: string;
+  readonly disposition: LegacyEnvironmentRowInspection['disposition'];
+  readonly reasons: LegacyEnvironmentRowInspection['reasons'];
+  readonly rowPlanDigest: string;
+}
+
+export type LocalReconciliationSecretConfigCandidateRequirement =
+  | 'review_apply_binding'
+  | 'review_preserve_disabled'
+  | 'review_skip_conflict';
+
+export type LocalReconciliationSecretConfigTarget =
+  | Readonly<{ state: 'absent' }>
+  | Readonly<{
+      state: 'occupied';
+      version: number;
+      contentDigest: string;
+    }>;
+
+export interface LocalReconciliationSecretConfigPlanCandidate {
+  readonly schemaVersion: 1;
+  readonly kind: typeof CANDIDATE_KIND;
+  readonly candidateOrdinal: number;
+  readonly candidateType: LegacyEnvironmentCandidate['kind'];
+  readonly candidateDigest: string;
+  readonly sourceRowCount: number;
+  readonly sourceSetDigest: string;
+  readonly proposedSecretName: string;
+  readonly target: LocalReconciliationSecretConfigTarget;
+  readonly requirement: LocalReconciliationSecretConfigCandidateRequirement;
+  readonly candidatePlanDigest: string;
+}
+
+export interface LocalReconciliationSecretConfigPlanSummary {
+  readonly tableState: LegacyEnvironmentInventory['tableState'];
+  readonly rowCount: number;
+  readonly activeRowCount: number;
+  readonly disabledRowCount: number;
+  readonly manualRowCount: number;
+  readonly activeGroupCount: number;
+  readonly bindingReadyCount: number;
+  readonly preservationReadyCount: number;
+  readonly manualGroupCount: number;
+  readonly eligibleBindingCount: number;
+  readonly eligiblePreservationCount: number;
+  readonly targetConflictCount: number;
+  readonly outcome: 'ready' | 'manual_required' | 'no_effect';
+}
+
+export interface LocalReconciliationSecretConfigPlanFooter
+  extends LocalReconciliationSecretConfigPlanSummary {
+  readonly schemaVersion: 1;
+  readonly kind: typeof FOOTER_KIND;
+  readonly secretConfigId: string;
+  readonly legacyInventoryDigest: string;
+  readonly rowSetDigest: string;
+  readonly candidateSetDigest: string;
+  readonly secretConfigPlanDigest: string;
+}
+
+export interface LocalReconciliationSecretConfigPlanReceipt
+  extends LocalReconciliationSecretConfigPlanSummary {
+  readonly schema: typeof RECEIPT_SCHEMA;
+  readonly schemaVersion: 1;
+  readonly state: 'reconciliation_secret_config_planned';
+  readonly secretConfigId: string;
+  readonly applicationId: string;
+  readonly applicationPlanDigest: string;
+  readonly preparedHeadDigest: string;
+  readonly legacyInventoryDigest: string;
+  readonly rowSetDigest: string;
+  readonly candidateSetDigest: string;
+  readonly secretConfigPlanDigest: string;
+  readonly planFileBytes: number;
+  readonly planFileDigest: string;
+  readonly preparedAtMs: number;
+  readonly receiptDigest: string;
+}
+
+export interface WriteLocalReconciliationSecretConfigPlanOptions {
+  readonly descriptor: number;
+  readonly maxBytes: number;
+  readonly header: Omit<
+    LocalReconciliationSecretConfigPlanHeader,
+    'headerDigest'
+  >;
+  readonly legacy: DatabaseSync;
+  readonly target: DatabaseSync;
+}
+
+function fail(message: string, cause?: unknown): never {
+  throw new LocalDeploymentConfigurationError(
+    `reconciliation secret config row plan ${message}`,
+    { cause },
+  );
+}
+
+function exact(
+  value: unknown,
+  keys: readonly string[],
+  label: string,
+): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail(`${label} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+  const actual = Object.keys(record).sort();
+  const expected = [...keys].sort();
+  if (
+    actual.length !== expected.length ||
+    actual.some((key, index) => key !== expected[index])
+  ) {
+    fail(`${label} shape is invalid`);
+  }
+  return record;
+}
+
+function line(value: unknown): Buffer {
+  const bytes = Buffer.from(`${JSON.stringify(value)}\n`, 'utf8');
+  if (bytes.byteLength < 3 || bytes.byteLength > MAX_LINE_BYTES + 1) {
+    bytes.fill(0);
+    fail('record exceeds its line bound');
+  }
+  return bytes;
+}
+
+function writeAll(descriptor: number, bytes: Buffer): void {
+  let offset = 0;
+  while (offset < bytes.byteLength) {
+    const written = fs.writeSync(
+      descriptor,
+      bytes,
+      offset,
+      bytes.byteLength - offset,
+    );
+    if (written < 1) fail('write stalled');
+    offset += written;
+  }
+}
+
+function bytesDigest(value: unknown, length: number, label: string): string {
+  if (!(value instanceof Uint8Array) || value.byteLength !== length) {
+    fail(`target ${label} is invalid`);
+  }
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function targetSecret(
+  target: DatabaseSync,
+  projectId: string,
+  secretName: string,
+): LocalReconciliationSecretConfigTarget {
+  let row: Readonly<Record<string, unknown>> | undefined;
+  try {
+    row = target
+      .prepare(
+        `SELECT "version", "mutation_id" AS "mutationId",
+                "key_id" AS "keyId", "algorithm", "nonce", "ciphertext",
+                "auth_tag" AS "authTag", "created_at_ms" AS "createdAtMs"
+         FROM "QingLong3LocalSecretEnvelopes"
+         WHERE "project_id" = ? AND "secret_name" = ?
+         ORDER BY "version" DESC LIMIT 1`,
+      )
+      .get(projectId, secretName) as
+      | Readonly<Record<string, unknown>>
+      | undefined;
+  } catch (error) {
+    return fail('target Secret projection is unavailable', error);
+  }
+  if (!row) return Object.freeze({ state: 'absent' as const });
+  if (
+    !Number.isSafeInteger(row.version) ||
+    (row.version as number) < 1 ||
+    typeof row.mutationId !== 'string' ||
+    row.mutationId.length < 1 ||
+    row.mutationId.length > 64 ||
+    typeof row.keyId !== 'string' ||
+    row.keyId.length < 1 ||
+    row.keyId.length > 128 ||
+    row.algorithm !== 'aes-256-gcm' ||
+    !Number.isSafeInteger(row.createdAtMs) ||
+    (row.createdAtMs as number) < 0
+  ) {
+    fail('target Secret projection drifted');
+  }
+  if (
+    !(row.ciphertext instanceof Uint8Array) ||
+    row.ciphertext.byteLength > 16 * 1024
+  ) {
+    fail('target ciphertext is invalid');
+  }
+  const contentDigest = cutoverDigest({
+    projectId,
+    secretName,
+    version: row.version,
+    mutationId: row.mutationId,
+    keyId: row.keyId,
+    algorithm: row.algorithm,
+    nonceDigest: bytesDigest(row.nonce, 12, 'nonce'),
+    ciphertextDigest: bytesDigest(
+      row.ciphertext,
+      row.ciphertext.byteLength,
+      'ciphertext',
+    ),
+    authTagDigest: bytesDigest(row.authTag, 16, 'auth tag'),
+    createdAtMs: row.createdAtMs,
+  });
+  return Object.freeze({
+    state: 'occupied' as const,
+    version: row.version as number,
+    contentDigest,
+  });
+}
+
+function secretName(candidate: Readonly<LegacyEnvironmentCandidate>): string {
+  const source =
+    candidate.kind === 'active_binding'
+      ? candidate.environmentName
+      : `${candidate.environmentName}\0${candidate.sourceDigest}`;
+  const suffix = createHash('sha256').update(source).digest('hex').slice(0, 32);
+  return candidate.kind === 'active_binding'
+    ? `legacy-db-env-${suffix}`
+    : `legacy-db-env-disabled-${suffix}`;
+}
+
+function planRow(
+  value: Readonly<LegacyEnvironmentRowInspection>,
+): Readonly<LocalReconciliationSecretConfigPlanRow> {
+  const payload = Object.freeze({
+    schemaVersion: 1 as const,
+    kind: ROW_KIND,
+    rowOrdinal: value.rowOrdinal,
+    sourceDigest: value.sourceDigest,
+    disposition: value.disposition,
+    reasons: value.reasons,
+  });
+  return Object.freeze({ ...payload, rowPlanDigest: cutoverDigest(payload) });
+}
+
+function planCandidate(
+  value: Readonly<LegacyEnvironmentCandidate>,
+  candidateOrdinal: number,
+  target: DatabaseSync,
+  projectId: string,
+): Readonly<LocalReconciliationSecretConfigPlanCandidate> {
+  const proposedSecretName = secretName(value);
+  const selectedTarget = targetSecret(target, projectId, proposedSecretName);
+  const sourceRowCount =
+    value.kind === 'active_binding' ? value.sourceRowCount : 1;
+  const sourceSetDigest =
+    value.kind === 'active_binding'
+      ? value.sourceSetDigest
+      : value.sourceDigest;
+  const requirement: LocalReconciliationSecretConfigCandidateRequirement =
+    selectedTarget.state === 'occupied'
+      ? 'review_skip_conflict'
+      : value.kind === 'active_binding'
+      ? 'review_apply_binding'
+      : 'review_preserve_disabled';
+  const payload = Object.freeze({
+    schemaVersion: 1 as const,
+    kind: CANDIDATE_KIND,
+    candidateOrdinal,
+    candidateType: value.kind,
+    candidateDigest: value.candidateDigest,
+    sourceRowCount,
+    sourceSetDigest,
+    proposedSecretName,
+    target: selectedTarget,
+    requirement,
+  });
+  return Object.freeze({
+    ...payload,
+    candidatePlanDigest: cutoverDigest(payload),
+  });
+}
+
+export function writeLocalReconciliationSecretConfigPlan(
+  options: Readonly<WriteLocalReconciliationSecretConfigPlanOptions>,
+): Readonly<{
+  header: Readonly<LocalReconciliationSecretConfigPlanHeader>;
+  footer: Readonly<LocalReconciliationSecretConfigPlanFooter>;
+  fileBytes: number;
+  fileDigest: string;
+}> {
+  if (
+    !Number.isSafeInteger(options.maxBytes) ||
+    options.maxBytes < MAX_LINE_BYTES
+  ) {
+    fail('byte budget is invalid');
+  }
+  const header = Object.freeze({
+    ...options.header,
+    headerDigest: cutoverDigest(options.header),
+  });
+  const fileHash = createHash('sha256');
+  const rowHash = createHash('sha256').update(
+    'qinglong3.local-reconciliation-secret-config-row-set.v1\0',
+  );
+  const candidateHash = createHash('sha256').update(
+    'qinglong3.local-reconciliation-secret-config-candidate-set.v1\0',
+  );
+  let fileBytes = 0;
+  const append = (
+    value: unknown,
+    set: 'none' | 'row' | 'candidate' = 'none',
+  ): void => {
+    const bytes = line(value);
+    try {
+      if (fileBytes + bytes.byteLength > options.maxBytes) {
+        fail('exceeds profile byte budget');
+      }
+      writeAll(options.descriptor, bytes);
+      fileHash.update(bytes);
+      if (set === 'row') rowHash.update(bytes);
+      if (set === 'candidate') candidateHash.update(bytes);
+      fileBytes += bytes.byteLength;
+    } finally {
+      bytes.fill(0);
+    }
+  };
+  append(header);
+  let candidateOrdinal = 0;
+  let eligibleBindingCount = 0;
+  let eligiblePreservationCount = 0;
+  let targetConflictCount = 0;
+  const inventory = visitLegacyEnvironmentAdoption(options.legacy, {
+    profile: header.profile,
+    visitRow(value) {
+      append(planRow(value), 'row');
+    },
+    visitCandidate(value) {
+      candidateOrdinal += 1;
+      const candidate = planCandidate(
+        value,
+        candidateOrdinal,
+        options.target,
+        header.projectId,
+      );
+      if (candidate.requirement === 'review_apply_binding') {
+        eligibleBindingCount += 1;
+      } else if (candidate.requirement === 'review_preserve_disabled') {
+        eligiblePreservationCount += 1;
+      } else {
+        targetConflictCount += 1;
+      }
+      append(candidate, 'candidate');
+    },
+  });
+  const summary: LocalReconciliationSecretConfigPlanSummary = Object.freeze({
+    tableState: inventory.tableState,
+    rowCount: inventory.rowCount,
+    activeRowCount: inventory.activeRowCount,
+    disabledRowCount: inventory.disabledRowCount,
+    manualRowCount: inventory.manualRowCount,
+    activeGroupCount: inventory.activeGroupCount,
+    bindingReadyCount: inventory.bindingReadyCount,
+    preservationReadyCount: inventory.preservationReadyCount,
+    manualGroupCount: inventory.manualGroupCount,
+    eligibleBindingCount,
+    eligiblePreservationCount,
+    targetConflictCount,
+    outcome:
+      inventory.tableState === 'absent' || inventory.rowCount === 0
+        ? ('no_effect' as const)
+        : !inventory.mutationReady || targetConflictCount > 0
+        ? ('manual_required' as const)
+        : ('ready' as const),
+  });
+  const footerPayload = Object.freeze({
+    schemaVersion: 1 as const,
+    kind: FOOTER_KIND,
+    secretConfigId: header.secretConfigId,
+    ...summary,
+    legacyInventoryDigest: inventory.inventoryDigest,
+    rowSetDigest: rowHash.digest('hex'),
+    candidateSetDigest: candidateHash.digest('hex'),
+  });
+  const footer = Object.freeze({
+    ...footerPayload,
+    secretConfigPlanDigest: cutoverDigest({
+      headerDigest: header.headerDigest,
+      ...footerPayload,
+    }),
+  });
+  append(footer);
+  return Object.freeze({
+    header,
+    footer,
+    fileBytes,
+    fileDigest: fileHash.digest('hex'),
+  });
+}
+
+export function buildLocalReconciliationSecretConfigPlanReceipt(
+  header: Readonly<LocalReconciliationSecretConfigPlanHeader>,
+  footer: Readonly<LocalReconciliationSecretConfigPlanFooter>,
+  planFileBytes: number,
+  planFileDigest: string,
+): Readonly<LocalReconciliationSecretConfigPlanReceipt> {
+  const payload = Object.freeze({
+    schema: RECEIPT_SCHEMA,
+    schemaVersion: 1 as const,
+    state: 'reconciliation_secret_config_planned' as const,
+    secretConfigId: header.secretConfigId,
+    applicationId: header.applicationId,
+    applicationPlanDigest: header.applicationPlanDigest,
+    preparedHeadDigest: header.preparedHeadDigest,
+    legacyInventoryDigest: footer.legacyInventoryDigest,
+    rowSetDigest: footer.rowSetDigest,
+    candidateSetDigest: footer.candidateSetDigest,
+    secretConfigPlanDigest: footer.secretConfigPlanDigest,
+    planFileBytes,
+    planFileDigest,
+    tableState: footer.tableState,
+    rowCount: footer.rowCount,
+    activeRowCount: footer.activeRowCount,
+    disabledRowCount: footer.disabledRowCount,
+    manualRowCount: footer.manualRowCount,
+    activeGroupCount: footer.activeGroupCount,
+    bindingReadyCount: footer.bindingReadyCount,
+    preservationReadyCount: footer.preservationReadyCount,
+    manualGroupCount: footer.manualGroupCount,
+    eligibleBindingCount: footer.eligibleBindingCount,
+    eligiblePreservationCount: footer.eligiblePreservationCount,
+    targetConflictCount: footer.targetConflictCount,
+    outcome: footer.outcome,
+    preparedAtMs: header.preparedAtMs,
+  });
+  return Object.freeze({ ...payload, receiptDigest: cutoverDigest(payload) });
+}
+
+export function normalizeLocalReconciliationSecretConfigPlanReceipt(
+  value: unknown,
+): Readonly<LocalReconciliationSecretConfigPlanReceipt> {
+  const receipt = exact(
+    value,
+    [
+      'activeGroupCount',
+      'activeRowCount',
+      'applicationId',
+      'applicationPlanDigest',
+      'bindingReadyCount',
+      'candidateSetDigest',
+      'disabledRowCount',
+      'eligibleBindingCount',
+      'eligiblePreservationCount',
+      'legacyInventoryDigest',
+      'manualGroupCount',
+      'manualRowCount',
+      'outcome',
+      'planFileBytes',
+      'planFileDigest',
+      'preparedAtMs',
+      'preparedHeadDigest',
+      'preservationReadyCount',
+      'receiptDigest',
+      'rowCount',
+      'rowSetDigest',
+      'schema',
+      'schemaVersion',
+      'secretConfigId',
+      'secretConfigPlanDigest',
+      'state',
+      'tableState',
+      'targetConflictCount',
+    ],
+    'receipt',
+  );
+  const { receiptDigest, ...payload } = receipt;
+  if (
+    receipt.schema !== RECEIPT_SCHEMA ||
+    receipt.schemaVersion !== 1 ||
+    receipt.state !== 'reconciliation_secret_config_planned' ||
+    typeof receipt.secretConfigId !== 'string' ||
+    !UUID_V4_PATTERN.test(receipt.secretConfigId) ||
+    typeof receipt.applicationId !== 'string' ||
+    !UUID_V4_PATTERN.test(receipt.applicationId) ||
+    ![
+      receipt.applicationPlanDigest,
+      receipt.preparedHeadDigest,
+      receipt.legacyInventoryDigest,
+      receipt.rowSetDigest,
+      receipt.candidateSetDigest,
+      receipt.secretConfigPlanDigest,
+      receipt.planFileDigest,
+      receiptDigest,
+    ].every(
+      (candidate) =>
+        typeof candidate === 'string' && DIGEST_PATTERN.test(candidate),
+    ) ||
+    ![
+      receipt.rowCount,
+      receipt.activeRowCount,
+      receipt.disabledRowCount,
+      receipt.manualRowCount,
+      receipt.activeGroupCount,
+      receipt.bindingReadyCount,
+      receipt.preservationReadyCount,
+      receipt.manualGroupCount,
+      receipt.eligibleBindingCount,
+      receipt.eligiblePreservationCount,
+      receipt.targetConflictCount,
+      receipt.planFileBytes,
+      receipt.preparedAtMs,
+    ].every((count) => Number.isSafeInteger(count) && (count as number) >= 0) ||
+    !['absent', 'supported', 'unsupported_schema', 'budget_exceeded'].includes(
+      receipt.tableState as string,
+    ) ||
+    !['ready', 'manual_required', 'no_effect'].includes(
+      receipt.outcome as string,
+    ) ||
+    cutoverDigest(payload) !== receiptDigest
+  ) {
+    fail('receipt drifted');
+  }
+  return Object.freeze(
+    receipt,
+  ) as unknown as Readonly<LocalReconciliationSecretConfigPlanReceipt>;
+}
+
+export function hashLocalReconciliationSecretConfigPlanFile(
+  descriptor: number,
+  expectedBytes: number,
+): string {
+  const hash = createHash('sha256');
+  const buffer = Buffer.allocUnsafe(HASH_BUFFER_BYTES);
+  let offset = 0;
+  while (offset < expectedBytes) {
+    const count = fs.readSync(
+      descriptor,
+      buffer,
+      0,
+      Math.min(buffer.byteLength, expectedBytes - offset),
+      offset,
+    );
+    if (count < 1) fail('plan file read stalled');
+    hash.update(buffer.subarray(0, count));
+    offset += count;
+  }
+  return hash.digest('hex');
+}
