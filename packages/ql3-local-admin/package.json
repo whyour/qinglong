@@ -45,6 +45,11 @@
       "require": "./dist/legacy-adoption/legacyCrontabInspection.js",
       "default": "./dist/legacy-adoption/legacyCrontabInspection.js"
     },
+    "./reconciliation-secret-and-config-inspection": {
+      "types": "./dist/legacy-adoption/secret-and-config/environmentInspection.d.ts",
+      "require": "./dist/legacy-adoption/secret-and-config/environmentInspection.js",
+      "default": "./dist/legacy-adoption/secret-and-config/environmentInspection.js"
+    },
     "./reconciliation-automation-decision": {
       "types": "./dist/legacy-adoption/reconciliationAutomationDecision.d.ts",
       "require": "./dist/legacy-adoption/reconciliationAutomationDecision.js",

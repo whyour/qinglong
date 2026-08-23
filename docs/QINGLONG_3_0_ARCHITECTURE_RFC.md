@@ -11,6 +11,23 @@
 
 最新增量证据（2026-08-23）：
 
+- D-397/ADR-0491（进行中）：Secret/Config reconciliation 已先冻结行为保持边界，不能把“密文已保存”冒充“任务已迁移”。2.x `Envs`
+  的 active 行必须按 `isPinned DESC、position DESC、createdAt ASC、id ASC` 重放旧顺序，同名值用 `&` 形成唯一 effective Secret；该
+  Secret 后续必须在同一事务中绑定到经 Automation adoption ledger 证明的全部 Legacy Task 新修订，并同步追加指向新 Task revision 的 Trigger/dispatch
+  修订。disabled 行逐行加密保全但不激活；非法/保留名称、异常 status/ordering、单值或总字节超限、部分组失败均进入 manual，不能静默丢行。
+
+  第一切片已在既有 `@qinglong/local-admin/src/legacy-adoption/secret-and-config/` 落地 content-free inspection 与精确私有 subpath，没有新增 package、
+  dependency、daemon 或 `src` 根平铺。Edge/Standalone 行数上限分别为 10,000/100,000，disabled preservation 为 128/512；共同受 256 个 active
+  binding、单值 16 KiB 与总 effective 64 KiB 限制。实现逐行扫描，active 在途 value 有固定内存上限，disabled 以第二遍逐项交付；inventory/row
+  diagnostics 不含 Env name/value/row body。absent、unsupported schema、Edge over-budget、旧顺序、同名连接、disabled、保留 `QL3_`、异常状态与
+  overflow 均已覆盖，Local Admin 完整测试 `95/95`。
+
+  D-385～D-388 的 `config.sh`/Keyv/SSH data-directory lineage 与 SQLite `Envs` 保持分离；当前无稳定生产 schema 的历史 `Configs` 表继续 sealed+manual，
+  不猜字段。后续切片必须完成独立 signed decision、Secret envelope + audit + Task/Trigger/dispatch + receipt ledger 的单事务发布、prepared/apply/rollback
+  lineage、completion 下一 schema 与备份回收。D-397 apply 只声明 sealed source retained 且 `physicalErasureGuaranteed=false`；明文销毁必须在 restart/
+  readiness、观察窗和 rollback retention 之后另行强认证。Cluster 必须使用 PostgreSQL SERIALIZABLE ledger、外部 KMS/Secret provider 与 HA evidence，
+  不复用 Local SQLite/POSIX authority，也不得把明文写入 PostgreSQL、ConfigMap、Pod env 或 Job command。
+
 - D-396/ADR-0490（已验收）：Run History 不再只有永久 `manual_external`，但也没有被错误实现为 Legacy 日志到 3.0 Run ledger 的回灌。
   新的 Local adapter 以 ADR-0482 sealed capture bundle 作为 append-only 保全资产：Legacy history 必须逐事实选择 `retain_both`，Target history
   必须选择 `retain_target`；receipt 只绑定 signed review、application、bundle fingerprint、领域 inventory 与有界 fact counts，不保存表名、Run ID、
