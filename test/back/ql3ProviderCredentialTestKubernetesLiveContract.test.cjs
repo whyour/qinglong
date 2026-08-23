@@ -14,6 +14,7 @@ const {
   executorJob,
   providerObservationKey,
   providerServerSource,
+  readyProviderPodForGeneration,
   retryProviderEvidence,
   terminalJobSnapshot,
 } = require('../../scripts/ql3-provider-credential-test-kubernetes-live-contract.cjs');
@@ -341,10 +342,14 @@ test('reads provider evidence from the exact ready Pod with trusted TLS SNI', ()
     'utf8',
   );
 
-  assert.match(source, /providerPodIp: pod\.status\.podIP/);
+  assert.match(source, /currentPod = await readyProviderPodForGeneration/);
+  assert.match(source, /providerPodIp: currentPod\.status\.podIP/);
   assert.match(source, /host:process\.argv\[1\]/);
   assert.match(source, /servername:process\.argv\[3\]/);
-  assert.match(source, /ca:fs\.readFileSync\('\/var\/run\/provider-ca\/ca\.crt'\)/);
+  assert.match(
+    source,
+    /ca:fs\.readFileSync\('\/var\/run\/provider-ca\/ca\.crt'\)/,
+  );
   assert.doesNotMatch(
     source,
     /fetch\('https:\/\/'\+process\.argv\[1\].*\/evidence/,
@@ -403,7 +408,12 @@ test('provider fixture uses headless DNS for exact Pod CIDR policy', async () =>
       return {
         items: [
           {
-            metadata: { uid: 'provider-uid' },
+            metadata: {
+              uid: 'provider-uid',
+              annotations: {
+                'qinglong.io/provider-generation': '1-initial',
+              },
+            },
             status: {
               podIP: '10.42.7.19',
               conditions: [{ type: 'Ready', status: 'True' }],
@@ -418,6 +428,50 @@ test('provider fixture uses headless DNS for exact Pod CIDR policy', async () =>
 
   const service = applied.find((resource) => resource.kind === 'Service');
   assert.equal(service.spec.clusterIP, 'None');
+});
+
+test('binds a rollout to the exact ready provider generation', async () => {
+  const fixture = {
+    kubectlJson() {
+      return {
+        items: [
+          {
+            metadata: {
+              uid: 'old-provider',
+              annotations: {
+                'qinglong.io/provider-generation': '1-initial',
+              },
+            },
+            status: {
+              podIP: '10.42.7.18',
+              conditions: [{ type: 'Ready', status: 'True' }],
+            },
+          },
+          {
+            metadata: {
+              uid: 'current-provider',
+              annotations: {
+                'qinglong.io/provider-generation': '2-material-rotation',
+              },
+            },
+            status: {
+              podIP: '10.42.7.19',
+              conditions: [{ type: 'Ready', status: 'True' }],
+            },
+          },
+        ],
+      };
+    },
+  };
+
+  const provider = await readyProviderPodForGeneration(
+    fixture,
+    '2-material-rotation',
+    1_000,
+  );
+
+  assert.equal(provider.metadata.uid, 'current-provider');
+  assert.equal(provider.status.podIP, '10.42.7.19');
 });
 
 test('actor writes bounded failure diagnostics to its termination message', () => {

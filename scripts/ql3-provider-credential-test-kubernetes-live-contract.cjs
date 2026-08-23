@@ -289,6 +289,34 @@ function providerPods(fixture) {
   ]).items;
 }
 
+async function readyProviderPodForGeneration(
+  fixture,
+  expectedGeneration,
+  timeoutMs = 60_000,
+) {
+  assert.match(expectedGeneration, /^[1-9]\d*-[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  return (
+    await waitFor(
+      `provider generation ${expectedGeneration}`,
+      timeoutMs,
+      () => {
+        const ready = providerPods(fixture).filter(podReady);
+        const matching = ready.filter(
+          (pod) =>
+            pod.metadata.annotations?.['qinglong.io/provider-generation'] ===
+            expectedGeneration,
+        );
+        return matching.length === 1
+          ? { ready: true, value: matching[0] }
+          : {
+              ready: false,
+              fact: `${matching.length} matching of ${ready.length} Ready provider Pods`,
+            };
+      },
+    )
+  ).value;
+}
+
 function providerObservationKey(pod) {
   assert.match(pod?.metadata?.uid ?? '', /^[A-Za-z0-9][A-Za-z0-9._-]+$/);
   const provider = pod?.status?.containerStatuses?.find(
@@ -421,6 +449,7 @@ const server=https.createServer({key:fs.readFileSync('/var/run/provider/tls.key'
 }
 
 async function deployProvider(fixture, adminImage, generation, value, nonce) {
+  const expectedGeneration = `${generation}-${nonce}`;
   applySecret(fixture, 'ql3-provider-live-authority', 'Opaque', {
     value,
   });
@@ -439,7 +468,7 @@ async function deployProvider(fixture, adminImage, generation, value, nonce) {
         metadata: {
           labels: { 'app.kubernetes.io/name': PROVIDER_NAME },
           annotations: {
-            'qinglong.io/provider-generation': `${generation}-${nonce}`,
+            'qinglong.io/provider-generation': expectedGeneration,
           },
         },
         spec: {
@@ -542,10 +571,12 @@ async function deployProvider(fixture, adminImage, generation, value, nonce) {
     `deployment/${PROVIDER_NAME}`,
     '--timeout=3m',
   ]);
-  const ready = providerPods(fixture).filter(podReady);
-  assert.equal(ready.length, 1);
-  assert.match(ready[0].status.podIP, /^\d{1,3}(?:\.\d{1,3}){3}$/);
-  return ready[0];
+  const ready = await readyProviderPodForGeneration(
+    fixture,
+    expectedGeneration,
+  );
+  assert.match(ready.status.podIP, /^\d{1,3}(?:\.\d{1,3}){3}$/);
+  return ready;
 }
 
 async function waitForJob(fixture, name, timeoutMs = 120_000) {
@@ -1091,8 +1122,9 @@ async function retryProviderEvidence(read, pause = undefined) {
       ) {
         throw error;
       }
-      await (pause ??
-        (() => new Promise((resolve) => setTimeout(resolve, 500))))();
+      await (
+        pause ?? (() => new Promise((resolve) => setTimeout(resolve, 500)))
+      )();
     }
   }
   throw lastError;
@@ -1630,29 +1662,42 @@ async function main() {
     let observedProviderRequests = 0;
     let evidenceSequence = 0;
     const observeProvider = async (pod, sourceNodeName) => {
-      applyExecutorNetworkPolicy(fixture, pod.status.podIP);
+      const expectedGeneration =
+        pod.metadata.annotations?.['qinglong.io/provider-generation'];
+      assert.match(
+        expectedGeneration ?? '',
+        /^[1-9]\d*-[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      );
+      let currentPod;
       const evidence = await retryProviderEvidence(async () => {
+        currentPod = await readyProviderPodForGeneration(
+          fixture,
+          expectedGeneration,
+        );
+        applyExecutorNetworkPolicy(fixture, currentPod.status.podIP);
         evidenceSequence += 1;
         return providerEvidence({
           fixture,
           adminImage,
           name: `ql3-provider-evidence-${evidenceSequence}`,
           nodeName: sourceNodeName,
-          providerPodIp: pod.status.podIP,
+          providerPodIp: currentPod.status.podIP,
         });
       });
+      assert.ok(currentPod);
       const count = evidence.requestCount;
-      const observationKey = providerObservationKey(pod);
+      const observationKey = providerObservationKey(currentPod);
       const previous = requestObservations.get(observationKey) ?? 0;
       assert.ok(count >= previous);
       observedProviderRequests += count - previous;
       requestObservations.set(observationKey, count);
+      return currentPod;
     };
 
     applyExecutorNetworkPolicy(fixture, null);
     const baseIdentity = await plan('base-denied');
     const baseDenied = await execute('base-denied', baseIdentity);
-    await observeProvider(providerPod, baseDenied.nodeName);
+    providerPod = await observeProvider(providerPod, baseDenied.nodeName);
     assert.equal(observedProviderRequests, 0);
     assert.equal(baseDenied.outcome, 'unreachable');
     assert.equal(baseDenied.modelCount, null);
@@ -1668,7 +1713,7 @@ async function main() {
     const exactAllowed = await execute('exact-allowed', allowedIdentity);
     const exactReplay = await execute('exact-replay', allowedIdentity);
     assert.equal(exactReplay.status, 'existing');
-    await observeProvider(providerPod, exactAllowed.nodeName);
+    providerPod = await observeProvider(providerPod, exactAllowed.nodeName);
     const exactCredentialAuditCount = Number(
       psql(
         fixture,
@@ -1723,7 +1768,7 @@ async function main() {
     });
     const rotatedIdentity = await plan('rotated-material');
     const rotatedMaterial = await execute('rotated-material', rotatedIdentity);
-    await observeProvider(providerPod, rotatedMaterial.nodeName);
+    providerPod = await observeProvider(providerPod, rotatedMaterial.nodeName);
     assert.equal(observedProviderRequests, 3);
     assert.equal(staleMaterial.outcome, 'unreachable');
     assert.equal(staleMaterial.modelCount, null);
@@ -1741,7 +1786,7 @@ async function main() {
     assert.notEqual(providerPod.status.podIP, cidrBeforeReplacement);
     const staleCidrIdentity = await plan('stale-cidr');
     const staleCidr = await execute('stale-cidr', staleCidrIdentity);
-    await observeProvider(providerPod, staleCidr.nodeName);
+    providerPod = await observeProvider(providerPod, staleCidr.nodeName);
     assert.equal(observedProviderRequests, 3);
     assert.equal(staleCidr.outcome, 'unreachable');
     assert.equal(staleCidr.modelCount, null);
@@ -1754,7 +1799,7 @@ async function main() {
     });
     const refreshedIdentity = await plan('refreshed-cidr');
     const refreshedCidr = await execute('refreshed-cidr', refreshedIdentity);
-    await observeProvider(providerPod, refreshedCidr.nodeName);
+    providerPod = await observeProvider(providerPod, refreshedCidr.nodeName);
     assert.equal(observedProviderRequests, 4);
     assert.equal(refreshedCidr.outcome, 'reachable');
     assert.equal(refreshedCidr.modelCount, 2);
@@ -1852,7 +1897,7 @@ async function main() {
     });
     const postFailoverIdentity = await plan('post-failover');
     const postFailover = await execute('post-failover', postFailoverIdentity);
-    await observeProvider(providerPod, postFailover.nodeName);
+    providerPod = await observeProvider(providerPod, postFailover.nodeName);
     assert.equal(observedProviderRequests, 5);
     assert.equal(postFailover.outcome, 'reachable');
     assert.equal(postFailover.modelCount, 2);
@@ -2090,6 +2135,7 @@ module.exports = {
   executorJob,
   providerObservationKey,
   providerServerSource,
+  readyProviderPodForGeneration,
   retryProviderEvidence,
   terminalJobSnapshot,
 };
