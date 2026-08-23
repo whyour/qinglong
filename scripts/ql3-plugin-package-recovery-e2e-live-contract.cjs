@@ -1647,6 +1647,24 @@ function jobImageId(name) {
   return pods.items[0].status.containerStatuses[0].imageID;
 }
 
+function buildOrderingEvidence(
+  migrated,
+  initialRecovered,
+  rejectedUpgrade,
+  runtime,
+) {
+  return Object.freeze({
+    migrationJobUid: migrated.metadata.uid,
+    migrationCompletedAt: migrated.status.completionTime,
+    initialRecoveryJobUid: initialRecovered.metadata.uid,
+    initialRecoveryCompletedAt: initialRecovered.status.completionTime,
+    upgradeRecoveryJobUid: rejectedUpgrade.metadata.uid,
+    upgradeRecoveryCompletedAt: runtime.recoveryCompletedAt,
+    runtimeCreatedAt: runtime.creationTimestamp,
+    runtimeBoundRecoveryJobUid: runtime.recoveryJobUid,
+  });
+}
+
 function diagnostics() {
   if (!kubeconfig || !fs.existsSync(kubeconfig)) return;
   const snapshot = kubectl(
@@ -1939,16 +1957,12 @@ async function main(argv = process.argv.slice(2)) {
         upgradeRecoveryImageId,
         postgresImageId: postgresPod.status.containerStatuses[0].imageID,
       }),
-      ordering: Object.freeze({
-        migrationJobUid: migrated.metadata.uid,
-        migrationCompletedAt: migrated.status.completionTime,
-        initialRecoveryJobUid: initialRecovered.metadata.uid,
-        initialRecoveryCompletedAt: initialRecovered.status.completionTime,
-        upgradeRecoveryJobUid: rejectedUpgrade.metadata.uid,
-        upgradeRecoveryCompletedAt: rejectedUpgrade.status.completionTime,
-        runtimeCreatedAt: runtime.creationTimestamp,
-        runtimeBoundRecoveryJobUid: runtime.recoveryJobUid,
-      }),
+      ordering: buildOrderingEvidence(
+        migrated,
+        initialRecovered,
+        rejectedUpgrade,
+        runtime,
+      ),
       failedUpgrade: Object.freeze({
         recoveryJobUid: rejectedUpgrade.metadata.uid,
         rejectionReason: database.upgradeFailureReason,
@@ -2024,6 +2038,7 @@ if (require.main === module) {
 
 module.exports = {
   REPORT_SCHEMA,
+  buildOrderingEvidence,
   privateReportPath,
   writePrivateReport,
 };

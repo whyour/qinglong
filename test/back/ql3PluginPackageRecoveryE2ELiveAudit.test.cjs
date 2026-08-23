@@ -20,6 +20,7 @@ const {
 } = require('../../scripts/ql3-plugin-package-recovery-e2e-live-audit.cjs');
 const {
   writePrivateReport,
+  buildOrderingEvidence,
 } = require('../../scripts/ql3-plugin-package-recovery-e2e-live-contract.cjs');
 
 function validReport() {
@@ -128,6 +129,33 @@ test('offline audit accepts one exact low-sensitive recovery report', () => {
   const result = validatePluginPackageRecoveryE2ELiveReport(validReport());
   assert.equal(result.compatible, true);
   assert.deepEqual(result.findings, []);
+});
+
+test('producer binds ordering to the recovery completion timestamp carried into runtime', () => {
+  const ordering = buildOrderingEvidence(
+    {
+      metadata: { uid: 'migration-job' },
+      status: { completionTime: '2026-08-14T08:00:01.000Z' },
+    },
+    {
+      metadata: { uid: 'initial-recovery-job' },
+      status: { completionTime: '2026-08-14T08:00:02.000Z' },
+    },
+    {
+      metadata: { uid: 'upgrade-recovery-job' },
+      status: { completionTime: '2026-08-14T08:00:03.000Z' },
+    },
+    {
+      creationTimestamp: '2026-08-14T08:00:05.000Z',
+      recoveryJobUid: 'upgrade-recovery-job',
+      recoveryCompletedAt: '2026-08-14T08:00:04.000Z',
+    },
+  );
+  assert.equal(
+    ordering.upgradeRecoveryCompletedAt,
+    '2026-08-14T08:00:04.000Z',
+  );
+  assert.equal(ordering.runtimeBoundRecoveryJobUid, 'upgrade-recovery-job');
 });
 
 test('offline audit rejects broken upgrade, ordering and image relationships', () => {
