@@ -225,9 +225,9 @@ function expectedImageConfig(architecture, revision, image) {
           'io.qinglong.ai': 'excluded',
           'io.qinglong.local.application-config': '2,3,4',
           'io.qinglong.local.compose-selection': '1',
-          'io.qinglong.local.sqlite-contract-max': '51',
+          'io.qinglong.local.sqlite-contract-max': '52',
           'io.qinglong.local.sqlite-contract-min': '51',
-          'io.qinglong.local.sqlite-write-contract': '51',
+          'io.qinglong.local.sqlite-write-contract': '52',
           'io.qinglong.profile': 'edge,standalone',
           'org.opencontainers.image.description':
             'QingLong 3.0 AI-excluded Edge and Standalone runtime',
