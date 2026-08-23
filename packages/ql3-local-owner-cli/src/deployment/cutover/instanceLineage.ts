@@ -38,6 +38,8 @@ export type LocalCutoverInstanceHeadState =
   | 'reconciliation_automation_applied'
   | 'reconciliation_automation_rolled_back'
   | 'reconciliation_secret_config_planned'
+  | 'reconciliation_secret_config_decision_prepared'
+  | 'reconciliation_secret_config_reviewed'
   | 'reconciliation_completed'
   | 'rollback_prepared'
   | 'legacy_restart_requested'
@@ -185,6 +187,8 @@ function parseHead(value: unknown): Readonly<LocalCutoverInstanceHead> {
       head.state !== 'reconciliation_automation_applied' &&
       head.state !== 'reconciliation_automation_rolled_back' &&
       head.state !== 'reconciliation_secret_config_planned' &&
+      head.state !== 'reconciliation_secret_config_decision_prepared' &&
+      head.state !== 'reconciliation_secret_config_reviewed' &&
       head.state !== 'reconciliation_completed' &&
       head.state !== 'rollback_prepared' &&
       head.state !== 'legacy_restart_requested' &&
@@ -367,6 +371,8 @@ export function advanceLocalCutoverInstanceHead(
     | 'reconciliation_automation_applied'
     | 'reconciliation_automation_rolled_back'
     | 'reconciliation_secret_config_planned'
+    | 'reconciliation_secret_config_decision_prepared'
+    | 'reconciliation_secret_config_reviewed'
     | 'reconciliation_completed'
     | 'rollback_prepared'
     | 'legacy_restart_requested'
@@ -421,6 +427,8 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_automation_applied' ||
       current.state === 'reconciliation_automation_rolled_back' ||
       current.state === 'reconciliation_secret_config_planned' ||
+      current.state === 'reconciliation_secret_config_decision_prepared' ||
+      current.state === 'reconciliation_secret_config_reviewed' ||
       current.state === 'reconciliation_completed' ||
       current.state === 'legacy_restart_requested' ||
       current.state === 'legacy_running' ||
@@ -469,6 +477,10 @@ export function advanceLocalCutoverInstanceHead(
     (state === 'reconciliation_secret_config_planned' &&
       (current.state === 'reconciliation_application_planned' ||
         current.state === 'reconciliation_automation_applied')) ||
+    (state === 'reconciliation_secret_config_decision_prepared' &&
+      current.state === 'reconciliation_secret_config_planned') ||
+    (state === 'reconciliation_secret_config_reviewed' &&
+      current.state === 'reconciliation_secret_config_decision_prepared') ||
     (state === 'reconciliation_completed' &&
       (current.state === 'reconciliation_application_planned' ||
         current.state === 'reconciliation_automation_applied')) ||

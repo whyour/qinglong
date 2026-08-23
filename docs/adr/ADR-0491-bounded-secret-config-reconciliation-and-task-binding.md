@@ -1,6 +1,6 @@
 # ADR-0491：有界 Secret/Config Reconciliation 与任务环境绑定
 
-- 状态：Proposed（D-397 已实现 Legacy Env inspection、私有有界 row plan 与 durable plan publication；独立 signed decision 和原子 application 尚未完成）
+- 状态：Proposed（D-397 已实现 Legacy Env inspection、私有有界 row plan、durable plan publication 与独立 signed decision；原子 application 尚未完成）
 - 日期：2026-08-23
 - 决策：D-397
 - 关联：ADR-0073、ADR-0074、ADR-0092、ADR-0094、ADR-0480、ADR-0482、ADR-0483、ADR-0484、ADR-0485、ADR-0486、ADR-0487、ADR-0488、ADR-0490
@@ -27,7 +27,7 @@ application plan
   → cross-domain completion
 ```
 
-Secret/Config 不消费 Automation decision 作为自身授权。D-391 把 `secret_and_config` facts 标为 `blocked`，其 review action 只能是 `manual_external|defer`；D-397 专用 adapter 只接收每条 fact 都精确选择 `manual_external` 的决策流，把它重新绑定到同一 sealed bundle、D-392 application plan 与当前 target snapshot，任何 `defer` 都继续失败关闭。后续 application 还必须消费独立的逐候选 signed decision；强认证 User、Project Policy、Secret custody 与 Task mutation authority 都要在写事务前及事务内重新验证。
+Secret/Config 不消费 Automation decision 作为自身授权。D-391 把 `secret_and_config` facts 标为 `blocked`，其 review action 只能是 `manual_external|defer`；D-397 专用 adapter 只接收每条 fact 都精确选择 `manual_external` 的决策流，把它重新绑定到同一 sealed bundle、D-392 application plan 与当前 target snapshot，任何 `defer` 都继续失败关闭。D-397 使用独立的逐候选 signed decision：只有 `plan.outcome=ready`、候选非空且没有 manual/conflict 才能 prepare；后续 application 必须消费该终态授权。强认证 User、Project Policy、Secret custody 与 Task mutation authority 都要在写事务前及事务内重新验证。
 
 存在 active Env 时，Automation 必须已经完成，且至少一个经 `QingLong3LegacyAdoptions` 证明的 Legacy Task 可绑定；否则不得用“Secret 已保存”冒充行为迁移。只有停用 Env 的场景可以在 Automation `no_effect` 后做纯保全。
 
@@ -67,6 +67,8 @@ id ASC
 Local Owner 使用私有 NDJSON row plan 记录 header、逐行 content-free disposition、逐 candidate 目标冲突投影与 footer。Edge/Standalone plan 文件分别限制为 8 MiB/32 MiB，单行不超过 64 KiB；超过预算立即失败关闭。公开 plan/receipt 不保存原 Env name/value、目标 ciphertext、key ID 或原始 row body。active 与 disabled candidate 分别使用 `legacy-db-env-*` 和 `legacy-db-env-disabled-*` 命名空间；目标已经存在时只记录 envelope 元数据的组合摘要并进入 `review_skip_conflict`，不得读取明文、覆盖或自动改名。plan 绑定 application、D-391 review authorization、sealed bundle、target projection、Automation adoption ledger 的有界 content-free 投影与 prepared head，并产生可重新计算的 row-set、candidate-set、adoption-set、plan-file 和 receipt digest。
 
 durable publisher 固定写入 `<secretConfigRoot>/<secretConfigId>/{plan.ndjson,receipt.json,staging/}`，使用 no-replace publication、`0400/0500` 权限、文件与目录 `fsync`，并覆盖 plan、receipt、terminal seal、head CAS 四个 response-loss 窗口。只有 Automation 无需 adapter 时的 `reconciliation_application_planned`，或 Automation 已完成时的 `reconciliation_automation_applied`，可以单向推进到 `reconciliation_secret_config_planned`；verify 只读复算 plan/receipt/seal/head 绑定，不修复漂移。active Env 若没有至少一条已采纳 Legacy Task ledger 记录仍为 manual；历史 `Configs` 计入 `unadaptedLegacyConfigCount` 并保持 manual。
+
+独立决策使用私有 NDJSON decision file，每个候选必须按 ordinal/digest 精确选择 `apply_active_binding/reviewed_active_binding`、`preserve_disabled/reviewed_disabled_preservation` 或 `skip/operator_excluded|target_conflict|security_review_required`。任何 `skip` 都把终态 outcome 降为 `manual_required`，不能被 application 当成部分成功；`no_effect` 不需要决策，manual/conflict plan 也不能通过强认证升级。签名授权使用与 D-391 review 相同的强认证 User，认证年龄最多 5 分钟、授权生命期最多 30 分钟，并以独立 HMAC domain 绑定 decision、Secret/Config plan、candidate set、application、preparation、prepared head、sealed bundle、reviewer 与时间。Edge/Standalone decision/authorization 文件分别限制为 1 MiB/4 MiB，沿用 owner-only `0700/0600`、sealed `0500/0400`、no-replace 与 `fsync`。lineage 单向推进 `reconciliation_secret_config_planned → reconciliation_secret_config_decision_prepared → reconciliation_secret_config_reviewed`；prepare/commit 的全部 publication response-loss 窗口都精确重放且不重复认证，terminal verify 只读复算 sealed decision、authorization、receipt 与当前 reviewed head。
 
 ### 4. 原子 application 必须同时完成 custody 与行为绑定
 
@@ -133,6 +135,6 @@ Cluster 不得把 Legacy Env 明文写入 PostgreSQL、ConfigMap、Job command�
 
 ## 当前验证与后续门禁
 
-D-397 当前三切片已经实现并测试：absent、unsupported、Edge over-budget、2.x 顺序、同名连接、disabled preservation、保留前缀、异常状态、effective overflow、candidate digest、content-free diagnostics、私有有界 row plan、目标 Secret 冲突、Automation adoption projection、no-effect/manual outcome、durable no-replace publication、terminal seal、head CAS、四个 response-loss 窗口、只读 verify 与 plan/receipt drift。调用方 visitor 的预算异常保持原始类型，不再被误报为 SQLite 读取失败。Local Admin 完整测试为 96/96；Local Owner 完整测试为 287/280/7/0；后端完整门为 1563/1561/2/0，18-package clean build/test 为 2934/2912/22/0。package boundary、Cluster dependency、Edge import 与十四档 Local artifact audit 全部 compatible；基础 Edge/Standalone 仍为 2,611,978 / 2,612,056 bytes、319 files、58 loaded modules，Owner-only authority 没有进入低资源常驻制品。workspace 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`。Local Admin 保持 48/47，Local Owner 随两个职责明确的嵌套文件增至 178/177；根目录仍只有一个 50 行 binary entry，没有新增平铺源文件。依赖隔离门仍只允许 exact Secret/Config row planner 导入 inspection subpath，相邻文件继续被拒绝。
+D-397 当前四切片已经实现并测试：absent、unsupported、Edge over-budget、2.x 顺序、同名连接、disabled preservation、保留前缀、异常状态、effective overflow、candidate digest、content-free diagnostics、私有有界 row plan、目标 Secret 冲突、Automation adoption projection、no-effect/manual outcome、durable no-replace publication、terminal seal、head CAS、逐候选独立 signed decision、同一强认证 reviewer、decision/authorization byte bound、`skip → manual_required`、prepare/commit response-loss exact replay、只读 terminal verify 与 plan/receipt/authorization/head drift。调用方 visitor 的预算异常保持原始类型，不再被误报为 SQLite 读取失败。Local Admin 完整测试为 96/96；Local Owner 完整测试为 295/288/7/0；后端完整门为 1564/1562/2/0，18-package clean build/test 为 2942/2920/22/0。package boundary、Cluster dependency 62/62、Edge import 与十四档 Local artifact audit 全部 compatible；基础 Edge/Standalone 仍为 2,611,978 / 2,612,056 bytes、319 files、58 loaded modules，Owner-only authority 没有进入低资源常驻制品。workspace 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`。Local Admin 保持 48/47，Local Owner 随六个职责明确的 decision 嵌套文件增至 184/183；根目录仍只有一个 50 行 binary entry，没有新增平铺源文件。依赖隔离门只允许 exact Secret/Config row planner 导入 inspection subpath，并只允许 decision authorization/coordinator 导入各自最小密钥、principal 与强认证只读 authority；邻接文件继续被拒绝。
 
-转为 Accepted 前仍必须完成：独立 signed decision、原子 Secret/Task/Trigger/dispatch publisher、prepared/apply/rollback response-loss、completion schema 演进、18-package/boundary/artifact gates、真实 Edge 空间预算、PostgreSQL HA 与 Cluster Secret provider live gate。
+转为 Accepted 前仍必须完成：原子 Secret/Task/Trigger/dispatch publisher、prepared/apply/rollback response-loss、completion schema 演进、18-package/boundary/artifact gates、真实 Edge 空间预算、PostgreSQL HA 与 Cluster Secret provider live gate。

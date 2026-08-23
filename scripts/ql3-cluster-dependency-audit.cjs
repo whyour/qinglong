@@ -2039,6 +2039,14 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/secret-and-config/decisionCoordinator.ts' &&
+          [
+            '@qinglong/local-owner-console/authenticated-command',
+            '@qinglong/local-sqlite/authentication-read',
+          ].includes(specifier)
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/deployment/reconciliation/application/automation/applyEvidence.ts' &&
           specifier === '@qinglong/local-sqlite/rollout-safety'
         ) &&
@@ -2723,6 +2731,17 @@ function auditSourceImports(root, packagePath, findings) {
           },
           {
             file: 'src/deployment/reconciliation/application/automation/applyCoordinator.ts',
+            specifiers: ['@qinglong/runtime-core/security'],
+          },
+          {
+            file: 'src/deployment/reconciliation/application/secret-and-config/decisionAuthorization.ts',
+            specifiers: [
+              '@qinglong/runtime-core/local-secret',
+              '@qinglong/runtime-core/security',
+            ],
+          },
+          {
+            file: 'src/deployment/reconciliation/application/secret-and-config/decisionCoordinator.ts',
             specifiers: ['@qinglong/runtime-core/security'],
           },
         ].some(

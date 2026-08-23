@@ -11,6 +11,7 @@ const {
   commitLocalReconciliationCapture,
   commitLocalReconciliationApplication,
   commitLocalReconciliationAutomationDecision,
+  commitLocalReconciliationSecretConfigDecision,
   completeLocalReconciliation,
   applyLocalReconciliationAutomation,
   commitLocalReconciliationPlan,
@@ -18,8 +19,10 @@ const {
   prepareLocalReconciliationCapture,
   prepareLocalReconciliationApplication,
   prepareLocalReconciliationAutomationDecision,
+  prepareLocalReconciliationSecretConfigDecision,
   preserveLocalReconciliationRunHistory,
   readLocalReconciliationAutomationDecisionTerminal,
+  readLocalReconciliationSecretConfigDecisionTerminal,
   rollbackLocalReconciliationAutomationApply,
   planLocalReconciliationAutomation,
   planLocalReconciliationSecretConfig,
@@ -28,6 +31,7 @@ const {
   verifyLocalReconciliationCapture,
   verifyLocalReconciliationApplication,
   verifyLocalReconciliationAutomationDecision,
+  verifyLocalReconciliationSecretConfigDecision,
   verifyLocalReconciliationAutomationApply,
   verifyLocalReconciliationAutomationPlan,
   verifyLocalReconciliationSecretConfigPlan,
@@ -1224,10 +1228,8 @@ function applicationCommitCommand(state, prepared) {
 async function secretConfigPlanFixture(t, options = {}) {
   const suffix = options.suffix ?? 'plan';
   const state = await reviewedApplicationFixture(t, {
-    planId:
-      options.planId ?? '00000000-0000-4000-8000-000000000421',
-    reviewId:
-      options.reviewId ?? '00000000-0000-4000-8000-000000000422',
+    planId: options.planId ?? '00000000-0000-4000-8000-000000000421',
+    reviewId: options.reviewId ?? '00000000-0000-4000-8000-000000000422',
     applicationId:
       options.applicationId ?? '00000000-0000-4000-8000-000000000423',
     reviewSuffix: `secret-config-${suffix}`,
@@ -1497,6 +1499,185 @@ function automationDecisionCommitFixture(
             id: options.reviewerId ?? 'review-owner',
           },
           authenticationId: 'local_reconciliation_automation:test',
+          authenticatedAtMs: committedAtMs,
+          expiresAtMs: committedAtMs + authorizationLifetimeMs + 60_000,
+          assurance: options.assurance ?? 'local_console',
+        },
+        databaseFence: {
+          credentialId: options.reviewerId ?? 'review-owner',
+          credentialVersion: 1,
+          pepperKeyId: 'review-owner-v1',
+          pepperVersion: 1,
+        },
+        async confirm() {
+          confirmations += 1;
+        },
+      };
+    },
+  };
+  return {
+    command,
+    dependencies,
+    authenticationCount: () => authentications,
+    confirmationCount: () => confirmations,
+    databaseCloseCount: () => databaseCloses,
+  };
+}
+
+async function plannedSecretConfigDecisionFixture(t, options = {}) {
+  const suffix = options.suffix ?? 'decision';
+  const state = await secretConfigPlanFixture(t, {
+    suffix,
+    active: options.active === true,
+    configs: options.configs === true,
+    planId: options.planId,
+    reviewId: options.reviewId,
+    applicationId: options.applicationId,
+    secretConfigId: options.secretConfigId,
+  });
+  const planned = await planLocalReconciliationSecretConfig(
+    state.secretConfigCommand,
+  );
+  const secretConfigDecisionRoot = path.join(
+    path.dirname(state.captureRoot),
+    `secret-config-decision-${suffix}`,
+  );
+  fs.mkdirSync(secretConfigDecisionRoot, { mode: 0o700 });
+  const planPath = path.join(
+    state.secretConfigRoot,
+    state.secretConfigId,
+    'plan.ndjson',
+  );
+  const candidates = fs
+    .readFileSync(planPath, 'utf8')
+    .trimEnd()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+    .filter(
+      (record) =>
+        record.kind ===
+        'qinglong3-local-reconciliation-secret-config-plan-candidate',
+    );
+  return {
+    ...state,
+    planned,
+    secretConfigDecisionRoot,
+    candidates,
+  };
+}
+
+function secretConfigDecisionPrepareCommand(state, decisionId) {
+  return {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.decision.prepare',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      secretConfigRoot: state.secretConfigRoot,
+      secretConfigDecisionRoot: state.secretConfigDecisionRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      decisionId,
+      secretConfigId: state.secretConfigId,
+      expectedSecretConfigPlanDigest: state.planned.secretConfigPlanDigest,
+      expectedHeadDigest: state.planned.instanceHeadDigest,
+      preparedAtMs: state.secretConfigCommand.request.preparedAtMs + 1,
+    },
+  };
+}
+
+function secretConfigDecisionFile(
+  state,
+  prepared,
+  dispositions,
+  suffix = 'decision',
+) {
+  assert.equal(state.candidates.length, dispositions.length);
+  const records = [
+    {
+      schemaVersion: 1,
+      kind: 'qinglong3-local-reconciliation-secret-config-decision-header',
+      decisionContractVersion: 1,
+      decisionId: prepared.result.decisionId,
+      profile: state.captureCommand.request.profile,
+      secretConfigPlanDigest: state.planned.secretConfigPlanDigest,
+      preparationDigest: prepared.result.preparationDigest,
+    },
+    ...state.candidates.map((candidate, index) => ({
+      schemaVersion: 1,
+      kind: 'qinglong3-local-reconciliation-secret-config-decision',
+      candidateOrdinal: candidate.candidateOrdinal,
+      candidateDigest: candidate.candidateDigest,
+      disposition: dispositions[index].disposition,
+      reason: dispositions[index].reason,
+    })),
+  ];
+  const filePath = path.join(
+    state.diagnosticRoot,
+    `secret-config-decision-${suffix}.ndjson`,
+  );
+  fs.writeFileSync(
+    filePath,
+    `${records.map((record) => JSON.stringify(record)).join('\n')}\n`,
+    { mode: 0o600 },
+  );
+  return { filePath, records };
+}
+
+function secretConfigDecisionCommitFixture(
+  state,
+  prepared,
+  decisionFilePath,
+  options = {},
+) {
+  const committedAtMs = options.committedAtMs ?? Date.now();
+  const authorizationLifetimeMs = 10 * 60 * 1_000;
+  let authentications = 0;
+  let confirmations = 0;
+  let databaseCloses = 0;
+  const command = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.decision.commit',
+    options: {
+      ...prepared.commandOptions,
+      targetDatabasePath: state.targetDatabasePath,
+      ownerPepperKeyringDirectory:
+        state.command.options.ownerPepperKeyringDirectory,
+      credentialFilePath: state.command.options.credentialFilePath,
+    },
+    request: {
+      decisionId: prepared.result.decisionId,
+      secretConfigId: state.secretConfigId,
+      expectedPreparationDigest: prepared.result.preparationDigest,
+      expectedHeadDigest: prepared.result.instanceHeadDigest,
+      decisionFilePath,
+      committedAtMs,
+      authorizationLifetimeMs,
+    },
+  };
+  const dependencies = {
+    now: () => committedAtMs,
+    async openAuthenticationDatabase() {
+      return {
+        async close() {
+          databaseCloses += 1;
+        },
+      };
+    },
+    async authenticate(_database, authenticateOptions) {
+      authentications += 1;
+      assert.equal(
+        authenticateOptions.authenticationNamespace,
+        'local_reconciliation_secret_config',
+      );
+      return {
+        principal: {
+          subject: {
+            type: 'user',
+            id: options.reviewerId ?? 'review-owner',
+          },
+          authenticationId: 'local_reconciliation_secret_config:test',
           authenticatedAtMs: committedAtMs,
           expiresAtMs: committedAtMs + authorizationLifetimeMs + 60_000,
           assurance: options.assurance ?? 'local_console',
@@ -3353,7 +3534,10 @@ test('Secret/Config plan publishes, seals, verifies and stays content-free', asy
   assert.equal(fs.statSync(root).mode & 0o777, 0o500);
   assert.equal(fs.statSync(path.join(root, 'staging')).mode & 0o777, 0o500);
   assert.equal(fs.statSync(path.join(root, 'plan.ndjson')).mode & 0o777, 0o400);
-  assert.equal(fs.statSync(path.join(root, 'receipt.json')).mode & 0o777, 0o400);
+  assert.equal(
+    fs.statSync(path.join(root, 'receipt.json')).mode & 0o777,
+    0o400,
+  );
   const serialized = fs.readFileSync(path.join(root, 'plan.ndjson'), 'utf8');
   for (const privateValue of [
     'DISABLED_TOKEN',
@@ -3483,15 +3667,382 @@ test('Secret/Config plan keeps active Env and unknown Configs manual', async (t)
     assert.equal(planned.outcome, 'manual_required');
     assert.equal(planned.unadaptedLegacyConfigCount, 1);
     const serialized = fs.readFileSync(
-      path.join(
-        state.secretConfigRoot,
-        state.secretConfigId,
-        'plan.ndjson',
-      ),
+      path.join(state.secretConfigRoot, state.secretConfigId, 'plan.ndjson'),
       'utf8',
     );
     assert.equal(serialized.includes('private-config-value'), false);
   });
+});
+
+test('Secret/Config decision reauthenticates the same reviewer, seals exact candidates and verifies content-free', async (t) => {
+  const state = await plannedSecretConfigDecisionFixture(t, {
+    suffix: 'decision-terminal',
+    planId: '00000000-0000-4000-8000-000000000425',
+    reviewId: '00000000-0000-4000-8000-000000000426',
+    applicationId: '00000000-0000-4000-8000-000000000427',
+    secretConfigId: '00000000-0000-4000-8000-000000000428',
+  });
+  assert.equal(state.planned.outcome, 'ready');
+  assert.equal(state.candidates.length, 1);
+  assert.equal(state.candidates[0].requirement, 'review_preserve_disabled');
+  const decisionId = '019b0000-0000-7000-8000-000000000425';
+  const prepareCommand = secretConfigDecisionPrepareCommand(state, decisionId);
+  const prepared = await prepareLocalReconciliationSecretConfigDecision(
+    prepareCommand,
+  );
+  assert.equal(prepared.status, 'prepared');
+  assert.equal(
+    prepared.state,
+    'reconciliation_secret_config_decision_prepared',
+  );
+  const decisionFile = secretConfigDecisionFile(
+    state,
+    { result: prepared },
+    [
+      {
+        disposition: 'preserve_disabled',
+        reason: 'reviewed_disabled_preservation',
+      },
+    ],
+    'terminal',
+  );
+  const commit = secretConfigDecisionCommitFixture(
+    state,
+    { result: prepared, commandOptions: prepareCommand.options },
+    decisionFile.filePath,
+  );
+  const targetBytes = fs.readFileSync(state.targetDatabasePath);
+  const committed = await commitLocalReconciliationSecretConfigDecision(
+    commit.command,
+    commit.dependencies,
+  );
+  assert.equal(committed.status, 'prepared');
+  assert.equal(committed.state, 'reconciliation_secret_config_reviewed');
+  assert.equal(committed.outcome, 'ready');
+  assert.equal(committed.candidateCount, 1);
+  assert.equal(committed.applyBindingCount, 0);
+  assert.equal(committed.preserveDisabledCount, 1);
+  assert.equal(committed.skippedCount, 0);
+  assert.equal(commit.authenticationCount(), 1);
+  assert.equal(commit.confirmationCount(), 3);
+  assert.equal(commit.databaseCloseCount(), 1);
+  assert.equal(
+    fs.readFileSync(state.targetDatabasePath).equals(targetBytes),
+    true,
+  );
+  const decisionRoot = path.join(
+    state.secretConfigDecisionRoot,
+    state.secretConfigId,
+  );
+  assert.deepEqual(fs.readdirSync(decisionRoot).sort(), [
+    'authorization.ndjson',
+    'intent.json',
+    'receipt.json',
+    'staging',
+  ]);
+  assert.equal(fs.statSync(decisionRoot).mode & 0o777, 0o500);
+  assert.equal(
+    fs.statSync(path.join(decisionRoot, 'staging')).mode & 0o777,
+    0o500,
+  );
+  for (const name of ['authorization.ndjson', 'intent.json', 'receipt.json']) {
+    assert.equal(
+      fs.statSync(path.join(decisionRoot, name)).mode & 0o777,
+      0o400,
+    );
+  }
+  const verifyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.decision.verify',
+    options: prepareCommand.options,
+    request: {
+      decisionId,
+      secretConfigId: state.secretConfigId,
+      expectedDecisionDigest: committed.decisionDigest,
+    },
+  };
+  const verified = await verifyLocalReconciliationSecretConfigDecision(
+    verifyCommand,
+  );
+  assert.equal(verified.status, 'verified');
+  assert.equal(
+    verified.signedDecisionSetDigest,
+    committed.signedDecisionSetDigest,
+  );
+  const terminal = await readLocalReconciliationSecretConfigDecisionTerminal(
+    prepareCommand.options,
+    state.secretConfigId,
+    process.getuid(),
+  );
+  assert.equal(terminal.receipt.decisionDigest, committed.decisionDigest);
+  assert.equal(terminal.reviewer.subject.id, 'review-owner');
+  const serialized = JSON.stringify(verified);
+  for (const privateValue of [
+    'DISABLED_TOKEN',
+    'private-secret-value',
+    'review-owner',
+    decisionFile.filePath,
+    state.candidates[0].candidateDigest,
+  ]) {
+    assert.equal(serialized.includes(privateValue), false);
+  }
+  const commandPath = path.join(
+    state.deploymentRoot,
+    'secret-config-decision-verify.json',
+  );
+  fs.writeFileSync(commandPath, `${JSON.stringify(verifyCommand)}\n`, {
+    mode: 0o600,
+  });
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-secret-config-decision-verify',
+      '--command-file',
+      commandPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cli.status, 0, cli.stderr);
+  assert.equal(JSON.parse(cli.stdout).status, 'verified');
+  assert.equal(cli.stdout.includes('review-owner'), false);
+  assert.equal(cli.stdout.includes('DISABLED_TOKEN'), false);
+  const head = readLocalCutoverInstanceHead(
+    state.deploymentRoot,
+    state.captureCommand.request.instanceId,
+    state.uid,
+  );
+  assert.equal(head.state, 'reconciliation_secret_config_reviewed');
+  assert.equal(head.sourceRecordDigest, committed.decisionDigest);
+
+  const authorizationPath = path.join(decisionRoot, 'authorization.ndjson');
+  fs.chmodSync(decisionRoot, 0o700);
+  fs.chmodSync(authorizationPath, 0o600);
+  fs.appendFileSync(authorizationPath, '{}\n');
+  fs.chmodSync(authorizationPath, 0o400);
+  fs.chmodSync(decisionRoot, 0o500);
+  await assert.rejects(
+    verifyLocalReconciliationSecretConfigDecision(verifyCommand),
+    /authorization|file identity or size|file is incomplete/,
+  );
+});
+
+test('Secret/Config decision rejects manual plans, invalid candidate choices and reviewer drift', async (t) => {
+  const manual = await plannedSecretConfigDecisionFixture(t, {
+    suffix: 'decision-manual-plan',
+    active: true,
+    planId: '00000000-0000-4000-8000-000000000429',
+    reviewId: '00000000-0000-4000-8000-00000000042a',
+    applicationId: '00000000-0000-4000-8000-00000000042b',
+    secretConfigId: '00000000-0000-4000-8000-00000000042c',
+  });
+  assert.equal(manual.planned.outcome, 'manual_required');
+  await assert.rejects(
+    prepareLocalReconciliationSecretConfigDecision(
+      secretConfigDecisionPrepareCommand(
+        manual,
+        '019b0000-0000-7000-8000-000000000429',
+      ),
+    ),
+    /only a ready non-empty plan can be reviewed/,
+  );
+
+  const state = await plannedSecretConfigDecisionFixture(t, {
+    suffix: 'decision-reject',
+    planId: '00000000-0000-4000-8000-00000000042d',
+    reviewId: '00000000-0000-4000-8000-00000000042e',
+    applicationId: '00000000-0000-4000-8000-00000000042f',
+    secretConfigId: '00000000-0000-4000-8000-000000000430',
+  });
+  const prepareCommand = secretConfigDecisionPrepareCommand(
+    state,
+    '019b0000-0000-7000-8000-00000000042d',
+  );
+  const prepared = await prepareLocalReconciliationSecretConfigDecision(
+    prepareCommand,
+  );
+  const invalid = secretConfigDecisionFile(
+    state,
+    { result: prepared },
+    [
+      {
+        disposition: 'apply_active_binding',
+        reason: 'reviewed_active_binding',
+      },
+    ],
+    'invalid-choice',
+  );
+  const invalidCommit = secretConfigDecisionCommitFixture(
+    state,
+    { result: prepared, commandOptions: prepareCommand.options },
+    invalid.filePath,
+  );
+  await assert.rejects(
+    commitLocalReconciliationSecretConfigDecision(
+      invalidCommit.command,
+      invalidCommit.dependencies,
+    ),
+    /decision is not allowed for canonical candidate/,
+  );
+  assert.equal(invalidCommit.authenticationCount(), 0);
+
+  const valid = secretConfigDecisionFile(
+    state,
+    { result: prepared },
+    [
+      {
+        disposition: 'preserve_disabled',
+        reason: 'reviewed_disabled_preservation',
+      },
+    ],
+    'reviewer-reject',
+  );
+  for (const auth of [
+    { reviewerId: 'another-owner', assurance: 'local_console' },
+    { reviewerId: 'review-owner', assurance: 'password' },
+  ]) {
+    const rejected = secretConfigDecisionCommitFixture(
+      state,
+      { result: prepared, commandOptions: prepareCommand.options },
+      valid.filePath,
+      auth,
+    );
+    await assert.rejects(
+      commitLocalReconciliationSecretConfigDecision(
+        rejected.command,
+        rejected.dependencies,
+      ),
+      /requires the same recently strong authenticated User/,
+    );
+    assert.equal(rejected.authenticationCount(), 1);
+    assert.equal(rejected.confirmationCount(), 0);
+    assert.equal(rejected.databaseCloseCount(), 1);
+  }
+});
+
+test('Secret/Config decision replays every publication boundary without repeated authentication', async (t) => {
+  const prepareState = await plannedSecretConfigDecisionFixture(t, {
+    suffix: 'decision-prepare-loss',
+    secretConfigId: '00000000-0000-4000-8000-000000000431',
+  });
+  const prepareCommand = secretConfigDecisionPrepareCommand(
+    prepareState,
+    '019b0000-0000-7000-8000-000000000431',
+  );
+  await assert.rejects(
+    prepareLocalReconciliationSecretConfigDecision(prepareCommand, {
+      afterHeadPrepared() {
+        throw new Error('secret config decision prepare response loss');
+      },
+    }),
+    /secret config decision prepare response loss/,
+  );
+  const prepareReplay = await prepareLocalReconciliationSecretConfigDecision(
+    prepareCommand,
+  );
+  assert.equal(
+    prepareReplay.state,
+    'reconciliation_secret_config_decision_prepared',
+  );
+
+  for (const [window, tail] of [
+    ['authorization', '432'],
+    ['receipt', '433'],
+    ['seal', '434'],
+    ['head', '435'],
+  ]) {
+    await t.test(window, async (subtest) => {
+      const state = await plannedSecretConfigDecisionFixture(subtest, {
+        suffix: `decision-${window}-loss`,
+        secretConfigId: `00000000-0000-4000-8000-000000000${tail}`,
+      });
+      const decisionId = `019b0000-0000-7000-8000-000000000${tail}`;
+      const selectedPrepareCommand = secretConfigDecisionPrepareCommand(
+        state,
+        decisionId,
+      );
+      const prepared = await prepareLocalReconciliationSecretConfigDecision(
+        selectedPrepareCommand,
+      );
+      const review = secretConfigDecisionFile(
+        state,
+        { result: prepared },
+        [
+          {
+            disposition: 'preserve_disabled',
+            reason: 'reviewed_disabled_preservation',
+          },
+        ],
+        `${window}-loss`,
+      );
+      const commit = secretConfigDecisionCommitFixture(
+        state,
+        {
+          result: prepared,
+          commandOptions: selectedPrepareCommand.options,
+        },
+        review.filePath,
+      );
+      const callback =
+        window === 'authorization'
+          ? 'afterAuthorizationPublished'
+          : window === 'receipt'
+          ? 'afterReceiptPublished'
+          : window === 'seal'
+          ? 'afterTerminalSealed'
+          : 'afterHeadAdvanced';
+      await assert.rejects(
+        commitLocalReconciliationSecretConfigDecision(commit.command, {
+          ...commit.dependencies,
+          [callback]() {
+            throw new Error(`secret config decision ${window} response loss`);
+          },
+        }),
+        new RegExp(`secret config decision ${window} response loss`),
+      );
+      const replay = await commitLocalReconciliationSecretConfigDecision(
+        commit.command,
+        commit.dependencies,
+      );
+      assert.equal(replay.state, 'reconciliation_secret_config_reviewed');
+      assert.equal(commit.authenticationCount(), 1);
+      assert.equal(commit.confirmationCount(), 3);
+      assert.equal(commit.databaseCloseCount(), 1);
+      if (window === 'head') assert.equal(replay.status, 'existing');
+    });
+  }
+});
+
+test('Secret/Config decision can explicitly skip a ready candidate only into manual_required', async (t) => {
+  const state = await plannedSecretConfigDecisionFixture(t, {
+    suffix: 'decision-skip',
+    secretConfigId: '00000000-0000-4000-8000-000000000436',
+  });
+  const prepareCommand = secretConfigDecisionPrepareCommand(
+    state,
+    '019b0000-0000-7000-8000-000000000436',
+  );
+  const prepared = await prepareLocalReconciliationSecretConfigDecision(
+    prepareCommand,
+  );
+  const review = secretConfigDecisionFile(
+    state,
+    { result: prepared },
+    [{ disposition: 'skip', reason: 'operator_excluded' }],
+    'skip',
+  );
+  const commit = secretConfigDecisionCommitFixture(
+    state,
+    { result: prepared, commandOptions: prepareCommand.options },
+    review.filePath,
+  );
+  const result = await commitLocalReconciliationSecretConfigDecision(
+    commit.command,
+    commit.dependencies,
+  );
+  assert.equal(result.outcome, 'manual_required');
+  assert.equal(result.skippedCount, 1);
+  assert.equal(result.preserveDisabledCount, 0);
 });
 
 test('completion fence retains automation rollback backup while other domains remain manual', async (t) => {

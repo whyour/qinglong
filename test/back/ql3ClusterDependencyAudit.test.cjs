@@ -2280,6 +2280,73 @@ test('confines reconciliation Secret and Config inspection to its exact row plan
   );
 });
 
+test('confines reconciliation Secret and Config decision authority to exact owners', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(
+      os.tmpdir(),
+      'ql3-reconciliation-secret-config-decision-boundary-',
+    ),
+  );
+  const secretConfigDirectory = path.join(
+    root,
+    'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config',
+  );
+  fs.mkdirSync(secretConfigDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(secretConfigDirectory, 'decisionAuthorization.ts'),
+    [
+      "import type { Key } from '@qinglong/runtime-core/local-secret';",
+      "import type { Principal } from '@qinglong/runtime-core/security';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(secretConfigDirectory, 'decisionCoordinator.ts'),
+    [
+      "import { authenticate } from '@qinglong/local-owner-console/authenticated-command';",
+      "import { database } from '@qinglong/local-sqlite/authentication-read';",
+      "import type { Principal } from '@qinglong/runtime-core/security';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(secretConfigDirectory, 'neighbor.ts'),
+    [
+      "import { authenticate } from '@qinglong/local-owner-console/authenticated-command';",
+      "import { database } from '@qinglong/local-sqlite/authentication-read';",
+      "import type { Key } from '@qinglong/runtime-core/local-secret';",
+      "import type { Principal } from '@qinglong/runtime-core/security';",
+    ].join('\n'),
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-owner-cli', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/neighbor.ts',
+        specifier: '@qinglong/local-owner-console/authenticated-command',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/authentication-read',
+      },
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/neighbor.ts',
+        specifier: '@qinglong/runtime-core/local-secret',
+      },
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/neighbor.ts',
+        specifier: '@qinglong/runtime-core/security',
+      },
+    ],
+  );
+});
+
 test('deleted Owner ceremony package names remain dependency tombstones', (t) => {
   const root = fixture(
     t,

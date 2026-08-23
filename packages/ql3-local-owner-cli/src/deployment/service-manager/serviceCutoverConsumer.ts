@@ -775,7 +775,9 @@ function replayResult(
       head.state === 'reconciliation_automation_apply_prepared' ||
       head.state === 'reconciliation_automation_applied' ||
       head.state === 'reconciliation_automation_rolled_back' ||
-      head.state === 'reconciliation_secret_config_planned');
+      head.state === 'reconciliation_secret_config_planned' ||
+      head.state === 'reconciliation_secret_config_decision_prepared' ||
+      head.state === 'reconciliation_secret_config_reviewed');
   const completionRestartPendingHead =
     (record.state === 'target_active' || record.state === 'manual_required') &&
     completionFence !== undefined &&

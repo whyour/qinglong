@@ -162,6 +162,15 @@ import {
   verifyLocalReconciliationSecretConfigPlanCommandFile,
 } from './reconciliation/application/secret-and-config/coordinator';
 import {
+  commitLocalReconciliationSecretConfigDecision,
+  commitLocalReconciliationSecretConfigDecisionCommandFile,
+  prepareLocalReconciliationSecretConfigDecision,
+  prepareLocalReconciliationSecretConfigDecisionCommandFile,
+  readLocalReconciliationSecretConfigDecisionTerminal,
+  verifyLocalReconciliationSecretConfigDecision,
+  verifyLocalReconciliationSecretConfigDecisionCommandFile,
+} from './reconciliation/application/secret-and-config/decisionCoordinator';
+import {
   preserveLocalReconciliationRunHistory,
   preserveLocalReconciliationRunHistoryCommandFile,
   readLocalReconciliationRunHistoryTerminal,
@@ -218,6 +227,13 @@ export {
   readLocalReconciliationSecretConfigTerminal,
   verifyLocalReconciliationSecretConfigPlan,
   verifyLocalReconciliationSecretConfigPlanCommandFile,
+  prepareLocalReconciliationSecretConfigDecision,
+  prepareLocalReconciliationSecretConfigDecisionCommandFile,
+  commitLocalReconciliationSecretConfigDecision,
+  commitLocalReconciliationSecretConfigDecisionCommandFile,
+  verifyLocalReconciliationSecretConfigDecision,
+  verifyLocalReconciliationSecretConfigDecisionCommandFile,
+  readLocalReconciliationSecretConfigDecisionTerminal,
   preserveLocalReconciliationRunHistory,
   preserveLocalReconciliationRunHistoryCommandFile,
   readLocalReconciliationRunHistoryTerminal,
@@ -349,6 +365,27 @@ export {
   type LocalReconciliationSecretConfigPlanDependencies,
   type LocalReconciliationSecretConfigTerminal,
 } from './reconciliation/application/secret-and-config/coordinator';
+export {
+  normalizeLocalReconciliationSecretConfigDecisionCommitCommand,
+  normalizeLocalReconciliationSecretConfigDecisionPrepareCommand,
+  normalizeLocalReconciliationSecretConfigDecisionVerifyCommand,
+  type LocalReconciliationSecretConfigDecisionCommitCommand,
+  type LocalReconciliationSecretConfigDecisionCommitOptions,
+  type LocalReconciliationSecretConfigDecisionOptions,
+  type LocalReconciliationSecretConfigDecisionPrepareCommand,
+  type LocalReconciliationSecretConfigDecisionPrepareResult,
+  type LocalReconciliationSecretConfigDecisionTerminalResult,
+  type LocalReconciliationSecretConfigDecisionVerifyCommand,
+} from './reconciliation/application/secret-and-config/decisionContract';
+export {
+  type LocalReconciliationSecretConfigDecisionDependencies,
+  type LocalReconciliationSecretConfigDecisionTerminal,
+} from './reconciliation/application/secret-and-config/decisionCoordinator';
+export {
+  type LocalReconciliationSecretConfigDecision,
+  type LocalReconciliationSecretConfigDecisionDisposition,
+  type LocalReconciliationSecretConfigDecisionReason,
+} from './reconciliation/application/secret-and-config/decisionFile';
 export {
   MAX_EDGE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES,
   MAX_STANDALONE_LOCAL_RECONCILIATION_SECRET_CONFIG_PLAN_BYTES,

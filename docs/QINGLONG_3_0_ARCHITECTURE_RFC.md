@@ -26,15 +26,21 @@
   的有界 content-free 投影与当前 head；`defer`、active Env 无已采纳 Legacy Task、历史 `Configs` 或 target 冲突都继续 manual。publisher 以 no-replace、
   `0400/0500`、文件/目录 `fsync` 发布 `plan.ndjson` 与 `receipt.json`，覆盖 plan、receipt、terminal seal、head CAS 四个 response-loss 窗口，并只允许
   `reconciliation_application_planned|reconciliation_automation_applied → reconciliation_secret_config_planned` 的合法单向推进；独立 verify 只读复算，不修复漂移。
-  全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。Local Admin 完整测试 `96/96`，Local Owner 完整测试 `287/280/7/0`；
-  后端完整门 `1563/1561/2/0`，18-package clean build/test `2934/2912/22/0`；package boundary、Cluster dependency、Edge import 与十四档
+  第四切片增加独立逐候选 signed decision：只有 ready、非空、无 manual/conflict 的 plan 才能 prepare；每条候选精确选择
+  `apply_active_binding`、`preserve_disabled` 或 `skip`，且 `skip` 必然形成 `manual_required`，不能造成部分 apply。decision 使用与 D-391 相同的强认证
+  reviewer，认证年龄最多 5 分钟、授权生命期最多 30 分钟；独立 HMAC domain 精确绑定 decision/SecretConfig/profile/plan/candidate/application/preparation/
+  prepared head/bundle/reviewer/time。Edge/Standalone decision 与 authorization 文件上限分别为 1/4 MiB，沿用 owner-only、sealed、no-replace 与 `fsync`；
+  lineage 仅允许 `reconciliation_secret_config_planned → reconciliation_secret_config_decision_prepared → reconciliation_secret_config_reviewed`，prepare/commit
+  的 publication response-loss 可精确重放而不重复认证，terminal verify 只读复算 sealed decision、authorization、receipt 与 reviewed head。
+  全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。Local Admin 完整测试 `96/96`，Local Owner 完整测试 `295/288/7/0`；
+  后端完整门 `1564/1562/2/0`，18-package clean build/test `2942/2920/22/0`；package boundary、Cluster dependency `62/62`、Edge import 与十四档
   Local artifact audit 全部 compatible，基础 Edge/Standalone 仍为 `2,611,978 / 2,612,056 bytes`、319 files、58 loaded modules，Owner-only authority
   没有进入低资源常驻制品。
-  Local Admin 保持 48/47，Local Owner 因两个职责明确的嵌套文件增至 178/177，根目录仍只有一个 50 行 binary entry；workspace 仍为 18 packages、
+  Local Admin 保持 48/47，Local Owner 因六个职责明确的 decision 嵌套文件增至 184/183，根目录仍只有一个 50 行 binary entry；workspace 仍为 18 packages、
   `singleSourcePackages=[]`、`shallowSourcePackages=[]`，且只允许 exact Secret/Config row planner 导入 inspection subpath。
 
   D-385～D-388 的 `config.sh`/Keyv/SSH data-directory lineage 与 SQLite `Envs` 保持分离；当前无稳定生产 schema 的历史 `Configs` 表继续 sealed+manual，
-  不猜字段。后续切片必须完成独立 signed decision、Secret envelope + audit + Task/Trigger/dispatch + receipt ledger 的单事务发布、prepared/apply/rollback
+  不猜字段。后续切片必须完成 Secret envelope + audit + Task/Trigger/dispatch + receipt ledger 的单事务发布、prepared/apply/rollback
   lineage、completion 下一 schema 与备份回收。D-397 apply 只声明 sealed source retained 且 `physicalErasureGuaranteed=false`；明文销毁必须在 restart/
   readiness、观察窗和 rollback retention 之后另行强认证。Cluster 必须使用 PostgreSQL SERIALIZABLE ledger、外部 KMS/Secret provider 与 HA evidence，
   不复用 Local SQLite/POSIX authority，也不得把明文写入 PostgreSQL、ConfigMap、Pod env 或 Job command。
