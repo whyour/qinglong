@@ -491,8 +491,8 @@ function composeDockerHarness(
             ],
             Labels: {
               'io.qinglong.local.sqlite-contract-min': '51',
-              'io.qinglong.local.sqlite-contract-max': '51',
-              'io.qinglong.local.sqlite-write-contract': '51',
+              'io.qinglong.local.sqlite-contract-max': '52',
+              'io.qinglong.local.sqlite-write-contract': '52',
               'io.qinglong.local.application-config': '2',
               'io.qinglong.local.compose-selection': '1',
               'io.qinglong.ai': 'excluded',
@@ -1200,8 +1200,8 @@ test('preflights exact local image, Compose merge and SQLite capability', async 
             ],
             Labels: {
               'io.qinglong.local.sqlite-contract-min': '51',
-              'io.qinglong.local.sqlite-contract-max': '51',
-              'io.qinglong.local.sqlite-write-contract': '51',
+              'io.qinglong.local.sqlite-contract-max': '52',
+              'io.qinglong.local.sqlite-write-contract': '52',
               'io.qinglong.local.application-config': '2',
               'io.qinglong.local.compose-selection': '1',
               'io.qinglong.ai': 'excluded',
@@ -1259,7 +1259,7 @@ test('preflights exact local image, Compose merge and SQLite capability', async 
   assert.equal(result.status, 'ready');
   assert.equal(result.generation, 1);
   assert.equal(result.profile, 'edge');
-  assert.equal(result.sqlite.contractVersion, 51);
+  assert.equal(result.sqlite.contractVersion, 52);
   assert.equal(result.image.architecture, 'arm64');
   assert.equal(calls.length, 2);
   assert.deepEqual(calls[0].slice(0, 2), ['image', 'inspect']);
@@ -1359,8 +1359,8 @@ test('applies one Compose generation and exactly replays its health receipt', as
   assert.equal(mode(receiptPath), 0o600);
   const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
   assert.deepEqual(receipt.sqlite, {
-    contractVersion: 51,
-    writeContractVersion: 51,
+    contractVersion: 52,
+    writeContractVersion: 52,
     writeObservation: 'unchanged',
     backup: null,
   });
@@ -1661,8 +1661,8 @@ test('rolls a failed Compose candidate forward to a healthy prior digest', async
     `${command.request.rolloutId}.sqlite`,
   );
   assert.equal(mode(backupPath), 0o600);
-  assert.equal(receipt.sqlite.contractVersion, 51);
-  assert.equal(receipt.sqlite.writeContractVersion, 51);
+  assert.equal(receipt.sqlite.contractVersion, 52);
+  assert.equal(receipt.sqlite.writeContractVersion, 52);
   assert.equal(receipt.sqlite.writeObservation, 'changed');
   assert.match(receipt.sqlite.backup.sha256, /^[0-9a-f]{64}$/);
   assert.equal(receipt.sqlite.backup.bytes > 0, true);

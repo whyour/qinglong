@@ -262,8 +262,8 @@ function auditDockerfile(contents, findings) {
     !contents.includes('io.qinglong.profile="edge,standalone"') ||
     !contents.includes('io.qinglong.local.application-config="2,3,4"') ||
     !contents.includes('io.qinglong.local.sqlite-contract-min="51"') ||
-    !contents.includes('io.qinglong.local.sqlite-contract-max="51"') ||
-    !contents.includes('io.qinglong.local.sqlite-write-contract="51"') ||
+    !contents.includes('io.qinglong.local.sqlite-contract-max="52"') ||
+    !contents.includes('io.qinglong.local.sqlite-write-contract="52"') ||
     !contents.includes('io.qinglong.local.compose-selection="1"')
   ) {
     addFinding(findings, 'RUNTIME_IDENTITY_OR_LABEL_DRIFT');
@@ -285,7 +285,7 @@ function auditWorkflow(contents, findings) {
     'pnpm audit:local-image:ql3',
     'docker build',
     '--file deploy/containers/ql3-local-application/Dockerfile',
-    'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 51 51 51 1',
+    'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 51 52 52 1',
     'actual="$(docker image inspect --format \'{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.local.application-config"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-min"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-max"}} {{index .Config.Labels "io.qinglong.local.sqlite-write-contract"}} {{index .Config.Labels "io.qinglong.local.compose-selection"}}\' "${IMAGE}")"',
     'io.qinglong.local.application-config',
     'io.qinglong.local.sqlite-contract-min',

@@ -12,7 +12,7 @@ import {
 } from '../run/stepRunSchemaContract';
 
 export const LOCAL_SQLITE_CONTRACT_NAME = 'local-control-core';
-export const LOCAL_SQLITE_CONTRACT_VERSION = 51;
+export const LOCAL_SQLITE_CONTRACT_VERSION = 52;
 
 const LEGACY_DATA_DIRECTORY_ADOPTION_TRIGGERS = Object.freeze([
   Object.freeze({
@@ -1439,6 +1439,96 @@ const REQUIRED_SCHEMA = Object.freeze({
       'ql3_legacy_adoption_triggers_item_uidx',
     ]),
   }),
+  QingLong3SecretConfigApplications: Object.freeze({
+    columns: Object.freeze([
+      'mutation_id',
+      'project_id',
+      'profile',
+      'secret_config_plan_digest',
+      'decision_digest',
+      'candidate_set_digest',
+      'automation_adoption_set_digest',
+      'active_binding_count',
+      'disabled_preservation_count',
+      'task_count',
+      'trigger_count',
+      'publication_digest',
+      'audit_event_id',
+      'applied_at_ms',
+      'receipt_digest',
+      'receipt_json',
+    ]),
+    indexes: Object.freeze([
+      'ql3_secret_config_applications_plan_uidx',
+      'ql3_secret_config_applications_decision_uidx',
+      'ql3_secret_config_applications_receipt_uidx',
+      'ql3_secret_config_applications_project_time_idx',
+    ]),
+  }),
+  QingLong3SecretConfigApplicationSecrets: Object.freeze({
+    columns: Object.freeze([
+      'application_mutation_id',
+      'ordinal',
+      'project_id',
+      'disposition',
+      'candidate_digest',
+      'source_set_digest',
+      'environment_name',
+      'secret_name',
+      'secret_version',
+      'secret_mutation_id',
+      'secret_ref',
+      'item_digest',
+    ]),
+    indexes: Object.freeze([
+      'ql3_secret_config_secrets_mutation_uidx',
+      'ql3_secret_config_secrets_candidate_uidx',
+      'ql3_secret_config_secrets_target_uidx',
+    ]),
+  }),
+  QingLong3SecretConfigApplicationTasks: Object.freeze({
+    columns: Object.freeze([
+      'application_mutation_id',
+      'ordinal',
+      'project_id',
+      'adoption_mutation_id',
+      'adoption_row_ordinal',
+      'task_id',
+      'previous_revision',
+      'previous_content_digest',
+      'task_revision',
+      'task_mutation_id',
+      'task_content_digest',
+      'item_digest',
+    ]),
+    indexes: Object.freeze([
+      'ql3_secret_config_tasks_identity_uidx',
+      'ql3_secret_config_tasks_mutation_uidx',
+    ]),
+  }),
+  QingLong3SecretConfigApplicationTriggers: Object.freeze({
+    columns: Object.freeze([
+      'application_mutation_id',
+      'ordinal',
+      'project_id',
+      'adoption_mutation_id',
+      'adoption_row_ordinal',
+      'adoption_trigger_ordinal',
+      'task_id',
+      'task_revision',
+      'trigger_id',
+      'previous_revision',
+      'previous_content_digest',
+      'trigger_revision',
+      'trigger_mutation_id',
+      'trigger_content_digest',
+      'item_digest',
+    ]),
+    indexes: Object.freeze([
+      'ql3_secret_config_triggers_identity_uidx',
+      'ql3_secret_config_triggers_mutation_uidx',
+    ]),
+  }),
   QingLong3LegacyDataDirectoryAdoptions: Object.freeze({
     columns: Object.freeze([
       'mutation_id',
@@ -2699,10 +2789,10 @@ export async function auditLocalSqliteReadiness(
       !capability ||
       capability.contract_name !== LOCAL_SQLITE_CONTRACT_NAME ||
       capability.contract_version !== LOCAL_SQLITE_CONTRACT_VERSION ||
-      capability.migration_id !== '0101-legacy-adoption-provenance' ||
+      capability.migration_id !== '0103-secret-config-applications' ||
       typeof capability.capabilities !== 'string' ||
       capability.capabilities !==
-        '{"run_core":1,"run_retry_policy":1,"completion_receipt_journal":1,"local_dispatch_plan":1,"local_secret_envelope":1,"local_project_policy":1,"local_project_administration":1,"local_security_audit":1,"local_security_audit_compaction":1,"local_secret_authorized_mutation":1,"local_identity":1,"local_api_credential":1,"local_identity_provisioning":1,"local_identity_credential_administration":1,"local_owner_bootstrap":1,"local_owner_delivery_acknowledgement":1,"api_credential_pepper_binding":1,"local_owner_pepper_catalog":1,"local_owner_credential_recovery":1,"local_owner_pepper_reference_inspection":1,"local_owner_pepper_material_gc":1,"local_owner_delivery_acknowledgement_gc":1,"task_definition":1,"local_execution_revision_digest":1,"trigger_definition":1,"legacy_adoption_ledger":1,"legacy_adoption_provenance":1,"legacy_data_directory_adoption":1,"local_scheduler_admission":1,"plugin_package_install":1,"approved_action":1,"plugin_package_admission":1,"approved_action_execution":1,"plugin_package_proposal":1,"plugin_package_materialized_revision":1,"plugin_package_secret_binding":1,"plugin_package_secret_binding_transition":1,"plugin_package_secret_binding_transition_receipt":1,"plugin_package_secret_materialization":1,"plugin_package_task_reconciliation":1,"project_tool_definition_snapshot":1,"step_run":1,"tool_execution_evidence":1,"tool_execution_start_barrier":1,"tool_invocation_artifact":1,"tool_execution_artifact_binding":1,"tool_execution_completion":1,"tool_execution_failure_completion":1,"tool_result_key_catalog":1,"tool_result_rekey":1,"plugin_package_quarantine":1,"plugin_package_lifecycle":1,"plugin_package_automation_publication":1,"plugin_package_automation_security_withdrawal":1,"plugin_package_workflow_admission":1,"plugin_package_workflow_run_list":1,"run_attempt_log_retention":1,"plugin_package_workflow_task_attempt_admission":1}' ||
+        '{"run_core":1,"run_retry_policy":1,"completion_receipt_journal":1,"local_dispatch_plan":1,"local_secret_envelope":1,"local_project_policy":1,"local_project_administration":1,"local_security_audit":1,"local_security_audit_compaction":1,"local_secret_authorized_mutation":1,"local_identity":1,"local_api_credential":1,"local_identity_provisioning":1,"local_identity_credential_administration":1,"local_owner_bootstrap":1,"local_owner_delivery_acknowledgement":1,"api_credential_pepper_binding":1,"local_owner_pepper_catalog":1,"local_owner_credential_recovery":1,"local_owner_pepper_reference_inspection":1,"local_owner_pepper_material_gc":1,"local_owner_delivery_acknowledgement_gc":1,"task_definition":1,"local_execution_revision_digest":1,"trigger_definition":1,"legacy_adoption_ledger":1,"legacy_adoption_provenance":1,"secret_config_application":1,"legacy_data_directory_adoption":1,"local_scheduler_admission":1,"plugin_package_install":1,"approved_action":1,"plugin_package_admission":1,"approved_action_execution":1,"plugin_package_proposal":1,"plugin_package_materialized_revision":1,"plugin_package_secret_binding":1,"plugin_package_secret_binding_transition":1,"plugin_package_secret_binding_transition_receipt":1,"plugin_package_secret_materialization":1,"plugin_package_task_reconciliation":1,"project_tool_definition_snapshot":1,"step_run":1,"tool_execution_evidence":1,"tool_execution_start_barrier":1,"tool_invocation_artifact":1,"tool_execution_artifact_binding":1,"tool_execution_completion":1,"tool_execution_failure_completion":1,"tool_result_key_catalog":1,"tool_result_rekey":1,"plugin_package_quarantine":1,"plugin_package_lifecycle":1,"plugin_package_automation_publication":1,"plugin_package_automation_security_withdrawal":1,"plugin_package_workflow_admission":1,"plugin_package_workflow_run_list":1,"run_attempt_log_retention":1,"plugin_package_workflow_task_attempt_admission":1}' ||
       typeof capability.updated_at_ms !== 'number' ||
       !Number.isSafeInteger(capability.updated_at_ms) ||
       capability.updated_at_ms < 0

@@ -90,6 +90,11 @@
       "require": "./dist/adoption/data-directory/applicationCommit.js",
       "default": "./dist/adoption/data-directory/applicationCommit.js"
     },
+    "./secret-config-application": {
+      "types": "./dist/adoption/secret-config/secretConfigApplicationDatabase.d.ts",
+      "require": "./dist/adoption/secret-config/secretConfigApplicationDatabase.js",
+      "default": "./dist/adoption/secret-config/secretConfigApplicationDatabase.js"
+    },
     "./plugin-package-install": {
       "types": "./dist/plugin-package/pluginPackageInstallRepository.d.ts",
       "require": "./dist/plugin-package/pluginPackageInstallRepository.js",

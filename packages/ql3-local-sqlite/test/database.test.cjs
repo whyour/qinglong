@@ -152,9 +152,11 @@ test('creates a reviewed edge database and opens runtime only after readiness', 
     '0100-capability-v50',
     '0101-legacy-adoption-provenance',
     '0102-capability-v51',
+    '0103-secret-config-applications',
+    '0104-capability-v52',
   ]);
   assert.equal(migrated.readiness.contractName, 'local-control-core');
-  assert.equal(migrated.readiness.contractVersion, 51);
+  assert.equal(migrated.readiness.contractVersion, 52);
   assert.equal(migrated.readiness.journalMode, 'delete');
   assert.equal(fs.statSync(databasePath).mode & 0o777, 0o600);
 
@@ -600,8 +602,8 @@ test('backfills v14 execution revisions with a verified independent digest', asy
           .get(),
       },
       {
-        contract_version: 51,
-        migration_id: '0101-legacy-adoption-provenance',
+        contract_version: 52,
+        migration_id: '0103-secret-config-applications',
       },
     );
   } finally {
@@ -788,19 +790,19 @@ test('excludes reviewed optional feature tables while preserving unknown table d
   const options = { databasePath, profile: 'edge' };
   await migrateLocalSqlitePath(options);
   const client = new DatabaseSync(databasePath);
-  assert.equal((await auditLocalSqlitePath(options)).tableCount, 85);
+  assert.equal((await auditLocalSqlitePath(options)).tableCount, 89);
   client.exec(
     'CREATE TABLE "ModelInvocationFeatureHead" (feature_id TEXT PRIMARY KEY)',
   );
   client.close();
 
-  assert.equal((await auditLocalSqlitePath(options)).tableCount, 85);
+  assert.equal((await auditLocalSqlitePath(options)).tableCount, 89);
 
   const unknownClient = new DatabaseSync(databasePath);
   unknownClient.exec('CREATE TABLE "UserExtensionData" (id TEXT PRIMARY KEY)');
   unknownClient.close();
 
-  assert.equal((await auditLocalSqlitePath(options)).tableCount, 86);
+  assert.equal((await auditLocalSqlitePath(options)).tableCount, 90);
 
   const triggerClient = new DatabaseSync(databasePath);
   triggerClient.exec(`

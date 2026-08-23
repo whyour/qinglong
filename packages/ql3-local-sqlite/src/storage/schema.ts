@@ -3472,6 +3472,259 @@ export const legacyAdoptionTriggers = sqliteTable(
   ],
 );
 
+export const secretConfigApplications = sqliteTable(
+  'QingLong3SecretConfigApplications',
+  {
+    mutationId: text('mutation_id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => localProjects.id, {
+        onDelete: 'restrict',
+        onUpdate: 'restrict',
+      }),
+    profile: text('profile').notNull(),
+    secretConfigPlanDigest: text('secret_config_plan_digest').notNull(),
+    decisionDigest: text('decision_digest').notNull(),
+    candidateSetDigest: text('candidate_set_digest').notNull(),
+    automationAdoptionSetDigest: text(
+      'automation_adoption_set_digest',
+    ).notNull(),
+    activeBindingCount: integer('active_binding_count').notNull(),
+    disabledPreservationCount: integer('disabled_preservation_count').notNull(),
+    taskCount: integer('task_count').notNull(),
+    triggerCount: integer('trigger_count').notNull(),
+    publicationDigest: text('publication_digest').notNull(),
+    auditEventId: text('audit_event_id')
+      .notNull()
+      .references(() => localSecurityAuditEvents.eventId, {
+        onDelete: 'restrict',
+        onUpdate: 'restrict',
+      }),
+    appliedAtMs: integer('applied_at_ms').notNull(),
+    receiptDigest: text('receipt_digest').notNull(),
+    receiptJson: text('receipt_json', { mode: 'json' })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      'ql3_secret_config_application_identity_check',
+      sql`length(${table.mutationId}) = 36 and replace(${table.mutationId}, '-', '') not glob '*[^0-9a-f]*' and length(${table.projectId}) between 1 and 128 and ${table.profile} in ('edge', 'standalone') and ${table.activeBindingCount} between 0 and 256 and ${table.disabledPreservationCount} between 0 and 512 and ${table.taskCount} between 0 and 100000 and ${table.triggerCount} between 0 and 500000 and ${table.appliedAtMs} >= 0`,
+    ),
+    check(
+      'ql3_secret_config_application_digest_check',
+      sql`length(${table.secretConfigPlanDigest}) = 64 and ${table.secretConfigPlanDigest} not glob '*[^0-9a-f]*' and length(${table.decisionDigest}) = 64 and ${table.decisionDigest} not glob '*[^0-9a-f]*' and length(${table.candidateSetDigest}) = 64 and ${table.candidateSetDigest} not glob '*[^0-9a-f]*' and length(${table.automationAdoptionSetDigest}) = 64 and ${table.automationAdoptionSetDigest} not glob '*[^0-9a-f]*' and length(${table.publicationDigest}) = 64 and ${table.publicationDigest} not glob '*[^0-9a-f]*' and length(${table.receiptDigest}) = 64 and ${table.receiptDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    uniqueIndex('ql3_secret_config_applications_plan_uidx').on(
+      table.secretConfigPlanDigest,
+    ),
+    uniqueIndex('ql3_secret_config_applications_decision_uidx').on(
+      table.decisionDigest,
+    ),
+    uniqueIndex('ql3_secret_config_applications_receipt_uidx').on(
+      table.receiptDigest,
+    ),
+    index('ql3_secret_config_applications_project_time_idx').on(
+      table.projectId,
+      table.appliedAtMs,
+    ),
+  ],
+);
+
+export const secretConfigApplicationSecrets = sqliteTable(
+  'QingLong3SecretConfigApplicationSecrets',
+  {
+    applicationMutationId: text('application_mutation_id').notNull(),
+    ordinal: integer('ordinal').notNull(),
+    projectId: text('project_id').notNull(),
+    disposition: text('disposition').notNull(),
+    candidateDigest: text('candidate_digest').notNull(),
+    sourceSetDigest: text('source_set_digest').notNull(),
+    environmentName: text('environment_name'),
+    secretName: text('secret_name').notNull(),
+    secretVersion: integer('secret_version').notNull(),
+    secretMutationId: text('secret_mutation_id').notNull(),
+    secretRef: text('secret_ref').notNull(),
+    itemDigest: text('item_digest').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.applicationMutationId, table.ordinal] }),
+    foreignKey({
+      columns: [table.applicationMutationId],
+      foreignColumns: [secretConfigApplications.mutationId],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [table.projectId, table.secretName, table.secretVersion],
+      foreignColumns: [
+        localSecretEnvelopes.projectId,
+        localSecretEnvelopes.name,
+        localSecretEnvelopes.version,
+      ],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    check(
+      'ql3_secret_config_secret_identity_check',
+      sql`${table.ordinal} between 1 and 768 and ${table.disposition} in ('active_binding', 'disabled_preservation') and ((${table.disposition} = 'active_binding' and ${table.environmentName} is not null) or (${table.disposition} = 'disabled_preservation' and ${table.environmentName} is null)) and ${table.secretVersion} = 1 and length(${table.secretMutationId}) = 36 and replace(${table.secretMutationId}, '-', '') not glob '*[^0-9a-f]*'`,
+    ),
+    check(
+      'ql3_secret_config_secret_digest_check',
+      sql`length(${table.candidateDigest}) = 64 and ${table.candidateDigest} not glob '*[^0-9a-f]*' and length(${table.sourceSetDigest}) = 64 and ${table.sourceSetDigest} not glob '*[^0-9a-f]*' and length(${table.itemDigest}) = 64 and ${table.itemDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    uniqueIndex('ql3_secret_config_secrets_mutation_uidx').on(
+      table.secretMutationId,
+    ),
+    uniqueIndex('ql3_secret_config_secrets_candidate_uidx').on(
+      table.candidateDigest,
+    ),
+    uniqueIndex('ql3_secret_config_secrets_target_uidx').on(
+      table.projectId,
+      table.secretName,
+    ),
+  ],
+);
+
+export const secretConfigApplicationTasks = sqliteTable(
+  'QingLong3SecretConfigApplicationTasks',
+  {
+    applicationMutationId: text('application_mutation_id').notNull(),
+    ordinal: integer('ordinal').notNull(),
+    projectId: text('project_id').notNull(),
+    adoptionMutationId: text('adoption_mutation_id').notNull(),
+    adoptionRowOrdinal: integer('adoption_row_ordinal').notNull(),
+    taskId: text('task_id').notNull(),
+    previousRevision: integer('previous_revision').notNull(),
+    previousContentDigest: text('previous_content_digest').notNull(),
+    taskRevision: integer('task_revision').notNull(),
+    taskMutationId: text('task_mutation_id').notNull(),
+    taskContentDigest: text('task_content_digest').notNull(),
+    itemDigest: text('item_digest').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.applicationMutationId, table.ordinal] }),
+    foreignKey({
+      columns: [table.applicationMutationId],
+      foreignColumns: [secretConfigApplications.mutationId],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [
+        table.adoptionMutationId,
+        table.adoptionRowOrdinal,
+        table.projectId,
+        table.taskId,
+        table.previousRevision,
+      ],
+      foreignColumns: [
+        legacyAdoptionTasks.adoptionMutationId,
+        legacyAdoptionTasks.rowOrdinal,
+        legacyAdoptionTasks.projectId,
+        legacyAdoptionTasks.taskId,
+        legacyAdoptionTasks.taskRevision,
+      ],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [table.projectId, table.taskId, table.taskRevision],
+      foreignColumns: [
+        taskDefinitionRevisions.projectId,
+        taskDefinitionRevisions.taskId,
+        taskDefinitionRevisions.revision,
+      ],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    check(
+      'ql3_secret_config_task_identity_check',
+      sql`${table.ordinal} between 1 and 100000 and ${table.adoptionRowOrdinal} between 1 and 100000 and ${table.previousRevision} = 1 and ${table.taskRevision} = 2 and length(${table.taskMutationId}) = 36 and replace(${table.taskMutationId}, '-', '') not glob '*[^0-9a-f]*'`,
+    ),
+    check(
+      'ql3_secret_config_task_digest_check',
+      sql`length(${table.previousContentDigest}) = 64 and ${table.previousContentDigest} not glob '*[^0-9a-f]*' and length(${table.taskContentDigest}) = 64 and ${table.taskContentDigest} not glob '*[^0-9a-f]*' and length(${table.itemDigest}) = 64 and ${table.itemDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    uniqueIndex('ql3_secret_config_tasks_identity_uidx').on(
+      table.projectId,
+      table.taskId,
+    ),
+    uniqueIndex('ql3_secret_config_tasks_mutation_uidx').on(
+      table.taskMutationId,
+    ),
+  ],
+);
+
+export const secretConfigApplicationTriggers = sqliteTable(
+  'QingLong3SecretConfigApplicationTriggers',
+  {
+    applicationMutationId: text('application_mutation_id').notNull(),
+    ordinal: integer('ordinal').notNull(),
+    projectId: text('project_id').notNull(),
+    adoptionMutationId: text('adoption_mutation_id').notNull(),
+    adoptionRowOrdinal: integer('adoption_row_ordinal').notNull(),
+    adoptionTriggerOrdinal: integer('adoption_trigger_ordinal').notNull(),
+    taskId: text('task_id').notNull(),
+    taskRevision: integer('task_revision').notNull(),
+    triggerId: text('trigger_id').notNull(),
+    previousRevision: integer('previous_revision').notNull(),
+    previousContentDigest: text('previous_content_digest').notNull(),
+    triggerRevision: integer('trigger_revision').notNull(),
+    triggerMutationId: text('trigger_mutation_id').notNull(),
+    triggerContentDigest: text('trigger_content_digest').notNull(),
+    itemDigest: text('item_digest').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.applicationMutationId, table.ordinal] }),
+    foreignKey({
+      columns: [table.applicationMutationId],
+      foreignColumns: [secretConfigApplications.mutationId],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [
+        table.adoptionMutationId,
+        table.adoptionRowOrdinal,
+        table.adoptionTriggerOrdinal,
+      ],
+      foreignColumns: [
+        legacyAdoptionTriggers.adoptionMutationId,
+        legacyAdoptionTriggers.rowOrdinal,
+        legacyAdoptionTriggers.triggerOrdinal,
+      ],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    foreignKey({
+      columns: [table.projectId, table.triggerId, table.triggerRevision],
+      foreignColumns: [
+        triggerRevisions.projectId,
+        triggerRevisions.triggerId,
+        triggerRevisions.revision,
+      ],
+    })
+      .onDelete('restrict')
+      .onUpdate('restrict'),
+    check(
+      'ql3_secret_config_trigger_identity_check',
+      sql`${table.ordinal} between 1 and 500000 and ${table.adoptionRowOrdinal} between 1 and 100000 and ${table.adoptionTriggerOrdinal} between 1 and 500000 and ${table.taskRevision} = 2 and ${table.previousRevision} = 1 and ${table.triggerRevision} = 2 and length(${table.triggerMutationId}) = 36 and replace(${table.triggerMutationId}, '-', '') not glob '*[^0-9a-f]*'`,
+    ),
+    check(
+      'ql3_secret_config_trigger_digest_check',
+      sql`length(${table.previousContentDigest}) = 64 and ${table.previousContentDigest} not glob '*[^0-9a-f]*' and length(${table.triggerContentDigest}) = 64 and ${table.triggerContentDigest} not glob '*[^0-9a-f]*' and length(${table.itemDigest}) = 64 and ${table.itemDigest} not glob '*[^0-9a-f]*'`,
+    ),
+    uniqueIndex('ql3_secret_config_triggers_identity_uidx').on(
+      table.projectId,
+      table.triggerId,
+    ),
+    uniqueIndex('ql3_secret_config_triggers_mutation_uidx').on(
+      table.triggerMutationId,
+    ),
+  ],
+);
+
 export const legacyDataDirectoryAdoptions = sqliteTable(
   'QingLong3LegacyDataDirectoryAdoptions',
   {
@@ -5326,6 +5579,10 @@ export const localSqliteSchema = Object.freeze({
   legacyAdoptions,
   legacyAdoptionTasks,
   legacyAdoptionTriggers,
+  secretConfigApplications,
+  secretConfigApplicationSecrets,
+  secretConfigApplicationTasks,
+  secretConfigApplicationTriggers,
   legacyDataDirectoryAdoptions,
   legacyDataDirectoryAdoptionSecrets,
   localIdentitySubjects,

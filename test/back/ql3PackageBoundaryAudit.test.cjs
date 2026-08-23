@@ -79,7 +79,7 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       },
       {
         directory: 'packages/ql3-local-sqlite/src/migrations',
-        directSourceFiles: 103,
+        directSourceFiles: 105,
         reviewKind: 'ordered_ledger',
       },
     ],
@@ -540,10 +540,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: localSqlite.rootSourceFileRoles,
     },
     {
-      sourceFiles: 206,
+      sourceFiles: 209,
       rootSourceFiles: 1,
       rootSourceLines: 31,
-      nestedSourceFiles: 205,
+      nestedSourceFiles: 208,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );

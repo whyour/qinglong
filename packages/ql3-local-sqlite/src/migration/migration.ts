@@ -112,6 +112,8 @@ import { local0099LegacyDataDirectoryAdoptionsMigration } from '../migrations/00
 import { local0100CapabilityV50Migration } from '../migrations/0100-capability-v50';
 import { local0101LegacyAdoptionProvenanceMigration } from '../migrations/0101-legacy-adoption-provenance';
 import { local0102CapabilityV51Migration } from '../migrations/0102-capability-v51';
+import { local0103SecretConfigApplicationsMigration } from '../migrations/0103-secret-config-applications';
+import { local0104CapabilityV52Migration } from '../migrations/0104-capability-v52';
 import type { LocalSqliteMigrationContext } from '../migrations/sqlMigration';
 import {
   LOCAL_SQLITE_MIGRATION_STREAM_ID,
@@ -236,6 +238,8 @@ export const localSqliteMigrationDefinition: MigrationStreamDefinition<LocalSqli
       local0100CapabilityV50Migration,
       local0101LegacyAdoptionProvenanceMigration,
       local0102CapabilityV51Migration,
+      local0103SecretConfigApplicationsMigration,
+      local0104CapabilityV52Migration,
     ]),
   });
 

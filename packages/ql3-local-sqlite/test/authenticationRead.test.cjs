@@ -25,7 +25,7 @@ test('authentication projection opens the target read-only without journal or fi
   try {
     assert.equal(database.profile, 'edge');
     assert.equal(database.readiness.contractName, 'local-control-core');
-    assert.equal(database.readiness.contractVersion, 51);
+    assert.equal(database.readiness.contractVersion, 52);
     assert.equal(await database.apiCredentials.resolve('absent'), null);
     assert.equal(await database.ownerPepper.resolveKey('absent'), null);
   } finally {

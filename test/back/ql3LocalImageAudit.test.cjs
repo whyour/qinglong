@@ -188,7 +188,7 @@ test('rejects removal of the SQLite rollout compatibility labels', () => {
     const dockerfilePath = path.join(current.target, 'Dockerfile');
     const dockerfile = fs
       .readFileSync(dockerfilePath, 'utf8')
-      .replace('  io.qinglong.local.sqlite-write-contract="51" \\\n', '');
+      .replace('  io.qinglong.local.sqlite-write-contract="52" \\\n', '');
     fs.writeFileSync(dockerfilePath, dockerfile);
     const report = auditLocalImageContract(current.root);
     assert.equal(report.compatible, false);
@@ -266,7 +266,7 @@ test('rejects a stale SQLite contract expectation in the native image CI gate', 
     const workflow = fs
       .readFileSync(workflowPath, 'utf8')
       .replace(
-        'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 51 51 51 1',
+        'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 51 52 52 1',
         'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 50 50 50 1',
       );
     fs.writeFileSync(workflowPath, workflow);

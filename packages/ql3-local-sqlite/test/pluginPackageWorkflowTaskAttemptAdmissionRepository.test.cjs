@@ -231,7 +231,7 @@ test('atomically admits the exact reconciled local Task revision and replays it'
       stepAttemptCount: 0,
     },
   );
-  assert.equal((await auditLocalSqliteReadiness(client)).contractVersion, 51);
+  assert.equal((await auditLocalSqliteReadiness(client)).contractVersion, 52);
 });
 
 test('bounds candidate paging before SQL and fences cancellation', async (t) => {

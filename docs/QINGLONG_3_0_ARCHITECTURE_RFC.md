@@ -6,10 +6,10 @@
 - 目标版本：QingLong 3.x
 - 作者：QingLong Maintainers
 - 创建日期：2026-07-17
-- 最后更新：2026-08-23
+- 最后更新：2026-08-24
 - 讨论范围：架构与演进路线，不包含最终 UI 视觉方案
 
-最新增量证据（2026-08-23）：
+最新增量证据（2026-08-24）：
 
 - D-397/ADR-0491（进行中）：Secret/Config reconciliation 已先冻结行为保持边界，不能把“密文已保存”冒充“任务已迁移”。2.x `Envs`
   的 active 行必须按 `isPinned DESC、position DESC、createdAt ASC、id ASC` 重放旧顺序，同名值用 `&` 形成唯一 effective Secret；该
@@ -37,18 +37,24 @@
   digest。Secret/Config planner 不再扫描 `legacy-cron:*` 或相信聚合计数，而是流式复算 provenance，并验证当前 Task/Trigger head、Trigger schedule 与非
   Plugin ownership。旧记录缺少逐项 provenance 为 `missing`，current revision/schedule/ownership 漂移为 `drifted`，两者都强制
   `manual_required`；不得猜测或自动回填。聚合 adoption 记录仍只保留 Edge/Standalone 128/512 条有界 Map，Task/Trigger 逐行读取，无目标规模 Set。
-  全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。Local SQLite、Local Admin 与 Local Owner 完整测试分别为 `241/241`、
-  `96/96` 与 `296 total / 289 pass / 7 conditional skip / 0 fail`；18-package clean build/test 在非沙箱环境全部通过。后端完整门在受限沙箱中为
-  `1544 total / 1531 pass / 11 loopback EPERM / 2 conditional skip`，四个受影响文件随后在非沙箱环境 `38/38` 通过，未发现代码失败。package
-  boundary、72 项 Cluster dependency/legacy boundary、Edge import、本地镜像与十四档 Local artifact audit 全部 compatible；基础 Edge/Standalone 为
-  `2,620,531 / 2,620,609 bytes`、321 files、58 loaded modules，Owner-only authority 没有进入低资源常驻制品。fresh Edge readiness 为 contract v51、
-  102 migrations、85 tables、SQLite 3.53.3、`DELETE` journal；PostgreSQL 18.6 arm64 physical HA 以 timeline `1 → 2`、146 gates 通过。
-  Local Admin 保持 48/47，Local Owner 因六个职责明确的 decision 嵌套文件增至 184/183，根目录仍只有一个 50 行 binary entry；workspace 仍为 18 packages、
-  `singleSourcePackages=[]`、`shallowSourcePackages=[]`，且只允许 exact Secret/Config row planner 导入 inspection subpath。
+  第六切片把原子 DML 下沉到既有 `@qinglong/local-sqlite/secret-config-application` 私有短生命周期 authority，不新增 package 或 Cluster 依赖。contract v52
+  增加 application/secret/task/trigger 四类 ledger；publisher 在一个 `BEGIN IMMEDIATE` 内复验 Project/RoleBinding、两次外部 authority、逐项 provenance、当前
+  Task/Trigger head、Plugin ownership 与每 Task Trigger 数量，然后同时写入加密 Secret、content-free audit、Task rev2、local dispatch、Trigger rev2、schedule
+  和 receipt。item 使用 deferred parent FK 流式落库，最终 receipt 才关闭父引用，因此最多 100,000 Task/500,000 Trigger 不进入 JS 全集或 O(N×M) 扫描。
+  commit response-loss exact replay 会重验 Secret envelope、Task/Trigger durable head 与 schedule；Secret 占用、provenance 缺项和提交前 authority 漂移均回滚全部 DML。
+  全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。v52 Local SQLite 完整测试为 `247/247`，publisher 定向回归 `6/6`；fresh Edge
+  readiness 为 contract v52、104 migrations、89 required tables、SQLite 3.53.3、`DELETE` journal。Local Owner 为
+  `296 total / 289 pass / 7 conditional skip / 0 fail`；18-package clean build 与逐包顺序测试单次退出 0，完整 backend 为
+  `1566 total / 1564 pass / 2 conditional skip / 0 fail`。package boundary、Cluster dependency/legacy boundary、122-module Edge import、本地镜像与
+  `14/14` Local artifact audit 全部 compatible；基础 Edge/Standalone 为 `2,635,529 / 2,635,607 bytes`、323 files、58 loaded modules，距 4 MiB
+  上限仍分别保留 `1,558,775 / 1,558,697 bytes`，且闭包只有 Local SQLite、runtime-core 与 SemVer，没有 Cluster/PostgreSQL 依赖。
+  Local SQLite 为 209 source / 208 nested / 1 root public export；Local Owner 保持 184/183，根目录仍只有一个 50 行 binary entry；workspace 仍为
+  18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`。本切片不改 PostgreSQL schema、连接、role、Pool、容器或 Kubernetes 拓扑，
+  因而不重跑且不重新占有 PostgreSQL HA 证明；相邻已通过的 remote CI/HA 只作为基线。
 
   D-385～D-388 的 `config.sh`/Keyv/SSH data-directory lineage 与 SQLite `Envs` 保持分离；当前无稳定生产 schema 的历史 `Configs` 表继续 sealed+manual，
-  不猜字段。后续切片必须完成 Secret envelope + audit + Task/Trigger/dispatch + receipt ledger 的单事务发布、prepared/apply/rollback
-  lineage、completion 下一 schema 与备份回收。D-397 apply 只声明 sealed source retained 且 `physicalErasureGuaranteed=false`；明文销毁必须在 restart/
+  不猜字段。后续切片必须完成 Owner prepared/apply/rollback、写前 backup、receipt/head/seal response-loss、completion 下一 schema 与备份回收。D-397 apply
+  只声明 sealed source retained 且 `physicalErasureGuaranteed=false`；明文销毁必须在 restart/
   readiness、观察窗和 rollback retention 之后另行强认证。Cluster 必须使用 PostgreSQL SERIALIZABLE ledger、外部 KMS/Secret provider 与 HA evidence，
   不复用 Local SQLite/POSIX authority，也不得把明文写入 PostgreSQL、ConfigMap、Pod env 或 Job command。
 
