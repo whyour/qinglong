@@ -11,7 +11,7 @@
 
 最新增量证据（2026-08-23）：
 
-- D-396/ADR-0490（进行中）：Run History 不再只有永久 `manual_external`，但也没有被错误实现为 Legacy 日志到 3.0 Run ledger 的回灌。
+- D-396/ADR-0490（已验收）：Run History 不再只有永久 `manual_external`，但也没有被错误实现为 Legacy 日志到 3.0 Run ledger 的回灌。
   新的 Local adapter 以 ADR-0482 sealed capture bundle 作为 append-only 保全资产：Legacy history 必须逐事实选择 `retain_both`，Target history
   必须选择 `retain_target`；receipt 只绑定 signed review、application、bundle fingerprint、领域 inventory 与有界 fact counts，不保存表名、Run ID、
   状态值、日志、路径或 row body。Target 只有在所有 Run 已 `succeeded|failed|cancelled|timed_out` 且有完成时间、没有 active Attempt、所有
@@ -23,11 +23,16 @@
   receipt no-replace 发布并封为 `0400/0500`，绑定 exact application/plan/head；跨领域 completion 以兼容 v1 的 schema v2 消费
   `run_history_preservation`，`adapterCount` 可为 `0|1|2`，因此 Automation 与 Run History 可以同时被证明而不产生 adapter 状态组合爆炸。
   当前聚焦 Run History `2/2`、旧 completion v1 `2/2`，已覆盖 publication/seal response loss、active Run、review escalation、receipt tamper、v2
-  completion 与 content-free CLI。完整 reconciliation 为 `48/46/2/0`，Local Owner 为 `273/266/7/0`，tracked backend 为
-  `1561/1559/2/0`，18-package clean build/test 为 `2919/2897/22/0`；package/dependency/source boundary、service-manager bridge、Edge import
+  completion 与 content-free CLI。完整 reconciliation 为 `48/46/2/0`，Local Owner 为 `273/266/7/0`，最终 tracked backend 为
+  `1562/1560/2/0`，18-package clean build/test 为 `2919/2897/22/0`；package/dependency/source boundary、service-manager bridge、Edge import
   与十四档 Local artifact audit 全部 compatible。workspace 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner
   为 `175/174/1`（source/nested/root binary entry）；基础 Edge/Standalone 制品仍为 `2,611,978 / 2,612,056 bytes`、319 files、58 modules，
-  一次性 Owner authority 未进入低资源常驻 runtime。远程 CI 尚未验证，ADR-0490 保持 Proposed。
+  一次性 Owner authority 未进入低资源常驻 runtime。实现提交为 [`42262094`](https://github.com/whyour/qinglong/commit/42262094cc573a63392576659367d2d80d036c89)；随后以
+  [`85e244f6`](https://github.com/whyour/qinglong/commit/85e244f6022a20813a8136a449d524e508c54373) 稳定 PostgreSQL 数据库时钟租约测试，并以
+  [`6001174e`](https://github.com/whyour/qinglong/commit/6001174e232b72ba12127158fc3618c8257c6138) 将 Provider live evidence 绑定到 exact rollout generation。
+  最终远程 [主 CI](https://github.com/whyour/qinglong/actions/runs/32623061467) `37/37 success`，四个 PostgreSQL 16/18 x64/arm64 矩阵、Provider K3s +
+  CloudNativePG material/CIDR rotation/failover 均通过；独立 [Kubernetes deployment live](https://github.com/whyour/qinglong/actions/runs/32623061462)
+  亦通过。ADR-0490 已转为 Accepted。
 
 - D-393/ADR-0486/ADR-0487（进行中）：首个 Automation adapter 已先建立独立的有界逐行 plan fence，而没有提前取得 DML authority。既有
   Legacy Crontab classifier 被复用于 exact sealed Legacy source；每行只记录 source/candidate digest、classification/reasons、proposed

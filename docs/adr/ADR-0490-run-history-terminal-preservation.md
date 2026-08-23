@@ -1,6 +1,6 @@
 # ADR-0490：Run History 终态保全与跨领域完成证明
 
-- 状态：Proposed（D-396 实现与本地完整门禁已完成，等待远程 CI）
+- 状态：Accepted（D-396 实现、本地完整门禁与远程 37-job CI 已通过）
 - 日期：2026-08-23
 - 决策：D-396
 - 关联：ADR-0482、ADR-0483、ADR-0484、ADR-0485、ADR-0488、ADR-0489
@@ -104,7 +104,9 @@ Edge/Standalone 每次最多打开一个 sealed SQLite handle，状态判定均�
 - 聚焦 Run History：`2/2`，覆盖终态 preserve/verify、两处 response-loss replay、v2 completion、CLI content-free、active Run blocked、人工越权拒绝与 sealed receipt 篡改。
 - 既有 completion v1 聚焦回归：`2/2`。
 - 完整 reconciliation：`48 total / 46 pass / 2 conditional Docker skip / 0 fail`；完整 Local Owner：`273 / 266 / 7 / 0`。
-- tracked backend：`1561 total / 1559 pass / 2 conditional skip / 0 fail`；18-package clean build/test：`2919 / 2897 / 22 / 0`。
+- tracked backend：D-396 实现提交为 `1561 total / 1559 pass / 2 conditional skip / 0 fail`；最终远程修复提交增加一项 rollout-generation 合同测试后为 `1562 / 1560 / 2 / 0`。18-package clean build/test 为 `2919 / 2897 / 22 / 0`。
 - package/dependency/source boundary、service-manager bridge import、Edge import 与十四档 Local artifact audit 全部 compatible；workspace 仍为 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`，Local Owner 为 `175 source / 174 nested / 1 root binary entry`。
 - 基础 Edge/Standalone 制品保持 `2,611,978 / 2,612,056 bytes`、319 files、58 loaded modules；本阶段未把一次性 Owner authority 带入常驻小设备 runtime。
-- 远程 CI 尚未验证，因此本 ADR 仍为 Proposed。
+- D-396 实现提交 [`42262094`](https://github.com/whyour/qinglong/commit/42262094cc573a63392576659367d2d80d036c89) 在远程暴露了两个与 Run History 领域逻辑无关、但会削弱总门稳定性的既存 live-test 时序问题：PostgreSQL claim takeover 只把过期时间置于数据库时钟前 1 ms，以及 Provider 证据在滚动发布后保存任意 Ready Pod 快照。
+- [`85e244f6`](https://github.com/whyour/qinglong/commit/85e244f6022a20813a8136a449d524e508c54373) 仅把测试夹具中的 claim 置于完整 30 秒租约之外，未改变生产租约语义；[`6001174e`](https://github.com/whyour/qinglong/commit/6001174e232b72ba12127158fc3618c8257c6138) 让 Provider 发布和每次瞬态证据重试都重新绑定 exact `qinglong.io/provider-generation` 的非终止 Ready Pod，并继续保留 UID/restartCount/requestCount 与 CIDR 断言。
+- 最终远程 [QingLong 3.0 CI](https://github.com/whyour/qinglong/actions/runs/32623061467) 为 `37/37 success`；此前失败的 PostgreSQL 16 arm64、其余 PostgreSQL 16/18 x64/arm64 矩阵及 Provider K3s + CloudNativePG material/CIDR rotation/failover gate 全部通过。独立 [Kubernetes deployment live contract](https://github.com/whyour/qinglong/actions/runs/32623061462) 同样通过，因此本 ADR 转为 Accepted。
