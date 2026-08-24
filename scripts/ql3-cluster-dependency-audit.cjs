@@ -2047,6 +2047,27 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/secret-and-config/application/coordinator.ts' &&
+          [
+            '@qinglong/local-admin/reconciliation-secret-and-config-application',
+            '@qinglong/local-owner-console/authenticated-command',
+            '@qinglong/local-sqlite/authentication-read',
+            '@qinglong/local-sqlite/rollout-safety',
+          ].includes(specifier)
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/secret-and-config/application/evidence.ts' &&
+          specifier === '@qinglong/local-sqlite/rollout-safety'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/secret-and-config/application/storage.ts' &&
+          specifier ===
+            '@qinglong/local-admin/reconciliation-secret-and-config-application'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/deployment/reconciliation/application/automation/applyEvidence.ts' &&
           specifier === '@qinglong/local-sqlite/rollout-safety'
         ) &&
@@ -2214,7 +2235,10 @@ function auditSourceImports(root, packagePath, findings) {
           (path.relative(packageDirectory, filePath) ===
             'src/plugin-package/pluginPackageSecretBinding.ts' &&
             specifier ===
-              '@qinglong/local-sqlite/plugin-package-secret-binding-administration')
+              '@qinglong/local-sqlite/plugin-package-secret-binding-administration') ||
+          (path.relative(packageDirectory, filePath) ===
+            'src/legacy-adoption/secret-and-config/reconciliationSecretConfigApplication.ts' &&
+            specifier === '@qinglong/local-sqlite/secret-config-application')
         )
       ) {
         findings.push({
@@ -2251,6 +2275,14 @@ function auditSourceImports(root, packagePath, findings) {
             [
               '@qinglong/runtime-core/local-secret',
               '@qinglong/runtime-core/security',
+            ].includes(specifier)) ||
+          (path.relative(packageDirectory, filePath) ===
+            'src/legacy-adoption/secret-and-config/reconciliationSecretConfigApplication.ts' &&
+            [
+              '@qinglong/runtime-core/local-secret',
+              '@qinglong/runtime-core/project-policy',
+              '@qinglong/runtime-core/security',
+              '@qinglong/runtime-core/security-audit',
             ].includes(specifier)) ||
           (path.relative(packageDirectory, filePath) ===
             'src/plugin-package/pluginPackageStaging.ts' &&
@@ -2979,6 +3011,16 @@ function auditSourceImports(root, packagePath, findings) {
         path.relative(packageDirectory, filePath) ===
           'src/lifecycle/data-directory-adoption/application/application.ts' &&
         specifier === '@qinglong/local-secret'
+      ) {
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-owner-cli' &&
+        path.relative(packageDirectory, filePath) ===
+          'src/deployment/reconciliation/application/secret-and-config/application/coordinator.ts' &&
+        ['@qinglong/local-secret', '@qinglong/runtime-core/security'].includes(
+          specifier,
+        )
       ) {
         continue;
       }

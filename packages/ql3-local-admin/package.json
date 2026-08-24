@@ -50,6 +50,11 @@
       "require": "./dist/legacy-adoption/secret-and-config/environmentInspection.js",
       "default": "./dist/legacy-adoption/secret-and-config/environmentInspection.js"
     },
+    "./reconciliation-secret-and-config-application": {
+      "types": "./dist/legacy-adoption/secret-and-config/reconciliationSecretConfigApplication.d.ts",
+      "require": "./dist/legacy-adoption/secret-and-config/reconciliationSecretConfigApplication.js",
+      "default": "./dist/legacy-adoption/secret-and-config/reconciliationSecretConfigApplication.js"
+    },
     "./reconciliation-automation-decision": {
       "types": "./dist/legacy-adoption/reconciliationAutomationDecision.d.ts",
       "require": "./dist/legacy-adoption/reconciliationAutomationDecision.js",

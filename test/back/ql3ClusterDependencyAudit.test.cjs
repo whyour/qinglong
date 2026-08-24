@@ -105,6 +105,87 @@ function fixture(t, packagePath, source, sourcePath = 'index.ts') {
   return root;
 }
 
+test('confines Secret/Config application authority to reviewed composition files', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-secret-config-application-boundary-'),
+  );
+  const sources = {
+    'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/application/coordinator.ts':
+      [
+        "import { prepare } from '@qinglong/local-admin/reconciliation-secret-and-config-application';",
+        "import { authenticate } from '@qinglong/local-owner-console/authenticated-command';",
+        "import { keyring } from '@qinglong/local-secret';",
+        "import { read } from '@qinglong/local-sqlite/authentication-read';",
+        "import { backup } from '@qinglong/local-sqlite/rollout-safety';",
+        "import type { Principal } from '@qinglong/runtime-core/security';",
+      ].join('\n'),
+    'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/application/evidence.ts':
+      "import type { Backup } from '@qinglong/local-sqlite/rollout-safety';",
+    'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/application/storage.ts':
+      "import type { Material } from '@qinglong/local-admin/reconciliation-secret-and-config-application';",
+    'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/application/widened.ts':
+      [
+        "import { prepare } from '@qinglong/local-admin/reconciliation-secret-and-config-application';",
+        "import { backup } from '@qinglong/local-sqlite/rollout-safety';",
+        "import type { Principal } from '@qinglong/runtime-core/security';",
+      ].join('\n'),
+    'packages/ql3-local-admin/src/legacy-adoption/secret-and-config/reconciliationSecretConfigApplication.ts':
+      [
+        "import { apply } from '@qinglong/local-sqlite/secret-config-application';",
+        "import { envelope } from '@qinglong/runtime-core/local-secret';",
+        "import { policy } from '@qinglong/runtime-core/project-policy';",
+        "import { principal } from '@qinglong/runtime-core/security';",
+        "import { audit } from '@qinglong/runtime-core/security-audit';",
+      ].join('\n'),
+    'packages/ql3-local-admin/src/legacy-adoption/secret-and-config/widened.ts':
+      [
+        "import { apply } from '@qinglong/local-sqlite/secret-config-application';",
+        "import { policy } from '@qinglong/runtime-core/project-policy';",
+      ].join('\n'),
+  };
+  for (const [relativePath, source] of Object.entries(sources)) {
+    const filePath = path.join(root, relativePath);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, source);
+  }
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-owner-cli', findings);
+  auditSourceImports(root, 'packages/ql3-local-admin', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/application/widened.ts',
+        specifier:
+          '@qinglong/local-admin/reconciliation-secret-and-config-application',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/application/widened.ts',
+        specifier: '@qinglong/local-sqlite/rollout-safety',
+      },
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/application/widened.ts',
+        specifier: '@qinglong/runtime-core/security',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADMIN_SQLITE_ENTRYPOINT',
+        file: 'packages/ql3-local-admin/src/legacy-adoption/secret-and-config/widened.ts',
+        specifier: '@qinglong/local-sqlite/secret-config-application',
+      },
+      {
+        code: 'FORBIDDEN_LOCAL_ADMIN_RUNTIME_CORE_ENTRYPOINT',
+        file: 'packages/ql3-local-admin/src/legacy-adoption/secret-and-config/widened.ts',
+        specifier: '@qinglong/runtime-core/project-policy',
+      },
+    ],
+  );
+});
+
 test('accepts package-local and declared forward source imports', (t) => {
   const root = fixture(
     t,

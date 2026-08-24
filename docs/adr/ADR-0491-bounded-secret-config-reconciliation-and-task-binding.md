@@ -1,6 +1,6 @@
 # ADR-0491：有界 Secret/Config Reconciliation 与任务环境绑定
 
-- 状态：Proposed（D-397 已实现 Legacy Env inspection、私有有界 row plan、durable plan publication、独立 signed decision、逐项 Automation adoption provenance 与 Local SQLite 原子 application publisher；Owner prepared/apply/rollback 编排尚未完成）
+- 状态：Proposed（D-397 已实现 Legacy Env inspection、私有有界 row plan、durable plan publication、独立 signed decision、逐项 Automation adoption provenance、Local SQLite 原子 application publisher 与 Owner prepared/apply/rollback 编排；跨领域 completion schema、真实 Edge 空间证据和 Cluster Secret provider live gate 尚未完成）
 - 日期：2026-08-23
 - 决策：D-397
 - 关联：ADR-0073、ADR-0074、ADR-0092、ADR-0094、ADR-0480、ADR-0482、ADR-0483、ADR-0484、ADR-0485、ADR-0486、ADR-0487、ADR-0488、ADR-0490
@@ -72,9 +72,9 @@ durable publisher 固定写入 `<secretConfigRoot>/<secretConfigId>/{plan.ndjson
 
 独立决策使用私有 NDJSON decision file，每个候选必须按 ordinal/digest 精确选择 `apply_active_binding/reviewed_active_binding`、`preserve_disabled/reviewed_disabled_preservation` 或 `skip/operator_excluded|target_conflict|security_review_required`。任何 `skip` 都把终态 outcome 降为 `manual_required`，不能被 application 当成部分成功；`no_effect` 不需要决策，manual/conflict plan 也不能通过强认证升级。签名授权使用与 D-391 review 相同的强认证 User，认证年龄最多 5 分钟、授权生命期最多 30 分钟，并以独立 HMAC domain 绑定 decision、Secret/Config plan、candidate set、application、preparation、prepared head、sealed bundle、reviewer 与时间。Edge/Standalone decision/authorization 文件分别限制为 1 MiB/4 MiB，沿用 owner-only `0700/0600`、sealed `0500/0400`、no-replace 与 `fsync`。lineage 单向推进 `reconciliation_secret_config_planned → reconciliation_secret_config_decision_prepared → reconciliation_secret_config_reviewed`；prepare/commit 的全部 publication response-loss 窗口都精确重放且不重复认证，terminal verify 只读复算 sealed decision、authorization、receipt 与当前 reviewed head。
 
-### 4. 原子 application 必须同时完成 custody 与行为绑定
+### 4. 原子 application 同时完成 custody 与行为绑定
 
-后续 D-397 application 必须在一个 `BEGIN IMMEDIATE` 事务内完成：
+D-397 application 已在一个 `BEGIN IMMEDIATE` 事务内完成：
 
 1. 复验 Project/RoleBinding fence、signed decision、sealed source、target snapshot 与当前 instance head；
 2. 为每个 active effective Env 写入加密 Local Secret envelope、content-free `secret.create` audit 与 adoption item；
@@ -85,7 +85,11 @@ durable publisher 固定写入 `<secretConfigRoot>/<secretConfigId>/{plan.ndjson
 
 任一 Secret、Task、Trigger、dispatch、audit、ledger 或 fence 冲突都回滚整个事务。禁止先提交 Secret 再逐任务修补，也禁止在现有 Task revision 上原地改 JSON。目标已有同名/同源 Secret、非 Legacy Task、Plugin-owned Task 或用户在 stopped window 中产生的 revision 都按冲突处理，不自动覆盖或重命名。
 
-由于该 adapter 执行 DML，它需要独立的 prepared/applied/rolled-back lineage 与写前 target backup；无 DML 的 Run History preservation 继续只绑定最新 head。跨领域 completion 后才可回收 Automation 与 Secret/Config 两份 rollback material。空间不足必须在 prepare 前失败，不得在低配设备上边写边赌。
+Owner 编排保留在既有 `local-owner-cli/deployment/reconciliation/application/secret-and-config/application/` 子域，不新增 package、常驻进程或依赖。它只把密文写入私有 `materials.ndjson`，单行不超过 64 KiB，Edge/Standalone 文件分别不超过 4/16 MiB；POSIX keyring 必须位于 deployment root 之外。编排在推进 head 前重新证明 stopped state、同一 reviewer 的 `local_console` 强认证与最多 5 分钟认证年龄，并先创建、校验 write-before SQLite v52 backup。空间不足、权限错误或 backup 漂移均发生在 prepared head 与任何 DML 之前，不得在低配设备上边写边赌。
+
+lineage 单向推进 `reconciliation_secret_config_reviewed → reconciliation_secret_config_apply_prepared → reconciliation_secret_config_applied`；回滚只允许从 applied 精确恢复写前 SQLite snapshot，再推进到 `reconciliation_secret_config_rolled_back`。material、backup、prepared head、数据库 commit、receipt、applied head、seal，以及 restore、rollback receipt/head/seal 的每个 response-loss 窗口都通过 immutable digest 与 durable target state 精确重放：intent 之前的孤儿密文会丢弃并重新生成，intent 之后只复用同一 ciphertext；数据库 commit 丢失响应时由 v52 publisher receipt 复验，不重复 DML。回滚保持原 SQLite 文件 identity 证明，任何 receipt/head/seal 漂移都失败关闭。
+
+无 DML 的 Run History preservation 继续只绑定最新 head。跨领域 completion 后才可回收 Automation 与 Secret/Config 两份 rollback material。
 
 ### 5. preserve、destroy 与 completion
 
@@ -137,8 +141,8 @@ Cluster 不得把 Legacy Env 明文写入 PostgreSQL、ConfigMap、Job command�
 
 ## 当前验证与后续门禁
 
-D-397 当前六切片已经实现：absent、unsupported、Edge over-budget、2.x 顺序、同名连接、disabled preservation、保留前缀、异常状态、effective overflow、candidate digest、content-free diagnostics、私有有界 row plan、目标 Secret 冲突、Automation adoption projection、no-effect/manual outcome、durable no-replace publication、terminal seal、head CAS、逐候选独立 signed decision、同一强认证 reviewer、decision/authorization byte bound、`skip → manual_required`、prepare/commit response-loss exact replay、只读 terminal verify、v51 逐 Task/Trigger adoption provenance，以及 v52 Local SQLite 原子 application publisher。v52 在一个 `BEGIN IMMEDIATE` 内复验 Project/RoleBinding、外部 authority、逐 Task/Trigger provenance、当前 head、Plugin ownership 与 Trigger 数量，流式写入加密 Secret、content-free audit、Task rev2、dispatch、Trigger rev2、schedule 和四类 application ledger；deferred parent FK 允许最多 100,000 Task/500,000 Trigger 逐项发布而不在 JS 堆保留全集。commit response-loss 通过 durable receipt exact replay，并重新验证 Secret envelope、Task/Trigger head 与 schedule；目标占用、provenance 缺项、提交前 authority 漂移均回滚全部 DML。
+D-397 当前七切片已经实现：absent、unsupported、Edge over-budget、2.x 顺序、同名连接、disabled preservation、保留前缀、异常状态、effective overflow、candidate digest、content-free diagnostics、私有有界 row plan、目标 Secret 冲突、Automation adoption projection、no-effect/manual outcome、durable no-replace publication、terminal seal、head CAS、逐候选独立 signed decision、同一强认证 reviewer、decision/authorization byte bound、`skip → manual_required`、prepare/commit response-loss exact replay、只读 terminal verify、v51 逐 Task/Trigger adoption provenance、v52 Local SQLite 原子 application publisher，以及 Owner prepared/apply/rollback orchestration。v52 在一个 `BEGIN IMMEDIATE` 内复验 Project/RoleBinding、外部 authority、逐 Task/Trigger provenance、当前 head、Plugin ownership 与 Trigger 数量，流式写入加密 Secret、content-free audit、Task rev2、dispatch、Trigger rev2、schedule 和四类 application ledger；deferred parent FK 允许最多 100,000 Task/500,000 Trigger 逐项发布而不在 JS 堆保留全集。Owner 在写前固定 backup 与 stopped proof，以有界 ciphertext-only material 连接 reviewed decision 和 publisher，并覆盖 apply/rollback 全部 response-loss 窗口。commit response-loss 通过 durable receipt exact replay，并重新验证 Secret envelope、Task/Trigger head 与 schedule；目标占用、provenance 缺项、提交前 authority 漂移均回滚全部 DML，rollback 则恢复写前 snapshot。
 
-本切片当前验证：Local SQLite `247/247`，其中 Secret/Config application publisher 定向回归 `6/6`；fresh Edge readiness 为 contract v52、104 migrations、89 required tables、SQLite 3.53.3、`DELETE` journal。Local Owner 为 `296 total / 289 pass / 7 conditional skip / 0 fail`；18-package clean build 与逐包顺序测试单次退出 0，完整 backend 为 `1566 total / 1564 pass / 2 conditional skip / 0 fail`。package boundary、Cluster dependency/legacy boundary、122-module Edge import、本地镜像与 `14/14` Local artifact audit 全部 compatible；基础 Edge/Standalone 为 `2,635,529 / 2,635,607 bytes`、323 files、58 loaded modules，且没有 Cluster/PostgreSQL 闭包。本切片不改 PostgreSQL schema、连接、role、Pool、容器或 Kubernetes 拓扑，因此不重跑且不重新占有 PostgreSQL HA 证明。
+本切片当前验证：Local SQLite `247/247`，其中 Secret/Config application publisher 定向回归 `6/6`；fresh Edge readiness 为 contract v52、104 migrations、89 required tables、SQLite 3.53.3、`DELETE` journal。Local Admin 为 `96/96`，Local Owner 为 `297 total / 290 pass / 7 conditional skip / 0 fail`；18-package clean build 与逐包顺序测试单次退出 0，完整 backend 为 `1567 total / 1565 pass / 2 conditional skip / 0 fail`。package boundary、精确 Cluster dependency/legacy boundary、122-module Edge import、本地镜像与 `14/14` Local artifact audit 全部 compatible；Local Admin 为 49 source / 48 nested / 1 root export，Local Owner 为 188/187/1，workspace 仍为 18 packages 且没有单文件或浅层 package。基础 Edge/Standalone 为 `2,635,529 / 2,635,607 bytes`、323 files、58 loaded modules，且没有 Cluster/PostgreSQL 闭包。本切片不改 PostgreSQL schema、连接、role、Pool、容器或 Kubernetes 拓扑，因此不重跑且不重新占有 PostgreSQL HA 证明。
 
-转为 Accepted 前仍必须完成：Owner prepared/apply/rollback 与写前 backup、application receipt/head/seal response-loss、completion schema 演进、真实 Edge 空间预算与 Cluster Secret provider live gate；本切片的 Local SQLite publisher 或 PostgreSQL HA 证据不得冒充 Owner 编排、外部密钥托管或跨领域 completion 已完成。
+转为 Accepted 前仍必须完成：completion schema 演进及 completion 后 rollback material 回收、真实 Edge 空间预算证据与 Cluster Secret provider live gate；本切片的 Local Owner 编排或 PostgreSQL HA 证据不得冒充外部密钥托管或跨领域 completion 已完成。

@@ -28,6 +28,7 @@ export interface LocalReconciliationSecretConfigDecisionRequirement {
   readonly candidateType: 'active_binding' | 'disabled_preservation';
   readonly candidateDigest: string;
   readonly sourceSetDigest: string;
+  readonly proposedSecretName: string;
   readonly requirement: LocalReconciliationSecretConfigCandidateRequirement;
 }
 
@@ -195,6 +196,7 @@ function candidate(
       | 'disabled_preservation',
     candidateDigest: record.candidateDigest,
     sourceSetDigest: record.sourceSetDigest,
+    proposedSecretName: record.proposedSecretName as string,
     requirement:
       record.requirement as LocalReconciliationSecretConfigCandidateRequirement,
   });

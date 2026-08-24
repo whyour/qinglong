@@ -12,6 +12,7 @@ const {
   commitLocalReconciliationApplication,
   commitLocalReconciliationAutomationDecision,
   commitLocalReconciliationSecretConfigDecision,
+  applyLocalReconciliationSecretConfig,
   completeLocalReconciliation,
   applyLocalReconciliationAutomation,
   commitLocalReconciliationPlan,
@@ -24,6 +25,7 @@ const {
   readLocalReconciliationAutomationDecisionTerminal,
   readLocalReconciliationSecretConfigDecisionTerminal,
   rollbackLocalReconciliationAutomationApply,
+  rollbackLocalReconciliationSecretConfigApply,
   planLocalReconciliationAutomation,
   planLocalReconciliationSecretConfig,
   prepareLocalReconciliationPlan,
@@ -32,6 +34,7 @@ const {
   verifyLocalReconciliationApplication,
   verifyLocalReconciliationAutomationDecision,
   verifyLocalReconciliationSecretConfigDecision,
+  verifyLocalReconciliationSecretConfigApply,
   verifyLocalReconciliationAutomationApply,
   verifyLocalReconciliationAutomationPlan,
   verifyLocalReconciliationSecretConfigPlan,
@@ -41,6 +44,7 @@ const {
   verifyLocalReconciliationRunHistory,
   writeLocalReconciliationReviewDiagnostics,
 } = require('../dist/deployment/localDeployment.js');
+const { provisionLocalSecretKeyring } = require('@qinglong/local-secret');
 const {
   normalizeLocalReconciliationCaptureManifest,
 } = require('../dist/deployment/reconciliation/bundle.js');
@@ -846,6 +850,20 @@ function secretConfigDatabaseInitializer({
     );
     assert.equal(migration.status, 0, migration.stderr);
     fs.chmodSync(targetDatabasePath, 0o600);
+    const target = new DatabaseSync(targetDatabasePath);
+    target.exec(`
+      INSERT INTO "QingLong3ProjectRoleBindings" (
+        "project_id", "subject_type", "subject_id", "version", "state",
+        "role", "mutation_id", "changed_by_type", "changed_by_id",
+        "created_at_ms"
+      ) VALUES (
+        'default', 'user', 'review-owner', 1, 'active', 'owner',
+        'secret-config-apply-owner-binding', 'user', 'review-owner', 1
+      );
+      PRAGMA wal_checkpoint(TRUNCATE);
+      PRAGMA journal_mode=DELETE;
+    `);
+    target.close();
   };
 }
 
@@ -3825,6 +3843,366 @@ test('Secret/Config decision reauthenticates the same reviewer, seals exact cand
     verifyLocalReconciliationSecretConfigDecision(verifyCommand),
     /authorization|file identity or size|file is incomplete/,
   );
+});
+
+test('Secret/Config apply publishes encrypted material atomically and recovers every apply and rollback boundary', async (t) => {
+  const state = await plannedSecretConfigDecisionFixture(t, {
+    suffix: 'apply-terminal',
+    planId: '00000000-0000-4000-8000-000000000437',
+    reviewId: '00000000-0000-4000-8000-000000000438',
+    applicationId: '00000000-0000-4000-8000-000000000439',
+    secretConfigId: '00000000-0000-4000-8000-00000000043a',
+  });
+  const decisionId = '019b0000-0000-7000-8000-000000000437';
+  const prepareCommand = secretConfigDecisionPrepareCommand(state, decisionId);
+  const prepared = await prepareLocalReconciliationSecretConfigDecision(
+    prepareCommand,
+  );
+  const review = secretConfigDecisionFile(
+    state,
+    { result: prepared },
+    [
+      {
+        disposition: 'preserve_disabled',
+        reason: 'reviewed_disabled_preservation',
+      },
+    ],
+    'apply-terminal',
+  );
+  const decision = secretConfigDecisionCommitFixture(
+    state,
+    { result: prepared, commandOptions: prepareCommand.options },
+    review.filePath,
+  );
+  const committed = await commitLocalReconciliationSecretConfigDecision(
+    decision.command,
+    decision.dependencies,
+  );
+  assert.equal(committed.outcome, 'ready');
+
+  const secretKeyringPath = path.join(
+    state.deploymentRoot,
+    'local-secret-keyring.json',
+  );
+  await provisionLocalSecretKeyring(secretKeyringPath);
+  const secretConfigApplyRoot = path.join(
+    path.dirname(state.captureRoot),
+    'secret-config-apply-terminal',
+  );
+  fs.mkdirSync(secretConfigApplyRoot, { mode: 0o700 });
+  const appliedAtMs = decision.command.request.committedAtMs + 1;
+  const applyOptions = {
+    ...prepareCommand.options,
+    secretConfigApplyRoot,
+    targetDatabasePath: state.targetDatabasePath,
+    secretKeyringPath,
+    ownerPepperKeyringDirectory:
+      state.command.options.ownerPepperKeyringDirectory,
+    credentialFilePath: state.command.options.credentialFilePath,
+  };
+  const applyCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.apply',
+    options: applyOptions,
+    request: {
+      decisionId,
+      secretConfigId: state.secretConfigId,
+      expectedDecisionDigest: committed.decisionDigest,
+      expectedHeadDigest: committed.instanceHeadDigest,
+      mutationId: '00000000-0000-4000-8000-00000000043b',
+      requestId: 'secret-config-apply-terminal',
+      appliedAtMs,
+    },
+  };
+  let authentications = 0;
+  let confirmations = 0;
+  let databaseCloses = 0;
+  const applyDependencies = {
+    async openAuthenticationDatabase() {
+      return {
+        async close() {
+          databaseCloses += 1;
+        },
+      };
+    },
+    async authenticate(_database, options) {
+      authentications += 1;
+      assert.equal(
+        options.authenticationNamespace,
+        'local_reconciliation_secret_config_apply',
+      );
+      const authenticatedAtMs = options.now();
+      return {
+        principal: {
+          subject: { type: 'user', id: 'review-owner' },
+          authenticationId: 'local_reconciliation_secret_config_apply:test',
+          authenticatedAtMs,
+          expiresAtMs: authenticatedAtMs + 60 * 60 * 1_000,
+          assurance: 'local_console',
+        },
+        databaseFence: {
+          credentialId: 'review-owner',
+          credentialVersion: 1,
+          pepperKeyId: 'review-owner-v1',
+          pepperVersion: 1,
+        },
+        async confirm() {
+          confirmations += 1;
+        },
+      };
+    },
+  };
+  const targetIdentity = fs.statSync(state.targetDatabasePath);
+  await assert.rejects(
+    applyLocalReconciliationSecretConfig(
+      {
+        ...applyCommand,
+        options: {
+          ...applyOptions,
+          secretKeyringPath: path.join(
+            path.dirname(state.deploymentRoot),
+            'outside-secret-keyring.json',
+          ),
+        },
+      },
+      applyDependencies,
+    ),
+    /authentication or Secret material must be below deploymentRoot/,
+  );
+  for (const boundary of ['afterMaterialPublished']) {
+    await assert.rejects(
+      applyLocalReconciliationSecretConfig(applyCommand, {
+        ...applyDependencies,
+        [boundary]() {
+          throw new Error(`secret config apply ${boundary} response loss`);
+        },
+      }),
+      new RegExp(`secret config apply ${boundary} response loss`),
+    );
+  }
+  await assert.rejects(
+    applyLocalReconciliationSecretConfig(applyCommand, {
+      ...applyDependencies,
+      async createBackup() {
+        const error = new Error('router storage is full');
+        error.code = 'ENOSPC';
+        throw error;
+      },
+    }),
+    /router storage is full/,
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(secretConfigApplyRoot, state.secretConfigId, 'intent.json'),
+    ),
+    false,
+  );
+  assert.equal(
+    readLocalCutoverInstanceHead(
+      state.deploymentRoot,
+      state.captureCommand.request.instanceId,
+      state.uid,
+    ).state,
+    'reconciliation_secret_config_reviewed',
+  );
+  for (const boundary of ['afterBackupPublished', 'afterPreparedHead']) {
+    await assert.rejects(
+      applyLocalReconciliationSecretConfig(applyCommand, {
+        ...applyDependencies,
+        [boundary]() {
+          throw new Error(`secret config apply ${boundary} response loss`);
+        },
+      }),
+      new RegExp(`secret config apply ${boundary} response loss`),
+    );
+  }
+  await assert.rejects(
+    applyLocalReconciliationSecretConfig(applyCommand, {
+      ...applyDependencies,
+      async authenticate(database, options) {
+        const authenticated = await applyDependencies.authenticate(
+          database,
+          options,
+        );
+        return {
+          ...authenticated,
+          principal: {
+            ...authenticated.principal,
+            subject: { type: 'user', id: 'another-owner' },
+          },
+        };
+      },
+    }),
+    /current reviewer authentication is not strong or identical/,
+  );
+  for (const boundary of [
+    'afterDatabaseCommit',
+    'afterReceiptPublished',
+    'afterAppliedHead',
+    'afterAppliedSeal',
+  ]) {
+    await assert.rejects(
+      applyLocalReconciliationSecretConfig(applyCommand, {
+        ...applyDependencies,
+        [boundary]() {
+          throw new Error(`secret config apply ${boundary} response loss`);
+        },
+      }),
+      new RegExp(`secret config apply ${boundary} response loss`),
+    );
+  }
+  const applied = await applyLocalReconciliationSecretConfig(
+    applyCommand,
+    applyDependencies,
+  );
+  assert.equal(applied.status, 'existing');
+  assert.equal(applied.state, 'reconciliation_secret_config_applied');
+  assert.equal(applied.activeBindingCount, 0);
+  assert.equal(applied.disabledPreservationCount, 1);
+  assert.equal(fs.statSync(state.targetDatabasePath).ino, targetIdentity.ino);
+  const target = new DatabaseSync(state.targetDatabasePath, {
+    readOnly: true,
+  });
+  assert.equal(
+    target
+      .prepare(
+        'SELECT count(*) AS count FROM "QingLong3SecretConfigApplications"',
+      )
+      .get().count,
+    1,
+  );
+  assert.equal(
+    target
+      .prepare('SELECT count(*) AS count FROM "QingLong3LocalSecretEnvelopes"')
+      .get().count,
+    1,
+  );
+  target.close();
+  const evidenceRoot = path.join(secretConfigApplyRoot, state.secretConfigId);
+  const materialsPath = path.join(evidenceRoot, 'materials.ndjson');
+  const materialText = fs.readFileSync(materialsPath, 'utf8');
+  assert.equal(materialText.includes('private-secret-value'), false);
+  assert.equal(materialText.includes('DISABLED_TOKEN'), false);
+  assert.equal(fs.statSync(evidenceRoot).mode & 0o777, 0o500);
+  assert.equal(fs.statSync(materialsPath).mode & 0o777, 0o400);
+  assert.deepEqual(fs.readdirSync(evidenceRoot).sort(), [
+    'backup',
+    'intent.json',
+    'materials.ndjson',
+    'receipt.json',
+    'rollback-work',
+  ]);
+  const verified = await verifyLocalReconciliationSecretConfigApply({
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.apply.verify',
+    options: applyOptions,
+    request: {
+      decisionId,
+      secretConfigId: state.secretConfigId,
+      expectedApplyDigest: applied.applyDigest,
+    },
+  });
+  assert.equal(verified.status, 'verified');
+  const verifyPath = path.join(
+    state.deploymentRoot,
+    'secret-config-apply-verify.json',
+  );
+  fs.writeFileSync(
+    verifyPath,
+    `${JSON.stringify({
+      schemaVersion: 1,
+      operation: 'local.deployment.reconciliation.secret-config.apply.verify',
+      options: applyOptions,
+      request: {
+        decisionId,
+        secretConfigId: state.secretConfigId,
+        expectedApplyDigest: applied.applyDigest,
+      },
+    })}\n`,
+    { mode: 0o600 },
+  );
+  const verifyCli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '../dist/deployment/localDeploymentCli.js'),
+      'reconciliation-secret-config-apply-verify',
+      '--command-file',
+      verifyPath,
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(verifyCli.status, 0, verifyCli.stderr);
+  assert.equal(JSON.parse(verifyCli.stdout).status, 'verified');
+  assert.equal(verifyCli.stdout.includes('private-secret-value'), false);
+
+  const rollbackCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.apply.rollback',
+    options: applyOptions,
+    request: {
+      decisionId,
+      secretConfigId: state.secretConfigId,
+      expectedApplyDigest: applied.applyDigest,
+      expectedHeadDigest: applied.instanceHeadDigest,
+      rolledBackAtMs: appliedAtMs + 1,
+    },
+  };
+  for (const boundary of [
+    'afterRestore',
+    'afterRollbackReceipt',
+    'afterRollbackHead',
+    'afterRollbackSeal',
+  ]) {
+    await assert.rejects(
+      rollbackLocalReconciliationSecretConfigApply(rollbackCommand, {
+        ...applyDependencies,
+        [boundary]() {
+          throw new Error(`secret config rollback ${boundary} response loss`);
+        },
+      }),
+      new RegExp(`secret config rollback ${boundary} response loss`),
+    );
+  }
+  const rolledBack = await rollbackLocalReconciliationSecretConfigApply(
+    rollbackCommand,
+    applyDependencies,
+  );
+  assert.equal(rolledBack.status, 'existing');
+  assert.equal(rolledBack.state, 'reconciliation_secret_config_rolled_back');
+  assert.equal(fs.statSync(state.targetDatabasePath).ino, targetIdentity.ino);
+  assert.deepEqual(fs.readdirSync(path.join(evidenceRoot, 'backup')), []);
+  assert.deepEqual(fs.readdirSync(path.join(evidenceRoot, 'rollback-work')), [
+    'receipt.json',
+  ]);
+  const restored = new DatabaseSync(state.targetDatabasePath, {
+    readOnly: true,
+  });
+  assert.equal(
+    restored
+      .prepare(
+        'SELECT count(*) AS count FROM "QingLong3SecretConfigApplications"',
+      )
+      .get().count,
+    0,
+  );
+  restored.close();
+  const rollbackVerified = await verifyLocalReconciliationSecretConfigApply({
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.apply.verify',
+    options: applyOptions,
+    request: {
+      decisionId,
+      secretConfigId: state.secretConfigId,
+      expectedApplyDigest: applied.applyDigest,
+    },
+  });
+  assert.equal(
+    rollbackVerified.state,
+    'reconciliation_secret_config_rolled_back',
+  );
+  assert.ok(authentications >= 3);
+  assert.ok(confirmations >= 4);
+  assert.equal(databaseCloses, authentications);
 });
 
 test('Secret/Config decision rejects manual plans, invalid candidate choices and reviewer drift', async (t) => {

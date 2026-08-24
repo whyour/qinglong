@@ -42,18 +42,25 @@
   Task/Trigger head、Plugin ownership 与每 Task Trigger 数量，然后同时写入加密 Secret、content-free audit、Task rev2、local dispatch、Trigger rev2、schedule
   和 receipt。item 使用 deferred parent FK 流式落库，最终 receipt 才关闭父引用，因此最多 100,000 Task/500,000 Trigger 不进入 JS 全集或 O(N×M) 扫描。
   commit response-loss exact replay 会重验 Secret envelope、Task/Trigger durable head 与 schedule；Secret 占用、provenance 缺项和提交前 authority 漂移均回滚全部 DML。
+  第七切片在同一 Secret/Config application 子域补齐 Owner `prepared → apply → rollback`，仍不新增 package、dependency 或常驻进程。Owner 只持有私有
+  ciphertext-only `materials.ndjson`，单行上限 64 KiB，Edge/Standalone 总量上限 4/16 MiB，且 keyring 必须位于 deployment root 之外；intent 之前的孤儿
+  material 丢弃并重新生成，intent 之后只重放同一 ciphertext。编排先复验 stopped proof、同一 reviewer 的 5 分钟内 `local_console` 强认证并完成 write-before
+  SQLite backup，随后单向推进 `reconciliation_secret_config_reviewed → reconciliation_secret_config_apply_prepared → reconciliation_secret_config_applied`。
+  material、backup、prepared head、数据库 commit、receipt、applied head 与 seal 的 response-loss 均精确恢复；rollback 只从 applied 恢复 exact 写前 snapshot，
+  再覆盖 restore、rollback receipt/head/seal 的 response-loss 并推进 `reconciliation_secret_config_rolled_back`。ENOSPC、权限错误或 backup 漂移发生在 head/DML 前，
+  适用于小型路由设备；该一次性 Owner authority 不进入常驻 Application 制品。
   全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。v52 Local SQLite 完整测试为 `247/247`，publisher 定向回归 `6/6`；fresh Edge
-  readiness 为 contract v52、104 migrations、89 required tables、SQLite 3.53.3、`DELETE` journal。Local Owner 为
-  `296 total / 289 pass / 7 conditional skip / 0 fail`；18-package clean build 与逐包顺序测试单次退出 0，完整 backend 为
-  `1566 total / 1564 pass / 2 conditional skip / 0 fail`。package boundary、Cluster dependency/legacy boundary、122-module Edge import、本地镜像与
+  readiness 为 contract v52、104 migrations、89 required tables、SQLite 3.53.3、`DELETE` journal。Local Admin 为 `96/96`，Local Owner 为
+  `297 total / 290 pass / 7 conditional skip / 0 fail`；18-package clean build 与逐包顺序测试单次退出 0，完整 backend 为
+  `1567 total / 1565 pass / 2 conditional skip / 0 fail`。package boundary、精确 Cluster dependency/legacy boundary、122-module Edge import、本地镜像与
   `14/14` Local artifact audit 全部 compatible；基础 Edge/Standalone 为 `2,635,529 / 2,635,607 bytes`、323 files、58 loaded modules，距 4 MiB
   上限仍分别保留 `1,558,775 / 1,558,697 bytes`，且闭包只有 Local SQLite、runtime-core 与 SemVer，没有 Cluster/PostgreSQL 依赖。
-  Local SQLite 为 209 source / 208 nested / 1 root public export；Local Owner 保持 184/183，根目录仍只有一个 50 行 binary entry；workspace 仍为
+  Local SQLite 为 209 source / 208 nested / 1 root public export；Local Admin 为 49/48/1，Local Owner 为 188/187/1，根目录仍只有一个 50 行 binary entry；workspace 仍为
   18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`。本切片不改 PostgreSQL schema、连接、role、Pool、容器或 Kubernetes 拓扑，
   因而不重跑且不重新占有 PostgreSQL HA 证明；相邻已通过的 remote CI/HA 只作为基线。
 
   D-385～D-388 的 `config.sh`/Keyv/SSH data-directory lineage 与 SQLite `Envs` 保持分离；当前无稳定生产 schema 的历史 `Configs` 表继续 sealed+manual，
-  不猜字段。后续切片必须完成 Owner prepared/apply/rollback、写前 backup、receipt/head/seal response-loss、completion 下一 schema 与备份回收。D-397 apply
+  不猜字段。后续切片必须完成 completion 下一 schema 与跨领域完成后的备份回收、真实 Edge 空间证据和 Cluster Secret provider live gate。D-397 apply
   只声明 sealed source retained 且 `physicalErasureGuaranteed=false`；明文销毁必须在 restart/
   readiness、观察窗和 rollback retention 之后另行强认证。Cluster 必须使用 PostgreSQL SERIALIZABLE ledger、外部 KMS/Secret provider 与 HA evidence，
   不复用 Local SQLite/POSIX authority，也不得把明文写入 PostgreSQL、ConfigMap、Pod env 或 Job command。

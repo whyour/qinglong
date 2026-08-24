@@ -171,6 +171,14 @@ import {
   verifyLocalReconciliationSecretConfigDecisionCommandFile,
 } from './reconciliation/application/secret-and-config/decisionCoordinator';
 import {
+  applyLocalReconciliationSecretConfig,
+  applyLocalReconciliationSecretConfigCommandFile,
+  rollbackLocalReconciliationSecretConfigApply,
+  rollbackLocalReconciliationSecretConfigApplyCommandFile,
+  verifyLocalReconciliationSecretConfigApply,
+  verifyLocalReconciliationSecretConfigApplyCommandFile,
+} from './reconciliation/application/secret-and-config/application/coordinator';
+import {
   preserveLocalReconciliationRunHistory,
   preserveLocalReconciliationRunHistoryCommandFile,
   readLocalReconciliationRunHistoryTerminal,
@@ -234,6 +242,12 @@ export {
   verifyLocalReconciliationSecretConfigDecision,
   verifyLocalReconciliationSecretConfigDecisionCommandFile,
   readLocalReconciliationSecretConfigDecisionTerminal,
+  applyLocalReconciliationSecretConfig,
+  applyLocalReconciliationSecretConfigCommandFile,
+  verifyLocalReconciliationSecretConfigApply,
+  verifyLocalReconciliationSecretConfigApplyCommandFile,
+  rollbackLocalReconciliationSecretConfigApply,
+  rollbackLocalReconciliationSecretConfigApplyCommandFile,
   preserveLocalReconciliationRunHistory,
   preserveLocalReconciliationRunHistoryCommandFile,
   readLocalReconciliationRunHistoryTerminal,
@@ -381,6 +395,17 @@ export {
   type LocalReconciliationSecretConfigDecisionDependencies,
   type LocalReconciliationSecretConfigDecisionTerminal,
 } from './reconciliation/application/secret-and-config/decisionCoordinator';
+export {
+  normalizeLocalReconciliationSecretConfigApplyCommand,
+  normalizeLocalReconciliationSecretConfigApplyRollbackCommand,
+  normalizeLocalReconciliationSecretConfigApplyVerifyCommand,
+  type LocalReconciliationSecretConfigApplyCommand,
+  type LocalReconciliationSecretConfigApplyOptions,
+  type LocalReconciliationSecretConfigApplyResult,
+  type LocalReconciliationSecretConfigApplyRollbackCommand,
+  type LocalReconciliationSecretConfigApplyVerifyCommand,
+} from './reconciliation/application/secret-and-config/application/contract';
+export { type LocalReconciliationSecretConfigApplyDependencies } from './reconciliation/application/secret-and-config/application/coordinator';
 export {
   type LocalReconciliationSecretConfigDecision,
   type LocalReconciliationSecretConfigDecisionDisposition,

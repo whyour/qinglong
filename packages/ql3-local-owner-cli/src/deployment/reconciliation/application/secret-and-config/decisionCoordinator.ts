@@ -1132,6 +1132,7 @@ export async function readLocalReconciliationSecretConfigDecisionTerminal(
   >,
   secretConfigId: string,
   uid: number,
+  acceptedSuccessorStates: readonly LocalCutoverInstanceHead['state'][] = [],
 ): Promise<Readonly<LocalReconciliationSecretConfigDecisionTerminal>> {
   for (const [directory, label] of [
     [options.deploymentRoot, 'deploymentRoot'],
@@ -1171,11 +1172,15 @@ export async function readLocalReconciliationSecretConfigDecisionTerminal(
     intent.instanceId,
     uid,
   );
-  if (
-    head.state !== 'reconciliation_secret_config_reviewed' ||
-    head.previousHeadDigest !== receipt.preparedHeadDigest ||
-    head.sourceRecordDigest !== receipt.decisionDigest
-  ) {
+  const reviewed =
+    head.state === 'reconciliation_secret_config_reviewed' &&
+    head.previousHeadDigest === receipt.preparedHeadDigest &&
+    head.sourceRecordDigest === receipt.decisionDigest;
+  const successor =
+    acceptedSuccessorStates.includes(head.state) &&
+    head.generation === intent.generation &&
+    head.updatedAtMs >= receipt.issuedAtMs;
+  if (!reviewed && !successor) {
     configurationError('terminal decision is detached from instance head');
   }
   return Object.freeze({
