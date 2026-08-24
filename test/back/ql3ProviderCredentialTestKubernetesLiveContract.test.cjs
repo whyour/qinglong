@@ -390,6 +390,19 @@ test('retries only bounded transient provider evidence failures', async () => {
     ),
     /invalid evidence schema/,
   );
+
+  attempts = 0;
+  await assert.rejects(
+    retryProviderEvidence(
+      async () => {
+        attempts += 1;
+        throw new Error('{"code":"ECONNREFUSED"}');
+      },
+      async () => {},
+    ),
+    /ECONNREFUSED/,
+  );
+  assert.equal(attempts, 8);
 });
 
 test('provider fixture logs only generation and authorization decision', () => {

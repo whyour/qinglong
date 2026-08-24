@@ -1109,7 +1109,8 @@ async function retryProviderEvidence(read, pause = undefined) {
   assert.equal(typeof read, 'function');
   assert.ok(pause === undefined || typeof pause === 'function');
   let lastError;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  const maxAttempts = 8;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       return await read();
     } catch (error) {
@@ -1118,12 +1119,12 @@ async function retryProviderEvidence(read, pause = undefined) {
         !/\b(?:ECONNREFUSED|ECONNRESET|ETIMEDOUT|TIMEOUT)\b/.test(
           error instanceof Error ? error.message : String(error),
         ) ||
-        attempt === 3
+        attempt === maxAttempts
       ) {
         throw error;
       }
       await (
-        pause ?? (() => new Promise((resolve) => setTimeout(resolve, 500)))
+        pause ?? (() => new Promise((resolve) => setTimeout(resolve, 1_000)))
       )();
     }
   }
