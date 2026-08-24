@@ -17,11 +17,19 @@ export interface LocalReconciliationCompletionAutomationOptions {
   readonly targetDatabasePath: string;
 }
 
+export interface LocalReconciliationCompletionSecretConfigOptions {
+  readonly secretConfigRoot: string;
+  readonly secretConfigDecisionRoot: string;
+  readonly secretConfigApplyRoot: string;
+  readonly targetDatabasePath: string;
+}
+
 export interface LocalReconciliationCompletionOptions {
   readonly deploymentRoot: string;
   readonly applicationRoot: string;
   readonly completionRoot: string;
   readonly automation: Readonly<LocalReconciliationCompletionAutomationOptions> | null;
+  readonly secretConfig: Readonly<LocalReconciliationCompletionSecretConfigOptions> | null;
   readonly runHistory: Readonly<LocalReconciliationCompletionRunHistoryOptions> | null;
   readonly allowRootService: boolean;
 }
@@ -37,13 +45,19 @@ export interface LocalReconciliationCompletionAutomationBinding {
   readonly expectedApplyDigest: string;
 }
 
+export interface LocalReconciliationCompletionSecretConfigBinding {
+  readonly secretConfigId: string;
+  readonly decisionId: string;
+  readonly expectedApplyDigest: string;
+}
+
 export interface LocalReconciliationCompletionRunHistoryBinding {
   readonly preservationId: string;
   readonly expectedPreservationDigest: string;
 }
 
 export interface LocalReconciliationCompleteCommand {
-  readonly schemaVersion: 1 | 2;
+  readonly schemaVersion: 1 | 2 | 3;
   readonly operation: 'local.deployment.reconciliation.complete';
   readonly options: Readonly<LocalReconciliationCompletionOptions>;
   readonly request: Readonly<{
@@ -52,13 +66,14 @@ export interface LocalReconciliationCompleteCommand {
     expectedApplicationPlanDigest: string;
     expectedHeadDigest: string;
     automation: Readonly<LocalReconciliationCompletionAutomationBinding> | null;
+    secretConfig: Readonly<LocalReconciliationCompletionSecretConfigBinding> | null;
     runHistory: Readonly<LocalReconciliationCompletionRunHistoryBinding> | null;
     completedAtMs: number;
   }>;
 }
 
 export interface LocalReconciliationCompletionVerifyCommand {
-  readonly schemaVersion: 1 | 2;
+  readonly schemaVersion: 1 | 2 | 3;
   readonly operation: 'local.deployment.reconciliation.complete.verify';
   readonly options: Readonly<LocalReconciliationCompletionOptions>;
   readonly request: Readonly<{
@@ -66,6 +81,7 @@ export interface LocalReconciliationCompletionVerifyCommand {
     applicationId: string;
     expectedCompletionDigest: string;
     automation: Readonly<LocalReconciliationCompletionAutomationBinding> | null;
+    secretConfig: Readonly<LocalReconciliationCompletionSecretConfigBinding> | null;
     runHistory: Readonly<LocalReconciliationCompletionRunHistoryBinding> | null;
   }>;
 }
@@ -81,7 +97,7 @@ export interface LocalReconciliationCompletionResult {
   readonly applicationId: string;
   readonly completionDigest: string;
   readonly domainCount: 8;
-  readonly adapterCount: 0 | 1 | 2;
+  readonly adapterCount: 0 | 1 | 2 | 3;
   readonly instanceHeadDigest: string;
 }
 
@@ -180,9 +196,41 @@ function normalizeAutomationOptions(
   });
 }
 
+function normalizeSecretConfigOptions(
+  value: unknown,
+): Readonly<LocalReconciliationCompletionSecretConfigOptions> | null {
+  if (value === null) return null;
+  const selected = record(value, 'secret config options');
+  exact(
+    selected,
+    [
+      'secretConfigApplyRoot',
+      'secretConfigDecisionRoot',
+      'secretConfigRoot',
+      'targetDatabasePath',
+    ],
+    'secret config options',
+  );
+  return Object.freeze({
+    secretConfigRoot: safePath(selected.secretConfigRoot, 'secretConfigRoot'),
+    secretConfigDecisionRoot: safePath(
+      selected.secretConfigDecisionRoot,
+      'secretConfigDecisionRoot',
+    ),
+    secretConfigApplyRoot: safePath(
+      selected.secretConfigApplyRoot,
+      'secretConfigApplyRoot',
+    ),
+    targetDatabasePath: safePath(
+      selected.targetDatabasePath,
+      'targetDatabasePath',
+    ),
+  });
+}
+
 function normalizeOptions(
   value: unknown,
-  schemaVersion: 1 | 2,
+  schemaVersion: 1 | 2 | 3,
 ): Readonly<LocalReconciliationCompletionOptions> {
   const selected = record(value, 'options');
   exact(
@@ -195,6 +243,15 @@ function normalizeOptions(
           'completionRoot',
           'deploymentRoot',
         ]
+      : schemaVersion === 2
+      ? [
+          'allowRootService',
+          'applicationRoot',
+          'automation',
+          'completionRoot',
+          'deploymentRoot',
+          'runHistory',
+        ]
       : [
           'allowRootService',
           'applicationRoot',
@@ -202,6 +259,7 @@ function normalizeOptions(
           'completionRoot',
           'deploymentRoot',
           'runHistory',
+          'secretConfig',
         ],
     'options',
   );
@@ -212,8 +270,14 @@ function normalizeOptions(
     fail('command identity is invalid');
   }
   const automation = normalizeAutomationOptions(selected.automation);
+  const secretConfig =
+    schemaVersion === 3
+      ? normalizeSecretConfigOptions(selected.secretConfig)
+      : null;
   const runHistory =
     schemaVersion === 1
+      ? null
+      : schemaVersion === 3 && selected.runHistory === null
       ? null
       : normalizeRunHistoryOptions(selected.runHistory);
   const normalized = Object.freeze({
@@ -221,6 +285,7 @@ function normalizeOptions(
     applicationRoot: safePath(selected.applicationRoot, 'applicationRoot'),
     completionRoot: safePath(selected.completionRoot, 'completionRoot'),
     automation,
+    secretConfig,
     runHistory,
     allowRootService: selected.allowRootService,
   }) as Readonly<LocalReconciliationCompletionOptions>;
@@ -234,6 +299,13 @@ function normalizeOptions(
           automation.automationRoot,
           automation.automationDecisionRoot,
           automation.automationApplyRoot,
+        ]),
+    ...(secretConfig === null
+      ? []
+      : [
+          secretConfig.secretConfigRoot,
+          secretConfig.secretConfigDecisionRoot,
+          secretConfig.secretConfigApplyRoot,
         ]),
     ...(runHistory === null ? [] : [runHistory.runHistoryRoot]),
   ];
@@ -256,6 +328,23 @@ function normalizeOptions(
     )
   ) {
     fail('targetDatabasePath overlaps an authority root');
+  }
+  if (
+    secretConfig !== null &&
+    roots.some(
+      (root) =>
+        overlaps(root, secretConfig.targetDatabasePath) ||
+        overlaps(secretConfig.targetDatabasePath, root),
+    )
+  ) {
+    fail('targetDatabasePath overlaps an authority root');
+  }
+  if (
+    automation !== null &&
+    secretConfig !== null &&
+    automation.targetDatabasePath !== secretConfig.targetDatabasePath
+  ) {
+    fail('adapter targetDatabasePath values differ');
   }
   if (
     runHistory !== null &&
@@ -305,6 +394,30 @@ function normalizeAutomationBinding(
   });
 }
 
+function normalizeSecretConfigBinding(
+  value: unknown,
+): Readonly<LocalReconciliationCompletionSecretConfigBinding> | null {
+  if (value === null) return null;
+  const selected = record(value, 'secret config binding');
+  exact(
+    selected,
+    ['decisionId', 'expectedApplyDigest', 'secretConfigId'],
+    'secret config binding',
+  );
+  return Object.freeze({
+    secretConfigId: identifier(
+      selected.secretConfigId,
+      UUID_V4,
+      'secretConfigId',
+    ),
+    decisionId: identifier(selected.decisionId, UUID_V7, 'decisionId'),
+    expectedApplyDigest: digest(
+      selected.expectedApplyDigest,
+      'expectedApplyDigest',
+    ),
+  });
+}
+
 function normalizeRunHistoryBinding(
   value: unknown,
 ): Readonly<LocalReconciliationCompletionRunHistoryBinding> {
@@ -335,7 +448,9 @@ function command(value: unknown, operation: string) {
     'command',
   );
   if (
-    (selected.schemaVersion !== 1 && selected.schemaVersion !== 2) ||
+    (selected.schemaVersion !== 1 &&
+      selected.schemaVersion !== 2 &&
+      selected.schemaVersion !== 3) ||
     selected.operation !== operation
   ) {
     fail('command version or operation is invalid');
@@ -362,6 +477,16 @@ export function normalizeLocalReconciliationCompleteCommand(
           'expectedApplicationPlanDigest',
           'expectedHeadDigest',
         ]
+      : selected.schemaVersion === 2
+      ? [
+          'applicationId',
+          'automation',
+          'completedAtMs',
+          'completionId',
+          'expectedApplicationPlanDigest',
+          'expectedHeadDigest',
+          'runHistory',
+        ]
       : [
           'applicationId',
           'automation',
@@ -370,6 +495,7 @@ export function normalizeLocalReconciliationCompleteCommand(
           'expectedApplicationPlanDigest',
           'expectedHeadDigest',
           'runHistory',
+          'secretConfig',
         ],
     'request',
   );
@@ -403,8 +529,14 @@ export function normalizeLocalReconciliationCompleteCommand(
         'expectedHeadDigest',
       ),
       automation: normalizeAutomationBinding(selected.request.automation),
+      secretConfig:
+        selected.schemaVersion === 3
+          ? normalizeSecretConfigBinding(selected.request.secretConfig)
+          : null,
       runHistory:
         selected.schemaVersion === 1
+          ? null
+          : selected.schemaVersion === 3 && selected.request.runHistory === null
           ? null
           : normalizeRunHistoryBinding(selected.request.runHistory),
       completedAtMs: selected.request.completedAtMs as number,
@@ -428,12 +560,21 @@ export function normalizeLocalReconciliationCompletionVerifyCommand(
           'completionId',
           'expectedCompletionDigest',
         ]
+      : selected.schemaVersion === 2
+      ? [
+          'applicationId',
+          'automation',
+          'completionId',
+          'expectedCompletionDigest',
+          'runHistory',
+        ]
       : [
           'applicationId',
           'automation',
           'completionId',
           'expectedCompletionDigest',
           'runHistory',
+          'secretConfig',
         ],
     'request',
   );
@@ -457,8 +598,14 @@ export function normalizeLocalReconciliationCompletionVerifyCommand(
         'expectedCompletionDigest',
       ),
       automation: normalizeAutomationBinding(selected.request.automation),
+      secretConfig:
+        selected.schemaVersion === 3
+          ? normalizeSecretConfigBinding(selected.request.secretConfig)
+          : null,
       runHistory:
         selected.schemaVersion === 1
+          ? null
+          : selected.schemaVersion === 3 && selected.request.runHistory === null
           ? null
           : normalizeRunHistoryBinding(selected.request.runHistory),
     }),

@@ -570,6 +570,78 @@ export function validateLocalReconciliationSecretConfigAppliedStorage(
   validateBackup(selected, intent, uid, [0o400]);
 }
 
+/**
+ * Collects the rollback copy only after the cross-domain completion head is
+ * durable. Encrypted material and receipts remain sealed as audit evidence.
+ * The partially collected layout is accepted so a response loss can replay.
+ */
+export function collectLocalReconciliationSecretConfigCompletedStorage(
+  selected: Readonly<LocalReconciliationSecretConfigApplyPaths>,
+  intent: Readonly<LocalReconciliationSecretConfigApplyIntent>,
+  uid: number,
+): void {
+  directoryMode(selected.root, uid, [0o500], 'root');
+  directoryMode(selected.backupRoot, uid, [0o700, 0o500], 'backup root');
+  directoryMode(
+    selected.rollbackRoot,
+    uid,
+    [0o700, 0o500],
+    'rollback work root',
+  );
+  validateLocalReconciliationSecretConfigApplyCatalog(selected);
+  if (fs.readdirSync(selected.rollbackRoot).length !== 0) {
+    fail('rollback work root must be empty');
+  }
+  readLocalReconciliationSecretConfigApplyIntent(selected, uid);
+  readLocalReconciliationSecretConfigApplyReceipt(selected, uid);
+  readLocalReconciliationSecretConfigMaterials(
+    selected,
+    intent.profile,
+    uid,
+    intent.material,
+  );
+  if (fs.existsSync(selected.backup)) {
+    validateBackup(selected, intent, uid, [0o400]);
+    if ((fs.statSync(selected.backupRoot).mode & 0o777) !== 0o700) {
+      fs.chmodSync(selected.backupRoot, 0o700);
+      syncDirectory(selected.root);
+    }
+    unlinkIfPresent(selected.backup);
+  }
+  sealDirectory(selected.backupRoot, uid, 'backup root');
+  sealDirectory(selected.rollbackRoot, uid, 'rollback work root');
+  validateLocalReconciliationSecretConfigCompletedStorage(
+    selected,
+    intent,
+    uid,
+  );
+}
+
+export function validateLocalReconciliationSecretConfigCompletedStorage(
+  selected: Readonly<LocalReconciliationSecretConfigApplyPaths>,
+  intent: Readonly<LocalReconciliationSecretConfigApplyIntent>,
+  uid: number,
+): void {
+  directoryMode(selected.root, uid, [0o500], 'root');
+  directoryMode(selected.backupRoot, uid, [0o500], 'backup root');
+  directoryMode(selected.rollbackRoot, uid, [0o500], 'rollback work root');
+  validateLocalReconciliationSecretConfigApplyCatalog(selected);
+  if (fs.readdirSync(selected.backupRoot).length !== 0) {
+    fail('backup root must be empty');
+  }
+  if (fs.readdirSync(selected.rollbackRoot).length !== 0) {
+    fail('rollback work root must be empty');
+  }
+  readLocalReconciliationSecretConfigApplyIntent(selected, uid);
+  readLocalReconciliationSecretConfigApplyReceipt(selected, uid);
+  readLocalReconciliationSecretConfigMaterials(
+    selected,
+    intent.profile,
+    uid,
+    intent.material,
+  );
+}
+
 export function prepareLocalReconciliationSecretConfigRollbackSource(
   selected: Readonly<LocalReconciliationSecretConfigApplyPaths>,
   intent: Readonly<LocalReconciliationSecretConfigApplyIntent>,

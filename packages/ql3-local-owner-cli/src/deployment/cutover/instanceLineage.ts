@@ -501,7 +501,8 @@ export function advanceLocalCutoverInstanceHead(
       current.state === 'reconciliation_secret_config_applied') ||
     (state === 'reconciliation_completed' &&
       (current.state === 'reconciliation_application_planned' ||
-        current.state === 'reconciliation_automation_applied')) ||
+        current.state === 'reconciliation_automation_applied' ||
+        current.state === 'reconciliation_secret_config_applied')) ||
     (state === 'rollback_prepared' && current.state === 'target_stopped') ||
     (state === 'legacy_restart_requested' &&
       current.state === 'rollback_prepared') ||

@@ -33,6 +33,20 @@ import type {
   LocalReconciliationAutomationApplyReceipt,
 } from '../application/automation/applyEvidence';
 import { readLocalReconciliationAutomationDecisionTerminal } from '../application/automation/decisionCoordinator';
+import { readLocalReconciliationSecretConfigDecisionTerminal } from '../application/secret-and-config/decisionCoordinator';
+import type {
+  LocalReconciliationSecretConfigApplyIntent,
+  LocalReconciliationSecretConfigApplyReceipt,
+} from '../application/secret-and-config/application/evidence';
+import {
+  collectLocalReconciliationSecretConfigCompletedStorage,
+  localReconciliationSecretConfigApplyPaths,
+  readLocalReconciliationSecretConfigApplyIntent,
+  readLocalReconciliationSecretConfigApplyReceipt,
+  validateLocalReconciliationSecretConfigAppliedStorage,
+  validateLocalReconciliationSecretConfigApplyCatalog,
+  validateLocalReconciliationSecretConfigCompletedStorage,
+} from '../application/secret-and-config/application/storage';
 import {
   readLocalReconciliationRunHistoryTerminal,
   type LocalReconciliationRunHistoryDependencies,
@@ -66,6 +80,14 @@ interface AutomationProof {
   readonly intent: Readonly<LocalReconciliationAutomationApplyIntent>;
   readonly receipt: Readonly<LocalReconciliationAutomationApplyReceipt>;
   readonly paths: ReturnType<typeof localReconciliationAutomationApplyPaths>;
+  readonly storageState: 'applied' | 'completed';
+}
+
+interface SecretConfigProof {
+  readonly intent: Readonly<LocalReconciliationSecretConfigApplyIntent>;
+  readonly receipt: Readonly<LocalReconciliationSecretConfigApplyReceipt>;
+  readonly paths: ReturnType<typeof localReconciliationSecretConfigApplyPaths>;
+  readonly storageState: 'applied' | 'completed';
 }
 
 interface RunHistoryProof {
@@ -79,6 +101,7 @@ export interface LocalReconciliationCompletionDependencies
   readonly afterTerminalSealed?: () => void;
   readonly afterHeadAdvanced?: () => void;
   readonly afterBackupCollected?: () => void;
+  readonly afterSecretConfigBackupCollected?: () => void;
 }
 
 async function runHistoryProof(
@@ -444,6 +467,134 @@ async function automationProof(
   ) {
     fail('automation apply evidence is detached');
   }
+  if (command.request.secretConfig === null) {
+    const current = await (
+      dependencies.inspectSnapshot ?? inspectLocalSqliteSnapshot
+    )({
+      databasePath: options.targetDatabasePath,
+      profile: intent.profile,
+    });
+    if (current.sha256 !== receipt.targetAfter.sha256) {
+      fail('automation target drifted after apply');
+    }
+  }
+  const storageState = fs.existsSync(selected.backup)
+    ? ('applied' as const)
+    : ('completed' as const);
+  if (storageState === 'applied') {
+    validateLocalReconciliationAutomationAppliedStorage(selected, intent, uid);
+  } else {
+    validateLocalReconciliationAutomationCompletedStorage(selected, uid);
+  }
+  return Object.freeze({
+    intent,
+    receipt,
+    paths: selected,
+    storageState,
+  });
+}
+
+async function secretConfigProof(
+  command: Readonly<LocalReconciliationCompleteCommand>,
+  terminal: Readonly<LocalReconciliationApplicationTerminal>,
+  automation: Readonly<AutomationProof> | null,
+  uid: number,
+  dependencies: LocalReconciliationCompletionDependencies,
+): Promise<Readonly<SecretConfigProof> | null> {
+  const secretConfigDomain = terminal.plan.domains.find(
+    (domain) => domain.domain === 'secret_and_config',
+  );
+  if (!secretConfigDomain) fail('secret and config domain is absent');
+  if (secretConfigDomain.action === 'no_effect') {
+    if (
+      command.options.secretConfig !== null ||
+      command.request.secretConfig !== null
+    ) {
+      fail('no-effect completion must not carry secret config authority');
+    }
+    return null;
+  }
+  if (
+    secretConfigDomain.action === 'manual_external' &&
+    command.options.secretConfig === null &&
+    command.request.secretConfig === null
+  ) {
+    return null;
+  }
+  if (
+    secretConfigDomain.action !== 'manual_external' ||
+    command.options.secretConfig === null ||
+    command.request.secretConfig === null
+  ) {
+    fail('secret and config domain is not terminally provable');
+  }
+  const options = command.options.secretConfig;
+  const binding = command.request.secretConfig;
+  for (const [directory, label] of [
+    [options.secretConfigRoot, 'secretConfigRoot'],
+    [options.secretConfigDecisionRoot, 'secretConfigDecisionRoot'],
+    [options.secretConfigApplyRoot, 'secretConfigApplyRoot'],
+  ] as const) {
+    validatePrivateDirectory(directory, uid, label);
+  }
+  const decision = await readLocalReconciliationSecretConfigDecisionTerminal(
+    {
+      deploymentRoot: command.options.deploymentRoot,
+      applicationRoot: command.options.applicationRoot,
+      secretConfigRoot: options.secretConfigRoot,
+      secretConfigDecisionRoot: options.secretConfigDecisionRoot,
+      allowRootService: command.options.allowRootService,
+    },
+    binding.secretConfigId,
+    uid,
+    [
+      'reconciliation_secret_config_applied',
+      'reconciliation_secret_config_rolled_back',
+      'reconciliation_completed',
+    ],
+  );
+  if (
+    decision.receipt.decisionId !== binding.decisionId ||
+    decision.receipt.outcome !== 'ready' ||
+    decision.context.application.plan.applicationPlanDigest !==
+      terminal.plan.applicationPlanDigest
+  ) {
+    fail('secret config decision is detached from application authority');
+  }
+  const selected = localReconciliationSecretConfigApplyPaths(
+    options.secretConfigApplyRoot,
+    binding.secretConfigId,
+  );
+  validateLocalReconciliationSecretConfigApplyCatalog(selected);
+  const intent = readLocalReconciliationSecretConfigApplyIntent(selected, uid);
+  const receipt = readLocalReconciliationSecretConfigApplyReceipt(
+    selected,
+    uid,
+  );
+  if (
+    intent.command.options.deploymentRoot !== command.options.deploymentRoot ||
+    intent.command.options.applicationRoot !==
+      command.options.applicationRoot ||
+    intent.command.options.secretConfigRoot !== options.secretConfigRoot ||
+    intent.command.options.secretConfigDecisionRoot !==
+      options.secretConfigDecisionRoot ||
+    intent.command.options.secretConfigApplyRoot !==
+      options.secretConfigApplyRoot ||
+    intent.command.options.targetDatabasePath !== options.targetDatabasePath ||
+    intent.command.request.secretConfigId !== binding.secretConfigId ||
+    intent.command.request.decisionId !== binding.decisionId ||
+    intent.command.request.expectedDecisionDigest !==
+      decision.receipt.decisionDigest ||
+    receipt.secretConfigId !== binding.secretConfigId ||
+    receipt.decisionId !== binding.decisionId ||
+    receipt.applyDigest !== binding.expectedApplyDigest ||
+    receipt.preparationDigest !== intent.preparationDigest ||
+    (automation !== null &&
+      intent.backup.sha256 !== automation.receipt.targetAfter.sha256) ||
+    fs.existsSync(selected.rollbackReceipt)
+  ) {
+    fail('secret config apply evidence is detached');
+  }
   const current = await (
     dependencies.inspectSnapshot ?? inspectLocalSqliteSnapshot
   )({
@@ -451,14 +602,36 @@ async function automationProof(
     profile: intent.profile,
   });
   if (current.sha256 !== receipt.targetAfter.sha256) {
-    fail('automation target drifted after apply');
+    fail('secret config target drifted after apply');
   }
-  return Object.freeze({ intent, receipt, paths: selected });
+  const storageState = fs.existsSync(selected.backup)
+    ? ('applied' as const)
+    : ('completed' as const);
+  if (storageState === 'applied') {
+    validateLocalReconciliationSecretConfigAppliedStorage(
+      selected,
+      intent,
+      uid,
+    );
+  } else {
+    validateLocalReconciliationSecretConfigCompletedStorage(
+      selected,
+      intent,
+      uid,
+    );
+  }
+  return Object.freeze({
+    intent,
+    receipt,
+    paths: selected,
+    storageState,
+  });
 }
 
 function domainEvidence(
   terminal: Readonly<LocalReconciliationApplicationTerminal>,
   automation: Readonly<AutomationProof> | null,
+  secretConfig: Readonly<SecretConfigProof> | null,
   runHistory: Readonly<RunHistoryProof> | null,
 ): readonly Readonly<LocalReconciliationCompletionDomainEvidence>[] {
   return Object.freeze(
@@ -481,6 +654,18 @@ function domainEvidence(
           action: 'adapter_required' as const,
           evidenceKind: 'automation_apply' as const,
           evidenceDigest: automation.receipt.applyDigest,
+        });
+      }
+      if (
+        domain.domain === 'secret_and_config' &&
+        domain.action === 'manual_external' &&
+        secretConfig !== null
+      ) {
+        return Object.freeze({
+          domain: domain.domain,
+          action: 'adapter_required' as const,
+          evidenceKind: 'secret_config_application' as const,
+          evidenceDigest: secretConfig.receipt.applyDigest,
         });
       }
       if (
@@ -571,13 +756,20 @@ function assertSourceHead(
   head: Readonly<LocalCutoverInstanceHead>,
   expectedHeadDigest: string,
   automation: Readonly<AutomationProof> | null,
+  secretConfig: Readonly<SecretConfigProof> | null,
 ): void {
   const expectedState =
-    automation === null
+    secretConfig !== null
+      ? 'reconciliation_secret_config_applied'
+      : automation === null
       ? 'reconciliation_application_planned'
       : 'reconciliation_automation_applied';
   const expectedSource =
-    automation === null ? undefined : automation.receipt.applyDigest;
+    secretConfig !== null
+      ? secretConfig.receipt.applyDigest
+      : automation === null
+      ? undefined
+      : automation.receipt.applyDigest;
   if (
     head.headDigest !== expectedHeadDigest ||
     head.state !== expectedState ||
@@ -618,13 +810,25 @@ export async function completeLocalReconciliation(
     uid,
     dependencies,
   );
+  const secretConfig = await secretConfigProof(
+    command,
+    terminal,
+    automation,
+    uid,
+    dependencies,
+  );
   const runHistory = await runHistoryProof(
     command,
     terminal,
     uid,
     dependencies,
   );
-  const domains = domainEvidence(terminal, automation, runHistory);
+  const domains = domainEvidence(
+    terminal,
+    automation,
+    secretConfig,
+    runHistory,
+  );
   const selected = ensureCompletionDirectory(
     command.options.completionRoot,
     command.request.completionId,
@@ -654,13 +858,19 @@ export async function completeLocalReconciliation(
       fail('completion command is not an exact replay');
     }
   } else {
-    assertSourceHead(head, command.request.expectedHeadDigest, automation);
+    assertSourceHead(
+      head,
+      command.request.expectedHeadDigest,
+      automation,
+      secretConfig,
+    );
     const adapterCount = domains.filter(
       (domain) => domain.action === 'adapter_required',
-    ).length as 0 | 1 | 2;
+    ).length as 0 | 1 | 2 | 3;
     const latestEvidenceAtMs = Math.max(
       terminal.plan.committedAtMs,
       automation?.receipt.appliedAtMs ?? 0,
+      secretConfig?.receipt.appliedAtMs ?? 0,
       runHistory?.receipt.preservedAtMs ?? 0,
     );
     if (command.request.completedAtMs < latestEvidenceAtMs) {
@@ -705,13 +915,12 @@ export async function completeLocalReconciliation(
     uid,
   );
   if (head.state !== 'reconciliation_completed') {
-    assertSourceHead(head, receipt.sourceHeadDigest, automation);
-    if (automation !== null) {
-      validateLocalReconciliationAutomationAppliedStorage(
-        automation.paths,
-        automation.intent,
-        uid,
-      );
+    assertSourceHead(head, receipt.sourceHeadDigest, automation, secretConfig);
+    if (automation?.storageState === 'completed') {
+      fail('automation rollback backup was collected before completion');
+    }
+    if (secretConfig?.storageState === 'completed') {
+      fail('secret config rollback backup was collected before completion');
     }
     head = advanceCompletedHead(terminal, receipt, uid);
   } else if (head.sourceRecordDigest !== receipt.completionDigest) {
@@ -725,6 +934,14 @@ export async function completeLocalReconciliation(
       uid,
     );
     dependencies.afterBackupCollected?.();
+  }
+  if (secretConfig !== null) {
+    collectLocalReconciliationSecretConfigCompletedStorage(
+      secretConfig.paths,
+      secretConfig.intent,
+      uid,
+    );
+    dependencies.afterSecretConfigBackupCollected?.();
   }
   return result(command.operation, status, receipt, head);
 }
@@ -777,6 +994,7 @@ export async function verifyLocalReconciliationCompletion(
       expectedApplicationPlanDigest: receipt.applicationPlanDigest,
       expectedHeadDigest: receipt.sourceHeadDigest,
       automation: command.request.automation,
+      secretConfig: command.request.secretConfig,
       runHistory: command.request.runHistory,
       completedAtMs: receipt.completedAtMs,
     }),
@@ -787,13 +1005,25 @@ export async function verifyLocalReconciliationCompletion(
     uid,
     dependencies,
   );
+  const secretConfig = await secretConfigProof(
+    syntheticCompleteCommand,
+    terminal,
+    automation,
+    uid,
+    dependencies,
+  );
   const runHistory = await runHistoryProof(
     syntheticCompleteCommand,
     terminal,
     uid,
     dependencies,
   );
-  const domains = domainEvidence(terminal, automation, runHistory);
+  const domains = domainEvidence(
+    terminal,
+    automation,
+    secretConfig,
+    runHistory,
+  );
   validateReceiptBinding(
     receipt,
     terminal,
@@ -815,6 +1045,13 @@ export async function verifyLocalReconciliationCompletion(
   if (automation !== null) {
     validateLocalReconciliationAutomationCompletedStorage(
       automation.paths,
+      uid,
+    );
+  }
+  if (secretConfig !== null) {
+    validateLocalReconciliationSecretConfigCompletedStorage(
+      secretConfig.paths,
+      secretConfig.intent,
       uid,
     );
   }

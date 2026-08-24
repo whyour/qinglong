@@ -16,13 +16,14 @@ export interface LocalReconciliationCompletionDomainEvidence {
   readonly evidenceKind:
     | 'application_summary'
     | 'automation_apply'
-    | 'run_history_preservation';
+    | 'run_history_preservation'
+    | 'secret_config_application';
   readonly evidenceDigest: string;
 }
 
 export interface LocalReconciliationCompletionReceipt {
   readonly schema: typeof RECEIPT_SCHEMA;
-  readonly schemaVersion: 1 | 2;
+  readonly schemaVersion: 1 | 2 | 3;
   readonly state: 'reconciliation_completed';
   readonly completionId: string;
   readonly applicationId: string;
@@ -34,7 +35,7 @@ export interface LocalReconciliationCompletionReceipt {
   readonly applicationPlanDigest: string;
   readonly sourceHeadDigest: string;
   readonly domains: readonly Readonly<LocalReconciliationCompletionDomainEvidence>[];
-  readonly adapterCount: 0 | 1 | 2;
+  readonly adapterCount: 0 | 1 | 2 | 3;
   readonly completedAtMs: number;
   readonly completionDigest: string;
 }
@@ -68,7 +69,7 @@ function exact(
 function domainEvidence(
   value: unknown,
   expectedDomain: LocalReconciliationPlanDomain,
-  schemaVersion: 1 | 2,
+  schemaVersion: 1 | 2 | 3,
 ): Readonly<LocalReconciliationCompletionDomainEvidence> {
   const selected = exact(
     value,
@@ -83,13 +84,18 @@ function domainEvidence(
     selected.action === 'adapter_required' &&
     selected.evidenceKind === 'automation_apply';
   const runHistory =
-    schemaVersion === 2 &&
+    schemaVersion >= 2 &&
     expectedDomain === 'run_history' &&
     selected.action === 'adapter_required' &&
     selected.evidenceKind === 'run_history_preservation';
+  const secretConfig =
+    schemaVersion === 3 &&
+    expectedDomain === 'secret_and_config' &&
+    selected.action === 'adapter_required' &&
+    selected.evidenceKind === 'secret_config_application';
   if (
     selected.domain !== expectedDomain ||
-    (!noEffect && !automation && !runHistory) ||
+    (!noEffect && !automation && !runHistory && !secretConfig) ||
     typeof selected.evidenceDigest !== 'string' ||
     !DIGEST.test(selected.evidenceDigest)
   ) {
@@ -110,8 +116,12 @@ export function buildLocalReconciliationCompletionReceipt(
   >,
 ): Readonly<LocalReconciliationCompletionReceipt> {
   const schemaVersion = input.domains.some(
-    (domain) => domain.evidenceKind === 'run_history_preservation',
+    (domain) => domain.evidenceKind === 'secret_config_application',
   )
+    ? (3 as const)
+    : input.domains.some(
+        (domain) => domain.evidenceKind === 'run_history_preservation',
+      )
     ? (2 as const)
     : (1 as const);
   const payload = Object.freeze({
@@ -154,7 +164,11 @@ export function normalizeLocalReconciliationCompletionReceipt(
   if (!Array.isArray(selected.domains) || selected.domains.length !== 8) {
     fail('receipt domain catalog is invalid');
   }
-  if (selected.schemaVersion !== 1 && selected.schemaVersion !== 2) {
+  if (
+    selected.schemaVersion !== 1 &&
+    selected.schemaVersion !== 2 &&
+    selected.schemaVersion !== 3
+  ) {
     fail('receipt schema version is invalid');
   }
   const schemaVersion = selected.schemaVersion;
@@ -171,10 +185,23 @@ export function normalizeLocalReconciliationCompletionReceipt(
   const normalized = Object.freeze({ ...raw, domains });
   if (
     selected.schema !== RECEIPT_SCHEMA ||
-    (schemaVersion === 2) !==
-      domains.some(
+    (schemaVersion === 1 &&
+      domains.some((domain) =>
+        ['run_history_preservation', 'secret_config_application'].includes(
+          domain.evidenceKind,
+        ),
+      )) ||
+    (schemaVersion === 2 &&
+      (!domains.some(
         (domain) => domain.evidenceKind === 'run_history_preservation',
       ) ||
+        domains.some(
+          (domain) => domain.evidenceKind === 'secret_config_application',
+        ))) ||
+    (schemaVersion === 3 &&
+      !domains.some(
+        (domain) => domain.evidenceKind === 'secret_config_application',
+      )) ||
     selected.state !== 'reconciliation_completed' ||
     typeof selected.completionId !== 'string' ||
     !UUID_V4.test(selected.completionId) ||
@@ -195,7 +222,7 @@ export function normalizeLocalReconciliationCompletionReceipt(
     ].every(
       (candidate) => typeof candidate === 'string' && DIGEST.test(candidate),
     ) ||
-    ![0, 1, 2].includes(selected.adapterCount as number) ||
+    ![0, 1, 2, 3].includes(selected.adapterCount as number) ||
     selected.adapterCount !== adapterCount ||
     !Number.isSafeInteger(selected.completedAtMs) ||
     (selected.completedAtMs as number) < 0 ||
