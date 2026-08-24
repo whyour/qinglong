@@ -175,10 +175,11 @@ function domainDisposition(
   ) {
     return 'unsupported';
   }
+  if (domain === 'identity_policy_audit' && legacyFacts > 0) {
+    return 'manual_required';
+  }
   if (
-    (domain === 'secret_and_config' ||
-      domain === 'run_history' ||
-      domain === 'identity_policy_audit') &&
+    (domain === 'secret_and_config' || domain === 'run_history') &&
     legacyFacts + targetFacts > 0
   ) {
     return 'manual_required';

@@ -74,17 +74,6 @@ const {
 const {
   targetStoppedEvidence,
 } = require('../dist/deployment/cutover/targetStopRecordEvidence.js');
-const {
-  collectLocalReconciliationSecretConfigCompletedStorage,
-  localReconciliationSecretConfigApplyPaths,
-  readLocalReconciliationSecretConfigApplyIntent,
-  validateLocalReconciliationSecretConfigCompletedStorage,
-} = require('../dist/deployment/reconciliation/application/secret-and-config/application/storage.js');
-const {
-  buildLocalReconciliationCompletionReceipt,
-  normalizeLocalReconciliationCompletionReceipt,
-} = require('../dist/deployment/reconciliation/completion/evidence.js');
-
 function digest(value) {
   return crypto
     .createHash('sha256')
@@ -2974,6 +2963,55 @@ test('review diagnostics keep secret and unknown facts blocked and row-free', (t
   );
 });
 
+test('review diagnostics preserve target-native identity but keep legacy identity fail-closed', (t) => {
+  const initializeDatabases = (paths) => {
+    planningDatabaseInitializer()(paths);
+    const legacy = new DatabaseSync(paths.legacySourcePath);
+    legacy.exec('CREATE TABLE "Auths" (id INTEGER PRIMARY KEY)');
+    legacy.close();
+    fs.copyFileSync(paths.legacySourcePath, paths.recoveryPath);
+    fs.chmodSync(paths.recoveryPath, 0o600);
+    const target = new DatabaseSync(paths.targetDatabasePath);
+    target.exec(
+      'CREATE TABLE "QingLong3IdentityRecords" (id INTEGER PRIMARY KEY)',
+    );
+    target.close();
+  };
+  const state = preparedReview(t, {
+    initializeDatabases,
+    planId: '00000000-0000-4000-8000-000000000333',
+    reviewId: '00000000-0000-4000-8000-000000000334',
+    reviewSuffix: 'identity-custody',
+  });
+  assert.equal(state.planned.outcome, 'manual_required');
+  const prepared = prepareLocalReconciliationReview(state.reviewCommand);
+  const legacyCommand = diagnosticCommand(state, prepared, {
+    database: 'legacy',
+    domain: 'identity_policy_audit',
+    outputName: 'legacy-identity.json',
+  });
+  writeLocalReconciliationReviewDiagnostics(legacyCommand);
+  const legacy = JSON.parse(
+    fs.readFileSync(legacyCommand.request.outputPath, 'utf8'),
+  );
+  assert.equal(legacy.records[0].name, 'Auths');
+  assert.equal(legacy.records[0].decisionRequirement, 'blocked');
+  assert.equal(legacy.records[0].reason, 'identity_custody_required');
+
+  const targetCommand = diagnosticCommand(state, prepared, {
+    database: 'target',
+    domain: 'identity_policy_audit',
+    outputName: 'target-identity.json',
+  });
+  writeLocalReconciliationReviewDiagnostics(targetCommand);
+  const target = JSON.parse(
+    fs.readFileSync(targetCommand.request.outputPath, 'utf8'),
+  );
+  assert.equal(target.records[0].name, 'QingLong3IdentityRecords');
+  assert.equal(target.records[0].decisionRequirement, 'required');
+  assert.equal(target.records[0].reason, 'reviewable_fact');
+});
+
 test('review diagnostics page at sixty-four and CLI output stays content-free', (t) => {
   const initializeDatabases = (paths) => {
     planningDatabaseInitializer()(paths);
@@ -4352,7 +4390,7 @@ test('Secret/Config apply publishes encrypted material atomically and recovers e
   assert.equal(databaseCloses, authentications);
 });
 
-test('completion v3 proves Secret/Config apply but preserves rollback authority while other domains remain manual', async (t) => {
+test('completion v3 completes a classified v52 target and collects Secret/Config rollback authority', async (t) => {
   const state = await appliedSecretConfigFixture(t, {
     suffix: 'completion-v3',
   });
@@ -4402,116 +4440,71 @@ test('completion v3 proves Secret/Config apply but preserves rollback authority 
   const backupPath = path.join(backupRoot, 'before.sqlite');
   const materialPath = path.join(applyRoot, 'materials.ndjson');
   assert.equal(fs.existsSync(backupPath), true);
-
-  await assert.rejects(
-    completeLocalReconciliation(command),
-    /identity_policy_audit is not terminally reconciled/,
+  const plan = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        state.planRoot,
+        state.prepareCommand.request.planId,
+        'plan.json',
+      ),
+      'utf8',
+    ),
   );
-  assert.equal(fs.existsSync(backupPath), true);
+  assert.deepEqual(
+    plan.domains.find((domain) => domain.domain === 'unknown'),
+    {
+      domain: 'unknown',
+      legacySchemaObjects: 0,
+      targetSchemaObjects: 0,
+      legacyTables: 0,
+      targetTables: 0,
+      legacyRows: 0,
+      targetRows: 0,
+      rowCountsComplete: true,
+      inventoryDigest: plan.domains.find(
+        (domain) => domain.domain === 'unknown',
+      ).inventoryDigest,
+      disposition: 'aligned',
+    },
+  );
+  assert.equal(
+    plan.domains.find((domain) => domain.domain === 'identity_policy_audit')
+      .disposition,
+    'target_only',
+  );
+  const targetIdentityDecisions = state.reviewFile.decisions.filter(
+    (decision) =>
+      decision.database === 'target' &&
+      decision.domain === 'identity_policy_audit',
+  );
+  assert.ok(targetIdentityDecisions.length > 0);
+  assert.equal(
+    targetIdentityDecisions.every(
+      (decision) => decision.disposition === 'retain_target',
+    ),
+    true,
+  );
+
+  const completed = await completeLocalReconciliation(command);
+  assert.equal(completed.status, 'completed');
+  assert.equal(completed.state, 'reconciliation_completed');
+  assert.equal(completed.adapterCount, 1);
+  assert.equal((await completeLocalReconciliation(command)).status, 'existing');
   assert.equal(
     readLocalCutoverInstanceHead(
       state.deploymentRoot,
       state.captureCommand.request.instanceId,
       state.uid,
     ).state,
-    'reconciliation_secret_config_applied',
-  );
-  assert.equal(
-    fs.existsSync(path.join(completionRoot, command.request.completionId)),
-    false,
-  );
-
-  const domainNames = [
-    'schema_lineage',
-    'automation',
-    'secret_and_config',
-    'run_history',
-    'plugin_package',
-    'ai_and_tool',
-    'identity_policy_audit',
-    'unknown',
-  ];
-  const domains = domainNames.map((domain) =>
-    domain === 'secret_and_config'
-      ? {
-          domain,
-          action: 'adapter_required',
-          evidenceKind: 'secret_config_application',
-          evidenceDigest: state.applied.applyDigest,
-        }
-      : {
-          domain,
-          action: 'no_effect',
-          evidenceKind: 'application_summary',
-          evidenceDigest: 'a'.repeat(64),
-        },
-  );
-  const receipt = buildLocalReconciliationCompletionReceipt({
-    completionId: command.request.completionId,
-    applicationId: command.request.applicationId,
-    profile: state.captureCommand.request.profile,
-    instanceId: state.captureCommand.request.instanceId,
-    cutoverId: state.captureCommand.request.cutoverId,
-    generation: 1,
-    activationDigest: state.captureCommand.request.expectedActivationDigest,
-    applicationPlanDigest: state.application.applicationPlanDigest,
-    sourceHeadDigest: state.applied.instanceHeadDigest,
-    domains,
-    adapterCount: 1,
-    completedAtMs: command.request.completedAtMs,
-  });
-  assert.equal(receipt.schemaVersion, 3);
-  assert.deepEqual(
-    normalizeLocalReconciliationCompletionReceipt(receipt),
-    receipt,
-  );
-
-  const currentHead = readLocalCutoverInstanceHead(
-    state.deploymentRoot,
-    state.captureCommand.request.instanceId,
-    state.uid,
-  );
-  const durableHead = advanceLocalCutoverInstanceHead(
-    {
-      options: { deploymentRoot: state.deploymentRoot },
-      request: {
-        cutoverId: state.captureCommand.request.cutoverId,
-        profile: state.captureCommand.request.profile,
-        instanceId: state.captureCommand.request.instanceId,
-        expectedActivationDigest:
-          state.captureCommand.request.expectedActivationDigest,
-        requestedAtMs: command.request.completedAtMs,
-      },
-    },
-    state.uid,
     'reconciliation_completed',
-    currentHead.generation,
-    receipt.completionDigest,
   );
-  assert.equal(durableHead.state, 'reconciliation_completed');
-  const selected = localReconciliationSecretConfigApplyPaths(
-    state.secretConfigApplyRoot,
-    state.secretConfigId,
+  const receipt = JSON.parse(
+    fs.readFileSync(
+      path.join(completionRoot, command.request.completionId, 'receipt.json'),
+      'utf8',
+    ),
   );
-  const intent = readLocalReconciliationSecretConfigApplyIntent(
-    selected,
-    state.uid,
-  );
-  collectLocalReconciliationSecretConfigCompletedStorage(
-    selected,
-    intent,
-    state.uid,
-  );
-  collectLocalReconciliationSecretConfigCompletedStorage(
-    selected,
-    intent,
-    state.uid,
-  );
-  validateLocalReconciliationSecretConfigCompletedStorage(
-    selected,
-    intent,
-    state.uid,
-  );
+  assert.equal(receipt.schemaVersion, 3);
   assert.equal(fs.existsSync(backupPath), false);
   assert.deepEqual(fs.readdirSync(backupRoot), []);
   assert.deepEqual(fs.readdirSync(path.join(applyRoot, 'rollback-work')), []);
@@ -4527,6 +4520,26 @@ test('completion v3 proves Secret/Config apply but preserves rollback authority 
       evidenceDigest: state.applied.applyDigest,
     },
   );
+  for (const domainName of ['identity_policy_audit', 'unknown']) {
+    assert.equal(
+      receipt.domains.find((domain) => domain.domain === domainName).action,
+      'no_effect',
+    );
+  }
+  const verified = await verifyLocalReconciliationCompletion({
+    schemaVersion: 3,
+    operation: 'local.deployment.reconciliation.complete.verify',
+    options: command.options,
+    request: {
+      completionId: command.request.completionId,
+      applicationId: command.request.applicationId,
+      expectedCompletionDigest: completed.completionDigest,
+      automation: null,
+      secretConfig,
+      runHistory: null,
+    },
+  });
+  assert.equal(verified.status, 'verified');
 });
 
 test('completion v3 rejects rolled-back Secret/Config evidence', async (t) => {

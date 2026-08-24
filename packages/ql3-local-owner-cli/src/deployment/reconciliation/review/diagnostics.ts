@@ -195,6 +195,12 @@ function requirement(
     });
   }
   if (domain === 'identity_policy_audit') {
+    if (database === 'target') {
+      return Object.freeze({
+        decisionRequirement: 'required' as const,
+        reason: 'reviewable_fact' as const,
+      });
+    }
     return Object.freeze({
       decisionRequirement: 'blocked' as const,
       reason: 'identity_custody_required' as const,

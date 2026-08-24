@@ -56,7 +56,7 @@ Cluster 不复用本机 receipt、POSIX storage 或 instance head。Cluster comp
 
 - completion receipt 的消费者必须按 `schemaVersion` 解析，未知版本继续失败关闭。
 - `advanceLocalCutoverInstanceHead` 是 CRITICAL 共享状态机；本 ADR 只增加一条 source-state 边，不改任何旧 transition。
-- 完整迁移库当前仍可能因 `identity_policy_audit` 或 `unknown` 保持 manual；这是正确的全局围栏，不应为了演示 v3 成功而放宽。
+- 本 ADR 验收时完整迁移库仍会因目标原生 `identity_policy_audit` 和六张未登记 v52 表落入 `unknown` 而保持 manual；ADR-0493 已通过精确分类与 signed `retain_target` 修正这两个本地 planner 缺口。Legacy `Auths/Users` 和真正未知表仍保持全局围栏。
 - v3 verify 要求 completed storage，不能在 head durable 之前充当修复命令。
 
 ## 被拒绝的替代方案

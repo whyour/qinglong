@@ -58,10 +58,19 @@
   `Secret/Config backup.sha256 == Automation targetAfter.sha256`，再证明 current target 等于 Secret/Config `targetAfter`。lineage 只新增
   `reconciliation_secret_config_applied → reconciliation_completed` 一条合法边；receipt seal 与 completed head durable 后，才幂等删除两类数据库等量
   backup。Secret/Config 的 ciphertext material、intent 与 receipt 继续 `0400` 保留，backup/rollback root 封为 `0500`，不增加后台 GC、timer 或常驻内存。
-  rolled-back、target drift、提前丢失 backup 与其余 manual 域继续失败关闭；完整迁移库当前仍可能因 Identity/Unknown 保持 manual，这不是 v3 可绕过的限制。
+  rolled-back、target drift、提前丢失 backup 与其余 manual 域继续失败关闭。
+  第九切片以 D-398/ADR-0493 修正 planner 对目标原生数据的两个架构误判，而没有新增 adapter 或放宽未知 schema。fresh v52 中
+  `QingLong3LegacyAdoptions`、`QingLong3LegacyAdoptionTasks`、`QingLong3LocalExecutionContextRecipes`、`QingLong3LocalTaskExecutionRevisions`
+  精确归入 Automation，`QingLong3RunAttemptLogArtifactTombstones`、`QingLong3RunAttemptLogRetentionState` 精确归入 Run History；不使用
+  `QingLong3*` 宽泛通配，未来未登记表仍是 row-free、blocked 的 `unknown`。`identity_policy_audit` 按来源分离：没有 Legacy `Auths/Users`
+  时，Target 原生 Project/RoleBinding/Identity/Credential/Pepper/Approval/SecurityAudit/LocalOwner 事实为 `target_only`，必须逐事实 signed
+  `retain_target`，随后才以 `no_effect/application_summary` 进入 completion；只要存在 Legacy 身份事实，仍为
+  `manual_required/identity_custody_required`，本切片不声称旧 credential、session、token、Policy 或 Audit 已迁移。Secret/Config v52 fixture
+  现已用真实 `complete → replay → verify` 完成 v3 闭环，不再由测试伪造 receipt、直接推进 head 或手工回收 storage；真正未知表和 Legacy 身份回归
+  继续失败关闭。
   全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。v52 Local SQLite 完整测试为 `247/247`，publisher 定向回归 `6/6`；fresh Edge
-  readiness 为 contract v52、104 migrations、89 required tables、SQLite 3.53.3、`DELETE` journal。Local Admin 为 `96/96`，Local Owner 为
-  `300 total / 293 pass / 7 conditional skip / 0 fail`；18-package clean build 与逐包顺序测试单次退出 0，完整 backend 为
+  readiness 为 contract v52、104 migrations、89 required tables、SQLite 3.53.3、`DELETE` journal。Local Admin 为 `96/96`，ADR-0493 后 Local Owner 有效结果为
+  `301 total / 294 pass / 7 conditional skip / 0 fail`；完整 backend 为
   `1567 total / 1565 pass / 2 conditional skip / 0 fail`。package boundary、精确 Cluster dependency/legacy boundary、122-module Edge import、本地镜像与
   `14/14` Local artifact audit 全部 compatible；基础 Edge/Standalone 为 `2,635,529 / 2,635,607 bytes`、323 files、58 loaded modules，距 4 MiB
   上限仍分别保留 `1,558,775 / 1,558,697 bytes`，且闭包只有 Local SQLite、runtime-core 与 SemVer，没有 Cluster/PostgreSQL 依赖。

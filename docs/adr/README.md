@@ -496,6 +496,7 @@
 | [ADR-0490](./ADR-0490-run-history-terminal-preservation.md)                                          | Run History 终态保全与跨领域完成证明                                                                                                                                                                        | Accepted |
 | [ADR-0491](./ADR-0491-bounded-secret-config-reconciliation-and-task-binding.md)                       | 有界 Secret/Config Reconciliation 与任务环境绑定                                                                                                                                                            | Proposed（D-397 local apply/rollback/completion complete；Edge/Cluster gate pending） |
 | [ADR-0492](./ADR-0492-compatible-secret-config-completion-v3.md)                                      | 兼容 Secret/Config 的 Reconciliation Completion v3                                                                                                                                                           | Accepted |
+| [ADR-0493](./ADR-0493-target-native-reconciliation-domain-preservation.md)                            | 目标原生 Reconciliation 域分类与身份保留                                                                                                                                                                      | Accepted |
 
 ## 规则
 

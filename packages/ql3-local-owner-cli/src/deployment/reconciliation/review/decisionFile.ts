@@ -297,10 +297,14 @@ export function assertLocalReconciliationReviewDecisionMatchesFact(
       !['retain_target', 'retain_both', 'defer', 'manual_external'].includes(
         selected.disposition,
       )) ||
-    ((fact.domain === 'secret_and_config' ||
-      fact.domain === 'identity_policy_audit' ||
-      fact.domain === 'unknown') &&
-      !['defer', 'manual_external'].includes(selected.disposition))
+    ((fact.domain === 'secret_and_config' || fact.domain === 'unknown') &&
+      !['defer', 'manual_external'].includes(selected.disposition)) ||
+    (fact.domain === 'identity_policy_audit' &&
+      !(
+        fact.database === 'target'
+          ? ['retain_target', 'defer', 'manual_external']
+          : ['defer', 'manual_external']
+      ).includes(selected.disposition))
   ) {
     configurationError(
       'decision disposition is not allowed for canonical fact',

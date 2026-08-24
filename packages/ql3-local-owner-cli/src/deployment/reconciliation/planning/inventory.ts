@@ -16,6 +16,16 @@ import {
 
 const MAX_SCHEMA_OBJECTS = 4_096;
 const MAX_TABLES = 512;
+const TARGET_AUTOMATION_TABLES = new Set([
+  'QingLong3LegacyAdoptions',
+  'QingLong3LegacyAdoptionTasks',
+  'QingLong3LocalExecutionContextRecipes',
+  'QingLong3LocalTaskExecutionRevisions',
+]);
+const TARGET_RUN_HISTORY_TABLES = new Set([
+  'QingLong3RunAttemptLogArtifactTombstones',
+  'QingLong3RunAttemptLogRetentionState',
+]);
 
 export interface LocalReconciliationDomainInventory {
   readonly domain: LocalReconciliationPlanDomain;
@@ -85,6 +95,7 @@ function targetDomain(name: string): LocalReconciliationPlanDomain {
     return 'schema_lineage';
   }
   if (
+    TARGET_AUTOMATION_TABLES.has(name) ||
     name.includes('TaskDefinition') ||
     name.includes('Trigger') ||
     name.includes('Automation')
@@ -95,6 +106,7 @@ function targetDomain(name: string): LocalReconciliationPlanDomain {
     return 'secret_and_config';
   }
   if (
+    TARGET_RUN_HISTORY_TABLES.has(name) ||
     name === 'Runs' ||
     name.startsWith('Run') ||
     name.startsWith('StepRun') ||
