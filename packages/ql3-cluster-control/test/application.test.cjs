@@ -217,6 +217,7 @@ function runtimePrivileges() {
     plugin_package_workflow_admissions: [true, true, false, false],
     plugin_package_workflow_admission_steps: [true, true, false, false],
     plugin_package_workflow_task_attempt_admissions: [true, true, false, false],
+    cluster_legacy_env_migration_plans: [false, false, false, false],
     worker_execution_attestations: [true, false, false, false],
     run_events: [true, true, false, false],
     run_cancellation_dispatches: [true, true, true, false],

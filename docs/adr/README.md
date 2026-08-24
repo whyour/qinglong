@@ -498,6 +498,7 @@
 | [ADR-0492](./ADR-0492-compatible-secret-config-completion-v3.md)                                      | 兼容 Secret/Config 的 Reconciliation Completion v3                                                                                                                                                           | Accepted |
 | [ADR-0493](./ADR-0493-target-native-reconciliation-domain-preservation.md)                            | 目标原生 Reconciliation 域分类与身份保留                                                                                                                                                                      | Accepted |
 | [ADR-0494](./ADR-0494-postgresql-secret-binding-and-mounted-provider-live-rotation.md)                | PostgreSQL Secret Binding 与 Mounted Provider 在线轮换门                                                                                                                                                        | Accepted |
+| [ADR-0495](./ADR-0495-content-free-cluster-legacy-env-migration-plan-ledger.md)                       | 无敏感内容的 Cluster Legacy Env 迁移计划账本                                                                                                                                                                    | Accepted |
 
 ## 规则
 

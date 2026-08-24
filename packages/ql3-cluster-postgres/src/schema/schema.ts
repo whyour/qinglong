@@ -109,6 +109,77 @@ export const projects = ql3Schema.table(
   ],
 );
 
+export const clusterLegacyEnvMigrationPlans = ql3Schema.table(
+  'cluster_legacy_env_migration_plans',
+  {
+    planId: varchar('plan_id', { length: 128 }).primaryKey(),
+    mutationId: varchar('mutation_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    planDigest: char('plan_digest', { length: 64 }).notNull(),
+    reconciliationBundleDigest: char('reconciliation_bundle_digest', {
+      length: 64,
+    }).notNull(),
+    decisionDigest: char('decision_digest', { length: 64 }).notNull(),
+    candidateSetDigest: char('candidate_set_digest', { length: 64 }).notNull(),
+    sourceRowCount: integer('source_row_count').notNull(),
+    activeRowCount: integer('active_row_count').notNull(),
+    disabledRowCount: integer('disabled_row_count').notNull(),
+    effectiveBindingCount: integer('effective_binding_count').notNull(),
+    secretRef: varchar('secret_ref', { length: 512 }).notNull(),
+    taskRevisionSetDigest: char('task_revision_set_digest', {
+      length: 64,
+    }).notNull(),
+    triggerRevisionSetDigest: char('trigger_revision_set_digest', {
+      length: 64,
+    }).notNull(),
+    taskCount: integer('task_count').notNull(),
+    triggerCount: integer('trigger_count').notNull(),
+    totalEffectiveBytes: integer('total_effective_bytes').notNull(),
+    plannedAtMs: bigint('planned_at_ms', { mode: 'number' }).notNull(),
+    planJson: jsonb('plan_json').$type<Record<string, unknown>>().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'ql3_cluster_legacy_env_plan_project_fk',
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+    }).onDelete('restrict'),
+    check(
+      'ql3_cluster_legacy_env_plan_identity_check',
+      sql`${table.planId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.mutationId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.projectId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_plan_digest_check',
+      sql`${table.planDigest} ~ '^[0-9a-f]{64}$' and ${table.reconciliationBundleDigest} ~ '^[0-9a-f]{64}$' and ${table.decisionDigest} ~ '^[0-9a-f]{64}$' and ${table.candidateSetDigest} ~ '^[0-9a-f]{64}$' and ${table.taskRevisionSetDigest} ~ '^[0-9a-f]{64}$' and ${table.triggerRevisionSetDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_plan_source_check',
+      sql`${table.sourceRowCount} between 1 and 100000 and ${table.activeRowCount} between 1 and 100000 and ${table.disabledRowCount} between 0 and 100000 and ${table.sourceRowCount} = ${table.activeRowCount} + ${table.disabledRowCount} and ${table.effectiveBindingCount} between 1 and ${table.activeRowCount}`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_plan_target_check',
+      sql`${table.secretRef} ~ '^qlsecret:v1:[A-Za-z0-9_-]+$' and octet_length(${table.secretRef}) between 14 and 512 and ${table.taskCount} between 1 and 100000 and ${table.triggerCount} between 0 and 500000 and ${table.totalEffectiveBytes} between 1 and 65536`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_plan_time_check',
+      sql`${table.plannedAtMs} >= 0`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_plan_json_check',
+      sql`jsonb_typeof(${table.planJson}) = 'object' and octet_length(${table.planJson}::text) between 2 and 8192 and ${table.planJson} = jsonb_build_object('schema', 'qinglong/cluster-legacy-env-migration-plan@v1', 'planId', ${table.planId}, 'mutationId', ${table.mutationId}, 'projectId', ${table.projectId}, 'source', jsonb_build_object('reconciliationBundleDigest', ${table.reconciliationBundleDigest}, 'decisionDigest', ${table.decisionDigest}, 'candidateSetDigest', ${table.candidateSetDigest}, 'sourceRowCount', ${table.sourceRowCount}, 'activeRowCount', ${table.activeRowCount}, 'disabledRowCount', ${table.disabledRowCount}, 'effectiveBindingCount', ${table.effectiveBindingCount}), 'target', jsonb_build_object('secretRef', ${table.secretRef}, 'taskRevisionSetDigest', ${table.taskRevisionSetDigest}, 'triggerRevisionSetDigest', ${table.triggerRevisionSetDigest}, 'taskCount', ${table.taskCount}, 'triggerCount', ${table.triggerCount}, 'totalEffectiveBytes', ${table.totalEffectiveBytes}), 'plannedAtMs', ${table.plannedAtMs}, 'planDigest', ${table.planDigest})`,
+    ),
+    uniqueIndex('ql3_cluster_legacy_env_plan_mutation_uidx').on(
+      table.mutationId,
+    ),
+    uniqueIndex('ql3_cluster_legacy_env_plan_digest_uidx').on(table.planDigest),
+    index('ql3_cluster_legacy_env_plan_project_idx').on(
+      table.projectId,
+      table.plannedAtMs,
+      table.planId,
+    ),
+  ],
+);
+
 export const pluginPackageInstalls = ql3Schema.table(
   'plugin_package_installs',
   {
@@ -520,7 +591,9 @@ export const pluginPackageSecretBindingTransitionApprovalPlans =
     'plugin_package_secret_binding_transition_approval_plans',
     {
       actionRef: varchar('action_ref', { length: 255 }).primaryKey(),
-      approvalPlanDigest: char('approval_plan_digest', { length: 64 }).notNull(),
+      approvalPlanDigest: char('approval_plan_digest', {
+        length: 64,
+      }).notNull(),
       transitionDigest: char('transition_digest', { length: 64 }).notNull(),
       generationDigest: char('generation_digest', { length: 64 }).notNull(),
       projectId: varchar('project_id', { length: 128 }).notNull(),
@@ -1045,7 +1118,9 @@ export const approvedActionManualRecoveryResolutions = ql3Schema.table(
     resolvedById: varchar('resolved_by_id', { length: 255 }).notNull(),
     authenticationId: varchar('authentication_id', { length: 128 }).notNull(),
     assurance: varchar('assurance', { length: 32 }).notNull(),
-    authenticatedAtMs: bigint('authenticated_at_ms', { mode: 'number' }).notNull(),
+    authenticatedAtMs: bigint('authenticated_at_ms', {
+      mode: 'number',
+    }).notNull(),
     projectVersion: integer('project_version').notNull(),
     bindingVersion: integer('binding_version').notNull(),
     auditEventId: uuid('audit_event_id').notNull(),
@@ -6213,6 +6288,7 @@ export const ql3PostgresTables = [
   schemaMigrations,
   schemaCapabilities,
   projects,
+  clusterLegacyEnvMigrationPlans,
   pluginPackageInstalls,
   pluginPackageInstallHeads,
   pluginPackageInstallMutations,

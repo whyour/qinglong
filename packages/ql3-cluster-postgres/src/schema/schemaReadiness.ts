@@ -150,6 +150,12 @@ const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
     update: true,
     delete: false,
   }),
+  cluster_legacy_env_migration_plans: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
   plugin_package_installs: Object.freeze({
     select: false,
     insert: false,
@@ -695,6 +701,12 @@ const REQUIRED_ADMIN_PRIVILEGES = Object.freeze({
   }),
   projects: Object.freeze({
     select: true,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  cluster_legacy_env_migration_plans: Object.freeze({
+    select: false,
     insert: false,
     update: false,
     delete: false,
@@ -1417,6 +1429,7 @@ const REQUIRED_AUTOMATION_MANAGER_PRIVILEGES: RequiredPrivileges =
                 update: true,
               }
             : name === 'security_audit_events' ||
+              name === 'cluster_legacy_env_migration_plans' ||
               name === 'task_definition_revisions' ||
               name === 'task_execution_revisions' ||
               name === 'trigger_revisions'

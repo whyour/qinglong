@@ -33,6 +33,7 @@ function validPrivileges() {
     schema_migrations: [true, false, false, false],
     schema_capabilities: [true, false, false, false],
     projects: [true, true, true, false],
+    cluster_legacy_env_migration_plans: [false, false, false, false],
     task_definitions: [true, false, false, false],
     task_definition_revisions: [true, false, false, false],
     task_execution_revisions: [true, false, false, false],
@@ -167,6 +168,7 @@ function validAdminPrivileges() {
     schema_migrations: [true, false, false, false],
     schema_capabilities: [true, false, false, false],
     projects: [true, false, false, false],
+    cluster_legacy_env_migration_plans: [false, false, false, false],
     task_definitions: [false, false, false, false],
     task_definition_revisions: [false, false, false, false],
     task_execution_revisions: [false, false, false, false],
@@ -454,6 +456,7 @@ function automationManagerPrivileges() {
     'project_role_bindings',
     'plugin_package_task_ownerships',
     'plugin_package_identity_keyset_ledger',
+    'cluster_legacy_env_migration_plans',
     'security_audit_events',
     'task_definitions',
     'task_definition_revisions',
@@ -471,6 +474,7 @@ function automationManagerPrivileges() {
     'trigger_revisions',
     'trigger_schedules',
     'plugin_package_identity_keyset_ledger',
+    'cluster_legacy_env_migration_plans',
   ]);
   return postgresqlControlSchemaContract.tables.map(({ name: tableName }) => ({
     tableName,
@@ -791,9 +795,7 @@ function queryable(overrides = {}) {
           : 'runs';
         assert.match(
           text,
-          new RegExp(
-            `format\\('%I\\.%I', \\$1::text, '${tableName}'\\)`,
-          ),
+          new RegExp(`format\\('%I\\.%I', \\$1::text, '${tableName}'\\)`),
         );
         const columns = contract.tables.find(
           ({ name }) => name === tableName,
@@ -836,7 +838,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
     serverMajor: 16,
     currentUser: 'ql3_runtime',
     contractName: 'control-core',
-    contractVersion: 68,
+    contractVersion: 69,
     migrationIds: [
       'pg-0001-schema-capability',
       'pg-0002-run-core',
@@ -907,6 +909,7 @@ test('accepts the exact PostgreSQL control schema and least-privilege runtime ro
       'pg-0067-cancellation-dispatch-management',
       'pg-0068-cancellation-dispatch-project-keyset',
       'pg-0069-worker-session-management-observation',
+      'pg-0070-cluster-legacy-env-migration-plans',
     ],
   });
 });
@@ -937,10 +940,10 @@ test('accepts the exact schema and isolated least-privilege admin role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_admin');
-  assert.equal(report.contractVersion, 68);
+  assert.equal(report.contractVersion, 69);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0069-worker-session-management-observation',
+    'pg-0070-cluster-legacy-env-migration-plans',
   );
 });
 
@@ -953,10 +956,10 @@ test('accepts the isolated least-privilege automation manager role', async () =>
     }),
   );
   assert.equal(report.currentUser, 'ql3_automation_manager');
-  assert.equal(report.contractVersion, 68);
+  assert.equal(report.contractVersion, 69);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0069-worker-session-management-observation',
+    'pg-0070-cluster-legacy-env-migration-plans',
   );
 
   const widened = automationManagerPrivileges();
@@ -985,10 +988,10 @@ test('accepts the isolated least-privilege human Approval manager role', async (
     }),
   );
   assert.equal(report.currentUser, 'ql3_approval_manager');
-  assert.equal(report.contractVersion, 68);
+  assert.equal(report.contractVersion, 69);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0069-worker-session-management-observation',
+    'pg-0070-cluster-legacy-env-migration-plans',
   );
 
   const widened = approvalManagerPrivileges();
@@ -1019,10 +1022,10 @@ test('accepts the isolated least-privilege Run manager role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_run_manager');
-  assert.equal(report.contractVersion, 68);
+  assert.equal(report.contractVersion, 69);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0069-worker-session-management-observation',
+    'pg-0070-cluster-legacy-env-migration-plans',
   );
 
   const widened = runManagerPrivileges();
@@ -1183,10 +1186,10 @@ test('accepts the exact schema and isolated Worker ingress role', async () => {
     }),
   );
   assert.equal(report.currentUser, 'ql3_worker_ingress');
-  assert.equal(report.contractVersion, 68);
+  assert.equal(report.contractVersion, 69);
   assert.equal(
     report.migrationIds.at(-1),
-    'pg-0069-worker-session-management-observation',
+    'pg-0070-cluster-legacy-env-migration-plans',
   );
 });
 

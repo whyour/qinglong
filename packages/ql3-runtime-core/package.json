@@ -260,6 +260,9 @@
       "builtin-run-log-excerpt-projection": [
         "dist/tool-execution/builtin-run-log-excerpt/builtInRunLogExcerptProjection.d.ts"
       ],
+      "cluster-legacy-env-migration-plan": [
+        "dist/migration/clusterLegacyEnvMigrationPlan.d.ts"
+      ],
       "run": [
         "dist/run/run.d.ts"
       ],
@@ -726,6 +729,11 @@
       "types": "./dist/secret/secretReference.d.ts",
       "require": "./dist/secret/secretReference.js",
       "default": "./dist/secret/secretReference.js"
+    },
+    "./cluster-legacy-env-migration-plan": {
+      "types": "./dist/migration/clusterLegacyEnvMigrationPlan.d.ts",
+      "require": "./dist/migration/clusterLegacyEnvMigrationPlan.js",
+      "default": "./dist/migration/clusterLegacyEnvMigrationPlan.js"
     },
     "./cluster-execution-revision": {
       "types": "./dist/task-definition/clusterExecutionRevision.d.ts",

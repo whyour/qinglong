@@ -93,6 +93,33 @@
   readiness、观察窗和 rollback retention 之后另行强认证。Cluster 必须使用 PostgreSQL SERIALIZABLE ledger、外部 KMS/Secret provider 与 HA evidence，
   不复用 Local SQLite/POSIX authority，也不得把明文写入 PostgreSQL、ConfigMap、Pod env 或 Job command。
 
+- D-400/ADR-0495（已验收）：第十一个 Secret/Config 切片补上 Cluster Legacy Env migration 的
+  **content-free plan ledger baseline**，但没有把计划冒充实际迁移。profile-neutral
+  `qinglong/cluster-legacy-env-migration-plan@v1` 只保存 reconciliation bundle、reviewed
+  decision、candidate set、Task/Trigger revision set 和 plan 的 SHA-256 摘要，外加守恒计数、
+  同 Project 且固定 version 的 canonical SecretRef、effective bytes 与数据库时间；不保存源
+  Env name/value、row body、plaintext/ciphertext、key ID、Task/Trigger spec 或 credential。
+  上限固定为 100,000 source rows、100,000 Tasks、500,000 Triggers、64 KiB effective
+  Secret 和 8 KiB JSON。
+
+  PostgreSQL `pg-0070-cluster-legacy-env-migration-plans` 将 control contract 推进到 v69，
+  以 Project FK、plan/mutation/digest 唯一性和六组 named constraints 创建 append-only 表；
+  `plan_json` 必须与列值重建的 canonical JSONB 精确相等，因此额外 Env 字段不能藏入 durable
+  JSON。只有 `ql3_automation_manager` 拥有 `SELECT, INSERT`，无 UPDATE/DELETE；runtime、
+  admin 和其余角色均无权限。repository 只从显式
+  `cluster-legacy-env-migration-plan` subpath 导出，以数据库时间和短 SERIALIZABLE transaction
+  完成 exact mutation replay、active Project snapshot、三次有界 serialization retry 与可选同事务
+  hook；普通 SERIALIZABLE read 避免 `FOR SHARE` 隐含的 Project UPDATE 权限扩张。
+
+  runtime contract 4/4、repository 5/5、migration/schema/readiness/entrypoint 92/92 通过，两包
+  完整测试零失败。真实 PostgreSQL 18.4 已成功应用 70 条 migration，并证明 create/replay/read、
+  automation UPDATE `42501`、runtime/admin SELECT `42501`，以及 widened `envName` JSON 被精确
+  constraint 以 `23514` 拒绝。该切片复用既有两个 package，未增加 dependency、daemon 或
+  Edge/Standalone import。它只关闭 plan ledger baseline；Cluster source scan/signed decision
+  装配、逐项 Task/Trigger current-head revalidation 与 revision mutation、Secret material custody、
+  migration receipt、HA promotion replay 和固定低性能设备证据仍是后续门禁。ADR-0491 因此继续
+  Proposed。
+
 - D-396/ADR-0490（已验收）：Run History 不再只有永久 `manual_external`，但也没有被错误实现为 Legacy 日志到 3.0 Run ledger 的回灌。
   新的 Local adapter 以 ADR-0482 sealed capture bundle 作为 append-only 保全资产：Legacy history 必须逐事实选择 `retain_both`，Target history
   必须选择 `retain_target`；receipt 只绑定 signed review、application、bundle fingerprint、领域 inventory 与有界 fact counts，不保存表名、Run ID、

@@ -120,6 +120,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0067-cancellation-dispatch-management',
       'pg-0068-cancellation-dispatch-project-keyset',
       'pg-0069-worker-session-management-observation',
+      'pg-0070-cluster-legacy-env-migration-plans',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -602,6 +603,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0069-worker-session-management-observation',
       checksum:
         '1191255575589abc2686b391827607abddb4edb78007245dbaaf45dc1c4e5e8b',
+    },
+    {
+      id: 'pg-0070-cluster-legacy-env-migration-plans',
+      checksum:
+        '7cd6d993f48e7bcebcd62c93571a738d5117c9bcde33b974c5ac8962e2a03fe4',
     },
   ];
   assert.deepEqual(
@@ -2241,11 +2247,11 @@ test('advances capability v63 with manager-only immutable Secret transition plan
     sql,
     /GRANT SELECT ON "ql3"\."plugin_package_secret_binding_transition_approval_plans" TO ql3_package_manager, ql3_package_executor/,
   );
-  assert.match(
+  assert.match(sql, /GRANT EXECUTE ON FUNCTION [^;]+ TO ql3_package_manager/);
+  assert.doesNotMatch(
     sql,
-    /GRANT EXECUTE ON FUNCTION [^;]+ TO ql3_package_manager/,
+    /GRANT EXECUTE ON FUNCTION [^;]+ TO ql3_package_executor/,
   );
-  assert.doesNotMatch(sql, /GRANT EXECUTE ON FUNCTION [^;]+ TO ql3_package_executor/);
   assert.match(sql, /contract_version = 63/);
   assert.match(
     sql,
@@ -2321,10 +2327,7 @@ test('advances capability v65 with database-timed fenced cancellation dispatch',
     sql,
     /CREATE UNIQUE INDEX ql3_run_attempts_run_id_uidx ON "ql3"\."run_attempts" \(run_id, id\)/,
   );
-  assert.match(
-    sql,
-    /CREATE TABLE "ql3"\."run_cancellation_dispatches"/,
-  );
+  assert.match(sql, /CREATE TABLE "ql3"\."run_cancellation_dispatches"/);
   assert.match(
     sql,
     /FOREIGN KEY \(run_id, attempt_id\)[\s\S]+REFERENCES "ql3"\."run_attempts" \(run_id, id\)/,
@@ -2342,16 +2345,11 @@ test('advances capability v65 with database-timed fenced cancellation dispatch',
   assert.match(sql, /contract_version = 65/);
   assert.match(sql, /"run_cancellation_dispatch":1/);
   assert.match(sql, /contract_version = 64/);
-  assert.match(
-    sql,
-    /migration_id = 'pg-0065-approved-action-manual-recovery'/,
-  );
+  assert.match(sql, /migration_id = 'pg-0065-approved-action-manual-recovery'/);
 });
 
 test('advances capability v66 with least-privilege cancellation diagnostics and rearm', async () => {
-  const migration = migrationById(
-    'pg-0067-cancellation-dispatch-management',
-  );
+  const migration = migrationById('pg-0067-cancellation-dispatch-management');
   const statements = [];
   await migration.up({
     async query(statement) {
@@ -2398,10 +2396,7 @@ test('advances capability v67 with a Project-scoped blocked keyset', async () =>
     },
   });
   const sql = statements.join('\n');
-  assert.match(
-    sql,
-    /ADD COLUMN project_id varchar\(128\)/,
-  );
+  assert.match(sql, /ADD COLUMN project_id varchar\(128\)/);
   assert.match(
     sql,
     /SET project_id = run\.project_id FROM "ql3"\."runs" AS run/,
@@ -2458,5 +2453,39 @@ test('advances capability v68 with read-only Worker session observation', async 
   assert.match(
     sql,
     /migration_id = 'pg-0068-cancellation-dispatch-project-keyset'/,
+  );
+});
+
+test('advances capability v69 with a content-free Legacy Env plan ledger', async () => {
+  const migration = migrationById('pg-0070-cluster-legacy-env-migration-plans');
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  assert.match(sql, /CREATE TABLE "ql3"\."cluster_legacy_env_migration_plans"/);
+  assert.match(sql, /source_row_count BETWEEN 1 AND 100000/);
+  assert.match(sql, /total_effective_bytes BETWEEN 1 AND 65536/);
+  assert.match(
+    sql,
+    /plan_json = jsonb_build_object\([\s\S]+qinglong\/cluster-legacy-env-migration-plan@v1/,
+  );
+  assert.match(
+    sql,
+    /GRANT SELECT, INSERT ON "ql3"\."cluster_legacy_env_migration_plans" TO ql3_automation_manager/,
+  );
+  assert.doesNotMatch(
+    sql,
+    /GRANT (?:UPDATE|DELETE|TRUNCATE)[^;]+cluster_legacy_env_migration_plans/,
+  );
+  assert.match(sql, /contract_version = 69/);
+  assert.match(sql, /"cluster_legacy_env_migration_plan":1/);
+  assert.match(sql, /contract_version = 68/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0069-worker-session-management-observation'/,
   );
 });

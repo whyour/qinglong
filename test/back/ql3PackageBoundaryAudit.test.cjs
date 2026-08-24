@@ -299,10 +299,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: runtimeCore.rootSourceFileRoles,
     },
     {
-      sourceFiles: 171,
+      sourceFiles: 172,
       rootSourceFiles: 1,
       rootSourceLines: 160,
-      nestedSourceFiles: 170,
+      nestedSourceFiles: 171,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );
@@ -421,10 +421,10 @@ test('current QL3 workspace has exactly eighteen reviewed package boundaries', (
       rootSourceFileRoles: clusterPostgres.rootSourceFileRoles,
     },
     {
-      sourceFiles: 175,
+      sourceFiles: 177,
       rootSourceFiles: 1,
       rootSourceLines: 126,
-      nestedSourceFiles: 174,
+      nestedSourceFiles: 176,
       rootSourceFileRoles: { 'index.ts': 'public_export' },
     },
   );

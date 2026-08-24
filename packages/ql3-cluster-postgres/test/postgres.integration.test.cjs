@@ -71,6 +71,9 @@ const {
 const {
   resolveClusterScheduleDecision,
 } = require('@qinglong/runtime-core/cluster-scheduler');
+const {
+  PostgresClusterLegacyEnvMigrationPlanRepository,
+} = require('../dist/reconciliation/clusterLegacyEnvMigrationPlanRepository');
 
 function nextMinute(schedule, afterMs) {
   if (schedule.expression !== '* * * * *' || schedule.timezone !== 'UTC') {
@@ -877,7 +880,10 @@ if (!migrationConnectionString) {
       assert.equal(competing?.status, 'leased');
       assert.equal(claimed.dispatch.version, 1);
       assert.equal(claimed.dispatch.dispatchCount, 1);
-      assert.equal(claimed.dispatch.createdAtMs >= Number(before.rows[0].nowMs), true);
+      assert.equal(
+        claimed.dispatch.createdAtMs >= Number(before.rows[0].nowMs),
+        true,
+      );
       const rawLeaseToken = claimed.leaseToken;
       const stored = await migrationDatabase.pool.query(
         `SELECT lease_token_digest AS "leaseTokenDigest",
@@ -963,11 +969,13 @@ if (!migrationConnectionString) {
       assert.equal(retry.dispatch.status, 'retry_wait');
       assert.equal(retry.event.type, 'run.cancel_dispatch_failed');
       assert.equal(
-        (await firstRepository.claim({
-          ...candidate,
-          owner: 'primary-a',
-          leaseToken: 'lease-a-retry',
-        })).status,
+        (
+          await firstRepository.claim({
+            ...candidate,
+            owner: 'primary-a',
+            leaseToken: 'lease-a-retry',
+          })
+        ).status,
         'not_due',
       );
       await migrationDatabase.pool.query(
@@ -2199,9 +2207,7 @@ if (!migrationConnectionString) {
     const migrationDatabase = await open('migration');
     try {
       await runPostgresMigrations({ pool: migrationDatabase.pool });
-      await migrationDatabase.pool.query(
-        'TRUNCATE TABLE "ql3"."runs" CASCADE',
-      );
+      await migrationDatabase.pool.query('TRUNCATE TABLE "ql3"."runs" CASCADE');
       await observeContractPublisherTrust(migrationDatabase.pool);
       await migrationDatabase.pool.query(
         `INSERT INTO "ql3"."projects" (
@@ -3847,12 +3853,13 @@ if (!migrationConnectionString) {
       const executions = new PostgresApprovedActionExecutionRepository(
         executorDatabase.pool,
       );
-      const pendingSecretActions =
-        await executions.listReconciliableExecutions({
+      const pendingSecretActions = await executions.listReconciliableExecutions(
+        {
           nowMs: claimedAtMs,
           limit: 1,
           actionTypes: [consumed.dispatch.action.actionType],
-        });
+        },
+      );
       assert.equal(pendingSecretActions.truncated, false);
       assert.equal(pendingSecretActions.executions.length, 1);
       assert.equal(
@@ -6530,6 +6537,138 @@ if (!migrationConnectionString) {
       );
     } finally {
       await database.close();
+    }
+  });
+
+  test('persists one content-free Legacy Env migration plan with isolated authority', async () => {
+    const projectId = `legacy-env-project-${process.pid}`;
+    const planId = `legacy-env-plan-${process.pid}`;
+    const mutationId = `legacy-env-mutation-${process.pid}`;
+    const migrationDatabase = await open('migration');
+    const automationDatabase = await open('automation-manager');
+    const runtimeDatabase = await open('runtime');
+    const adminDatabase = await open('admin');
+    try {
+      await runPostgresMigrations({ pool: migrationDatabase.pool });
+      await migrationDatabase.pool.query(
+        `INSERT INTO "ql3"."projects"
+           (id, name, slug, status, version, created_at_ms, updated_at_ms)
+         VALUES ($1, $1, $1, 'active', 1, 1, 1)
+         ON CONFLICT (id) DO NOTHING`,
+        [projectId],
+      );
+      const intent = {
+        planId,
+        mutationId,
+        projectId,
+        source: {
+          reconciliationBundleDigest: '1'.repeat(64),
+          decisionDigest: '2'.repeat(64),
+          candidateSetDigest: '3'.repeat(64),
+          sourceRowCount: 3,
+          activeRowCount: 2,
+          disabledRowCount: 1,
+          effectiveBindingCount: 2,
+        },
+        target: {
+          secretRef: createSecretRef({
+            projectId,
+            name: 'legacy-env-bundle',
+            version: 1,
+          }),
+          taskRevisionSetDigest: '4'.repeat(64),
+          triggerRevisionSetDigest: '5'.repeat(64),
+          taskCount: 2,
+          triggerCount: 1,
+          totalEffectiveBytes: 1024,
+        },
+      };
+      const repository = new PostgresClusterLegacyEnvMigrationPlanRepository(
+        automationDatabase.pool,
+      );
+      const created = await repository.publish(intent);
+      const replay = await repository.publish(intent);
+      assert.equal(created.status, 'created');
+      assert.equal(replay.status, 'existing');
+      assert.deepEqual(replay.plan, created.plan);
+      assert.deepEqual(await repository.findByPlanId(planId), created.plan);
+
+      const stored = await automationDatabase.pool.query(
+        `SELECT plan_json AS "planJson"
+           FROM "ql3"."cluster_legacy_env_migration_plans"
+          WHERE plan_id = $1`,
+        [planId],
+      );
+      assert.equal(stored.rowCount, 1);
+      assert.deepEqual(stored.rows[0].planJson, created.plan);
+      assert.doesNotMatch(
+        JSON.stringify(stored.rows[0].planJson),
+        /TOKEN|secretValue|ciphertext|keyId/i,
+      );
+
+      const invalidPlanId = `${planId}-widened`;
+      const invalidMutationId = `${mutationId}-widened`;
+      const invalidDigest = 'f'.repeat(64);
+      await assert.rejects(
+        migrationDatabase.pool.query(
+          `INSERT INTO "ql3"."cluster_legacy_env_migration_plans" (
+             plan_id, mutation_id, project_id, plan_digest,
+             reconciliation_bundle_digest, decision_digest,
+             candidate_set_digest, source_row_count, active_row_count,
+             disabled_row_count, effective_binding_count, secret_ref,
+             task_revision_set_digest, trigger_revision_set_digest,
+             task_count, trigger_count, total_effective_bytes,
+             planned_at_ms, plan_json
+           )
+           SELECT $2::varchar, $3::varchar, project_id, $4::varchar,
+                  reconciliation_bundle_digest, decision_digest,
+                  candidate_set_digest, source_row_count, active_row_count,
+                  disabled_row_count, effective_binding_count, secret_ref,
+                  task_revision_set_digest, trigger_revision_set_digest,
+                  task_count, trigger_count, total_effective_bytes,
+                  planned_at_ms,
+                  plan_json || jsonb_build_object(
+                    'planId', $2::varchar,
+                    'mutationId', $3::varchar,
+                    'planDigest', $4::varchar,
+                    'envName', 'TOKEN'
+                  )
+             FROM "ql3"."cluster_legacy_env_migration_plans"
+            WHERE plan_id = $1`,
+          [planId, invalidPlanId, invalidMutationId, invalidDigest],
+        ),
+        (error) =>
+          error?.code === '23514' &&
+          error?.constraint === 'ql3_cluster_legacy_env_plan_json_check',
+      );
+
+      await assert.rejects(
+        automationDatabase.pool.query(
+          `UPDATE "ql3"."cluster_legacy_env_migration_plans"
+              SET planned_at_ms = planned_at_ms
+            WHERE plan_id = $1`,
+          [planId],
+        ),
+        (error) => error?.code === '42501',
+      );
+      for (const database of [runtimeDatabase, adminDatabase]) {
+        await assert.rejects(
+          database.pool.query(
+            `SELECT plan_id
+               FROM "ql3"."cluster_legacy_env_migration_plans"
+              WHERE plan_id = $1`,
+            [planId],
+          ),
+          (error) => error?.code === '42501',
+        );
+      }
+    } finally {
+      await Promise.all([
+        adminDatabase.close(),
+        runtimeDatabase.close(),
+        automationDatabase.close(),
+        migrationDatabase.close(),
+      ]);
     }
   });
 }

@@ -65,6 +65,11 @@
       "require": "./dist/entrypoints/automationManager.js",
       "default": "./dist/entrypoints/automationManager.js"
     },
+    "./cluster-legacy-env-migration-plan": {
+      "types": "./dist/reconciliation/clusterLegacyEnvMigrationPlanRepository.d.ts",
+      "require": "./dist/reconciliation/clusterLegacyEnvMigrationPlanRepository.js",
+      "default": "./dist/reconciliation/clusterLegacyEnvMigrationPlanRepository.js"
+    },
     "./task-start": {
       "types": "./dist/task-start/taskStartRepository.d.ts",
       "require": "./dist/task-start/taskStartRepository.js",
