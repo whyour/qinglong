@@ -1185,6 +1185,8 @@ jobs:
             postgres:18.4-bookworm
       - name: Install workspace dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build QL3 workspace once
+        run: pnpm run build:packages:ql3
       - name: Verify the backward-compatible offline evidence contract
         run: node --test test/back/ql3PluginPackageSecretBindingKubernetesLiveAudit.test.cjs
       - name: Prove approval, two-replica rotation and missing projection fail-close
