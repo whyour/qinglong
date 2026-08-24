@@ -1,6 +1,6 @@
 # ADR-0491：有界 Secret/Config Reconciliation 与任务环境绑定
 
-- 状态：Proposed（D-397 已实现 Legacy Env inspection、私有有界 row plan、durable plan publication、独立 signed decision、逐项 Automation adoption provenance、Local SQLite 原子 application publisher、Owner prepared/apply/rollback 编排与 ADR-0492 completion v3；真实 Edge 空间证据和 Cluster Secret provider live gate 尚未完成）
+- 状态：Proposed（D-397 已实现 Legacy Env inspection、私有有界 row plan、durable plan publication、独立 signed decision、逐项 Automation adoption provenance、Local SQLite 原子 application publisher、Owner prepared/apply/rollback 编排、ADR-0492 completion v3，并由 ADR-0494 完成 Cluster mounted-files provider live 子门；真实 Edge 空间证据、Cluster migration ledger 与直接外部 custody gate 尚未完成）
 - 日期：2026-08-23
 - 决策：D-397
 - 关联：ADR-0073、ADR-0074、ADR-0092、ADR-0094、ADR-0480、ADR-0482、ADR-0483、ADR-0484、ADR-0485、ADR-0486、ADR-0487、ADR-0488、ADR-0490
@@ -145,4 +145,6 @@ D-397 当前八切片已经实现：absent、unsupported、Edge over-budget、2.
 
 本切片当前验证：Local SQLite `247/247`，其中 Secret/Config application publisher 定向回归 `6/6`；fresh Edge readiness 为 contract v52、104 migrations、89 required tables、SQLite 3.53.3、`DELETE` journal。Local Admin 为 `96/96`；ADR-0493 后 Local Owner 有效结果为 `301 total / 294 pass / 7 conditional skip / 0 fail`。完整 backend 为 `1567 total / 1565 pass / 2 conditional skip / 0 fail`。package boundary、精确 Cluster dependency/legacy boundary、122-module Edge import、service-manager bridge import、本地镜像与 `14/14` Local artifact audit 全部 compatible；Local Admin 为 49 source / 48 nested / 1 root export，Local Owner 为 188/187/1，workspace 仍为 18 packages 且没有单文件或浅层 package。基础 Edge/Standalone 为 `2,635,529 / 2,635,607 bytes`、323 files、58 loaded modules，且没有 Cluster/PostgreSQL 闭包。本切片不改 PostgreSQL schema、连接、role、Pool、容器或 Kubernetes 拓扑，因此不重跑且不重新占有 PostgreSQL HA 证明。
 
-转为 Accepted 前仍必须完成：真实 Edge 空间预算证据与 Cluster Secret provider live gate；ADR-0492 已完成本机 completion schema 演进和 completed-head 后 rollback material 回收，ADR-0493 又让没有 Legacy 身份输入的 fresh v52 目标身份经 signed `retain_target` 正确形成 no-effect，并精确消除六张已知目标表的 `unknown` 误判。Legacy `Auths/Users` 或真正未知表仍保持 manual；本切片的 Local Owner 编排或 PostgreSQL HA 证据不得冒充外部密钥托管。
+ADR-0494 已完成 Cluster `mounted-files` provider live 子门：真实三节点 K3s 中两个 management replica、direct exact-key executor 和两个跨节点 provider observer 完成 PostgreSQL durable approval/binding、Kubernetes atomic projection rotation、无 Secret API 权限/ServiceAccount token、只读 `0440`、内容脱敏及删除后 fail-closed；v2 私有报告 24/24 gates 为 true，并保持 v1 verifier 兼容。该门不增加 Edge 闭包，也不等于直接 Vault/KMS/HSM custody。
+
+转为 Accepted 前仍必须完成：固定低性能 Edge 设备的真实空间/写放大/断电恢复证据，以及 Cluster Legacy Env migration 的专用 PostgreSQL SERIALIZABLE ledger、Task/Trigger revision mutation、外部 custody adapter 和 HA promotion 后 receipt replay。ADR-0492 已完成本机 completion schema 演进和 completed-head 后 rollback material 回收，ADR-0493 又让没有 Legacy 身份输入的 fresh v52 目标身份经 signed `retain_target` 正确形成 no-effect，并精确消除六张已知目标表的 `unknown` 误判。Legacy `Auths/Users` 或真正未知表仍保持 manual；本切片的 Local Owner 编排、ADR-0494 的 mounted-files gate 或 PostgreSQL HA 证据都不得冒充完整 Cluster migration 与外部密钥托管。

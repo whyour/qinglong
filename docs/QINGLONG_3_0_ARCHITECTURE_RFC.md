@@ -68,6 +68,14 @@
   `manual_required/identity_custody_required`，本切片不声称旧 credential、session、token、Policy 或 Audit 已迁移。Secret/Config v52 fixture
   现已用真实 `complete → replay → verify` 完成 v3 闭环，不再由测试伪造 receipt、直接推进 head 或手工回收 storage；真正未知表和 Legacy 身份回归
   继续失败关闭。
+  第十切片以 D-399/ADR-0494 完成 Cluster `mounted-files` provider 的真实在线子门，而没有增加 Edge/Standalone 闭包。固定 K3s
+  `v1.34.3+k3s1` 三节点和 PostgreSQL 18.4 中，两个跨节点 management replica 通过正式 mTLS client 完成 plan、跨副本 replay、四眼审批与 inspect；
+  direct exact-key executor 以无 ServiceAccount token、不可读取 Secret API、单一只读 `0440` projection 完成 binding exactly once，数据库 material
+  match 为 0。两个 production provider observer 以 required anti-affinity 位于不同节点，在无 Secret API 权限、无 token、deny-all network、非 root/
+  只读 root 下先观察 generation 1，再于 Secret resourceVersion-fenced replace 后无重启观察 generation 2；删除 Secret 后空 projection 以
+  `QL3_CLUSTER_MOUNTED_SECRET_UNAVAILABLE` 失败关闭。observer 将 content-free JSON 写入 termination log，审计不依赖偶发 EOF 的 kubelet logs。
+  `qinglong/plugin-package-secret-binding-kubernetes-live@v2` 私有 `0600` 报告 24/24 gates 为 true、离线 findings 为空，同时 verifier 继续接受 immutable
+  v1 shape。该门不声明 control-plane HA、PostgreSQL 物理 failover或直接 Vault/KMS/HSM；也没有实现 Cluster Legacy Env migration ledger。
   全部 evidence 不含原 Env name/value、目标 ciphertext/key ID 或 row body。v52 Local SQLite 完整测试为 `247/247`，publisher 定向回归 `6/6`；fresh Edge
   readiness 为 contract v52、104 migrations、89 required tables、SQLite 3.53.3、`DELETE` journal。Local Admin 为 `96/96`，ADR-0493 后 Local Owner 有效结果为
   `301 total / 294 pass / 7 conditional skip / 0 fail`；完整 backend 为
@@ -79,7 +87,8 @@
   因而不重跑且不重新占有 PostgreSQL HA 证明；相邻已通过的 remote CI/HA 只作为基线。
 
   D-385～D-388 的 `config.sh`/Keyv/SSH data-directory lineage 与 SQLite `Envs` 保持分离；当前无稳定生产 schema 的历史 `Configs` 表继续 sealed+manual，
-  不猜字段。后续切片必须完成真实 Edge 空间证据和 Cluster Secret provider live gate。D-397 apply
+  不猜字段。ADR-0494 已关闭基础 Cluster mounted-files provider live 子门；后续切片仍必须完成固定低性能设备的真实 Edge 空间/写放大/断电证据，
+  以及 Cluster Legacy Env migration 的专用 PostgreSQL SERIALIZABLE ledger、Task/Trigger revision mutation、直接外部 custody adapter 与 HA promotion 后 receipt replay。D-397 apply
   只声明 sealed source retained 且 `physicalErasureGuaranteed=false`；明文销毁必须在 restart/
   readiness、观察窗和 rollback retention 之后另行强认证。Cluster 必须使用 PostgreSQL SERIALIZABLE ledger、外部 KMS/Secret provider 与 HA evidence，
   不复用 Local SQLite/POSIX authority，也不得把明文写入 PostgreSQL、ConfigMap、Pod env 或 Job command。

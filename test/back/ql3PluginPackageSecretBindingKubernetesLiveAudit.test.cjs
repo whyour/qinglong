@@ -5,6 +5,8 @@ const { test } = require('node:test');
 
 const {
   FIXTURE,
+  LEGACY_FIXTURE,
+  LEGACY_REQUIRED_GATES,
   REQUIRED_GATES,
   validatePluginPackageSecretBindingKubernetesLiveReport,
 } = require('../../scripts/ql3-plugin-package-secret-binding-kubernetes-live-audit.cjs');
@@ -12,7 +14,7 @@ const {
 function report() {
   const digest = 'a'.repeat(64);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixture: FIXTURE,
     observedAtMs: 1,
     platform: {
@@ -21,6 +23,7 @@ function report() {
       nodeCount: 3,
       postgresVersionNumber: 180004,
       adminImageId: `sha256:${digest}`,
+      controlImageId: `sha256:${'9'.repeat(64)}`,
     },
     management: {
       replicas: 2,
@@ -70,12 +73,46 @@ function report() {
       executionSucceeded: true,
       sensitiveMatchCount: 0,
     },
+    provider: {
+      provider: 'mounted-files',
+      replicas: 2,
+      distinctNodeHashes: [
+        `sha256:${'a'.repeat(64)}`,
+        `sha256:${'b'.repeat(64)}`,
+      ],
+      serviceAccountTokenMounted: false,
+      canGetSecrets: false,
+      canListSecrets: false,
+      canPatchSecrets: false,
+      projectionReadOnly: true,
+      projectionMode: '0440',
+      firstGenerationObserved: 2,
+      rotatedGenerationObserved: 2,
+      resourceVersionAdvanced: true,
+      outputSensitiveFree: true,
+      missingProjectionRejected: true,
+      missingErrorCode: 'QL3_CLUSTER_MOUNTED_SECRET_UNAVAILABLE',
+    },
     gates: Object.fromEntries(REQUIRED_GATES.map((gate) => [gate, true])),
     limitations: [
       'single-server k3s control plane is not Kubernetes control-plane HA evidence',
       'PostgreSQL physical failover is proven by the independent 125-gate HA contract',
+      'the mounted-files gate proves Kubernetes projection, not a direct Vault KMS or HSM adapter',
     ],
   };
+}
+
+function legacyReport() {
+  const value = report();
+  value.schemaVersion = 1;
+  value.fixture = LEGACY_FIXTURE;
+  delete value.platform.controlImageId;
+  delete value.provider;
+  value.gates = Object.fromEntries(
+    LEGACY_REQUIRED_GATES.map((gate) => [gate, true]),
+  );
+  value.limitations = value.limitations.slice(0, 2);
+  return value;
 }
 
 test('accepts one exact low-sensitive Secret binding Kubernetes report', () => {
@@ -85,15 +122,25 @@ test('accepts one exact low-sensitive Secret binding Kubernetes report', () => {
   );
 });
 
+test('continues to verify the immutable v1 report shape', () => {
+  assert.deepEqual(
+    validatePluginPackageSecretBindingKubernetesLiveReport(legacyReport())
+      .findings,
+    [],
+  );
+});
+
 test('rejects false gates, topology drift and sensitive material', () => {
   const invalid = report();
   invalid.gates.realExecutorJob = false;
   invalid.management.distinctNodeHashes[1] =
     invalid.management.distinctNodeHashes[0];
+  invalid.provider.missingProjectionRejected = false;
   invalid.executor.secretRef = 'qlsecret:v1:forbidden';
   const findings =
     validatePluginPackageSecretBindingKubernetesLiveReport(invalid).findings;
   assert.ok(findings.some((value) => value.includes('management')));
   assert.ok(findings.some((value) => value.includes('gates')));
+  assert.ok(findings.some((value) => value.includes('provider')));
   assert.ok(findings.some((value) => value.includes('forbidden')));
 });

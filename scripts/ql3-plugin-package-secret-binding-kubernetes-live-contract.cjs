@@ -42,6 +42,11 @@ const REVIEWER_ID = 'secret-binding-reviewer';
 const ACTION_REF = 'secret-binding:secret-binding-live:v1';
 const APPROVAL_ID = 'secret-binding-live-approval';
 const ADMIN_IMAGE_BASE = 'ql3-secret-binding-kubernetes-live';
+const CONTROL_IMAGE_BASE = 'ql3-secret-binding-mounted-provider-live';
+const PROVIDER_SECRET = 'ql3-cluster-worker-values-live';
+const PROVIDER_SERVICE_ACCOUNT = 'ql3-mounted-secret-provider-live';
+const PROVIDER_ACTOR_CONFIG = 'ql3-mounted-secret-provider-live-actor';
+const PROVIDER_ROOT = '/var/run/secrets/qinglong3/worker-values';
 const ZERO_DIGEST = 'sha256:' + '0'.repeat(64);
 const ISSUER = 'https://identity.qinglong.test/';
 const AUDIENCE = 'qinglong3-plugin-package-management';
@@ -428,11 +433,6 @@ async function waitJob(fixture, name, timeoutMs = 600_000) {
 }
 
 function jobLog(fixture, name) {
-  const logs = fixture.kubectl(
-    ['-n', NAMESPACE, 'logs', 'job/' + name, '--all-containers=true'],
-    { capture: true, quiet: true, allowFailure: true },
-  );
-  if (logs.status === 0) return logs.stdout;
   const pod = fixture.kubectlJson([
     '-n',
     NAMESPACE,
@@ -444,10 +444,13 @@ function jobLog(fixture, name) {
   const messages = pod?.status?.containerStatuses
     ?.map((status) => status.state?.terminated?.message)
     .filter(Boolean);
-  if (!messages?.length) {
-    throw new Error(name + ' output is unavailable: ' + logs.stderr);
-  }
-  return messages.join('\n');
+  if (messages?.length) return messages.join('\n');
+  const logs = fixture.kubectl(
+    ['-n', NAMESPACE, 'logs', 'job/' + name, '--all-containers=true'],
+    { capture: true, quiet: true, allowFailure: true },
+  );
+  if (logs.status === 0) return logs.stdout;
+  throw new Error(name + ' output is unavailable: ' + logs.stderr);
 }
 
 function lastJsonLine(output, predicate) {
@@ -838,7 +841,8 @@ function canI(fixture, serviceAccount, verb) {
   return result.stdout === 'yes';
 }
 
-function renderExecutor(fixture, adminImage) {
+function renderExecutor(fixture, adminImage, projectionKey) {
+  assert.match(projectionKey, /^[a-f0-9]{64}$/);
   const rendered = fixture.kubectl(
     [
       'kustomize',
@@ -852,6 +856,7 @@ function renderExecutor(fixture, adminImage) {
   cronJob.spec.suspend = true;
   cronJob.spec.jobTemplate.spec.backoffLimit = 0;
   const template = cronJob.spec.jobTemplate.spec.template.spec;
+  template.automountServiceAccountToken = false;
   const container = template.containers[0];
   container.image = adminImage;
   container.imagePullPolicy = 'Never';
@@ -885,6 +890,14 @@ function renderExecutor(fixture, adminImage) {
     name: 'QL3_POSTGRES_ALLOW_INSECURE',
     value: 'true',
   });
+  setEnvironment(container, {
+    name: 'QL3_PLUGIN_PACKAGE_SECRET_ACTION_CONTROLLER_ENABLED',
+    value: 'false',
+  });
+  setEnvironment(container, {
+    name: 'QL3_PLUGIN_PACKAGE_EXECUTOR_SECRET_ROOT',
+    value: '/var/run/secrets/qinglong3/plugin-package-values',
+  });
   for (const entry of roleEnvironment(
     'PACKAGE_EXECUTOR',
     'package-executor-password',
@@ -901,9 +914,33 @@ function renderExecutor(fixture, adminImage) {
   container.volumeMounts = container.volumeMounts.filter(
     (entry) => entry.name !== 'postgres-package-executor-ca',
   );
+  assert.equal(
+    container.volumeMounts.some(
+      (entry) => entry.name === 'plugin-package-values',
+    ),
+    false,
+  );
+  container.volumeMounts.push({
+    name: 'plugin-package-values',
+    mountPath: '/var/run/secrets/qinglong3/plugin-package-values',
+    readOnly: true,
+  });
   template.volumes = template.volumes.filter(
     (entry) => entry.name !== 'postgres-package-executor-ca',
   );
+  assert.equal(
+    template.volumes.some((entry) => entry.name === 'plugin-package-values'),
+    false,
+  );
+  template.volumes.push({
+    name: 'plugin-package-values',
+    secret: {
+      secretName: 'ql3-cluster-plugin-package-values',
+      optional: false,
+      defaultMode: 288,
+      items: [{ key: projectionKey, path: projectionKey }],
+    },
+  });
   const networkPolicy = resources.find(
     (value) => value.kind === 'NetworkPolicy',
   );
@@ -953,6 +990,334 @@ SELECT json_build_object(
   return JSON.parse(psql(fixture, DATABASE, sql).stdout);
 }
 
+function replaceProviderSecret(
+  fixture,
+  projectionKey,
+  value,
+  resourceVersion = undefined,
+) {
+  const manifest = {
+    apiVersion: 'v1',
+    kind: 'Secret',
+    metadata: {
+      name: PROVIDER_SECRET,
+      namespace: NAMESPACE,
+      ...(resourceVersion === undefined ? {} : { resourceVersion }),
+    },
+    type: 'Opaque',
+    data: { [projectionKey]: Buffer.from(value, 'utf8').toString('base64') },
+  };
+  return resourceVersion === undefined
+    ? fixture.create(manifest)
+    : fixture.kubectl(['replace', '-f', '-'], {
+        input: `${JSON.stringify(manifest)}\n`,
+        capture: true,
+        quiet: true,
+      });
+}
+
+function providerObserverJob(controlImage, name, projectionKey, missing) {
+  const pair = !missing;
+  const labels = {
+    'app.kubernetes.io/name': 'ql3-mounted-secret-provider-live',
+    'qinglong.io/provider-observer-pair': pair ? 'true' : 'false',
+  };
+  return {
+    apiVersion: 'batch/v1',
+    kind: 'Job',
+    metadata: { name, namespace: NAMESPACE },
+    spec: {
+      backoffLimit: 0,
+      activeDeadlineSeconds: 300,
+      ttlSecondsAfterFinished: 600,
+      template: {
+        metadata: { labels },
+        spec: {
+          serviceAccountName: PROVIDER_SERVICE_ACCOUNT,
+          automountServiceAccountToken: false,
+          enableServiceLinks: false,
+          restartPolicy: 'Never',
+          securityContext: {
+            runAsNonRoot: true,
+            runAsUser: 10001,
+            runAsGroup: 10001,
+            fsGroup: 10001,
+            fsGroupChangePolicy: 'OnRootMismatch',
+            seccompProfile: { type: 'RuntimeDefault' },
+          },
+          ...(pair
+            ? {
+                affinity: {
+                  podAntiAffinity: {
+                    requiredDuringSchedulingIgnoredDuringExecution: [
+                      {
+                        labelSelector: {
+                          matchLabels: {
+                            'qinglong.io/provider-observer-pair': 'true',
+                          },
+                        },
+                        topologyKey: 'kubernetes.io/hostname',
+                      },
+                    ],
+                  },
+                },
+              }
+            : {}),
+          containers: [
+            {
+              name: 'observer',
+              image: controlImage,
+              imagePullPolicy: 'Never',
+              command: ['/bin/sh', '-c'],
+              args: [
+                [
+                  'set +e',
+                  'output="$(node /opt/ql3-live/actor.cjs 2>&1)"',
+                  'status=$?',
+                  'printf \'%s\\n\' "$output" > /dev/termination-log',
+                  'printf \'%s\\n\' "$output"',
+                  'exit "$status"',
+                ].join('\n'),
+              ],
+              terminationMessagePolicy: 'File',
+              env: [
+                { name: 'NODE_PATH', value: '/opt/qinglong/node_modules' },
+                ...(missing
+                  ? [{ name: 'QL3_LIVE_EXPECT_MISSING', value: 'true' }]
+                  : []),
+              ],
+              ...(pair
+                ? {
+                    readinessProbe: {
+                      exec: {
+                        command: [
+                          '/bin/sh',
+                          '-c',
+                          'test -f /tmp/ql3-mounted-secret-first-observed',
+                        ],
+                      },
+                      periodSeconds: 1,
+                      failureThreshold: 180,
+                    },
+                  }
+                : {}),
+              securityContext: {
+                allowPrivilegeEscalation: false,
+                readOnlyRootFilesystem: true,
+                capabilities: { drop: ['ALL'] },
+              },
+              resources: {
+                requests: { cpu: '5m', memory: '16Mi' },
+                limits: { cpu: '100m', memory: '64Mi' },
+              },
+              volumeMounts: [
+                {
+                  name: 'actor',
+                  mountPath: '/opt/ql3-live',
+                  readOnly: true,
+                },
+                {
+                  name: 'provider-values',
+                  mountPath: PROVIDER_ROOT,
+                  readOnly: true,
+                },
+                { name: 'tmp', mountPath: '/tmp' },
+              ],
+            },
+          ],
+          volumes: [
+            {
+              name: 'actor',
+              configMap: {
+                name: PROVIDER_ACTOR_CONFIG,
+                defaultMode: 292,
+              },
+            },
+            {
+              name: 'provider-values',
+              secret: {
+                secretName: PROVIDER_SECRET,
+                optional: missing,
+                defaultMode: 288,
+                items: [{ key: projectionKey, path: projectionKey }],
+              },
+            },
+            { name: 'tmp', emptyDir: { medium: 'Memory', sizeLimit: '1Mi' } },
+          ],
+        },
+      },
+    },
+  };
+}
+
+async function proveMountedProviderRotation({
+  fixture,
+  controlImage,
+  projectionKey,
+  secretRef,
+  firstValue,
+  secondValue,
+}) {
+  fixture.create({
+    apiVersion: 'v1',
+    kind: 'ServiceAccount',
+    metadata: { name: PROVIDER_SERVICE_ACCOUNT, namespace: NAMESPACE },
+    automountServiceAccountToken: false,
+  });
+  fixture.create({
+    apiVersion: 'v1',
+    kind: 'ConfigMap',
+    metadata: { name: PROVIDER_ACTOR_CONFIG, namespace: NAMESPACE },
+    immutable: true,
+    data: {
+      'actor.cjs': fs.readFileSync(
+        path.join(
+          ROOT,
+          'scripts/ql3-plugin-package-secret-binding-mounted-provider-actor.cjs',
+        ),
+        'utf8',
+      ),
+    },
+  });
+  fixture.create({
+    apiVersion: 'networking.k8s.io/v1',
+    kind: 'NetworkPolicy',
+    metadata: {
+      name: 'ql3-mounted-secret-provider-live-deny-all',
+      namespace: NAMESPACE,
+    },
+    spec: {
+      podSelector: {
+        matchLabels: {
+          'app.kubernetes.io/name': 'ql3-mounted-secret-provider-live',
+        },
+      },
+      policyTypes: ['Ingress', 'Egress'],
+    },
+  });
+  replaceProviderSecret(fixture, projectionKey, firstValue);
+  const firstResourceVersion = fixture.kubectlJson([
+    '-n',
+    NAMESPACE,
+    'get',
+    'secret',
+    PROVIDER_SECRET,
+  ]).metadata.resourceVersion;
+  const names = ['ql3-mounted-provider-a', 'ql3-mounted-provider-b'];
+  for (const name of names) {
+    fixture.create(
+      providerObserverJob(controlImage, name, projectionKey, false),
+    );
+  }
+  const ready = await waitFor('two mounted provider observers', 300_000, () => {
+    const pods = fixture.kubectlJson([
+      '-n',
+      NAMESPACE,
+      'get',
+      'pods',
+      '-l',
+      'qinglong.io/provider-observer-pair=true',
+    ]).items;
+    const readyPods = pods.filter(podReady);
+    return readyPods.length === 2
+      ? { ready: true, value: readyPods }
+      : { ready: false, fact: `${readyPods.length}/2 observers Ready` };
+  });
+  const providerPods = ready.value;
+  assert.equal(new Set(providerPods.map((pod) => pod.spec.nodeName)).size, 2);
+  for (const pod of providerPods) {
+    assert.equal(pod.spec.automountServiceAccountToken, false);
+    const mount = pod.spec.containers[0].volumeMounts.find(
+      (entry) => entry.name === 'provider-values',
+    );
+    assert.equal(mount?.readOnly, true);
+    assert.equal(
+      pod.spec.volumes.some((volume) =>
+        volume.projected?.sources?.some(
+          (source) => source.serviceAccountToken !== undefined,
+        ),
+      ),
+      false,
+    );
+  }
+  const current = fixture.kubectlJson([
+    '-n',
+    NAMESPACE,
+    'get',
+    'secret',
+    PROVIDER_SECRET,
+  ]);
+  replaceProviderSecret(
+    fixture,
+    projectionKey,
+    secondValue,
+    current.metadata.resourceVersion,
+  );
+  const secondResourceVersion = fixture.kubectlJson([
+    '-n',
+    NAMESPACE,
+    'get',
+    'secret',
+    PROVIDER_SECRET,
+  ]).metadata.resourceVersion;
+  assert.notEqual(secondResourceVersion, firstResourceVersion);
+  await Promise.all(names.map((name) => waitJob(fixture, name, 300_000)));
+  const observations = names.map((name) =>
+    lastJsonLine(
+      jobLog(fixture, name),
+      (value) => value.event === 'mounted_secret_rotation_observed',
+    ),
+  );
+  assert.ok(observations.every((value) => value.generations === 2));
+  const combinedOutput = names.map((name) => jobLog(fixture, name)).join('\n');
+  assert.equal(combinedOutput.includes(firstValue), false);
+  assert.equal(combinedOutput.includes(secondValue), false);
+  assert.equal(combinedOutput.includes(secretRef), false);
+
+  fixture.kubectl([
+    '-n',
+    NAMESPACE,
+    'delete',
+    'secret',
+    PROVIDER_SECRET,
+    '--wait=true',
+  ]);
+  const missingName = 'ql3-mounted-provider-missing';
+  fixture.create(
+    providerObserverJob(controlImage, missingName, projectionKey, true),
+  );
+  await waitJob(fixture, missingName, 300_000);
+  const missing = lastJsonLine(
+    jobLog(fixture, missingName),
+    (value) => value.event === 'mounted_secret_missing_rejected',
+  );
+  assert.equal(missing.errorCode, 'QL3_CLUSTER_MOUNTED_SECRET_UNAVAILABLE');
+
+  return Object.freeze({
+    provider: 'mounted-files',
+    replicas: providerPods.length,
+    distinctNodeHashes: providerPods
+      .map((pod) => sha256(pod.spec.nodeName))
+      .sort(),
+    serviceAccountTokenMounted: false,
+    canGetSecrets: canI(fixture, PROVIDER_SERVICE_ACCOUNT, 'get'),
+    canListSecrets: canI(fixture, PROVIDER_SERVICE_ACCOUNT, 'list'),
+    canPatchSecrets: canI(fixture, PROVIDER_SERVICE_ACCOUNT, 'patch'),
+    projectionReadOnly: true,
+    projectionMode: '0440',
+    firstGenerationObserved: observations.length,
+    rotatedGenerationObserved: observations.length,
+    resourceVersionAdvanced: secondResourceVersion !== firstResourceVersion,
+    outputSensitiveFree:
+      !combinedOutput.includes(firstValue) &&
+      !combinedOutput.includes(secondValue) &&
+      !combinedOutput.includes(secretRef),
+    missingProjectionRejected:
+      missing.errorCode === 'QL3_CLUSTER_MOUNTED_SECRET_UNAVAILABLE',
+    missingErrorCode: missing.errorCode,
+  });
+}
+
 async function main(argv = process.argv.slice(2)) {
   const reportFile = privateReportPath(argv);
   if (process.env.QL3_PLUGIN_PACKAGE_SECRET_BINDING_KUBERNETES_LIVE !== '1') {
@@ -967,7 +1332,9 @@ async function main(argv = process.argv.slice(2)) {
   const suffix =
     process.pid.toString(36) + '-' + crypto.randomBytes(3).toString('hex');
   const adminImage = ADMIN_IMAGE_BASE + ':' + suffix;
+  const controlImage = CONTROL_IMAGE_BASE + ':' + suffix;
   let adminImageBuilt = false;
+  let controlImageBuilt = false;
   try {
     const nodes = await fixture.start();
     assert.equal(nodes.length, 3);
@@ -990,6 +1357,20 @@ async function main(argv = process.argv.slice(2)) {
     fixture.loadImage(adminImage, 'secret-binding-admin.tar');
     const adminImageInfo = fixture.inspectImage(adminImage);
     assert.ok(['amd64', 'arm64'].includes(adminImageInfo.Architecture));
+    run(fixture.docker, [
+      'build',
+      '--file',
+      'deploy/containers/ql3-cluster-control/Dockerfile',
+      '--tag',
+      controlImage,
+      '--build-arg',
+      'SOURCE_REVISION=' + sourceRevision,
+      '.',
+    ]);
+    controlImageBuilt = true;
+    fixture.loadImage(controlImage, 'secret-binding-control.tar');
+    const controlImageInfo = fixture.inspectImage(controlImage);
+    assert.equal(controlImageInfo.Architecture, adminImageInfo.Architecture);
 
     fixture.apply({
       apiVersion: 'v1',
@@ -1000,7 +1381,20 @@ async function main(argv = process.argv.slice(2)) {
     for (const resource of postgresResources(superuserPassword)) {
       fixture.apply(resource);
     }
-    await waitFor('PostgreSQL readiness', 300_000, () => {
+    try {
+      await waitFor('PostgreSQL readiness', 300_000, () => {
+        const pod = fixture.kubectlJson([
+          '-n',
+          NAMESPACE,
+          'get',
+          'pod',
+          POSTGRES,
+        ]);
+        return podReady(pod)
+          ? { ready: true, value: pod }
+          : { ready: false, fact: pod.status?.phase ?? 'unknown' };
+      });
+    } catch (error) {
       const pod = fixture.kubectlJson([
         '-n',
         NAMESPACE,
@@ -1008,10 +1402,30 @@ async function main(argv = process.argv.slice(2)) {
         'pod',
         POSTGRES,
       ]);
-      return podReady(pod)
-        ? { ready: true, value: pod }
-        : { ready: false, fact: pod.status?.phase ?? 'unknown' };
-    });
+      const events = fixture.kubectlJson([
+        '-n',
+        NAMESPACE,
+        'get',
+        'events',
+        '--field-selector',
+        'involvedObject.name=' + POSTGRES,
+      ]);
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)}; ` +
+          `node=${pod.spec?.nodeName ?? 'unscheduled'}; ` +
+          `conditions=${JSON.stringify(pod.status?.conditions ?? [])}; ` +
+          `containerStatuses=${JSON.stringify(
+            pod.status?.containerStatuses ?? [],
+          )}; events=${JSON.stringify(
+            (events.items ?? []).map((event) => ({
+              reason: event.reason,
+              message: event.message,
+              count: event.count,
+            })),
+          )}`,
+        { cause: error },
+      );
+    }
     const passwords = Object.fromEntries(
       ROLE_NAMES.map((role) => [role, randomSecret()]),
     );
@@ -1187,7 +1601,11 @@ async function main(argv = process.argv.slice(2)) {
     applySecret(fixture, 'ql3-cluster-plugin-package-values', {
       [prerequisite.projectionKey]: sensitiveValue,
     });
-    const executorResources = renderExecutor(fixture, adminImage);
+    const executorResources = renderExecutor(
+      fixture,
+      adminImage,
+      prerequisite.projectionKey,
+    );
     for (const resource of executorResources) fixture.apply(resource);
     fixture.kubectl([
       '-n',
@@ -1247,9 +1665,21 @@ async function main(argv = process.argv.slice(2)) {
     );
     assert.notEqual(managerBindingRead.status, 0);
 
+    const mountedProvider = await proveMountedProviderRotation({
+      fixture,
+      controlImage,
+      projectionKey: prerequisite.projectionKey,
+      secretRef: prerequisite.secretRef,
+      firstValue: sensitiveValue,
+      secondValue: 'ql3-live-rotated-' + randomSecret(),
+    });
+    assert.equal(mountedProvider.canGetSecrets, false);
+    assert.equal(mountedProvider.canListSecrets, false);
+    assert.equal(mountedProvider.canPatchSecrets, false);
+
     const report = {
-      schemaVersion: 1,
-      fixture: 'qinglong/plugin-package-secret-binding-kubernetes-live@v1',
+      schemaVersion: 2,
+      fixture: 'qinglong/plugin-package-secret-binding-kubernetes-live@v2',
       observedAtMs: Date.now(),
       platform: {
         architecture: adminImageInfo.Architecture,
@@ -1258,6 +1688,7 @@ async function main(argv = process.argv.slice(2)) {
         nodeCount: nodes.length,
         postgresVersionNumber,
         adminImageId: imageId(adminImageInfo),
+        controlImageId: imageId(controlImageInfo),
       },
       management: {
         replicas: managementPods.length,
@@ -1308,6 +1739,7 @@ async function main(argv = process.argv.slice(2)) {
           !executorOutput.includes(prerequisite.secretRef),
       },
       persistence,
+      provider: mountedProvider,
       gates: {
         realThreeNodeKubernetes: true,
         twoManagementReplicasOnDistinctNodes: true,
@@ -1324,11 +1756,20 @@ async function main(argv = process.argv.slice(2)) {
         executorHasNoServiceAccountToken: true,
         executorProjectionReadOnly: true,
         databaseContainsNoSensitiveValue: true,
+        twoProviderReplicasOnDistinctNodes: true,
+        productionMountedProviderUsed: true,
+        atomicProjectionRotationObserved: true,
+        providerCannotReadSecretApi: true,
+        providerHasNoServiceAccountToken: true,
+        providerProjectionReadOnly: true,
+        providerOutputSensitiveFree: true,
+        missingProjectionFailsClosed: true,
         passed: true,
       },
       limitations: [
         'single-server k3s control plane is not Kubernetes control-plane HA evidence',
         'PostgreSQL physical failover is proven by the independent 125-gate HA contract',
+        'the mounted-files gate proves Kubernetes projection, not a direct Vault KMS or HSM adapter',
       ],
     };
     const audit =
@@ -1349,6 +1790,12 @@ async function main(argv = process.argv.slice(2)) {
     await fixture.cleanup();
     if (adminImageBuilt) {
       run(fixture.docker, ['image', 'rm', '-f', adminImage], {
+        capture: true,
+        quiet: true,
+      });
+    }
+    if (controlImageBuilt) {
+      run(fixture.docker, ['image', 'rm', '-f', controlImage], {
         capture: true,
         quiet: true,
       });

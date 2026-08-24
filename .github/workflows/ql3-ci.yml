@@ -1149,6 +1149,74 @@ jobs:
           QL3_KUBECTL_BIN: ${{ github.workspace }}/kubectl
         run: pnpm test:provider-credential-test-kubernetes-live:ql3
 
+  cluster-secret-binding-mounted-provider-kubernetes-live:
+    name: Secret binding approval and mounted provider rotation live contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install verified kubectl v1.34.3
+        run: |
+          curl --fail --location --silent --show-error \
+            --output kubectl \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error \
+            --output kubectl.sha256 \
+            https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl.sha256
+          test "$(cat kubectl.sha256)" = "$(sha256sum kubectl | cut -d ' ' -f 1)"
+          chmod +x kubectl
+      - name: Preload digest-bound K3s and PostgreSQL fixtures
+        run: |
+          docker pull rancher/k3s@sha256:71abd3a56f57884c62732e0e0d87606052cb5f8555b7db7e8e33c04570b8175c
+          docker tag \
+            rancher/k3s@sha256:71abd3a56f57884c62732e0e0d87606052cb5f8555b7db7e8e33c04570b8175c \
+            rancher/k3s:v1.34.3-k3s1
+          docker pull postgres@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296
+          docker tag \
+            postgres@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296 \
+            postgres:18.4-bookworm
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify the backward-compatible offline evidence contract
+        run: node --test test/back/ql3PluginPackageSecretBindingKubernetesLiveAudit.test.cjs
+      - name: Prove approval, two-replica rotation and missing projection fail-close
+        env:
+          QL3_PLUGIN_PACKAGE_SECRET_BINDING_KUBERNETES_LIVE: '1'
+          QL3_KUBECTL_BIN: ${{ github.workspace }}/kubectl
+          QL3_SECRET_BINDING_LIVE_REPORT: ${{ runner.temp }}/ql3-secret-binding/report.json
+        run: |
+          umask 077
+          mkdir -m 0700 "$(dirname "${QL3_SECRET_BINDING_LIVE_REPORT}")"
+          pnpm test:plugin-package-secret-binding-kubernetes-live:ql3 \
+            "--report=${QL3_SECRET_BINDING_LIVE_REPORT}"
+      - name: Re-audit content-free evidence and isolated cleanup
+        env:
+          QL3_SECRET_BINDING_LIVE_REPORT: ${{ runner.temp }}/ql3-secret-binding/report.json
+        run: |
+          test "$(stat -c '%a' "${QL3_SECRET_BINDING_LIVE_REPORT}")" = '600'
+          pnpm audit:plugin-package-secret-binding-kubernetes-live:ql3 \
+            "--report=${QL3_SECRET_BINDING_LIVE_REPORT}"
+          sha256sum "${QL3_SECRET_BINDING_LIVE_REPORT}"
+          test -z "$(docker ps -aq --filter name=ql3-secret-binding-live-)"
+      - name: Upload audited content-free mounted provider evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-secret-binding-provider-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-secret-binding/report.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false
+
   cluster-plugin-package-kubernetes-live:
     name: Plugin Package Kubernetes CAS and RBAC live contract
     runs-on: ubuntu-24.04

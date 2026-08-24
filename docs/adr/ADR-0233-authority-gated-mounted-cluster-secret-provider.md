@@ -144,6 +144,11 @@ Unicode、大小写和 Kubernetes key 兼容问题。canonical ref hash 更小�
    `24526848` bytes、零 OOM/oom_kill；
 6. workspace 仍为 20 个 QL3 package，没有新增 migration、表、生产依赖、timer、
    watcher、listener、Pool、连接、sidecar 或 Kubernetes API 权限。
+7. ADR-0494 已在真实三节点 K3s 中以两个跨节点 observer 证明 Kubernetes Secret
+   atomic-writer rotation：两副本无重启观察新 generation，均无 Secret API 权限、
+   ServiceAccount token 与网络权限，projection 为只读 `0440`；删除 projection 后以
+   `QL3_CLUSTER_MOUNTED_SECRET_UNAVAILABLE` 失败关闭。v2 私有报告 24/24 gates
+   为 true，且报告/termination message 不含值或 SecretRef。
 
 ## 尚未关闭
 
@@ -152,5 +157,6 @@ Unicode、大小写和 Kubernetes key 兼容问题。canonical ref hash 更小�
 2. 直接 Vault/KMS/HSM adapter 的可选供应链、认证、rate limit 和 outage contract；
 3. Worker materialization 后的 tmpfs/文件清除、Executor-specific injection 与真实
    Pod/节点回收证据；
-4. Kubernetes Secret/CSI/Vault Agent live rotation、并发 delivery、raw-wire
-   response loss 和多副本故障证据。
+4. 直接 CSI/Vault Agent adapter 自身的 live rotation/credential outage、raw-wire
+   response loss、节点丢失与 Kubernetes control-plane 多副本故障证据；基础
+   Kubernetes Secret 双副本 atomic rotation 已由 ADR-0494 关闭。

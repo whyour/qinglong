@@ -5,11 +5,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const FIXTURE = 'qinglong/plugin-package-secret-binding-kubernetes-live@v1';
+const LEGACY_FIXTURE =
+  'qinglong/plugin-package-secret-binding-kubernetes-live@v1';
+const FIXTURE = 'qinglong/plugin-package-secret-binding-kubernetes-live@v2';
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const FORBIDDEN_KEY =
   /(secretRef|secretValue|material|assertion|jwt|password|dsn|privateKey|certificate|kubeconfig|podUid|nodeUid|podName|nodeName)/i;
-const REQUIRED_GATES = Object.freeze([
+const CORE_GATES = Object.freeze([
   'realThreeNodeKubernetes',
   'twoManagementReplicasOnDistinctNodes',
   'formalHttpsClientCommands',
@@ -25,6 +27,21 @@ const REQUIRED_GATES = Object.freeze([
   'executorHasNoServiceAccountToken',
   'executorProjectionReadOnly',
   'databaseContainsNoSensitiveValue',
+]);
+const LEGACY_REQUIRED_GATES = Object.freeze([
+  ...CORE_GATES,
+  'passed',
+]);
+const REQUIRED_GATES = Object.freeze([
+  ...CORE_GATES,
+  'twoProviderReplicasOnDistinctNodes',
+  'productionMountedProviderUsed',
+  'atomicProjectionRotationObserved',
+  'providerCannotReadSecretApi',
+  'providerHasNoServiceAccountToken',
+  'providerProjectionReadOnly',
+  'providerOutputSensitiveFree',
+  'missingProjectionFailsClosed',
   'passed',
 ]);
 
@@ -63,21 +80,16 @@ function scan(value, findings, location = 'report') {
 
 function validatePluginPackageSecretBindingKubernetesLiveReport(report) {
   const findings = [];
+  const legacy =
+    report?.schemaVersion === 1 && report?.fixture === LEGACY_FIXTURE;
+  const current = report?.schemaVersion === 2 && report?.fixture === FIXTURE;
   if (
+    (!legacy && !current) ||
     !exact(report, [
-      'schemaVersion',
-      'fixture',
-      'observedAtMs',
-      'platform',
-      'management',
-      'review',
-      'executor',
-      'persistence',
-      'gates',
-      'limitations',
+      'schemaVersion', 'fixture', 'observedAtMs', 'platform', 'management',
+      'review', 'executor', 'persistence', ...(current ? ['provider'] : []),
+      'gates', 'limitations',
     ]) ||
-    report.schemaVersion !== 1 ||
-    report.fixture !== FIXTURE ||
     !Number.isSafeInteger(report.observedAtMs) ||
     report.observedAtMs < 1
   ) {
@@ -85,17 +97,16 @@ function validatePluginPackageSecretBindingKubernetesLiveReport(report) {
   }
   if (
     !exact(report.platform, [
-      'architecture',
-      'kubernetesVersion',
-      'nodeCount',
-      'postgresVersionNumber',
-      'adminImageId',
+      'architecture', 'kubernetesVersion', 'nodeCount',
+      'postgresVersionNumber', 'adminImageId',
+      ...(current ? ['controlImageId'] : []),
     ]) ||
     !['amd64', 'arm64'].includes(report.platform?.architecture) ||
     typeof report.platform?.kubernetesVersion !== 'string' ||
     report.platform?.nodeCount !== 3 ||
     report.platform?.postgresVersionNumber !== 180004 ||
-    !SHA256.test(report.platform?.adminImageId ?? '')
+    !SHA256.test(report.platform?.adminImageId ?? '') ||
+    (current && !SHA256.test(report.platform?.controlImageId ?? ''))
   ) {
     findings.push('platform evidence is invalid');
   }
@@ -200,14 +211,58 @@ function validatePluginPackageSecretBindingKubernetesLiveReport(report) {
     findings.push('durable binding evidence is invalid');
   }
   if (
-    !exact(report.gates, REQUIRED_GATES) ||
-    REQUIRED_GATES.some((gate) => report.gates?.[gate] !== true)
+    current &&
+    (!exact(report.provider, [
+      'provider',
+      'replicas',
+      'distinctNodeHashes',
+      'serviceAccountTokenMounted',
+      'canGetSecrets',
+      'canListSecrets',
+      'canPatchSecrets',
+      'projectionReadOnly',
+      'projectionMode',
+      'firstGenerationObserved',
+      'rotatedGenerationObserved',
+      'resourceVersionAdvanced',
+      'outputSensitiveFree',
+      'missingProjectionRejected',
+      'missingErrorCode',
+    ]) ||
+      report.provider?.provider !== 'mounted-files' ||
+      report.provider?.replicas !== 2 ||
+      !Array.isArray(report.provider?.distinctNodeHashes) ||
+      report.provider.distinctNodeHashes.length !== 2 ||
+      new Set(report.provider.distinctNodeHashes).size !== 2 ||
+      !report.provider.distinctNodeHashes.every((value) =>
+        SHA256.test(value),
+      ) ||
+      report.provider.serviceAccountTokenMounted !== false ||
+      report.provider.canGetSecrets !== false ||
+      report.provider.canListSecrets !== false ||
+      report.provider.canPatchSecrets !== false ||
+      report.provider.projectionReadOnly !== true ||
+      report.provider.projectionMode !== '0440' ||
+      report.provider.firstGenerationObserved !== 2 ||
+      report.provider.rotatedGenerationObserved !== 2 ||
+      report.provider.resourceVersionAdvanced !== true ||
+      report.provider.outputSensitiveFree !== true ||
+      report.provider.missingProjectionRejected !== true ||
+      report.provider.missingErrorCode !==
+        'QL3_CLUSTER_MOUNTED_SECRET_UNAVAILABLE')
+  ) {
+    findings.push('mounted provider evidence is invalid');
+  }
+  const requiredGates = current ? REQUIRED_GATES : LEGACY_REQUIRED_GATES;
+  if (
+    !exact(report.gates, requiredGates) ||
+    requiredGates.some((gate) => report.gates?.[gate] !== true)
   ) {
     findings.push('one or more required gates are false or missing');
   }
   if (
     !Array.isArray(report.limitations) ||
-    report.limitations.length !== 2 ||
+    report.limitations.length !== (current ? 3 : 2) ||
     report.limitations.some(
       (value) =>
         typeof value !== 'string' || value.length < 16 || value.length > 512,
@@ -218,7 +273,7 @@ function validatePluginPackageSecretBindingKubernetesLiveReport(report) {
   scan(report, findings);
   return Object.freeze({
     schemaVersion: 1,
-    fixture: FIXTURE,
+    fixture: current ? FIXTURE : LEGACY_FIXTURE,
     findings: Object.freeze(findings),
     compatible: findings.length === 0,
   });
@@ -254,6 +309,8 @@ if (require.main === module) {
 
 module.exports = {
   FIXTURE,
+  LEGACY_FIXTURE,
+  LEGACY_REQUIRED_GATES,
   REQUIRED_GATES,
   validatePluginPackageSecretBindingKubernetesLiveReport,
 };
