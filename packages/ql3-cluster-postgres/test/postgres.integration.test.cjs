@@ -4868,13 +4868,27 @@ if (!migrationConnectionString) {
         5_000,
         nextMinute,
       );
-      assert.equal(initialize.disposition, 'initialize');
+      const initializationIds = {
+        runId: '019f7900-0000-7000-8000-000000000101',
+        attemptId: '019f7900-0000-7000-8000-000000000102',
+        createdEventId: '019f7900-0000-7000-8000-000000000103',
+        queuedEventId: '019f7900-0000-7000-8000-000000000104',
+      };
+      const initialization = await schedules.commitClusterScheduleDecision({
+        claim: initializeClaim,
+        decision: initialize,
+        ...(initialize.disposition === 'admit' ? initializationIds : {}),
+      });
       assert.deepEqual(
-        await schedules.commitClusterScheduleDecision({
-          claim: initializeClaim,
-          decision: initialize,
-        }),
-        { status: 'advanced', disposition: 'initialize' },
+        initialization,
+        initialize.disposition === 'admit'
+          ? {
+              status: 'admitted',
+              disposition: 'admit',
+              runId: initializationIds.runId,
+              attemptId: initializationIds.attemptId,
+            }
+          : { status: 'advanced', disposition: initialize.disposition },
       );
 
       const forcedDueResult = await database.pool.query(
