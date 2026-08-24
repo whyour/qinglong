@@ -919,7 +919,7 @@ test('CLI rejects symlinks, open arguments, output aliasing and policy ambiguity
 test('source-surface audit freezes every reviewed cluster and worker authority', () => {
   assert.deepEqual(auditDeploymentImageSurfaces(root), {
     schemaVersion: 1,
-    deploymentYamlFiles: 224,
+    deploymentYamlFiles: 227,
     imageOccurrences: {
       control: 2,
       'control-ai': 1,

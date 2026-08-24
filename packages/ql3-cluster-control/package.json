@@ -150,6 +150,11 @@
       "require": "./dist/remote-execution/mountedSecretProvider.js",
       "default": "./dist/remote-execution/mountedSecretProvider.js"
     },
+    "./vault-kv-secret-provider": {
+      "types": "./dist/remote-execution/vaultKvSecretProvider.d.ts",
+      "require": "./dist/remote-execution/vaultKvSecretProvider.js",
+      "default": "./dist/remote-execution/vaultKvSecretProvider.js"
+    },
     "./trusted-tool-result-keyring": {
       "types": "./dist/trusted-tool/key-management/toolResultProjectedKeyring.d.ts",
       "require": "./dist/trusted-tool/key-management/toolResultProjectedKeyring.js",

@@ -52,6 +52,24 @@ export interface ClusterWorkerMountedSecretConfig {
   readonly rootDirectory: string;
 }
 
+export interface ClusterWorkerVaultKvSecretConfig {
+  readonly provider: 'vault-kv-v2';
+  readonly endpoint: string;
+  readonly caFile: string;
+  readonly tokenFile: string;
+  readonly kvMount: string;
+  readonly pathPrefix: string;
+  readonly expectedPolicy: string;
+  readonly maximumTokenTtlSeconds: number;
+  readonly requestTimeoutMs: number;
+  readonly maximumConcurrency: number;
+  readonly namespace?: string;
+}
+
+export type ClusterWorkerSecretConfig =
+  | ClusterWorkerMountedSecretConfig
+  | ClusterWorkerVaultKvSecretConfig;
+
 export interface EnabledClusterWorkerIngressConfig {
   readonly enabled: true;
   readonly profile: 'cluster-control';
@@ -70,7 +88,7 @@ export interface EnabledClusterWorkerIngressConfig {
     readonly workerCredentialPepper: string;
   }>;
   readonly artifact: Readonly<ClusterWorkerArtifactS3Config>;
-  readonly secret?: Readonly<ClusterWorkerMountedSecretConfig>;
+  readonly secret?: Readonly<ClusterWorkerSecretConfig>;
 }
 
 export type ClusterWorkerIngressConfig =
@@ -327,13 +345,11 @@ function workerArtifactS3(
   );
   if (
     prefix !== undefined &&
-    (
-      !/^[A-Za-z0-9][A-Za-z0-9/_=-]{0,254}$/.test(prefix) ||
+    (!/^[A-Za-z0-9][A-Za-z0-9/_=-]{0,254}$/.test(prefix) ||
       prefix.startsWith('/') ||
       prefix.endsWith('/') ||
       prefix.includes('//') ||
-      prefix.split('/').some((segment) => segment === '.' || segment === '..')
-    )
+      prefix.split('/').some((segment) => segment === '.' || segment === '..'))
   ) {
     throw new ClusterWorkerIngressConfigError(
       'QL3_WORKER_ARTIFACT_S3_PREFIX is invalid',
@@ -388,11 +404,7 @@ function workerArtifactS3(
     endpoint = parsed.origin;
   }
   const encryptionMode =
-    boundedValue(
-      environment,
-      'QL3_WORKER_ARTIFACT_S3_ENCRYPTION',
-      3,
-    ) ?? 's3';
+    boundedValue(environment, 'QL3_WORKER_ARTIFACT_S3_ENCRYPTION', 3) ?? 's3';
   if (encryptionMode !== 's3' && encryptionMode !== 'kms') {
     throw new ClusterWorkerIngressConfigError(
       'QL3_WORKER_ARTIFACT_S3_ENCRYPTION must be s3 or kms',
@@ -415,9 +427,7 @@ function workerArtifactS3(
     bucket,
     region,
     ...(prefix === undefined ? {} : { prefix }),
-    ...(expectedBucketOwner === undefined
-      ? {}
-      : { expectedBucketOwner }),
+    ...(expectedBucketOwner === undefined ? {} : { expectedBucketOwner }),
     ...(endpoint === undefined ? {} : { endpoint }),
     forcePathStyle: booleanValue(
       environment,
@@ -433,17 +443,95 @@ function workerArtifactS3(
 
 function workerSecret(
   environment: ClusterWorkerIngressEnvironment,
-): Readonly<ClusterWorkerMountedSecretConfig> | undefined {
-  const provider = boundedValue(
-    environment,
-    'QL3_WORKER_SECRET_PROVIDER',
-    32,
-  );
+): Readonly<ClusterWorkerSecretConfig> | undefined {
+  const provider = boundedValue(environment, 'QL3_WORKER_SECRET_PROVIDER', 32);
   if (provider === undefined || provider === 'disabled') return undefined;
-  if (provider !== 'mounted-files') {
+  if (provider !== 'mounted-files' && provider !== 'vault-kv-v2') {
     throw new ClusterWorkerIngressConfigError(
-      'QL3_WORKER_SECRET_PROVIDER must be disabled or mounted-files',
+      'QL3_WORKER_SECRET_PROVIDER must be disabled, mounted-files or vault-kv-v2',
     );
+  }
+  if (provider === 'vault-kv-v2') {
+    const endpoint = boundedValue(
+      environment,
+      'QL3_WORKER_SECRET_VAULT_ENDPOINT',
+      2048,
+      true,
+    )!;
+    let parsedEndpoint: URL;
+    try {
+      parsedEndpoint = new URL(endpoint);
+    } catch {
+      throw new ClusterWorkerIngressConfigError(
+        'QL3_WORKER_SECRET_VAULT_ENDPOINT must be an HTTPS authority',
+      );
+    }
+    if (
+      parsedEndpoint.protocol !== 'https:' ||
+      parsedEndpoint.username ||
+      parsedEndpoint.password ||
+      parsedEndpoint.pathname !== '/' ||
+      parsedEndpoint.search ||
+      parsedEndpoint.hash
+    ) {
+      throw new ClusterWorkerIngressConfigError(
+        'QL3_WORKER_SECRET_VAULT_ENDPOINT must be an HTTPS authority',
+      );
+    }
+    const namespace = boundedValue(
+      environment,
+      'QL3_WORKER_SECRET_VAULT_NAMESPACE',
+      512,
+    );
+    return Object.freeze({
+      provider,
+      endpoint: parsedEndpoint.toString(),
+      caFile: absoluteFile(environment, 'QL3_WORKER_SECRET_VAULT_CA_FILE'),
+      tokenFile: absoluteFile(
+        environment,
+        'QL3_WORKER_SECRET_VAULT_TOKEN_FILE',
+      ),
+      kvMount: boundedValue(
+        environment,
+        'QL3_WORKER_SECRET_VAULT_KV_MOUNT',
+        128,
+        true,
+      )!,
+      pathPrefix: boundedValue(
+        environment,
+        'QL3_WORKER_SECRET_VAULT_PATH_PREFIX',
+        512,
+        true,
+      )!,
+      expectedPolicy: boundedValue(
+        environment,
+        'QL3_WORKER_SECRET_VAULT_EXPECTED_POLICY',
+        128,
+        true,
+      )!,
+      maximumTokenTtlSeconds: integerValue(
+        environment,
+        'QL3_WORKER_SECRET_VAULT_MAX_TOKEN_TTL_SECONDS',
+        900,
+        30,
+        3600,
+      ),
+      requestTimeoutMs: integerValue(
+        environment,
+        'QL3_WORKER_SECRET_VAULT_REQUEST_TIMEOUT_MS',
+        5000,
+        100,
+        30_000,
+      ),
+      maximumConcurrency: integerValue(
+        environment,
+        'QL3_WORKER_SECRET_VAULT_MAX_CONCURRENCY',
+        4,
+        1,
+        8,
+      ),
+      ...(namespace === undefined ? {} : { namespace }),
+    });
   }
   return Object.freeze({
     provider,

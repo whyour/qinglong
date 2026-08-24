@@ -128,8 +128,11 @@ async function createWorkerArtifactBinding(
 async function createWorkerSecretProvider(
   config: NonNullable<EnabledClusterWorkerIngressConfig['secret']>,
 ): Promise<Readonly<RemoteWorkerSecretValueProvider>> {
-  if (config.provider !== 'mounted-files') {
-    throw new TypeError('Cluster Worker Secret provider is unsupported');
+  if (config.provider === 'vault-kv-v2') {
+    const provider = await import(
+      '../remote-execution/vaultKvSecretProvider.js'
+    );
+    return provider.createClusterVaultKvSecretProvider(config);
   }
   const provider = await import('../remote-execution/mountedSecretProvider.js');
   return provider.createClusterMountedSecretProvider({

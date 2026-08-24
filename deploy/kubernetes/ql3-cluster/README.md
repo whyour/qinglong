@@ -1032,6 +1032,22 @@ Kubernetes API permission. Version-pinned SecretRefs use a different hash and
 remain immutable by policy; retain their files until referenced Run/Artifact
 retention has completed.
 
+For deployments that require direct external custody, use the optional
+`vault-kv-worker-secret` overlay instead of projecting value files:
+
+```bash
+kubectl kustomize \
+  deploy/kubernetes/ql3-cluster/vault-kv-worker-secret >/dev/null
+```
+
+That overlay mounts only a private Vault CA and a short-lived, orphan,
+non-renewable read token. The adapter revalidates the token and fetches exact
+digest-derived KV v2 paths over TLS 1.3 for every authorized delivery; it has no
+cache, watcher, renewal loop or fallback to `mounted-files`. Follow the
+overlay's README for the exact policy, payload and token-rotation contract.
+External Vault HA, seal custody, audit devices, backup and disaster recovery
+remain deployment-specific gates.
+
 Create a distinct migration Secret:
 
 ```yaml

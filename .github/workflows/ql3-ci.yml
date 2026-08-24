@@ -1219,6 +1219,92 @@ jobs:
           overwrite: false
           include-hidden-files: false
 
+  cluster-vault-kv-worker-secret-live:
+    name: Vault KV Worker Secret direct custody (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+            kubernetesArch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            kubernetesArch: arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Verify native runner architecture
+        run: node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install verified kubectl v1.34.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl" \
+            "https://dl.k8s.io/release/v1.34.3/bin/linux/${{ matrix.kubernetesArch }}/kubectl"
+          curl --fail --location --silent --show-error \
+            --output "${RUNNER_TEMP}/kubectl.sha256" \
+            "https://dl.k8s.io/release/v1.34.3/bin/linux/${{ matrix.kubernetesArch }}/kubectl.sha256"
+          test "$(cat "${RUNNER_TEMP}/kubectl.sha256")" = \
+            "$(sha256sum "${RUNNER_TEMP}/kubectl" | cut -d ' ' -f 1)"
+          chmod 0755 "${RUNNER_TEMP}/kubectl"
+      - name: Build the direct custody adapter
+        run: |
+          pnpm --filter @qinglong/runtime-core build
+          pnpm --filter @qinglong/cluster-control build
+      - name: Verify the fail-closed adapter and evidence contracts
+        run: |
+          node --test \
+            packages/ql3-cluster-control/test/vaultKvSecretProvider.test.cjs \
+            packages/ql3-cluster-control/test/vaultKvWorkerIngressConfig.test.cjs \
+            test/back/ql3VaultKvWorkerSecretLiveAudit.test.cjs \
+            test/back/ql3VaultKvWorkerSecretDeploymentAudit.test.cjs
+          pnpm audit:vault-kv-worker-secret-deployment:ql3
+          "${RUNNER_TEMP}/kubectl" kustomize \
+            deploy/kubernetes/ql3-cluster/vault-kv-worker-secret \
+            >/dev/null
+      - name: Preload the digest-pinned native Vault image
+        run: docker pull docker.io/hashicorp/vault@sha256:4e33b126a59c0c333b76fb4e894722462659a6bec7c48c9ee8cea56fccfd2569
+      - name: Prove TLS, least privilege, value and token rotation, seal and recovery
+        env:
+          QL3_RUN_VAULT_KV_WORKER_SECRET_LIVE: 'true'
+          QL3_VAULT_KV_WORKER_SECRET_REPORT: ${{ runner.temp }}/ql3-vault-kv-worker-secret/report.json
+        run: |
+          umask 077
+          mkdir -m 0700 "$(dirname "${QL3_VAULT_KV_WORKER_SECRET_REPORT}")"
+          node scripts/ql3-vault-kv-worker-secret-live-contract.cjs >/dev/null
+      - name: Re-audit content-free direct custody evidence and cleanup
+        env:
+          QL3_VAULT_KV_WORKER_SECRET_REPORT: ${{ runner.temp }}/ql3-vault-kv-worker-secret/report.json
+        run: |
+          test "$(stat -c '%a' "${QL3_VAULT_KV_WORKER_SECRET_REPORT}")" = '600'
+          pnpm audit:vault-kv-worker-secret-live:ql3 \
+            "--report=${QL3_VAULT_KV_WORKER_SECRET_REPORT}"
+          sha256sum "${QL3_VAULT_KV_WORKER_SECRET_REPORT}"
+          test -z "$(docker ps -aq --filter name=ql3-vault-kv-worker-)"
+      - name: Upload audited content-free Vault KV custody evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-vault-kv-worker-secret-${{ matrix.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-vault-kv-worker-secret/report.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false
+
   cluster-plugin-package-kubernetes-live:
     name: Plugin Package Kubernetes CAS and RBAC live contract
     runs-on: ubuntu-24.04

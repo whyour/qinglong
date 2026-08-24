@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ql3-cluster-control
+spec:
+  template:
+    spec:
+      containers:
+        - name: cluster-control
+          env:
+            - name: QL3_WORKER_SECRET_PROVIDER
+              value: vault-kv-v2
+            - name: QL3_WORKER_SECRET_ROOT_DIRECTORY
+              $patch: delete
+            - name: QL3_WORKER_SECRET_VAULT_ENDPOINT
+              value: https://vault.vault.svc.cluster.local:8200
+            - name: QL3_WORKER_SECRET_VAULT_CA_FILE
+              value: /var/run/secrets/qinglong3/worker-vault-trust/ca.pem
+            - name: QL3_WORKER_SECRET_VAULT_TOKEN_FILE
+              value: /var/run/secrets/qinglong3/worker-vault-auth/token
+            - name: QL3_WORKER_SECRET_VAULT_KV_MOUNT
+              value: worker-secrets
+            - name: QL3_WORKER_SECRET_VAULT_PATH_PREFIX
+              value: values/production
+            - name: QL3_WORKER_SECRET_VAULT_EXPECTED_POLICY
+              value: ql3-worker-secret-read
+            - name: QL3_WORKER_SECRET_VAULT_MAX_TOKEN_TTL_SECONDS
+              value: '900'
+            - name: QL3_WORKER_SECRET_VAULT_REQUEST_TIMEOUT_MS
+              value: '5000'
+            - name: QL3_WORKER_SECRET_VAULT_MAX_CONCURRENCY
+              value: '4'
+          volumeMounts:
+            - name: worker-secret-values
+              $patch: delete
+            - name: worker-vault-trust
+              mountPath: /var/run/secrets/qinglong3/worker-vault-trust
+              readOnly: true
+            - name: worker-vault-auth
+              mountPath: /var/run/secrets/qinglong3/worker-vault-auth
+              readOnly: true
+      volumes:
+        - name: worker-secret-values
+          $patch: delete
+        - name: worker-vault-trust
+          secret:
+            secretName: ql3-cluster-worker-vault-trust
+            defaultMode: 292
+            items:
+              - key: ca.pem
+                path: ca.pem
+        - name: worker-vault-auth
+          secret:
+            secretName: ql3-cluster-worker-vault-auth
+            defaultMode: 288
+            items:
+              - key: token
+                path: token

@@ -102,7 +102,7 @@ test('audits one source-derived QingLong 3 release identity', () => {
     legacyRootExcluded: true,
     workspacePackageCount: 18,
     containerRootCount: 4,
-    deploymentFileCount: 242,
+    deploymentFileCount: 246,
     deploymentImageReferences: 32,
     deploymentVersionOccurrences: 36,
     compatible: true,

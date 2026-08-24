@@ -11,6 +11,8 @@
 
 最新增量证据（2026-08-24）：
 
+- D-404/ADR-0499（已验收）：Cluster Worker 现在有可选的直接外部 Secret custody adapter，而不再只能依赖 Kubernetes Secret value projection。`vault-kv-v2` 位于既有 `@qinglong/cluster-control` Remote Execution 子域，只有显式选择 provider 的 Cluster 进程才动态加载；基础部署继续使用 `mounted-files`，Edge/Standalone 不新增 package、依赖、daemon、timer、watcher、连接池或常驻内存。adapter 只在 durable Run/Attempt/Lease/Worker Session/execution digest/SecretRef authority 通过后，用 `SHA-256(canonical SecretRef)` 路径读取 KV v2；只接受显式私有 CA 的 TLS 1.3、每次重新打开的短期 orphan/non-renewable service token 和唯一精确 policy，不跟随 redirect、不使用系统 CA 回退、不缓存值或 token。Kubernetes overlay 删除 value Secret projection，只挂载 CA 与 token；普通 Secret、opaque environment bundle 和总响应仍受原 16/96/256 KiB 边界约束，空 Secret 保持合法，异常 envelope、metadata、digest、token、TLS 或 Vault availability 均失败关闭且不回退。真实 arm64 Vault 1.21.4 gate 已完成 3-share/2-threshold init、两个普通 Secret 与一个 bundle、value/token 原子轮换、旧 accessor revoke、缺失 material、不可信 CA、seal/unseal 与同持久存储容器替换；`0600` content-free 报告 SHA-256 为 `df225509cb763009b610cb0aea2207e0b07b5e05a44cf8cf0dff1633c1624d52`，audit 为 `compatible=true/findings=[]`。Cluster Control 为 `279 total / 277 pass / 2 conditional skip / 0 fail`，backend 为 `1574 total / 1572 pass / 2 conditional skip / 0 fail`，18-package clean build/test 退出 0；package、Cluster dependency、122-module Edge import、部署和 14 档 Local artifact 审计全部 compatible，基础 Edge/Standalone 仍为 `2,669,390 / 2,669,468 bytes`、325 files、58 modules。共享 CI 新增原生 x64/arm64 live matrix。该 fixture 关闭 QingLong 直接 custody adapter/data-boundary 门，不冒充生产 Vault HA、KMS/HSM seal、审计设备或灾备证明；ADR-0491 现在只剩固定低性能物理 Edge 的真实空间、RSS/I/O、写放大、ENOSPC 与断电恢复门。
+
 - D-397/ADR-0491（进行中）：Secret/Config reconciliation 已先冻结行为保持边界，不能把“密文已保存”冒充“任务已迁移”。2.x `Envs`
   的 active 行必须按 `isPinned DESC、position DESC、createdAt ASC、id ASC` 重放旧顺序，同名值用 `&` 形成唯一 effective Secret；该
   Secret 后续必须在同一事务中绑定到经 Automation adoption ledger 证明的全部 Legacy Task 新修订，并同步追加指向新 Task revision 的 Trigger/dispatch
@@ -87,8 +89,7 @@
   因而不重跑且不重新占有 PostgreSQL HA 证明；相邻已通过的 remote CI/HA 只作为基线。
 
   D-385～D-388 的 `config.sh`/Keyv/SSH data-directory lineage 与 SQLite `Envs` 保持分离；当前无稳定生产 schema 的历史 `Configs` 表继续 sealed+manual，
-  不猜字段。ADR-0494 已关闭基础 Cluster mounted-files provider live 子门；后续切片仍必须完成固定低性能设备的真实 Edge 空间/写放大/断电证据，
-  以及 Cluster Legacy Env migration 的专用 PostgreSQL SERIALIZABLE ledger、Task/Trigger revision mutation 与直接外部 custody adapter。HA promotion 后 receipt replay 已由 D-403/ADR-0498 关闭。D-397 apply
+  不猜字段。ADR-0494 已关闭基础 Cluster mounted-files provider live 子门，ADR-0495～ADR-0498 已关闭 Cluster plan/application/HA replay，ADR-0499 已关闭直接 Vault KV 外部 custody adapter；后续仍必须完成固定低性能设备的真实 Edge 空间、RSS/I/O、写放大、ENOSPC 与断电证据。D-397 apply
   只声明 sealed source retained 且 `physicalErasureGuaranteed=false`；明文销毁必须在 restart/
   readiness、观察窗和 rollback retention 之后另行强认证。Cluster 必须使用 PostgreSQL SERIALIZABLE ledger、外部 KMS/Secret provider 与 HA evidence，
   不复用 Local SQLite/POSIX authority，也不得把明文写入 PostgreSQL、ConfigMap、Pod env 或 Job command。
@@ -174,8 +175,8 @@
   `a7c8a05e08c748d677475a09ce2998b741ed9326e27678613e93d431bc3769aa`；
   真实用例覆盖 Trigger 固定 Task r1、Task current r2、原子生成 Task r3/Trigger r2 并重定向 pin，
   同时证明 bundle ref-only execution、schedule reset、无流消费 replay 与数据库角色隔离。D-402
-  关闭 mutation/receipt 边界；相邻 D-403 已继续关闭 promotion 后 receipt replay，direct external
-  custody 与固定低性能 Edge 物理证据仍是 ADR-0491 转 Accepted 前的门禁。
+  关闭 mutation/receipt 边界；相邻 D-403 已继续关闭 promotion 后 receipt replay，D-404/ADR-0499 已关闭 direct external
+  custody adapter；固定低性能 Edge 物理证据是 ADR-0491 转 Accepted 前唯一剩余门禁。
 
 - D-403/ADR-0498（已验收）：ADR-0497 application receipt 已进入真实 PostgreSQL 18 physical HA
   领域门，而不是继续引用通用表存活作为间接证据。主库与 standby 达到
@@ -199,8 +200,8 @@
   `1569 total / 1567 pass / 2 conditional skip / 0 fail`，四项 package/依赖/import 边界均 compatible。
   基础 Edge/Standalone 仍只包含 Local SQLite、runtime-core 与 SemVer，均为 325 files/58 modules，
   大小 `2,669,390 / 2,669,468 bytes`，距 4 MiB 上限保留 `1,524,914 / 1,524,836 bytes`；它只证明
-  常驻闭包未扩大，不冒充真实设备证据。D-403 关闭 promotion replay；ADR-0491 现在只剩 direct
-  external custody 与固定低性能 Edge 空间/写放大/断电恢复两项硬门。
+  常驻闭包未扩大，不冒充真实设备证据。D-403 关闭 promotion replay，D-404/ADR-0499 关闭 direct
+  external custody adapter；ADR-0491 现在只剩固定低性能 Edge 空间、RSS/I/O、写放大、ENOSPC 与断电恢复硬门。
 
 - D-396/ADR-0490（已验收）：Run History 不再只有永久 `manual_external`，但也没有被错误实现为 Legacy 日志到 3.0 Run ledger 的回灌。
   新的 Local adapter 以 ADR-0482 sealed capture bundle 作为 append-only 保全资产：Legacy history 必须逐事实选择 `retain_both`，Target history
