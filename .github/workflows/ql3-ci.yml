@@ -61,6 +61,7 @@ jobs:
           pnpm audit:edge-imports:ql3
           pnpm audit:cluster-dependencies:ql3
           pnpm audit:cluster-deployment:ql3
+          pnpm audit:security-administration-kubernetes:ql3
       - name: Smoke benchmark edge executor
         run: pnpm benchmark:edge -- --json
       - name: Prove disabled AI Profile has zero storage or credential reachability

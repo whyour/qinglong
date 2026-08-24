@@ -504,6 +504,7 @@
 | [ADR-0498](./ADR-0498-cluster-legacy-env-application-ha-replay.md)                                   | Cluster Legacy Env Application 的 HA Promotion 后精确重放                                                                                                                                                        | Accepted |
 | [ADR-0499](./ADR-0499-direct-vault-kv-worker-secret-custody.md)                                      | 直接 Vault KV Worker Secret 外部托管                                                                                                                                                                             | Accepted |
 | [ADR-0500](./ADR-0500-short-lived-cluster-security-administration-command.md)                        | 短生命周期 Cluster Security Administration 产品命令                                                                                                                                                              | Accepted |
+| [ADR-0501](./ADR-0501-opt-in-kubernetes-security-administration-job.md)                              | 可选的一次性 Kubernetes Security Administration Job                                                                                                                                                              | Accepted |
 
 ## 规则
 

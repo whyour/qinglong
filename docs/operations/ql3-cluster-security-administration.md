@@ -125,6 +125,32 @@ ql3-cluster-admin security \
 
 成功签发或轮换时，stdout 只包含 delivery 文件名和 SHA-256。token 只存在于新建的 `0600` delivery 文件。目标已存在时命令失败且绝不覆盖。精确重放返回 `status=existing` 且不重新发布 token；如果首次响应丢失，先检查原 delivery 文件，确实丢失时使用新的 mutationId 执行 rotate，不能尝试恢复旧 token。
 
+## Kubernetes 一次性 Job
+
+仓库提供显式 opt-in 的部署模板，但不会随共享 Cluster operations 安装：
+
+- `base`：外部 PostgreSQL；默认 NetworkPolicy 只有 DNS，必须用私有 overlay 增加数据库的精确 IP/Pod egress；
+- `cloudnative-pg`：使用 `ql3-postgres-admin-auth`、`ql3-postgres-rw`、`ql3-postgres-ca`；
+- `credential-delivery`：在 base 上增加调用方提供的 RWO PVC；
+- `cloudnative-pg-credential-delivery`：CloudNativePG 与 PVC 交付的组合。
+
+把 `input-secret.example.yaml` 复制到仓库外的私有目录，替换四个占位值，并保持 `immutable: true`。示例不属于任何 Kustomization。非签发操作不要选择 delivery overlay；`credential.issue` / `credential.rotate` 必须先按 `delivery-pvc.example.yaml` 创建受加密、受访问控制的 PVC，并把 manifest 中的 `replace-with-unique-delivery.json` 改为本次唯一文件名。
+
+以 CloudNativePG 的无 delivery audit query 为例：
+
+```sh
+kubectl create -f /secure/qinglong3/security-administration-input.yaml
+kubectl kustomize \
+  deploy/kubernetes/ql3-cluster/operations/security-administration/cloudnative-pg \
+  | kubectl create -f -
+kubectl wait --for=condition=complete --timeout=300s \
+  job/ql3-security-administration -n qinglong3-system
+kubectl logs job/ql3-security-administration -n qinglong3-system \
+  -c administrator
+```
+
+当前固定资源名只允许串行执行。收集 content-free 结果和（仅 issue/rotate）PVC 中的 `0600` delivery 文件后，删除 Job 与本次 immutable input Secret；不得重用 assertion、把 token 复制到终端输出，或以 `kubectl apply` 修改旧 Job。真实 K3s + PostgreSQL live ceremony 尚未验收，生产启用前仍需完成 ADR-0501 的 live gate。
+
 ## 当前边界
 
-本入口没有远程 API/UI、双人复核或 break-glass、pepper rotation、audit retention/export/alert，也没有默认安装的 Kubernetes Job。生产部署应把它放在受控工作站或自行审查的一次性 Job 中，并确保 admin database credential 不进入常驻 Cluster Control。完整安全决策见 [ADR-0500](../adr/ADR-0500-short-lived-cluster-security-administration-command.md)。
+本入口没有远程 API/UI、双人复核或 break-glass、pepper rotation、audit retention/export/alert。可选 Job 已有受审静态部署契约，但不默认安装，真实 K3s + PostgreSQL/PVC ceremony 仍待验收；admin database credential 始终不得进入常驻 Cluster Control。命令决策见 [ADR-0500](../adr/ADR-0500-short-lived-cluster-security-administration-command.md)，部署决策见 [ADR-0501](../adr/ADR-0501-opt-in-kubernetes-security-administration-job.md)。

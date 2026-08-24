@@ -30,7 +30,7 @@ const IMAGE_NAMES = Object.freeze({
 const EXPECTED_SOURCE_SURFACES = Object.freeze({
   control: 2,
   'control-ai': 1,
-  admin: 26,
+  admin: 28,
   worker: 2,
 });
 const ADMISSION_CONFIG_NAME = 'ql3-plugin-package-secret-action-admission';

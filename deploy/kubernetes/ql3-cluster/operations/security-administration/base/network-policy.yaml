@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ql3-security-administration
+  namespace: qinglong3-system
+  labels:
+    app.kubernetes.io/name: ql3-security-administration
+    app.kubernetes.io/component: security-administration
+    app.kubernetes.io/part-of: qinglong3
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ql3-security-administration
+      app.kubernetes.io/component: security-administration
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

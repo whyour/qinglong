@@ -1,0 +1,12 @@
+# Example only. Use an encrypted, access-controlled StorageClass and a fresh PVC.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ql3-security-administration-delivery
+  namespace: qinglong3-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 16Mi

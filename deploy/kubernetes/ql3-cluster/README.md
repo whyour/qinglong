@@ -76,6 +76,18 @@ command schemas and operator procedure are documented in
 response-loss behavior and remaining gates are frozen in
 [`ADR-0500`](../../../docs/adr/ADR-0500-short-lived-cluster-security-administration-command.md).
 
+An opt-in one-shot Job is available under
+[`operations/security-administration`](./operations/security-administration).
+It is deliberately absent from the shared operations Kustomization. Select
+`base` or `cloudnative-pg`; select a credential-delivery variant only for
+issue/rotate after provisioning a private encrypted RWO PVC. A non-root init
+container copies the kubelet symlink projection into a `0700` memory-backed
+directory with `0600` files before the administrator starts. The Job has no
+Kubernetes API token or RBAC, does not retry, and retains the one-connection
+database ceiling. The exact serial dispatch and cleanup procedure is in the
+operator guide above; production remains gated on the ADR-0501 live K3s,
+PostgreSQL and PVC ceremony.
+
 Workstation operators may pass an explicit owner-private context to reuse only
 stable client paths:
 

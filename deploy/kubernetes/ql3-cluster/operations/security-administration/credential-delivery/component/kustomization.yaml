@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+patches:
+  - path: job-patch.yaml
+    target:
+      group: batch
+      version: v1
+      kind: Job
+      name: ql3-security-administration

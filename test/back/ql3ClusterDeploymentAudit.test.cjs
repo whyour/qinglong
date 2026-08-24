@@ -34,7 +34,7 @@ test('accepts the exact locked non-root multi-replica cluster deployment', () =>
   );
   assert.equal(report.clusterCopilotMcpHost, 'external-host-stdio');
   assert.equal(report.promptOutputKeyRotation, 'caller-driven-staged-material');
-  assert.equal(report.clusterAdminImageReferences, 24);
+  assert.equal(report.clusterAdminImageReferences, 26);
   assert.deepEqual(report.workspacePackages, [
     '@qinglong/runtime-core',
     '@qinglong/cluster-postgres',
@@ -92,7 +92,7 @@ test('requires every Cluster Admin Kubernetes workload to override the image com
     ),
   });
   assert.equal(report.compatible, false);
-  assert.equal(report.clusterAdminImageReferences, 24);
+  assert.equal(report.clusterAdminImageReferences, 26);
   assert.equal(
     report.findings.some(
       ({ code }) => code === 'QL3_CLUSTER_ADMIN_IMAGE_COMMAND_IMPLICIT',

@@ -92,6 +92,7 @@
     "audit:vault-kv-worker-secret-deployment:ql3": "node scripts/ql3-vault-kv-worker-secret-deployment-audit.cjs",
     "test:postgres-backup-prompt-output-recovery-live:ql3": "pnpm --filter @qinglong/ai build && pnpm --filter @qinglong/cluster-admin build && node scripts/ql3-postgres-prompt-output-recovery-live-contract.cjs",
     "audit:cluster-deployment:ql3": "node scripts/ql3-cluster-deployment-audit.cjs",
+    "audit:security-administration-kubernetes:ql3": "node scripts/ql3-security-administration-kubernetes-audit.cjs",
     "audit:cluster-copilot-console:ql3": "node scripts/ql3-cluster-copilot-console-audit.cjs",
     "audit:cluster-copilot-console-distribution:ql3": "node scripts/ql3-cluster-copilot-console-distribution-audit.cjs",
     "evidence:cluster-admin-release-workstation:ql3": "node scripts/ql3-cluster-admin-release-workstation-ceremony.cjs",

@@ -102,9 +102,9 @@ test('audits one source-derived QingLong 3 release identity', () => {
     legacyRootExcluded: true,
     workspacePackageCount: 18,
     containerRootCount: 4,
-    deploymentFileCount: 246,
-    deploymentImageReferences: 32,
-    deploymentVersionOccurrences: 36,
+    deploymentFileCount: 260,
+    deploymentImageReferences: 34,
+    deploymentVersionOccurrences: 38,
     compatible: true,
   });
 });
@@ -115,8 +115,8 @@ test('plans the exact governed version surface without touching legacy 2.x', () 
     sourceVersion: SOURCE_VERSION,
     targetVersion: TARGET_VERSION,
   });
-  assert.equal(plan.fileCount, 65);
-  assert.equal(plan.replacementCount, 83);
+  assert.equal(plan.fileCount, 66);
+  assert.equal(plan.replacementCount, 85);
   assert.equal(plan.legacyRootPackageVersion, LEGACY_VERSION);
   assert.equal(plan.legacyRootExcluded, true);
   assert.equal(

@@ -1,0 +1,22 @@
+- op: add
+  path: /spec/template/spec/initContainers/0/args/-
+  value: --delivery-directory=/var/lib/qinglong3/security-administration-delivery/private
+- op: add
+  path: /spec/template/spec/initContainers/0/volumeMounts/-
+  value:
+    name: credential-delivery
+    mountPath: /var/lib/qinglong3/security-administration-delivery
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --delivery=/var/lib/qinglong3/security-administration-delivery/private/replace-with-unique-delivery.json
+- op: add
+  path: /spec/template/spec/containers/0/volumeMounts/-
+  value:
+    name: credential-delivery
+    mountPath: /var/lib/qinglong3/security-administration-delivery
+- op: add
+  path: /spec/template/spec/volumes/-
+  value:
+    name: credential-delivery
+    persistentVolumeClaim:
+      claimName: ql3-security-administration-delivery
