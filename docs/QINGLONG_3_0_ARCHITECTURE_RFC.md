@@ -167,8 +167,11 @@
   package、生产依赖、daemon 或 Edge import。
 
   Runtime Core `591/591`、Cluster PostgreSQL `361 total / 358 pass / 3 conditional skip / 0 fail`、
-  v70 定向门 `74/74` 均为零失败。PostgreSQL 18.6 arm64 HA 再次通过 146 gates、timeline `1→2`，
-  最终报告 SHA-256 为 `42ca97de43cfebd4611282b1fd5c0b09030eda89e88144967497902b01d18b3a`；
+  v70 定向门 `74/74`、CI 同构八角色 PostgreSQL integration `57/57` 均为零失败。Automation Manager
+  对 Project 与 immutable plan 只执行普通 SERIALIZABLE `SELECT`，不要求越权的 row-lock 权限；
+  Task/Trigger 可变 head 与 schedule 仍保持 `FOR UPDATE`。PostgreSQL 18.6 arm64 HA 再次通过 146 gates、
+  timeline `1→2`，最终报告 SHA-256 为
+  `a7c8a05e08c748d677475a09ce2998b741ed9326e27678613e93d431bc3769aa`；
   真实用例覆盖 Trigger 固定 Task r1、Task current r2、原子生成 Task r3/Trigger r2 并重定向 pin，
   同时证明 bundle ref-only execution、schedule reset、无流消费 replay 与数据库角色隔离。D-402
   关闭 mutation/receipt 边界；direct external custody、promotion 后 receipt replay 和固定低性能 Edge

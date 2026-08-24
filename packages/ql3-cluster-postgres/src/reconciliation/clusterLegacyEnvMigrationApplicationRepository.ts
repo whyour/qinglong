@@ -319,8 +319,7 @@ async function loadPlan(
   const result = await client.query<Row>(
     `SELECT plan_json AS "planJson"
        FROM "ql3"."cluster_legacy_env_migration_plans"
-      WHERE plan_id = $1
-      FOR SHARE`,
+      WHERE plan_id = $1`,
     [intent.planId],
   );
   if (result.rows.length !== 1) throw conflict();
@@ -1126,7 +1125,7 @@ export class PostgresClusterLegacyEnvMigrationApplicationRepository
         );
         if (occupied) throw conflict();
         const project = await client.query<{ status: unknown }>(
-          `SELECT status FROM "ql3"."projects" WHERE id = $1 FOR SHARE`,
+          `SELECT status FROM "ql3"."projects" WHERE id = $1`,
           [intent.projectId],
         );
         if (project.rows.length !== 1 || project.rows[0]?.status !== 'active') {

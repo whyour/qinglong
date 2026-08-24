@@ -5019,6 +5019,12 @@ if (!migrationConnectionString) {
           eventCount: 2,
         },
       ]);
+      await database.pool.query(
+        `UPDATE "ql3"."trigger_schedules"
+         SET next_fire_at_ms = $1
+         WHERE project_id = $2 AND trigger_id = $3`,
+        [forcedDueAtMs + 3_600_000, 'default', triggerId],
+      );
 
       const takeoverTriggerId = `trigger-takeover-${'x'.repeat(32)}`;
       await new PostgresTriggerRepository(database.pool).appendTriggerRevision({
@@ -6982,7 +6988,7 @@ if (!migrationConnectionString) {
       assert.equal(row.taskSpec.config.timeoutMs, 30_000);
       assert.equal(row.taskName, task.name);
       assert.equal(row.taskDescription, task.description);
-      assert.deepEqual(row.taskLabels, task.labels);
+      assert.deepEqual(row.taskLabels, { ...task.labels });
       assert.equal(row.executionPlan.environmentBundleRef, secretRef);
       assert.equal(row.triggerRevision, 2);
       assert.equal(row.triggerTaskRevision, 3);

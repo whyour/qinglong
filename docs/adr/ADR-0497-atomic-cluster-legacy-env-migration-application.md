@@ -103,9 +103,11 @@ batch；Edge/Standalone 默认 import graph 不加载 PostgreSQL authority。
 ## 当前验证与后续门禁
 
 runtime-core 完整测试 `591/591`；cluster-postgres package 测试 `361 total / 358 pass / 3
-conditional skip / 0 fail`；v70 migration/schema/readiness 定向门 `74/74`。真实 PostgreSQL 18.6
-arm64 HA 多次通过 146 gates，timeline `1→2`；最终报告 SHA-256 为
-`42ca97de43cfebd4611282b1fd5c0b09030eda89e88144967497902b01d18b3a`。
+conditional skip / 0 fail`；v70 migration/schema/readiness 定向门 `74/74`；CI 同构八角色
+PostgreSQL integration `57/57`。Automation Manager 对 Project 与 immutable plan 只需普通
+SERIALIZABLE `SELECT`，Task/Trigger 可变 head 与 schedule 继续持有 `FOR UPDATE`。真实 PostgreSQL
+18.6 arm64 HA 多次通过 146 gates，timeline `1→2`；最终报告 SHA-256 为
+`a7c8a05e08c748d677475a09ce2998b741ed9326e27678613e93d431bc3769aa`。
 
 真实数据库用例证明：带空格的合法 Task/Trigger ID 可迁移；Trigger 固定 Task r1、Task current r2
 时会原子生成 Task r3 与 Trigger r2 并让新 Trigger 固定 r3；execution plan 只出现 bundle ref；
