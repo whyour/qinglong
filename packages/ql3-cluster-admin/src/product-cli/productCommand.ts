@@ -84,6 +84,12 @@ export const QINGLONG3_CLUSTER_PRODUCT_COMMANDS: readonly QingLong3ClusterProduc
       description: 'manage Worker credentials through the authenticated API',
     }),
     Object.freeze({
+      name: 'security',
+      binary: 'ql3-security-admin',
+      target: 'security-administration/clusterAdministrationCli.js',
+      description: 'administer identities, API credentials and audit records',
+    }),
+    Object.freeze({
       name: 'approval',
       binary: 'ql3-approval-client',
       target: 'approval-management/approvalManagementClientCli.js',

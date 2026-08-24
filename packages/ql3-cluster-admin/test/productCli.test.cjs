@@ -336,7 +336,7 @@ function validContextFixture(t) {
 
 test('catalog exposes only reviewed product entrypoints from the same package', () => {
   assert.equal(manifest.bin['ql3-cluster-admin'], 'dist/product-cli/cli.js');
-  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 12);
+  assert.equal(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length, 13);
   assert.equal(
     new Set(QINGLONG3_CLUSTER_PRODUCT_COMMANDS.map(({ name }) => name)).size,
     QINGLONG3_CLUSTER_PRODUCT_COMMANDS.length,
@@ -354,6 +354,7 @@ test('catalog exposes only reviewed product entrypoints from the same package', 
     );
     assert.equal(
       command.binary.includes('-client') ||
+        command.binary === 'ql3-security-admin' ||
         command.binary === 'ql3-copilot-mcp' ||
         command.binary === 'ql3-copilot-console' ||
         command.binary === 'ql3-copilot-evidence-verify',
@@ -391,6 +392,7 @@ test('help and version are bounded installation-derived product facts', () => {
     /\n  evidence-verify\s+verify one redacted Console evidence/,
   );
   assert.match(help, /Server, migration, recovery, executor and key-custody/);
+  assert.match(help, /\n  security\s+administer identities, API credentials/);
   assert.equal(help.includes('plugin-package-manage'), false);
   assert.equal(
     loadQingLong3ClusterProductVersion(moduleDirectory),
@@ -922,6 +924,11 @@ test('binary exposes help/version and delegates without a shell', () => {
   assert.equal(delegatedHelp.status, 0);
   assert.match(delegatedHelp.stdout, /^Usage: ql3-run-client /);
   assert.equal(delegatedHelp.stderr, '');
+
+  const securityHelp = runCli(['security', '--help']);
+  assert.equal(securityHelp.status, 0);
+  assert.match(securityHelp.stdout, /^Usage: ql3-security-admin /);
+  assert.equal(securityHelp.stderr, '');
 
   const rejected = runCli(['../../tmp/not-a-command']);
   assert.equal(rejected.status, 64);

@@ -43,13 +43,38 @@ client and stdio transport.
 Its default entrypoint is the bounded `ql3-cluster-admin` product facade. The
 facade exposes eight operator-facing remote clients: `copilot`, `package`,
 `package-kubernetes`, `worker-credential`, `approval`, `run`, `automation` and
-`model-credential`, plus the bounded `copilot-mcp` stdio process. It delegates
+`model-credential`, the short-lived local `security` administration command,
+plus the bounded `copilot-mcp` stdio process. It delegates
 with the current Node executable, an exact same-image target and `shell=false`;
 arguments and MCP stdio remain opaque. Server
 `*-manage` processes, migration, recovery, executors, Prompt output key custody
 and garbage collection remain separate explicit binaries and Kubernetes
 operations. Existing Jobs continue to name their exact binary and do not
 inherit facade authority.
+
+Run Identity, API credential and bounded Security Audit administration only
+from a short-lived operator workstation or one-shot Job. The command opens at
+most one admin PostgreSQL connection and never starts a listener:
+
+```sh
+ql3-cluster-admin security \
+  --command=/secure/qinglong3/security-command.json \
+  --assertion=/secure/qinglong3/security-assertion.jwt \
+  --keyset=/secure/qinglong3/security-keyset.json \
+  --pepper=/secure/qinglong3/api-credential-pepper \
+  --delivery=/secure/qinglong3/delivery/new-api-credential.json
+```
+
+Use `--delivery` only for `credential.issue` and `credential.rotate`. Its
+parent directory must already be private and the target must not exist; the
+token is published as a `0600`, no-replace file while stdout contains only its
+basename and SHA-256. The four input files must be explicit, bounded and
+private. Inject `QL3_POSTGRES_ADMIN_*` separately from runtime and migration
+credentials; production defaults to TLS `verify-full`. Exact keyset/JWT rules,
+command schemas and operator procedure are documented in
+[`ql3-cluster-security-administration`](../../../docs/operations/ql3-cluster-security-administration.md);
+response-loss behavior and remaining gates are frozen in
+[`ADR-0500`](../../../docs/adr/ADR-0500-short-lived-cluster-security-administration-command.md).
 
 Workstation operators may pass an explicit owner-private context to reuse only
 stable client paths:
@@ -88,8 +113,8 @@ ql3-cluster-admin context validate \
 
 This command reuses the production client parsers to validate every selected
 endpoint shape, CA, matching client certificate/private key and the bounded
-Kubernetes config. It also verifies that all nine facade targets exist in the
-same installation. It does not read a command or assertion, open a network
+Kubernetes config. It also verifies the context-aware facade targets exist in
+the same installation. It does not read a command or assertion, open a network
 connection, query Kubernetes or mutate the cluster. Its JSON summary contains
 only command names and reviewed transport/authentication classes; paths,
 endpoints, namespaces, context names and credentials are never emitted.

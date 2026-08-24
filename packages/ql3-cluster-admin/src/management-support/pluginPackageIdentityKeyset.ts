@@ -10,6 +10,7 @@ import {
   CLUSTER_APPROVAL_MANAGEMENT_IDENTITY_ASSERTION_PROFILE,
   CLUSTER_MODEL_PROVIDER_CREDENTIAL_MANAGEMENT_IDENTITY_ASSERTION_PROFILE,
   CLUSTER_RUN_MANAGEMENT_IDENTITY_ASSERTION_PROFILE,
+  CLUSTER_SECURITY_ADMINISTRATION_IDENTITY_ASSERTION_PROFILE,
   createClusterPluginPackageIdentityAssertionVerifier,
   type ClusterManagementIdentityAssertionProfile,
   type ClusterPluginPackageIdentityAssertionAuthentication,
@@ -515,5 +516,15 @@ export function createClusterRunIdentityKeysetFile(
   return createClusterPluginPackageIdentityKeysetFile({
     ...options,
     assertionProfile: CLUSTER_RUN_MANAGEMENT_IDENTITY_ASSERTION_PROFILE,
+  });
+}
+
+export function createClusterSecurityAdministrationIdentityKeysetFile(
+  options: ClusterWorkerCredentialIdentityKeysetFileOptions,
+): Readonly<ClusterPluginPackageIdentityKeysetFile> {
+  return createClusterPluginPackageIdentityKeysetFile({
+    ...options,
+    assertionProfile:
+      CLUSTER_SECURITY_ADMINISTRATION_IDENTITY_ASSERTION_PROFILE,
   });
 }

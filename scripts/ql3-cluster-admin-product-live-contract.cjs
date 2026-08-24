@@ -40,6 +40,10 @@ const COMMANDS = Object.freeze([
     name: 'worker-credential',
     usage: 'Usage: ql3-worker-credential-client ',
   }),
+  Object.freeze({
+    name: 'security',
+    usage: 'Usage: ql3-security-admin ',
+  }),
   Object.freeze({ name: 'approval', usage: 'Usage: ql3-approval-client ' }),
   Object.freeze({ name: 'run', usage: 'Usage: ql3-run-client ' }),
   Object.freeze({ name: 'automation', usage: 'Usage: ql3-automation-client ' }),

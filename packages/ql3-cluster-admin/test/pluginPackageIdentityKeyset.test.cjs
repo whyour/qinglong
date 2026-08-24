@@ -13,6 +13,7 @@ const {
   createClusterApprovalIdentityKeysetFile,
   createClusterModelProviderCredentialIdentityKeysetFile,
   createClusterRunIdentityKeysetFile,
+  createClusterSecurityAdministrationIdentityKeysetFile,
 } = require('@qinglong/cluster-admin/plugin-package-identity-keyset');
 
 const NOW_MS = 1_700_000_000_000;
@@ -249,6 +250,38 @@ function runAssertion(key, overrides = {}) {
   ).toString('base64url')}`;
 }
 
+function securityAdministrationAssertion(key, overrides = {}) {
+  const header = Buffer.from(
+    JSON.stringify({
+      alg: 'EdDSA',
+      kid: key.kid,
+      typ: 'ql3-security-administration+jwt',
+    }),
+  ).toString('base64url');
+  const now = Math.floor(NOW_MS / 1000);
+  const payload = Buffer.from(
+    JSON.stringify({
+      acr: 'urn:ql3:mfa',
+      amr: ['pwd', 'otp'],
+      aud: 'qinglong3-security-administration',
+      auth_time: now - 10,
+      exp: now + 120,
+      iat: now,
+      iss: ISSUER,
+      jti: `security-administration-assertion-${key.kid}`,
+      ql3_purpose: 'security-administration',
+      sub: 'security-owner-1',
+      ...overrides,
+    }),
+  ).toString('base64url');
+  const signed = `${header}.${payload}`;
+  return `${signed}.${sign(
+    null,
+    Buffer.from(signed, 'ascii'),
+    key.privateKey,
+  ).toString('base64url')}`;
+}
+
 async function atomicWrite(filePath, document) {
   const nextPath = `${filePath}.next`;
   await writeFile(nextPath, `${JSON.stringify(document)}\n`, { mode: 0o644 });
@@ -337,10 +370,9 @@ test('loads an automation keyset with a purpose isolated from other management p
       type: 'user',
       id: 'automation-operator-1',
     });
-    await assert.rejects(
-      provider.bind(workerAssertion(key)).authenticate(),
-      { code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID' },
-    );
+    await assert.rejects(provider.bind(workerAssertion(key)).authenticate(), {
+      code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID',
+    });
     await assert.rejects(provider.bind(assertion(key)).authenticate(), {
       code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID',
     });
@@ -358,14 +390,19 @@ test('loads an Approval keyset isolated by type, purpose and audience', async ()
       filePath,
       now: () => NOW_MS,
     });
-    const principal = await provider.bind(approvalAssertion(key)).authenticate();
+    const principal = await provider
+      .bind(approvalAssertion(key))
+      .authenticate();
     assert.deepEqual(principal.subject, {
       type: 'user',
       id: 'approval-owner-1',
     });
-    await assert.rejects(provider.bind(automationAssertion(key)).authenticate(), {
-      code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID',
-    });
+    await assert.rejects(
+      provider.bind(automationAssertion(key)).authenticate(),
+      {
+        code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID',
+      },
+    );
     await assert.rejects(provider.bind(assertion(key)).authenticate(), {
       code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID',
     });
@@ -429,6 +466,40 @@ test('loads a Run keyset isolated from every other management purpose', async ()
     await assert.rejects(
       provider
         .bind(runAssertion(key, { ql3_purpose: 'approval-management' }))
+        .authenticate(),
+      { code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID' },
+    );
+  });
+});
+
+test('loads a Security Administration keyset isolated from other management purposes', async () => {
+  await fixture(async ({ filePath }) => {
+    const key = reviewedKey('security-administration-key-1');
+    await atomicWrite(filePath, {
+      ...keyset(1, [key]),
+      audience: 'qinglong3-security-administration',
+    });
+    const provider = createClusterSecurityAdministrationIdentityKeysetFile({
+      filePath,
+      now: () => NOW_MS,
+    });
+    const principal = await provider
+      .bind(securityAdministrationAssertion(key))
+      .authenticate();
+    assert.deepEqual(principal.subject, {
+      type: 'user',
+      id: 'security-owner-1',
+    });
+    await assert.rejects(provider.bind(runAssertion(key)).authenticate(), {
+      code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID',
+    });
+    await assert.rejects(
+      provider
+        .bind(
+          securityAdministrationAssertion(key, {
+            ql3_purpose: 'run-management',
+          }),
+        )
         .authenticate(),
       { code: 'CLUSTER_PLUGIN_PACKAGE_IDENTITY_ASSERTION_INVALID' },
     );

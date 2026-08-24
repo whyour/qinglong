@@ -85,6 +85,12 @@ export const CLUSTER_RUN_MANAGEMENT_IDENTITY_ASSERTION_PROFILE = Object.freeze({
   purpose: 'run-management',
 });
 
+export const CLUSTER_SECURITY_ADMINISTRATION_IDENTITY_ASSERTION_PROFILE =
+  Object.freeze({
+    type: 'ql3-security-administration+jwt',
+    purpose: 'security-administration',
+  });
+
 export interface ClusterPluginPackageIdentityAssertionVerifierOptions {
   readonly issuer: string;
   readonly audience: string;

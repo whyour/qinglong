@@ -75,6 +75,11 @@
       "require": "./dist/security-administration/clusterAdministration.js",
       "default": "./dist/security-administration/clusterAdministration.js"
     },
+    "./administration-command": {
+      "types": "./dist/security-administration/clusterAdministrationCommand.d.ts",
+      "require": "./dist/security-administration/clusterAdministrationCommand.js",
+      "default": "./dist/security-administration/clusterAdministrationCommand.js"
+    },
     "./automation-management": {
       "types": "./dist/automation-management/automationManagement.d.ts",
       "require": "./dist/automation-management/automationManagement.js",
@@ -414,6 +419,7 @@
   },
   "bin": {
     "ql3-cluster-admin": "dist/product-cli/cli.js",
+    "ql3-security-admin": "dist/security-administration/clusterAdministrationCli.js",
     "ql3-copilot-client": "dist/copilot-client/cli.js",
     "ql3-copilot-mcp": "dist/copilot-mcp/cli.js",
     "ql3-copilot-console": "dist/copilot-console/cli.js",
