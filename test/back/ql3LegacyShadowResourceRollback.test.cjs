@@ -17,6 +17,7 @@ const SCRIPT = path.join(
   'scripts/ql3-legacy-shadow-resource-rollback.cjs',
 );
 const NODE_MAJOR = Number(process.versions.node.split('.')[0]);
+const RESOURCE_EVIDENCE_WATCHDOG_MS = 120_000;
 
 function execute(profile, mode, samples) {
   const result = spawnSync(
@@ -33,7 +34,7 @@ function execute(profile, mode, samples) {
     {
       cwd: REPOSITORY_ROOT,
       encoding: 'utf8',
-      timeout: 30_000,
+      timeout: RESOURCE_EVIDENCE_WATCHDOG_MS,
       maxBuffer: 128 * 1024,
     },
   );
