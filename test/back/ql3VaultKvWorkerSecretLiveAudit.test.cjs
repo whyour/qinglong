@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { test } = require('node:test');
 
 const {
@@ -9,6 +11,14 @@ const {
   REQUIRED_GATES,
   validateVaultKvWorkerSecretLiveReport,
 } = require('../../scripts/ql3-vault-kv-worker-secret-live-audit.cjs');
+
+const LIVE_CONTRACT = fs.readFileSync(
+  path.resolve(
+    __dirname,
+    '../../scripts/ql3-vault-kv-worker-secret-live-contract.cjs',
+  ),
+  'utf8',
+);
 
 function fixture() {
   return {
@@ -85,4 +95,11 @@ test('rejects sensitive material or widened report shape', () => {
   const findings = validateVaultKvWorkerSecretLiveReport(widened).findings;
   assert.ok(findings.includes('report envelope is invalid'));
   assert.match(findings.join('; '), /endpoint is forbidden/);
+});
+
+test('keeps the hosted-runner fixture capability-free and non-swappable', () => {
+  assert.match(LIVE_CONTRACT, /'--cap-drop',\n\s+'ALL'/);
+  assert.match(LIVE_CONTRACT, /'--memory-swappiness',\n\s+'0'/);
+  assert.match(LIVE_CONTRACT, /'disable_mlock = true'/);
+  assert.doesNotMatch(LIVE_CONTRACT, /'--cap-add'|'IPC_LOCK'/);
 });

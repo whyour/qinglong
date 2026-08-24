@@ -302,8 +302,8 @@ function startVaultContainer(container, publish, directory, tls) {
     `${uid}:${gid}`,
     '--cap-drop',
     'ALL',
-    '--cap-add',
-    'IPC_LOCK',
+    '--memory-swappiness',
+    '0',
     '--security-opt',
     'no-new-privileges:true',
     '--read-only',
@@ -436,7 +436,7 @@ async function main() {
       'vault-server.hcl',
       [
         'ui = false',
-        'disable_mlock = false',
+        'disable_mlock = true',
         'api_addr = "https://127.0.0.1:8200"',
         'cluster_addr = "https://127.0.0.1:8201"',
         'storage "file" {',
@@ -760,7 +760,7 @@ async function main() {
       },
       limitations: [
         'single-host file storage is not Vault integrated-storage HA or an HSM seal quorum',
-        'the short-lived private CA and service tokens are live fixture authorities rather than enterprise PKI or workload identity',
+        'the capability-free live fixture disables mlock with zero container swappiness and does not prove production Vault host swap hardening',
         'the live gate proves direct external custody resolution and rotation, not fixed physical Edge storage behavior',
       ],
     };

@@ -95,7 +95,9 @@ path "auth/token/lookup-self" {
 - unseal 后恢复，Vault 容器在同一持久存储上替换后值仍可读取；
 - 私有 `0600` 报告不含 token、SecretRef、value、证书私钥或 Vault path。
 
-最终本地报告 SHA-256 为 `df225509cb763009b610cb0aea2207e0b07b5e05a44cf8cf0dff1633c1624d52`，离线 audit 为 `compatible=true`、`findings=[]`。共享 CI 在原生 x64/arm64 runner 上分别构建 provider、审计 overlay、拉取同一 digest-pinned Vault image 并重跑完整 live contract；远程运行结果作为提交后的独立证据。
+该单机 fixture 以当前非 root UID/GID、read-only rootfs、`cap-drop=ALL`、不增加 capability、`no-new-privileges` 和 `memory-swappiness=0` 运行。为兼容 capability/lock 策略不同的原生 Linux hosted runner，fixture 显式 `disable_mlock=true`；这只作用于临时测试 authority，不替代生产 Vault 主机的 swap 禁用或 mlock、HA seal 与审计硬化门禁。
+
+最终 capability-free 本地报告 SHA-256 为 `281fe542e1bf6078132216b9701a28e76f36dcbccc95367997d8457773a9c210`，离线 audit 为 `compatible=true`、`findings=[]`。共享 CI 在原生 x64/arm64 runner 上分别构建 provider、审计 overlay、拉取同一 digest-pinned Vault image 并重跑完整 live contract；远程运行结果作为提交后的独立证据。
 
 本地完整验证中，Cluster Control 为 `279 total / 277 pass / 2 conditional skip / 0 fail`，backend 为 `1574 total / 1572 pass / 2 conditional skip / 0 fail`，18-package clean build/test 退出 0。package boundary 保持 18 packages、`singleSourcePackages=[]`、`shallowSourcePackages=[]`；Cluster dependency、122-module Edge import、service-manager bridge、Cluster deployment、Local image、Vault overlay 和 14 档 Local artifact 均 compatible。基础 Edge/Standalone 制品仍为 `2,669,390 / 2,669,468 bytes`、325 files、58 loaded modules，不包含 Cluster Control 或 Vault adapter。
 
