@@ -121,6 +121,7 @@ test('defines the immutable PostgreSQL capability and Run core stream', async ()
       'pg-0068-cancellation-dispatch-project-keyset',
       'pg-0069-worker-session-management-observation',
       'pg-0070-cluster-legacy-env-migration-plans',
+      'pg-0071-cluster-legacy-env-migration-applications',
     ],
   );
   for (const migration of postgresqlMainMigrationStream.migrations) {
@@ -608,6 +609,11 @@ test('freezes every published PostgreSQL migration checksum', () => {
       id: 'pg-0070-cluster-legacy-env-migration-plans',
       checksum:
         '7cd6d993f48e7bcebcd62c93571a738d5117c9bcde33b974c5ac8962e2a03fe4',
+    },
+    {
+      id: 'pg-0071-cluster-legacy-env-migration-applications',
+      checksum:
+        '82538b5a244011a22afad7f9c6d266a8997da538bdd2bec2ee524997c3b85996',
     },
   ];
   assert.deepEqual(
@@ -2487,5 +2493,50 @@ test('advances capability v69 with a content-free Legacy Env plan ledger', async
   assert.match(
     sql,
     /migration_id = 'pg-0069-worker-session-management-observation'/,
+  );
+});
+
+test('advances capability v70 with atomic Legacy Env application receipts', async () => {
+  const migration = migrationById(
+    'pg-0071-cluster-legacy-env-migration-applications',
+  );
+  const statements = [];
+  await migration.up({
+    async query(statement) {
+      statements.push(statement);
+      return { rows: [] };
+    },
+  });
+  const sql = statements.join('\n');
+  for (const table of [
+    'cluster_legacy_env_migration_application_receipts',
+    'cluster_legacy_env_migration_application_tasks',
+    'cluster_legacy_env_migration_application_triggers',
+  ]) {
+    assert.match(sql, new RegExp(`CREATE TABLE "ql3"\\."${table}"`));
+    assert.match(
+      sql,
+      new RegExp(
+        `GRANT SELECT, INSERT ON "ql3"\\."${table}" TO ql3_automation_manager`,
+      ),
+    );
+  }
+  assert.match(sql, /task_count BETWEEN 1 AND 100000/);
+  assert.match(sql, /trigger_count BETWEEN 0 AND 500000/);
+  assert.match(sql, /revision = previous_revision \+ 1/);
+  assert.match(
+    sql,
+    /qinglong\/cluster-legacy-env-migration-application-receipt@v1/,
+  );
+  assert.doesNotMatch(
+    sql,
+    /GRANT (?:UPDATE|DELETE|TRUNCATE)[^;]+cluster_legacy_env_migration_application/,
+  );
+  assert.match(sql, /contract_version = 70/);
+  assert.match(sql, /"cluster_legacy_env_migration_application":1/);
+  assert.match(sql, /contract_version = 69/);
+  assert.match(
+    sql,
+    /migration_id = 'pg-0070-cluster-legacy-env-migration-plans'/,
   );
 });

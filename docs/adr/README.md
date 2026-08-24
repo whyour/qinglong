@@ -499,6 +499,8 @@
 | [ADR-0493](./ADR-0493-target-native-reconciliation-domain-preservation.md)                            | 目标原生 Reconciliation 域分类与身份保留                                                                                                                                                                      | Accepted |
 | [ADR-0494](./ADR-0494-postgresql-secret-binding-and-mounted-provider-live-rotation.md)                | PostgreSQL Secret Binding 与 Mounted Provider 在线轮换门                                                                                                                                                        | Accepted |
 | [ADR-0495](./ADR-0495-content-free-cluster-legacy-env-migration-plan-ledger.md)                       | 无敏感内容的 Cluster Legacy Env 迁移计划账本                                                                                                                                                                    | Accepted |
+| [ADR-0496](./ADR-0496-opaque-cluster-environment-bundle-delivery.md)                                 | Cluster 不透明环境 Bundle 的有界交付与 Worker 内存展开                                                                                                                                                          | Accepted |
+| [ADR-0497](./ADR-0497-atomic-cluster-legacy-env-migration-application.md)                             | Cluster Legacy Env 的原子 Task/Trigger 迁移与只追加回执                                                                                                                                                           | Accepted |
 
 ## 规则
 

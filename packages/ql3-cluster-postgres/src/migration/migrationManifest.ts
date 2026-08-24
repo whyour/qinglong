@@ -358,5 +358,10 @@ export const postgresqlMainMigrationManifest: MigrationStreamManifest =
         checksum:
           '7cd6d993f48e7bcebcd62c93571a738d5117c9bcde33b974c5ac8962e2a03fe4',
       }),
+      Object.freeze({
+        id: 'pg-0071-cluster-legacy-env-migration-applications',
+        checksum:
+          '82538b5a244011a22afad7f9c6d266a8997da538bdd2bec2ee524997c3b85996',
+      }),
     ]),
   });

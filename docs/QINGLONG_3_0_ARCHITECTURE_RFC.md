@@ -148,6 +148,32 @@
   arm64 physical HA 通过 146 gates、timeline `1→2`，报告 SHA-256 为
   `0ee2199d0a52a02025bff017a07477d707353d12aefc3811f474e3775f2bb86b`。
 
+- D-402/ADR-0497（已验收）：Cluster Legacy Env plan 现在可以在一个 Project-serialized
+  `SERIALIZABLE` transaction 中真正提交。profile-neutral contract 使用可重放、按 ID 排序的
+  Task/Trigger mutation stream，并分别冻结 source revision-set 与 mutation-set digest；repository
+  每批只保留 128 项，先迁移 Task，再迁移 Trigger，支持 100,000/500,000 上限而不在管理节点
+  JS 堆保存全集。
+
+  Task current head、Plugin ownership、`command@v1` semantic、旧 digest 与数据库时间均在写前复验；
+  新 Task revision 保留原字段，只追加固定 `environmentBundleRef`，enabled Task 同时生成 Cluster
+  execution revision。Trigger 复验自己的 current revision、旧 Task pin 和 schedule fence，随后固定
+  到同 application 的新 Task revision；合法的历史 pin 不要求等于迁移前 Task current head。
+  Trigger revision、head CAS、schedule claim/due reset 和 fence 递增与 Task DML 原子提交。
+
+  `pg-0071-cluster-legacy-env-migration-applications` 将 PostgreSQL contract 推进到 v70，增加 application、
+  Task item、Trigger item 三张 content-free append-only receipt 表。只有 Automation Manager 拥有
+  `SELECT, INSERT`；runtime/admin 和其余角色无权限。exact replay 重新验证 durable heads、execution
+  revisions 和 schedules，但不会再次消费输入流。实现仍复用 runtime-core/cluster-postgres，没有新增
+  package、生产依赖、daemon 或 Edge import。
+
+  Runtime Core `591/591`、Cluster PostgreSQL `361 total / 358 pass / 3 conditional skip / 0 fail`、
+  v70 定向门 `74/74` 均为零失败。PostgreSQL 18.6 arm64 HA 再次通过 146 gates、timeline `1→2`，
+  最终报告 SHA-256 为 `42ca97de43cfebd4611282b1fd5c0b09030eda89e88144967497902b01d18b3a`；
+  真实用例覆盖 Trigger 固定 Task r1、Task current r2、原子生成 Task r3/Trigger r2 并重定向 pin，
+  同时证明 bundle ref-only execution、schedule reset、无流消费 replay 与数据库角色隔离。D-402
+  关闭 mutation/receipt 边界；direct external custody、promotion 后 receipt replay 和固定低性能 Edge
+  物理证据仍是 ADR-0491 转 Accepted 前的门禁。
+
 - D-396/ADR-0490（已验收）：Run History 不再只有永久 `manual_external`，但也没有被错误实现为 Legacy 日志到 3.0 Run ledger 的回灌。
   新的 Local adapter 以 ADR-0482 sealed capture bundle 作为 append-only 保全资产：Legacy history 必须逐事实选择 `retain_both`，Target history
   必须选择 `retain_target`；receipt 只绑定 signed review、application、bundle fingerprint、领域 inventory 与有界 fact counts，不保存表名、Run ID、

@@ -21,8 +21,8 @@ export interface PostgresSchemaContractTrigger {
 export interface PostgresSchemaContract {
   readonly schema: 'ql3';
   readonly contractName: 'control-core';
-  readonly contractVersion: 69;
-  readonly migrationId: 'pg-0070-cluster-legacy-env-migration-plans';
+  readonly contractVersion: 70;
+  readonly migrationId: 'pg-0071-cluster-legacy-env-migration-applications';
   readonly minimumServerMajor: 16;
   readonly maximumServerMajor: 18;
   readonly capabilities: Readonly<{
@@ -50,6 +50,7 @@ export interface PostgresSchemaContract {
     cluster_scheduler_admission: 1;
     database_role_grants: 1;
     cluster_execution_revision: 1;
+    cluster_legacy_env_migration_application: 1;
     cluster_legacy_env_migration_plan: 1;
     identity_admin: 1;
     plugin_package_admission: 1;
@@ -123,8 +124,8 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
   Object.freeze({
     schema: 'ql3',
     contractName: 'control-core',
-    contractVersion: 69,
-    migrationId: 'pg-0070-cluster-legacy-env-migration-plans',
+    contractVersion: 70,
+    migrationId: 'pg-0071-cluster-legacy-env-migration-applications',
     minimumServerMajor: 16,
     maximumServerMajor: 18,
     capabilities: Object.freeze({
@@ -138,6 +139,7 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       automation_management_boundary: 1,
       automation_management_identity_keyset_ledger: 1,
       cluster_execution_revision: 1,
+      cluster_legacy_env_migration_application: 1,
       cluster_legacy_env_migration_plan: 1,
       cluster_recovery: 1,
       cluster_recovery_claim: 1,
@@ -250,6 +252,53 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
         'total_effective_bytes',
         'planned_at_ms',
         'plan_json',
+      ]),
+      table('cluster_legacy_env_migration_application_receipts', [
+        'application_id',
+        'mutation_id',
+        'project_id',
+        'plan_id',
+        'plan_digest',
+        'environment_bundle_ref',
+        'task_revision_set_digest',
+        'trigger_revision_set_digest',
+        'task_mutation_set_digest',
+        'trigger_mutation_set_digest',
+        'task_count',
+        'trigger_count',
+        'committed_at_ms',
+        'receipt_digest',
+        'receipt_json',
+      ]),
+      table('cluster_legacy_env_migration_application_tasks', [
+        'application_id',
+        'ordinal',
+        'project_id',
+        'task_id',
+        'previous_revision',
+        'previous_content_digest',
+        'mutation_id',
+        'revision',
+        'content_digest',
+        'execution_content_digest',
+        'item_digest',
+      ]),
+      table('cluster_legacy_env_migration_application_triggers', [
+        'application_id',
+        'ordinal',
+        'project_id',
+        'trigger_id',
+        'task_id',
+        'previous_revision',
+        'previous_content_digest',
+        'previous_task_revision',
+        'previous_task_content_digest',
+        'mutation_id',
+        'revision',
+        'content_digest',
+        'task_revision',
+        'task_content_digest',
+        'item_digest',
       ]),
       table('plugin_package_installs', [
         'installation_id',
@@ -1566,6 +1615,17 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_cluster_legacy_env_plan_mutation_uidx',
       'ql3_cluster_legacy_env_plan_digest_uidx',
       'ql3_cluster_legacy_env_plan_project_idx',
+      'cluster_legacy_env_migration_application_receipts_pkey',
+      'ql3_cluster_legacy_env_application_mutation_uidx',
+      'ql3_cluster_legacy_env_application_project_uidx',
+      'ql3_cluster_legacy_env_application_plan_uidx',
+      'ql3_cluster_legacy_env_application_digest_uidx',
+      'ql3_cluster_legacy_env_application_project_idx',
+      'cluster_legacy_env_migration_application_tasks_pkey',
+      'ql3_cluster_legacy_env_application_task_uidx',
+      'ql3_cluster_legacy_env_application_task_revision_uidx',
+      'cluster_legacy_env_migration_application_triggers_pkey',
+      'ql3_cluster_legacy_env_application_trigger_uidx',
       'plugin_package_installs_pkey',
       'ql3_plugin_package_installs_quarantine_target_key',
       'ql3_plugin_package_installs_recovery_idx',
@@ -1896,6 +1956,16 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
       'ql3_cluster_legacy_env_plan_target_check',
       'ql3_cluster_legacy_env_plan_time_check',
       'ql3_cluster_legacy_env_plan_json_check',
+      'ql3_cluster_legacy_env_application_identity_check',
+      'ql3_cluster_legacy_env_application_digest_check',
+      'ql3_cluster_legacy_env_application_target_check',
+      'ql3_cluster_legacy_env_application_json_check',
+      'ql3_cluster_legacy_env_application_task_identity_check',
+      'ql3_cluster_legacy_env_application_task_revision_check',
+      'ql3_cluster_legacy_env_application_task_digest_check',
+      'ql3_cluster_legacy_env_application_trigger_identity_check',
+      'ql3_cluster_legacy_env_application_trigger_revision_check',
+      'ql3_cluster_legacy_env_application_trigger_digest_check',
       'ql3_plugin_package_installs_identity_check',
       'ql3_plugin_package_installs_operation_check',
       'ql3_plugin_package_installs_state_check',
@@ -2376,6 +2446,11 @@ export const postgresqlControlSchemaContract: PostgresSchemaContract =
     foreignKeys: Object.freeze([
       'ql3_schema_capabilities_migration_fk',
       'ql3_cluster_legacy_env_plan_project_fk',
+      'ql3_cluster_legacy_env_application_project_fk',
+      'ql3_cluster_legacy_env_application_plan_fk',
+      'ql3_cluster_legacy_env_application_task_receipt_fk',
+      'ql3_cluster_legacy_env_application_trigger_receipt_fk',
+      'ql3_cluster_legacy_env_application_trigger_task_fk',
       'ql3_plugin_package_installs_project_fk',
       'ql3_plugin_package_install_heads_project_fk',
       'ql3_plugin_package_install_heads_install_fk',

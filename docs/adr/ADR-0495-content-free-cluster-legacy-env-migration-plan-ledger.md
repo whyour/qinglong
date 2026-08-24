@@ -5,6 +5,10 @@
 - 决策：D-400
 - 关联：ADR-0104、ADR-0233、ADR-0259、ADR-0491、ADR-0494
 
+> 2026-08-24：ADR-0497/D-402 已完成本 ADR 所列的下一切片：在同一 Automation Manager
+> SERIALIZABLE transaction 中复验并迁移 Task/Trigger，重置 schedule fence，并写入逐项
+> content-free receipt。本 ADR 的 plan ledger 决策保持不变。
+
 ## 背景
 
 ADR-0491 已完成 Local SQLite 上的 Legacy Env 检查、人工裁决、Secret application、

@@ -70,6 +70,11 @@
       "require": "./dist/reconciliation/clusterLegacyEnvMigrationPlanRepository.js",
       "default": "./dist/reconciliation/clusterLegacyEnvMigrationPlanRepository.js"
     },
+    "./cluster-legacy-env-migration-application": {
+      "types": "./dist/reconciliation/clusterLegacyEnvMigrationApplicationRepository.d.ts",
+      "require": "./dist/reconciliation/clusterLegacyEnvMigrationApplicationRepository.js",
+      "default": "./dist/reconciliation/clusterLegacyEnvMigrationApplicationRepository.js"
+    },
     "./task-start": {
       "types": "./dist/task-start/taskStartRepository.d.ts",
       "require": "./dist/task-start/taskStartRepository.js",

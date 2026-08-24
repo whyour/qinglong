@@ -180,6 +180,213 @@ export const clusterLegacyEnvMigrationPlans = ql3Schema.table(
   ],
 );
 
+export const clusterLegacyEnvMigrationApplicationReceipts = ql3Schema.table(
+  'cluster_legacy_env_migration_application_receipts',
+  {
+    applicationId: varchar('application_id', { length: 128 }).primaryKey(),
+    mutationId: uuid('mutation_id').notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    planId: varchar('plan_id', { length: 128 }).notNull(),
+    planDigest: char('plan_digest', { length: 64 }).notNull(),
+    environmentBundleRef: varchar('environment_bundle_ref', {
+      length: 512,
+    }).notNull(),
+    taskRevisionSetDigest: char('task_revision_set_digest', {
+      length: 64,
+    }).notNull(),
+    triggerRevisionSetDigest: char('trigger_revision_set_digest', {
+      length: 64,
+    }).notNull(),
+    taskMutationSetDigest: char('task_mutation_set_digest', {
+      length: 64,
+    }).notNull(),
+    triggerMutationSetDigest: char('trigger_mutation_set_digest', {
+      length: 64,
+    }).notNull(),
+    taskCount: integer('task_count').notNull(),
+    triggerCount: integer('trigger_count').notNull(),
+    committedAtMs: bigint('committed_at_ms', { mode: 'number' }).notNull(),
+    receiptDigest: char('receipt_digest', { length: 64 }).notNull(),
+    receiptJson: jsonb('receipt_json')
+      .$type<Record<string, unknown>>()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'ql3_cluster_legacy_env_application_project_fk',
+      columns: [table.projectId],
+      foreignColumns: [projects.id],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'ql3_cluster_legacy_env_application_plan_fk',
+      columns: [table.planId],
+      foreignColumns: [clusterLegacyEnvMigrationPlans.planId],
+    }).onDelete('restrict'),
+    check(
+      'ql3_cluster_legacy_env_application_identity_check',
+      sql`${table.applicationId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.projectId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and ${table.planId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_application_digest_check',
+      sql`${table.planDigest} ~ '^[0-9a-f]{64}$' and ${table.taskRevisionSetDigest} ~ '^[0-9a-f]{64}$' and ${table.triggerRevisionSetDigest} ~ '^[0-9a-f]{64}$' and ${table.taskMutationSetDigest} ~ '^[0-9a-f]{64}$' and ${table.triggerMutationSetDigest} ~ '^[0-9a-f]{64}$' and ${table.receiptDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_application_target_check',
+      sql`${table.environmentBundleRef} ~ '^qlsecret:v1:[A-Za-z0-9_-]+$' and octet_length(${table.environmentBundleRef}) between 14 and 512 and ${table.taskCount} between 1 and 100000 and ${table.triggerCount} between 0 and 500000 and ${table.committedAtMs} >= 0`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_application_json_check',
+      sql`jsonb_typeof(${table.receiptJson}) = 'object' and octet_length(${table.receiptJson}::text) between 2 and 8192 and ${table.receiptJson} = jsonb_build_object('schema', 'qinglong/cluster-legacy-env-migration-application-receipt@v1', 'applicationId', ${table.applicationId}, 'mutationId', ${table.mutationId}::text, 'projectId', ${table.projectId}, 'planId', ${table.planId}, 'planDigest', ${table.planDigest}, 'environmentBundleRef', ${table.environmentBundleRef}, 'taskRevisionSetDigest', ${table.taskRevisionSetDigest}, 'triggerRevisionSetDigest', ${table.triggerRevisionSetDigest}, 'taskMutationSetDigest', ${table.taskMutationSetDigest}, 'triggerMutationSetDigest', ${table.triggerMutationSetDigest}, 'taskCount', ${table.taskCount}, 'triggerCount', ${table.triggerCount}, 'committedAtMs', ${table.committedAtMs}, 'receiptDigest', ${table.receiptDigest})`,
+    ),
+    uniqueIndex('ql3_cluster_legacy_env_application_mutation_uidx').on(
+      table.mutationId,
+    ),
+    uniqueIndex('ql3_cluster_legacy_env_application_project_uidx').on(
+      table.applicationId,
+      table.projectId,
+    ),
+    uniqueIndex('ql3_cluster_legacy_env_application_plan_uidx').on(
+      table.planId,
+    ),
+    uniqueIndex('ql3_cluster_legacy_env_application_digest_uidx').on(
+      table.receiptDigest,
+    ),
+    index('ql3_cluster_legacy_env_application_project_idx').on(
+      table.projectId,
+      table.committedAtMs,
+      table.applicationId,
+    ),
+  ],
+);
+
+export const clusterLegacyEnvMigrationApplicationTasks = ql3Schema.table(
+  'cluster_legacy_env_migration_application_tasks',
+  {
+    applicationId: varchar('application_id', { length: 128 }).notNull(),
+    ordinal: integer('ordinal').notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    taskId: varchar('task_id', { length: 128 }).notNull(),
+    previousRevision: integer('previous_revision').notNull(),
+    previousContentDigest: char('previous_content_digest', {
+      length: 64,
+    }).notNull(),
+    mutationId: uuid('mutation_id').notNull(),
+    revision: integer('revision').notNull(),
+    contentDigest: char('content_digest', { length: 64 }).notNull(),
+    executionContentDigest: char('execution_content_digest', { length: 64 }),
+    itemDigest: char('item_digest', { length: 64 }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'cluster_legacy_env_migration_application_tasks_pkey',
+      columns: [table.applicationId, table.ordinal],
+    }),
+    foreignKey({
+      name: 'ql3_cluster_legacy_env_application_task_receipt_fk',
+      columns: [table.applicationId, table.projectId],
+      foreignColumns: [
+        clusterLegacyEnvMigrationApplicationReceipts.applicationId,
+        clusterLegacyEnvMigrationApplicationReceipts.projectId,
+      ],
+    }).onDelete('restrict'),
+    check(
+      'ql3_cluster_legacy_env_application_task_identity_check',
+      sql`${table.projectId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and char_length(${table.taskId}) between 1 and 128 and ${table.taskId} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_application_task_revision_check',
+      sql`${table.ordinal} between 0 and 99999 and ${table.previousRevision} between 1 and 2147483646 and ${table.revision} = ${table.previousRevision} + 1`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_application_task_digest_check',
+      sql`${table.previousContentDigest} ~ '^[0-9a-f]{64}$' and ${table.contentDigest} ~ '^[0-9a-f]{64}$' and (${table.executionContentDigest} is null or ${table.executionContentDigest} ~ '^[0-9a-f]{64}$') and ${table.itemDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    uniqueIndex('ql3_cluster_legacy_env_application_task_uidx').on(
+      table.applicationId,
+      table.taskId,
+    ),
+    uniqueIndex('ql3_cluster_legacy_env_application_task_revision_uidx').on(
+      table.applicationId,
+      table.projectId,
+      table.taskId,
+      table.revision,
+      table.contentDigest,
+    ),
+  ],
+);
+
+export const clusterLegacyEnvMigrationApplicationTriggers = ql3Schema.table(
+  'cluster_legacy_env_migration_application_triggers',
+  {
+    applicationId: varchar('application_id', { length: 128 }).notNull(),
+    ordinal: integer('ordinal').notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    triggerId: varchar('trigger_id', { length: 128 }).notNull(),
+    taskId: varchar('task_id', { length: 128 }).notNull(),
+    previousRevision: integer('previous_revision').notNull(),
+    previousContentDigest: char('previous_content_digest', {
+      length: 64,
+    }).notNull(),
+    previousTaskRevision: integer('previous_task_revision').notNull(),
+    previousTaskContentDigest: char('previous_task_content_digest', {
+      length: 64,
+    }).notNull(),
+    mutationId: uuid('mutation_id').notNull(),
+    revision: integer('revision').notNull(),
+    contentDigest: char('content_digest', { length: 64 }).notNull(),
+    taskRevision: integer('task_revision').notNull(),
+    taskContentDigest: char('task_content_digest', { length: 64 }).notNull(),
+    itemDigest: char('item_digest', { length: 64 }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'cluster_legacy_env_migration_application_triggers_pkey',
+      columns: [table.applicationId, table.ordinal],
+    }),
+    foreignKey({
+      name: 'ql3_cluster_legacy_env_application_trigger_receipt_fk',
+      columns: [table.applicationId, table.projectId],
+      foreignColumns: [
+        clusterLegacyEnvMigrationApplicationReceipts.applicationId,
+        clusterLegacyEnvMigrationApplicationReceipts.projectId,
+      ],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'ql3_cluster_legacy_env_application_trigger_task_fk',
+      columns: [
+        table.applicationId,
+        table.projectId,
+        table.taskId,
+        table.taskRevision,
+        table.taskContentDigest,
+      ],
+      foreignColumns: [
+        clusterLegacyEnvMigrationApplicationTasks.applicationId,
+        clusterLegacyEnvMigrationApplicationTasks.projectId,
+        clusterLegacyEnvMigrationApplicationTasks.taskId,
+        clusterLegacyEnvMigrationApplicationTasks.revision,
+        clusterLegacyEnvMigrationApplicationTasks.contentDigest,
+      ],
+    }).onDelete('restrict'),
+    check(
+      'ql3_cluster_legacy_env_application_trigger_identity_check',
+      sql`${table.projectId} ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' and char_length(${table.triggerId}) between 1 and 128 and ${table.triggerId} !~ '[[:cntrl:]]' and char_length(${table.taskId}) between 1 and 128 and ${table.taskId} !~ '[[:cntrl:]]'`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_application_trigger_revision_check',
+      sql`${table.ordinal} between 0 and 499999 and ${table.previousRevision} between 1 and 2147483646 and ${table.revision} = ${table.previousRevision} + 1 and ${table.previousTaskRevision} between 1 and 2147483647 and ${table.taskRevision} between 2 and 2147483647`,
+    ),
+    check(
+      'ql3_cluster_legacy_env_application_trigger_digest_check',
+      sql`${table.previousContentDigest} ~ '^[0-9a-f]{64}$' and ${table.previousTaskContentDigest} ~ '^[0-9a-f]{64}$' and ${table.contentDigest} ~ '^[0-9a-f]{64}$' and ${table.taskContentDigest} ~ '^[0-9a-f]{64}$' and ${table.itemDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    uniqueIndex('ql3_cluster_legacy_env_application_trigger_uidx').on(
+      table.applicationId,
+      table.triggerId,
+    ),
+  ],
+);
+
 export const pluginPackageInstalls = ql3Schema.table(
   'plugin_package_installs',
   {
@@ -6289,6 +6496,9 @@ export const ql3PostgresTables = [
   schemaCapabilities,
   projects,
   clusterLegacyEnvMigrationPlans,
+  clusterLegacyEnvMigrationApplicationReceipts,
+  clusterLegacyEnvMigrationApplicationTasks,
+  clusterLegacyEnvMigrationApplicationTriggers,
   pluginPackageInstalls,
   pluginPackageInstallHeads,
   pluginPackageInstallMutations,

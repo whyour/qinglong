@@ -74,6 +74,14 @@ const {
 const {
   PostgresClusterLegacyEnvMigrationPlanRepository,
 } = require('../dist/reconciliation/clusterLegacyEnvMigrationPlanRepository');
+const {
+  PostgresClusterLegacyEnvMigrationApplicationRepository,
+} = require('../dist/reconciliation/clusterLegacyEnvMigrationApplicationRepository');
+const {
+  InvalidClusterLegacyEnvMigrationApplicationError,
+  createClusterLegacyEnvMigrationTaskMutationSetDigester,
+  createClusterLegacyEnvMigrationTriggerMutationSetDigester,
+} = require('@qinglong/runtime-core/cluster-legacy-env-migration-application');
 
 function nextMinute(schedule, afterMs) {
   if (schedule.expression !== '* * * * *' || schedule.timezone !== 'UTC') {
@@ -665,6 +673,49 @@ async function observeContractPublisherTrust(pool) {
     snapshot: contractPublisherTrustSnapshot,
   });
 }
+
+test('Cluster Legacy Env application rejects accessor stream factories before PostgreSQL', async () => {
+  let getterCalls = 0;
+  let connectCalls = 0;
+  const repository = new PostgresClusterLegacyEnvMigrationApplicationRepository(
+    {
+      async query() {
+        throw new Error('query must not be called');
+      },
+      async connect() {
+        connectCalls += 1;
+        throw new Error('connect must not be called');
+      },
+    },
+  );
+  const streams = {};
+  for (const name of ['taskMutations', 'triggerMutations']) {
+    Object.defineProperty(streams, name, {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return () => [];
+      },
+    });
+  }
+  await assert.rejects(
+    repository.apply(
+      {
+        applicationId: 'accessor-stream-application',
+        mutationId: '10000000-0000-4000-8000-000000000001',
+        projectId: 'accessor-stream-project',
+        planId: 'accessor-stream-plan',
+        planDigest: '1'.repeat(64),
+        taskMutationSetDigest: '2'.repeat(64),
+        triggerMutationSetDigest: '3'.repeat(64),
+      },
+      streams,
+    ),
+    InvalidClusterLegacyEnvMigrationApplicationError,
+  );
+  assert.equal(getterCalls, 0);
+  assert.equal(connectCalls, 0);
+});
 
 if (!migrationConnectionString) {
   test('PostgreSQL integration requires QL3_TEST_POSTGRES_URL', {
@@ -6672,6 +6723,312 @@ if (!migrationConnectionString) {
                FROM "ql3"."cluster_legacy_env_migration_plans"
               WHERE plan_id = $1`,
             [planId],
+          ),
+          (error) => error?.code === '42501',
+        );
+      }
+    } finally {
+      await Promise.all([
+        adminDatabase.close(),
+        runtimeDatabase.close(),
+        automationDatabase.close(),
+        migrationDatabase.close(),
+      ]);
+    }
+  });
+
+  test('atomically applies one Legacy Env plan to Task, Trigger and schedule receipts', async () => {
+    const projectId = `legacy-env-application-${process.pid}`;
+    const taskId = `legacy task ${process.pid}`;
+    const triggerId = `legacy trigger ${process.pid}`;
+    const planId = `legacy-env-application-plan-${process.pid}`;
+    const planMutationId = `legacy-env-application-plan-mutation-${process.pid}`;
+    const applicationId = `legacy-env-application-receipt-${process.pid}`;
+    const taskMutationId = '719f7900-0000-4000-8000-000000000001';
+    const triggerMutationId = '719f7900-0000-4000-8000-000000000002';
+    const applicationMutationId = '719f7900-0000-4000-8000-000000000003';
+    const migrationDatabase = await open('migration');
+    const automationDatabase = await open('automation-manager');
+    const runtimeDatabase = await open('runtime');
+    const adminDatabase = await open('admin');
+    try {
+      await runPostgresMigrations({ pool: migrationDatabase.pool });
+      await migrationDatabase.pool.query(
+        `TRUNCATE TABLE
+           "ql3"."cluster_legacy_env_migration_application_triggers",
+           "ql3"."cluster_legacy_env_migration_application_tasks",
+           "ql3"."cluster_legacy_env_migration_application_receipts",
+           "ql3"."cluster_legacy_env_migration_plans",
+           "ql3"."trigger_schedules", "ql3"."triggers",
+           "ql3"."task_execution_revisions", "ql3"."task_definitions"
+         CASCADE`,
+      );
+      await migrationDatabase.pool.query(
+        `INSERT INTO "ql3"."projects"
+           (id, name, slug, status, version, created_at_ms, updated_at_ms)
+         VALUES ($1, $1, $2, 'active', 1, 1, 1)
+         ON CONFLICT (id) DO NOTHING`,
+        [projectId, `legacy-env-application-${process.pid}`],
+      );
+      const clock = await migrationDatabase.pool.query(
+        `SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint
+                AS "observedAtMs"`,
+      );
+      const occurredAtMs = Number(clock.rows[0].observedAtMs) - 1000;
+      const initialTask = (
+        await new PostgresTaskDefinitionRepository(
+          migrationDatabase.pool,
+        ).appendTaskDefinitionRevision({
+          projectId,
+          taskId,
+          expectedRevision: null,
+          mutationId: '719f7900-0000-4000-8000-000000000010',
+          name: 'Legacy command',
+          description: 'preserved by atomic migration',
+          kind: 'command',
+          spec: {
+            schema: 'qinglong/command@v1',
+            config: {
+              command: {
+                kind: 'argv',
+                file: '/bin/echo',
+                args: ['legacy'],
+              },
+              timeoutMs: 30_000,
+            },
+          },
+          labels: { 'qinglong.io/source': 'legacy' },
+          enabled: true,
+          occurredAtMs,
+        })
+      ).definition;
+      const trigger = (
+        await new PostgresTriggerRepository(
+          migrationDatabase.pool,
+        ).appendTriggerRevision({
+          projectId,
+          triggerId,
+          expectedRevision: null,
+          mutationId: '719f7900-0000-4000-8000-000000000011',
+          taskId,
+          taskRevision: initialTask.revision,
+          taskContentDigest: initialTask.contentDigest,
+          spec: {
+            schema: 'qinglong/cron@v1',
+            config: {
+              expression: '* * * * *',
+              timezone: 'UTC',
+              misfirePolicy: 'skip',
+            },
+          },
+          enabled: true,
+          occurredAtMs: occurredAtMs + 1,
+        })
+      ).trigger;
+      const task = (
+        await new PostgresTaskDefinitionRepository(
+          migrationDatabase.pool,
+        ).appendTaskDefinitionRevision({
+          projectId,
+          taskId,
+          expectedRevision: initialTask.revision,
+          mutationId: '719f7900-0000-4000-8000-000000000012',
+          name: initialTask.name,
+          description: initialTask.description,
+          kind: initialTask.kind,
+          spec: initialTask.spec,
+          labels: initialTask.labels,
+          enabled: initialTask.enabled,
+          occurredAtMs: occurredAtMs + 2,
+        })
+      ).definition;
+
+      const taskMutations = [
+        {
+          ordinal: 0,
+          taskId,
+          previousRevision: task.revision,
+          previousContentDigest: task.contentDigest,
+          mutationId: taskMutationId,
+        },
+      ];
+      const triggerMutations = [
+        {
+          ordinal: 0,
+          triggerId,
+          taskId,
+          previousRevision: trigger.revision,
+          previousContentDigest: trigger.contentDigest,
+          previousTaskRevision: initialTask.revision,
+          previousTaskContentDigest: initialTask.contentDigest,
+          mutationId: triggerMutationId,
+        },
+      ];
+      const taskDigester =
+        createClusterLegacyEnvMigrationTaskMutationSetDigester();
+      taskMutations.forEach((value) => taskDigester.update(value));
+      const taskSet = taskDigester.finish();
+      const triggerDigester =
+        createClusterLegacyEnvMigrationTriggerMutationSetDigester();
+      triggerMutations.forEach((value) => triggerDigester.update(value));
+      const triggerSet = triggerDigester.finish();
+      const secretRef = createSecretRef({
+        projectId,
+        name: 'legacy-env-bundle',
+        version: 1,
+      });
+      const plan = (
+        await new PostgresClusterLegacyEnvMigrationPlanRepository(
+          automationDatabase.pool,
+        ).publish({
+          planId,
+          mutationId: planMutationId,
+          projectId,
+          source: {
+            reconciliationBundleDigest: '1'.repeat(64),
+            decisionDigest: '2'.repeat(64),
+            candidateSetDigest: '3'.repeat(64),
+            sourceRowCount: 1,
+            activeRowCount: 1,
+            disabledRowCount: 0,
+            effectiveBindingCount: 1,
+          },
+          target: {
+            secretRef,
+            taskRevisionSetDigest: taskSet.revisionSetDigest,
+            triggerRevisionSetDigest: triggerSet.revisionSetDigest,
+            taskCount: taskSet.count,
+            triggerCount: triggerSet.count,
+            totalEffectiveBytes: 128,
+          },
+        })
+      ).plan;
+      const intent = {
+        applicationId,
+        mutationId: applicationMutationId,
+        projectId,
+        planId,
+        planDigest: plan.planDigest,
+        taskMutationSetDigest: taskSet.mutationSetDigest,
+        triggerMutationSetDigest: triggerSet.mutationSetDigest,
+      };
+      let taskStreamCalls = 0;
+      let triggerStreamCalls = 0;
+      const streams = {
+        taskMutations() {
+          taskStreamCalls += 1;
+          return taskMutations;
+        },
+        triggerMutations() {
+          triggerStreamCalls += 1;
+          return triggerMutations;
+        },
+      };
+      const applications =
+        new PostgresClusterLegacyEnvMigrationApplicationRepository(
+          automationDatabase.pool,
+        );
+      const applied = await applications.apply(intent, streams);
+      assert.equal(applied.status, 'applied');
+      assert.equal(taskStreamCalls, 1);
+      assert.equal(triggerStreamCalls, 1);
+      assert.deepEqual(
+        await applications.findByApplicationId(applicationId),
+        applied.receipt,
+      );
+
+      const state = await automationDatabase.pool.query(
+        `SELECT task.current_revision AS "taskRevision",
+                task_revision.spec_json AS "taskSpec",
+                task_revision.name AS "taskName",
+                task_revision.description AS "taskDescription",
+                task_revision.labels_json AS "taskLabels",
+                execution.plan_json AS "executionPlan",
+                trigger.current_revision AS "triggerRevision",
+                trigger_revision.task_revision AS "triggerTaskRevision",
+                trigger_revision.task_content_digest AS "triggerTaskContentDigest",
+                schedule.trigger_revision AS "scheduleRevision",
+                schedule.next_fire_at_ms AS "nextFireAtMs",
+                schedule.last_scheduled_at_ms AS "lastScheduledAtMs",
+                schedule.state_version AS "scheduleStateVersion",
+                schedule.claim_version AS "scheduleClaimVersion"
+           FROM "ql3"."task_definitions" AS task
+           JOIN "ql3"."task_definition_revisions" AS task_revision
+             ON task_revision.project_id = task.project_id
+            AND task_revision.task_id = task.task_id
+            AND task_revision.revision = task.current_revision
+           JOIN "ql3"."task_execution_revisions" AS execution
+             ON execution.project_id = task.project_id
+            AND execution.task_id = task.task_id
+            AND execution.source_revision = task.current_revision
+           JOIN "ql3"."triggers" AS trigger
+             ON trigger.project_id = task.project_id
+            AND trigger.task_id = task.task_id
+           JOIN "ql3"."trigger_revisions" AS trigger_revision
+             ON trigger_revision.project_id = trigger.project_id
+            AND trigger_revision.trigger_id = trigger.trigger_id
+            AND trigger_revision.revision = trigger.current_revision
+           JOIN "ql3"."trigger_schedules" AS schedule
+             ON schedule.project_id = trigger.project_id
+            AND schedule.trigger_id = trigger.trigger_id
+          WHERE task.project_id = $1 AND task.task_id = $2
+            AND trigger.trigger_id = $3`,
+        [projectId, taskId, triggerId],
+      );
+      assert.equal(state.rowCount, 1);
+      const row = state.rows[0];
+      assert.equal(row.taskRevision, 3);
+      assert.equal(row.taskSpec.config.environmentBundleRef, secretRef);
+      assert.equal(row.taskSpec.config.timeoutMs, 30_000);
+      assert.equal(row.taskName, task.name);
+      assert.equal(row.taskDescription, task.description);
+      assert.deepEqual(row.taskLabels, task.labels);
+      assert.equal(row.executionPlan.environmentBundleRef, secretRef);
+      assert.equal(row.triggerRevision, 2);
+      assert.equal(row.triggerTaskRevision, 3);
+      assert.match(row.triggerTaskContentDigest, /^[0-9a-f]{64}$/);
+      assert.equal(row.scheduleRevision, 2);
+      assert.equal(row.nextFireAtMs, null);
+      assert.equal(row.lastScheduledAtMs, null);
+      assert.equal(row.scheduleStateVersion, 1);
+      assert.equal(row.scheduleClaimVersion, 1);
+
+      const replay = await applications.apply(intent, streams);
+      assert.equal(replay.status, 'existing');
+      assert.deepEqual(replay.receipt, applied.receipt);
+      assert.equal(taskStreamCalls, 1);
+      assert.equal(triggerStreamCalls, 1);
+
+      const ledger = await automationDatabase.pool.query(
+        `SELECT
+           (SELECT count(*)::integer
+              FROM "ql3"."cluster_legacy_env_migration_application_receipts"
+             WHERE application_id = $1) AS receipts,
+           (SELECT count(*)::integer
+              FROM "ql3"."cluster_legacy_env_migration_application_tasks"
+             WHERE application_id = $1) AS tasks,
+           (SELECT count(*)::integer
+              FROM "ql3"."cluster_legacy_env_migration_application_triggers"
+             WHERE application_id = $1) AS triggers`,
+        [applicationId],
+      );
+      assert.deepEqual(ledger.rows, [{ receipts: 1, tasks: 1, triggers: 1 }]);
+      await assert.rejects(
+        automationDatabase.pool.query(
+          `UPDATE "ql3"."cluster_legacy_env_migration_application_receipts"
+              SET committed_at_ms = committed_at_ms
+            WHERE application_id = $1`,
+          [applicationId],
+        ),
+        (error) => error?.code === '42501',
+      );
+      for (const database of [runtimeDatabase, adminDatabase]) {
+        await assert.rejects(
+          database.pool.query(
+            `SELECT application_id
+               FROM "ql3"."cluster_legacy_env_migration_application_receipts"
+              WHERE application_id = $1`,
+            [applicationId],
           ),
           (error) => error?.code === '42501',
         );

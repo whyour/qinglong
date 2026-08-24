@@ -5,6 +5,10 @@
 - 决策：D-401 前置切片
 - 关联：ADR-0091、ADR-0092、ADR-0104、ADR-0113、ADR-0114、ADR-0491、ADR-0494、ADR-0495
 
+> 2026-08-24：ADR-0497/D-402 已完成本 ADR 所要求的 Task/Trigger mutation 与 migration
+> receipt；本 ADR 继续定义 opaque bundle 的安全数据面，direct external custody 与 promotion
+> 后 receipt replay 仍是后续门禁。
+
 ## 背景
 
 ADR-0495 的 Cluster plan 只保存一个同 Project、固定 version 的 SecretRef，并明确禁止把

@@ -156,6 +156,24 @@ const REQUIRED_RUNTIME_PRIVILEGES = Object.freeze({
     update: false,
     delete: false,
   }),
+  cluster_legacy_env_migration_application_receipts: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  cluster_legacy_env_migration_application_tasks: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  cluster_legacy_env_migration_application_triggers: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
   plugin_package_installs: Object.freeze({
     select: false,
     insert: false,
@@ -706,6 +724,24 @@ const REQUIRED_ADMIN_PRIVILEGES = Object.freeze({
     delete: false,
   }),
   cluster_legacy_env_migration_plans: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  cluster_legacy_env_migration_application_receipts: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  cluster_legacy_env_migration_application_tasks: Object.freeze({
+    select: false,
+    insert: false,
+    update: false,
+    delete: false,
+  }),
+  cluster_legacy_env_migration_application_triggers: Object.freeze({
     select: false,
     insert: false,
     update: false,
@@ -1430,6 +1466,9 @@ const REQUIRED_AUTOMATION_MANAGER_PRIVILEGES: RequiredPrivileges =
               }
             : name === 'security_audit_events' ||
               name === 'cluster_legacy_env_migration_plans' ||
+              name === 'cluster_legacy_env_migration_application_receipts' ||
+              name === 'cluster_legacy_env_migration_application_tasks' ||
+              name === 'cluster_legacy_env_migration_application_triggers' ||
               name === 'task_definition_revisions' ||
               name === 'task_execution_revisions' ||
               name === 'trigger_revisions'
