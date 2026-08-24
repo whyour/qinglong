@@ -27,7 +27,8 @@ function text(row: Row, key: string): string {
 
 function integer(row: Row, key: string): number {
   const raw = row[key];
-  const value = typeof raw === 'string' && /^\d+$/.test(raw) ? Number(raw) : raw;
+  const value =
+    typeof raw === 'string' && /^\d+$/.test(raw) ? Number(raw) : raw;
   if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
     throw new RemoteWorkerSecretDeliveryUnavailableError();
   }
@@ -44,10 +45,19 @@ function executionRevision(row: Row): ClusterTaskExecutionRevision {
   if (
     !keys.includes('command') ||
     !keys.includes('environment') ||
-    keys.some((key) =>
-      !['command', 'environment', 'placement', 'timeoutMs', 'workingDirectory']
-        .includes(key))
-  ) throw new RemoteWorkerSecretDeliveryUnavailableError();
+    keys.some(
+      (key) =>
+        ![
+          'command',
+          'environment',
+          'environmentBundleRef',
+          'placement',
+          'timeoutMs',
+          'workingDirectory',
+        ].includes(key),
+    )
+  )
+    throw new RemoteWorkerSecretDeliveryUnavailableError();
   return normalizeClusterTaskExecutionRevision({
     projectId: text(row, 'revisionProjectId'),
     taskId: text(row, 'revisionTaskId'),
@@ -57,7 +67,11 @@ function executionRevision(row: Row): ClusterTaskExecutionRevision {
     executorType: text(row, 'revisionExecutorType') as 'remote_worker',
     planSchema: text(row, 'planSchema') as 'qinglong/command-execution@v1',
     command: value.command as ClusterTaskExecutionRevision['command'],
-    environment: value.environment as ClusterTaskExecutionRevision['environment'],
+    environment:
+      value.environment as ClusterTaskExecutionRevision['environment'],
+    ...(value.environmentBundleRef === undefined
+      ? {}
+      : { environmentBundleRef: value.environmentBundleRef as string }),
     ...(value.workingDirectory === undefined
       ? {}
       : { workingDirectory: value.workingDirectory as string }),
@@ -66,7 +80,11 @@ function executionRevision(row: Row): ClusterTaskExecutionRevision {
       : { timeoutMs: value.timeoutMs as number }),
     ...(value.placement === undefined
       ? {}
-      : { placement: value.placement as NonNullable<ClusterTaskExecutionRevision['placement']> }),
+      : {
+          placement: value.placement as NonNullable<
+            ClusterTaskExecutionRevision['placement']
+          >,
+        }),
     contentDigest: text(row, 'revisionContentDigest'),
     createdAtMs: integer(row, 'revisionCreatedAtMs'),
   });
@@ -80,7 +98,8 @@ async function begin(client: PostgresClient): Promise<void> {
 }
 
 export class PostgresRemoteWorkerSecretDeliveryAuthorityRepository
-  implements RemoteWorkerSecretDeliveryAuthorityRepository {
+  implements RemoteWorkerSecretDeliveryAuthorityRepository
+{
   constructor(private readonly pool: PostgresPool) {
     if (!pool || typeof pool.connect !== 'function') {
       throw new TypeError('PostgreSQL remote Secret delivery pool is invalid');
@@ -156,7 +175,9 @@ export class PostgresRemoteWorkerSecretDeliveryAuthorityRepository
       }
       const row = result.rows[0];
       if (!row) {
-        throw new RemoteWorkerSecretDeliveryFenceRejectedError('authority_mismatch');
+        throw new RemoteWorkerSecretDeliveryFenceRejectedError(
+          'authority_mismatch',
+        );
       }
       const observedAtMs = integer(row, 'observedAtMs');
       const tokenDigest = digestRunDispatchLeaseToken(command.leaseToken);
@@ -192,25 +213,38 @@ export class PostgresRemoteWorkerSecretDeliveryAuthorityRepository
         row.leaseOfferId === command.offerId &&
         integer(row, 'leaseExpiresAtMs') > observedAtMs;
       if (!matches) {
-        throw new RemoteWorkerSecretDeliveryFenceRejectedError('authority_mismatch');
+        throw new RemoteWorkerSecretDeliveryFenceRejectedError(
+          'authority_mismatch',
+        );
       }
       let revision: ClusterTaskExecutionRevision;
       try {
         revision = executionRevision(row);
       } catch (error) {
-        if (error instanceof RemoteWorkerSecretDeliveryUnavailableError) throw error;
+        if (error instanceof RemoteWorkerSecretDeliveryUnavailableError)
+          throw error;
         throw new RemoteWorkerSecretDeliveryUnavailableError();
       }
       const expectedRefs = Object.freeze([
-        ...new Set(revision.environment.flatMap((binding) =>
-          binding.kind === 'secret' ? [binding.secretRef] : [])),
+        ...new Set(
+          revision.environment.flatMap((binding) =>
+            binding.kind === 'secret' ? [binding.secretRef] : [],
+          ),
+        ),
       ]);
+      const expectedEnvironmentBundleRefs = Object.freeze(
+        revision.environmentBundleRef === undefined
+          ? []
+          : [revision.environmentBundleRef],
+      );
       if (
         revision.projectId !== command.projectId ||
         revision.taskId !== command.taskId ||
         revision.taskRevision !== command.taskRevision ||
         revision.contentDigest !== command.executionDigest ||
-        JSON.stringify(expectedRefs) !== JSON.stringify(command.secretRefs)
+        JSON.stringify(expectedRefs) !== JSON.stringify(command.secretRefs) ||
+        JSON.stringify(expectedEnvironmentBundleRefs) !==
+          JSON.stringify(command.environmentBundleRefs)
       ) {
         throw new RemoteWorkerSecretDeliveryFenceRejectedError(
           'secret_scope_mismatch',
@@ -230,15 +264,21 @@ export class PostgresRemoteWorkerSecretDeliveryAuthorityRepository
         leaseGeneration: command.leaseGeneration,
         leaseVersion: command.expectedLeaseVersion,
         secretRefs: expectedRefs,
+        environmentBundleRefs: expectedEnvironmentBundleRefs,
       });
       await client.query('COMMIT');
       return authority;
     } catch (error) {
-      try { await client.query('ROLLBACK'); } catch { /* preserve root */ }
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* preserve root */
+      }
       if (
         error instanceof RemoteWorkerSecretDeliveryFenceRejectedError ||
         error instanceof RemoteWorkerSecretDeliveryUnavailableError
-      ) throw error;
+      )
+        throw error;
       throw new RemoteWorkerSecretDeliveryUnavailableError();
     } finally {
       client.release();

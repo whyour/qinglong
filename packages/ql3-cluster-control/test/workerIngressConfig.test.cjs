@@ -93,7 +93,7 @@ test('builds exact bounded Worker ingress and least-privilege Pool config', asyn
     host: '127.0.0.1',
     port: 5901,
     maxBodyBytes: 65_536,
-    maxResponseBytes: 65_536,
+    maxResponseBytes: 262_144,
     maxInFlightRequests: 32,
     authenticationRateWindowMs: 60_000,
     authenticationRatePerPeer: 20,

@@ -30,6 +30,11 @@ const VERSIONED_SECRET_REF = createSecretRef({
   name: 'certificate',
   version: 3,
 });
+const ENVIRONMENT_BUNDLE_REF = createSecretRef({
+  projectId: 'project-1',
+  name: 'legacy-env-bundle',
+  version: 4,
+});
 
 function authority(secretRefs = [SECRET_REF]) {
   return {
@@ -46,6 +51,7 @@ function authority(secretRefs = [SECRET_REF]) {
     leaseGeneration: 1,
     leaseVersion: 1,
     secretRefs,
+    environmentBundleRefs: [],
   };
 }
 
@@ -58,10 +64,7 @@ test('maps canonical SecretRef to a stable path-free Kubernetes key', () => {
   const first = clusterMountedSecretFileName(SECRET_REF);
   assert.match(first, /^[0-9a-f]{64}$/);
   assert.equal(clusterMountedSecretFileName(SECRET_REF), first);
-  assert.notEqual(
-    clusterMountedSecretFileName(VERSIONED_SECRET_REF),
-    first,
-  );
+  assert.notEqual(clusterMountedSecretFileName(VERSIONED_SECRET_REF), first);
   assert.throws(
     () => clusterMountedSecretFileName('not-a-secret-ref'),
     ClusterMountedSecretProviderError,
@@ -82,6 +85,7 @@ test('resolves every request again and observes atomic material rotation', async
   assert.deepEqual(first.values, [
     { secretRef: SECRET_REF, value: 'generation-one' },
   ]);
+  assert.deepEqual(first.environmentBundles, []);
   await first.dispose();
 
   const replacement = `${file}.replacement`;
@@ -154,4 +158,36 @@ test('fails readiness for a missing or symlinked provider root', async (t) => {
     }),
     ClusterMountedSecretProviderError,
   );
+});
+
+test('delivers one larger opaque environment bundle without widening normal Secrets', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'ql3-mounted-bundle-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await chmod(root, 0o700);
+  const value = JSON.stringify({
+    schema: 'qinglong/environment-bundle@v1',
+    entries: [{ name: 'LEGACY_VALUE', value: 'x'.repeat(20 * 1024) }],
+  });
+  await privateFile(
+    path.join(root, clusterMountedSecretFileName(ENVIRONMENT_BUNDLE_REF)),
+    value,
+  );
+  const provider = await createClusterMountedSecretProvider({
+    rootDirectory: root,
+  });
+  const resolution = await provider.resolve({
+    ...authority([]),
+    environmentBundleRefs: [ENVIRONMENT_BUNDLE_REF],
+  });
+  assert.deepEqual(resolution.values, []);
+  assert.deepEqual(resolution.environmentBundles, [
+    { secretRef: ENVIRONMENT_BUNDLE_REF, value },
+  ]);
+  await resolution.dispose();
+
+  await privateFile(
+    path.join(root, clusterMountedSecretFileName(SECRET_REF)),
+    'x'.repeat(16 * 1024 + 1),
+  );
+  await assert.rejects(provider.resolve(authority()), /material_unavailable/);
 });

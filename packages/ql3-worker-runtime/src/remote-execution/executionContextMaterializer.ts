@@ -1,8 +1,10 @@
 // Remote Execution owns bounded Secret and Artifact context materialization.
 import {
   MAX_LOCAL_DISPATCH_ENVIRONMENT_BYTES,
+  MAX_LOCAL_DISPATCH_ENVIRONMENT_ENTRIES,
   MAX_LOCAL_DISPATCH_SECRET_REFS,
 } from '@qinglong/runtime-core/local-dispatch';
+import { parseEnvironmentBundle } from '@qinglong/runtime-core/environment-bundle';
 import type { ClusterRemoteExecutionOffer } from '@qinglong/runtime-core/remote-dispatch';
 import { createClusterRemoteExecutionOffer } from '@qinglong/runtime-core/remote-dispatch';
 import { assertRunDispatchId } from '@qinglong/runtime-core/run-dispatch-lease';
@@ -17,20 +19,27 @@ export interface WorkerRemoteSecretResolution {
     secretRef: string;
     value: string;
   }>[];
+  readonly environmentBundles: readonly Readonly<{
+    secretRef: string;
+    value: string;
+  }>[];
   readonly dispose?: () => Promise<void> | void;
 }
 
 export interface WorkerRemoteSecretEnvironmentProvider {
-  resolve(request: Readonly<{
-    projectId: string;
-    taskId: string;
-    taskRevision: string;
-    runId: string;
-    attemptId: string;
-    offerId: string;
-    executionDigest: string;
-    secretRefs: readonly string[];
-  }>): Promise<WorkerRemoteSecretResolution | undefined>;
+  resolve(
+    request: Readonly<{
+      projectId: string;
+      taskId: string;
+      taskRevision: string;
+      runId: string;
+      attemptId: string;
+      offerId: string;
+      executionDigest: string;
+      secretRefs: readonly string[];
+      environmentBundleRefs: readonly string[];
+    }>,
+  ): Promise<WorkerRemoteSecretResolution | undefined>;
 }
 
 export interface WorkerRemoteLogArtifactPreparation {
@@ -42,12 +51,14 @@ export interface WorkerRemoteLogArtifactPreparation {
 }
 
 export interface WorkerRemoteLogArtifactAllocator {
-  prepare(request: Readonly<{
-    projectId: string;
-    runId: string;
-    attemptId: string;
-    offerId: string;
-  }>): Promise<WorkerRemoteLogArtifactPreparation | undefined>;
+  prepare(
+    request: Readonly<{
+      projectId: string;
+      runId: string;
+      attemptId: string;
+      offerId: string;
+    }>,
+  ): Promise<WorkerRemoteLogArtifactPreparation | undefined>;
 }
 
 export interface BoundedWorkerRemoteExecutionContextMaterializerOptions {
@@ -86,11 +97,14 @@ function environmentValue(value: unknown): string {
 async function disposeQuietly(
   operation: (() => Promise<void> | void) | undefined,
 ): Promise<void> {
-  await Promise.resolve().then(() => operation?.()).catch(() => undefined);
+  await Promise.resolve()
+    .then(() => operation?.())
+    .catch(() => undefined);
 }
 
 export class BoundedWorkerRemoteExecutionContextMaterializer
-  implements WorkerRemoteExecutionContextMaterializer {
+  implements WorkerRemoteExecutionContextMaterializer
+{
   private readonly artifacts: WorkerRemoteLogArtifactAllocator;
   private readonly secrets?: WorkerRemoteSecretEnvironmentProvider;
 
@@ -109,9 +123,11 @@ export class BoundedWorkerRemoteExecutionContextMaterializer
     this.secrets = options.secrets;
   }
 
-  async prepare(input: Readonly<{
-    offer: ClusterRemoteExecutionOffer;
-  }>): Promise<MaterializedWorkerRemoteExecutionContext> {
+  async prepare(
+    input: Readonly<{
+      offer: ClusterRemoteExecutionOffer;
+    }>,
+  ): Promise<MaterializedWorkerRemoteExecutionContext> {
     let offer: ClusterRemoteExecutionOffer;
     try {
       offer = createClusterRemoteExecutionOffer(input?.offer);
@@ -122,9 +138,17 @@ export class BoundedWorkerRemoteExecutionContextMaterializer
     }
     const bindings = offer.executionRevision.environment;
     const secretRefs = Object.freeze([
-      ...new Set(bindings.flatMap((binding) =>
-        binding.kind === 'secret' ? [binding.secretRef] : [])),
+      ...new Set(
+        bindings.flatMap((binding) =>
+          binding.kind === 'secret' ? [binding.secretRef] : [],
+        ),
+      ),
     ]);
+    const environmentBundleRefs = Object.freeze(
+      offer.executionRevision.environmentBundleRef === undefined
+        ? []
+        : [offer.executionRevision.environmentBundleRef],
+    );
     if (secretRefs.length > MAX_LOCAL_DISPATCH_SECRET_REFS) {
       throw new WorkerRemoteExecutionMaterializationError(
         'environment_budget_exceeded',
@@ -132,23 +156,26 @@ export class BoundedWorkerRemoteExecutionContextMaterializer
     }
     let secretResolution: WorkerRemoteSecretResolution | undefined;
     const secretByRef = new Map<string, string>();
-    if (secretRefs.length > 0) {
+    if (secretRefs.length > 0 || environmentBundleRefs.length > 0) {
       if (!this.secrets) {
         throw new WorkerRemoteExecutionMaterializationError(
           'secret_unavailable',
         );
       }
       try {
-        secretResolution = await this.secrets.resolve(Object.freeze({
-          projectId: offer.candidate.projectId,
-          taskId: offer.candidate.taskId,
-          taskRevision: offer.candidate.taskRevision,
-          runId: offer.candidate.runId,
-          attemptId: offer.candidate.attemptId,
-          offerId: offer.offerId,
-          executionDigest: offer.executionDigest,
-          secretRefs,
-        }));
+        secretResolution = await this.secrets.resolve(
+          Object.freeze({
+            projectId: offer.candidate.projectId,
+            taskId: offer.candidate.taskId,
+            taskRevision: offer.candidate.taskRevision,
+            runId: offer.candidate.runId,
+            attemptId: offer.candidate.attemptId,
+            offerId: offer.offerId,
+            executionDigest: offer.executionDigest,
+            secretRefs,
+            environmentBundleRefs,
+          }),
+        );
       } catch {
         throw new WorkerRemoteExecutionMaterializationError(
           'secret_unavailable',
@@ -160,10 +187,17 @@ export class BoundedWorkerRemoteExecutionContextMaterializer
         );
       }
       if (
-        Object.keys(secretResolution).some((key) =>
-          key !== 'values' && key !== 'dispose') ||
+        Object.keys(secretResolution).some(
+          (key) =>
+            key !== 'values' &&
+            key !== 'environmentBundles' &&
+            key !== 'dispose',
+        ) ||
         !Array.isArray(secretResolution.values) ||
         secretResolution.values.length !== secretRefs.length ||
+        !Array.isArray(secretResolution.environmentBundles) ||
+        secretResolution.environmentBundles.length !==
+          environmentBundleRefs.length ||
         (secretResolution.dispose !== undefined &&
           typeof secretResolution.dispose !== 'function')
       ) {
@@ -198,36 +232,89 @@ export class BoundedWorkerRemoteExecutionContextMaterializer
     let environmentBytes = 0;
     let environment: MaterializedWorkerRemoteExecutionContext['environment'];
     try {
-      environment = Object.freeze(bindings.map((binding) => {
-        const value = binding.kind === 'public'
-          ? binding.value
-          : secretByRef.get(binding.secretRef);
+      const names = new Set<string>();
+      const materialized = bindings.map((binding) => {
+        const value =
+          binding.kind === 'public'
+            ? binding.value
+            : secretByRef.get(binding.secretRef);
         if (value === undefined) {
           throw new WorkerRemoteExecutionMaterializationError(
             'secret_response_invalid',
           );
         }
-        environmentBytes += Buffer.byteLength(binding.name, 'utf8') +
+        environmentBytes +=
+          Buffer.byteLength(binding.name, 'utf8') +
           Buffer.byteLength(value, 'utf8');
+        names.add(binding.name);
         if (environmentBytes > MAX_LOCAL_DISPATCH_ENVIRONMENT_BYTES) {
           throw new WorkerRemoteExecutionMaterializationError(
             'environment_budget_exceeded',
           );
         }
         return Object.freeze({ name: binding.name, value });
-      }));
+      });
+      for (const entry of secretResolution?.environmentBundles ?? []) {
+        if (
+          !entry ||
+          typeof entry !== 'object' ||
+          Object.keys(entry).length !== 2 ||
+          !Object.hasOwn(entry, 'secretRef') ||
+          !Object.hasOwn(entry, 'value') ||
+          typeof entry.secretRef !== 'string' ||
+          !environmentBundleRefs.includes(entry.secretRef) ||
+          typeof entry.value !== 'string'
+        ) {
+          throw new WorkerRemoteExecutionMaterializationError(
+            'secret_response_invalid',
+          );
+        }
+        let bundle;
+        try {
+          bundle = parseEnvironmentBundle(entry.value);
+        } catch {
+          throw new WorkerRemoteExecutionMaterializationError(
+            'secret_response_invalid',
+          );
+        }
+        for (const binding of bundle.entries) {
+          if (names.has(binding.name)) {
+            throw new WorkerRemoteExecutionMaterializationError(
+              'secret_response_invalid',
+            );
+          }
+          names.add(binding.name);
+          environmentBytes +=
+            Buffer.byteLength(binding.name, 'utf8') +
+            Buffer.byteLength(binding.value, 'utf8');
+          if (
+            materialized.length >= MAX_LOCAL_DISPATCH_ENVIRONMENT_ENTRIES ||
+            environmentBytes > MAX_LOCAL_DISPATCH_ENVIRONMENT_BYTES
+          ) {
+            throw new WorkerRemoteExecutionMaterializationError(
+              'environment_budget_exceeded',
+            );
+          }
+          materialized.push(
+            Object.freeze({ name: binding.name, value: binding.value }),
+          );
+        }
+      }
+      environment = Object.freeze(materialized);
     } catch (error) {
       await disposeQuietly(secretResolution?.dispose);
       throw error;
     }
     let artifact: WorkerRemoteLogArtifactPreparation | undefined;
     try {
-      artifact = await this.artifacts.prepare(Object.freeze({
-        projectId: offer.candidate.projectId,
-        runId: offer.candidate.runId,
-        attemptId: offer.candidate.attemptId,
-        offerId: offer.offerId,
-      }));
+      artifact = await this.artifacts.prepare(
+        Object.freeze({
+          projectId: offer.candidate.projectId,
+          runId: offer.candidate.runId,
+          attemptId: offer.candidate.attemptId,
+          offerId: offer.offerId,
+        }),
+      );
     } catch {
       await disposeQuietly(secretResolution?.dispose);
       throw new WorkerRemoteExecutionMaterializationError(

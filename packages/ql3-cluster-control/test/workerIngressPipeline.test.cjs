@@ -592,6 +592,7 @@ test('binds one Secret batch to path identity and never echoes capabilities', as
           offerId: command.offerId,
           executionDigest: command.executionDigest,
           values: [{ secretRef, value: 'resolved-value' }],
+          environmentBundles: [],
           dispose() { disposed += 1; },
         };
       },
@@ -599,18 +600,20 @@ test('binds one Secret batch to path identity and never echoes capabilities', as
   });
   const leaseToken = 'worker_generated_lease_capability_0000000000000001';
   const body = {
-    schema: 'qinglong/remote-secret-delivery@v1',
+    schema: 'qinglong/remote-secret-delivery@v2',
     runId: 'run-1', attemptId: 'attempt-1', projectId: 'project-1',
     taskId: 'task-1', taskRevision: 'revision-1', executionDigest,
     workerGeneration: 2, offerId: 'offer-1', leaseGeneration: 3,
     leaseToken, expectedLeaseVersion: 4, secretRefs: [secretRef],
+    environmentBundleRefs: [],
   };
   const result = await (await pipeline.prepare(metadata('secrets'))).handle(body);
   assert.equal(result.statusCode, 200);
-  assert.equal(result.body.schema, 'qinglong/remote-secret-delivery@v1');
+  assert.equal(result.body.schema, 'qinglong/remote-secret-delivery@v2');
   assert.deepEqual(result.body.values, [
     { secretRef, value: 'resolved-value' },
   ]);
+  assert.deepEqual(result.body.environmentBundles, []);
   assert.equal(JSON.stringify(result.body).includes(leaseToken), false);
   const { schema: _schema, ...commandBody } = body;
   assert.deepEqual(observed, {
@@ -634,13 +637,14 @@ test('maps stale Secret delivery authority to conflict before any response', asy
   });
   await assert.rejects(
     (await pipeline.prepare(metadata('secrets'))).handle({
-      schema: 'qinglong/remote-secret-delivery@v1',
+      schema: 'qinglong/remote-secret-delivery@v2',
       runId: 'run-1', attemptId: 'attempt-1', projectId: 'project-1',
       taskId: 'task-1', taskRevision: 'revision-1',
       executionDigest: 'c'.repeat(64), workerGeneration: 2,
       offerId: 'offer-1', leaseGeneration: 3,
       leaseToken: 'worker_generated_lease_capability_0000000000000001',
       expectedLeaseVersion: 4, secretRefs: [secretRef],
+      environmentBundleRefs: [],
     }),
     (error) =>
       error.statusCode === 409 && error.code === 'worker_secret_delivery_fenced',
@@ -656,19 +660,21 @@ test('rejects a Secret service response whose authority drifts', async () => {
           runId: 'run-other', attemptId: 'attempt-1', offerId: 'offer-1',
           executionDigest: 'c'.repeat(64),
           values: [{ secretRef, value: 'must-not-escape' }],
+          environmentBundles: [],
         };
       },
     },
   });
   await assert.rejects(
     (await pipeline.prepare(metadata('secrets'))).handle({
-      schema: 'qinglong/remote-secret-delivery@v1',
+      schema: 'qinglong/remote-secret-delivery@v2',
       runId: 'run-1', attemptId: 'attempt-1', projectId: 'project-1',
       taskId: 'task-1', taskRevision: 'revision-1',
       executionDigest: 'c'.repeat(64), workerGeneration: 2,
       offerId: 'offer-1', leaseGeneration: 3,
       leaseToken: 'worker_generated_lease_capability_0000000000000001',
       expectedLeaseVersion: 4, secretRefs: [secretRef],
+      environmentBundleRefs: [],
     }),
     (error) =>
       error.statusCode === 503 && error.code === 'worker_ingress_unavailable',

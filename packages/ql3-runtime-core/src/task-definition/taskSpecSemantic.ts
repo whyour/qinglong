@@ -196,9 +196,7 @@ function normalizeEnvironment(
     );
   });
   if (bytes > MAX_COMMAND_TASK_ENVIRONMENT_BYTES) {
-    throw new InvalidTaskSpecSemanticError(
-      'environment byte budget exceeded',
-    );
+    throw new InvalidTaskSpecSemanticError('environment byte budget exceeded');
   }
   environment.sort((left, right) =>
     (left as { name: string }).name.localeCompare(
@@ -215,14 +213,46 @@ function normalizeCommandConfig(
   exactKeys(
     config,
     ['command'],
-    ['environment', 'placement', 'timeoutMs', 'workingDirectory'],
+    [
+      'environment',
+      'environmentBundleRef',
+      'placement',
+      'timeoutMs',
+      'workingDirectory',
+    ],
     'command config',
   );
   const command = normalizeCommand(config.command);
-  const environment = normalizeEnvironment(config.environment ?? [], context.projectId);
-  const placement = config.placement === undefined
-    ? undefined
-    : normalizeRemoteWorkerPlacement(config.placement);
+  const environment = normalizeEnvironment(
+    config.environment ?? [],
+    context.projectId,
+  );
+  let environmentBundleRef: string | undefined;
+  if (config.environmentBundleRef !== undefined) {
+    environmentBundleRef = boundedText(
+      config.environmentBundleRef,
+      'environmentBundleRef',
+      512,
+    );
+    let reference;
+    try {
+      reference = parseSecretRef(environmentBundleRef);
+    } catch {
+      throw new InvalidTaskSpecSemanticError('environmentBundleRef is invalid');
+    }
+    if (
+      reference.projectId !== context.projectId ||
+      reference.version === undefined
+    ) {
+      throw new InvalidTaskSpecSemanticError(
+        'environmentBundleRef must pin a version in the same Project',
+      );
+    }
+  }
+  const placement =
+    config.placement === undefined
+      ? undefined
+      : normalizeRemoteWorkerPlacement(config.placement);
   let workingDirectory: string | undefined;
   if (config.workingDirectory !== undefined) {
     workingDirectory = boundedText(
@@ -250,6 +280,7 @@ function normalizeCommandConfig(
   return Object.freeze({
     command,
     environment,
+    ...(environmentBundleRef === undefined ? {} : { environmentBundleRef }),
     ...(placement === undefined
       ? {}
       : { placement: placement as unknown as TaskDefinitionJson }),
@@ -268,10 +299,7 @@ const BUILT_IN_DESCRIPTORS: readonly TaskSpecSemanticDescriptor[] =
   ]);
 
 export class TaskSpecSemanticRegistry {
-  readonly #descriptors: ReadonlyMap<
-    string,
-    TaskSpecSemanticDescriptor
-  >;
+  readonly #descriptors: ReadonlyMap<string, TaskSpecSemanticDescriptor>;
   readonly #metadata: readonly TaskSpecSemanticMetadata[];
 
   constructor(descriptors: readonly TaskSpecSemanticDescriptor[]) {
@@ -393,8 +421,5 @@ export function createTaskSpecSemanticRegistry(
       'extension descriptor uses the reserved qinglong namespace',
     );
   }
-  return new TaskSpecSemanticRegistry([
-    ...BUILT_IN_DESCRIPTORS,
-    ...extensions,
-  ]);
+  return new TaskSpecSemanticRegistry([...BUILT_IN_DESCRIPTORS, ...extensions]);
 }

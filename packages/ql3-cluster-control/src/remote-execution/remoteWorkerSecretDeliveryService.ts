@@ -66,7 +66,9 @@ export class ClusterRemoteWorkerSecretDeliveryService {
         authorized.offerId !== command.offerId ||
         authorized.leaseGeneration !== command.leaseGeneration ||
         authorized.leaseVersion !== command.expectedLeaseVersion ||
-        JSON.stringify(authorized.secretRefs) !== JSON.stringify(command.secretRefs)
+        JSON.stringify(authorized.secretRefs) !== JSON.stringify(command.secretRefs) ||
+        JSON.stringify(authorized.environmentBundleRefs) !==
+          JSON.stringify(command.environmentBundleRefs)
       ) throw new InvalidRemoteWorkerSecretDeliveryError(
         'repository authority does not match command',
       );
@@ -88,7 +90,8 @@ export class ClusterRemoteWorkerSecretDeliveryService {
       if (
         typeof resolution !== 'object' ||
         Array.isArray(resolution) ||
-        Object.keys(resolution).some((key) => key !== 'values' && key !== 'dispose') ||
+        Object.keys(resolution).some((key) =>
+          key !== 'values' && key !== 'environmentBundles' && key !== 'dispose') ||
         (resolution.dispose !== undefined &&
           typeof resolution.dispose !== 'function')
       ) throw new InvalidRemoteWorkerSecretDeliveryError(
@@ -100,13 +103,18 @@ export class ClusterRemoteWorkerSecretDeliveryService {
         offerId: authorized.offerId,
         executionDigest: authorized.executionDigest,
         values: resolution.values,
-      }, authorized.secretRefs);
+        environmentBundles: resolution.environmentBundles,
+      }, {
+        secretRefs: authorized.secretRefs,
+        environmentBundleRefs: authorized.environmentBundleRefs,
+      });
       return Object.freeze({
         runId: body.runId,
         attemptId: body.attemptId,
         offerId: body.offerId,
         executionDigest: body.executionDigest,
         values: body.values,
+        environmentBundles: body.environmentBundles,
         ...(resolution.dispose === undefined
           ? {}
           : { dispose: resolution.dispose }),

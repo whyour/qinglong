@@ -32,6 +32,7 @@ export interface ClusterTaskExecutionRevisionContent {
   readonly planSchema: typeof CLUSTER_EXECUTION_PLAN_SCHEMA;
   readonly command: LocalDispatchCommand;
   readonly environment: readonly LocalExecutionEnvironmentBinding[];
+  readonly environmentBundleRef?: string;
   readonly workingDirectory?: string;
   readonly timeoutMs?: number;
   readonly placement?: RemoteWorkerPlacementSpec;
@@ -79,9 +80,7 @@ function revision(value: unknown): number {
     (value as number) < 1 ||
     (value as number) > 2_147_483_647
   ) {
-    throw new InvalidClusterExecutionRevisionError(
-      'sourceRevision is invalid',
-    );
+    throw new InvalidClusterExecutionRevisionError('sourceRevision is invalid');
   }
   return value as number;
 }
@@ -103,6 +102,7 @@ function normalizeContent(
     'command',
     'createdAtMs',
     'environment',
+    'environmentBundleRef',
     'executorType',
     'planSchema',
     'placement',
@@ -155,6 +155,7 @@ function normalizeContent(
   }
   let command: LocalDispatchCommand;
   let environment: readonly LocalExecutionEnvironmentBinding[];
+  let environmentBundleRef: string | undefined;
   try {
     command = normalizeLocalDispatchCommand(value.command);
     environment = createLocalExecutionContextRecipe({
@@ -168,6 +169,16 @@ function normalizeContent(
       ) {
         throw new Error('cross-project Secret reference');
       }
+    }
+    if (value.environmentBundleRef !== undefined) {
+      const reference = parseSecretRef(value.environmentBundleRef);
+      if (
+        reference.projectId !== projectId ||
+        reference.version === undefined
+      ) {
+        throw new Error('invalid environment bundle Secret reference');
+      }
+      environmentBundleRef = value.environmentBundleRef;
     }
   } catch {
     throw new InvalidClusterExecutionRevisionError(
@@ -200,9 +211,10 @@ function normalizeContent(
     timeoutMs = value.timeoutMs;
   }
   const createdAtMs = timestamp(value.createdAtMs);
-  const placement = value.placement === undefined
-    ? undefined
-    : effectiveRemoteWorkerPlacement(value.placement);
+  const placement =
+    value.placement === undefined
+      ? undefined
+      : effectiveRemoteWorkerPlacement(value.placement);
   const normalized = Object.freeze({
     projectId,
     taskId,
@@ -213,20 +225,22 @@ function normalizeContent(
     planSchema: CLUSTER_EXECUTION_PLAN_SCHEMA,
     command,
     environment,
+    ...(environmentBundleRef === undefined ? {} : { environmentBundleRef }),
     ...(workingDirectory === undefined ? {} : { workingDirectory }),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
     ...(placement === undefined ? {} : { placement }),
     createdAtMs,
   });
-  if (Buffer.byteLength(JSON.stringify(normalized), 'utf8') > MAX_CLUSTER_EXECUTION_PLAN_BYTES) {
+  if (
+    Buffer.byteLength(JSON.stringify(normalized), 'utf8') >
+    MAX_CLUSTER_EXECUTION_PLAN_BYTES
+  ) {
     throw new InvalidClusterExecutionRevisionError('plan byte budget exceeded');
   }
   return normalized;
 }
 
-function digest(
-  content: ClusterTaskExecutionRevisionContent,
-): string {
+function digest(content: ClusterTaskExecutionRevisionContent): string {
   const { createdAtMs: _createdAtMs, ...immutable } = content;
   return createHash('sha256')
     .update('qinglong.cluster-task-execution-revision.v1\0', 'utf8')
@@ -273,6 +287,9 @@ export function compileClusterCommandTaskDefinition(
     planSchema: CLUSTER_EXECUTION_PLAN_SCHEMA,
     command: plan.command,
     environment: plan.environment,
+    ...(plan.environmentBundleRef === undefined
+      ? {}
+      : { environmentBundleRef: plan.environmentBundleRef }),
     ...(plan.workingDirectory === undefined
       ? {}
       : { workingDirectory: plan.workingDirectory }),

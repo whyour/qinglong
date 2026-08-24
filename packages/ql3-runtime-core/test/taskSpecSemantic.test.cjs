@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { createLocalSecretRef } = require('../dist/secret/localSecret');
+const { createSecretRef } = require('../dist/secret/secretReference');
 const {
   BUILT_IN_COMMAND_TASK_SPEC_SCHEMA,
   InvalidTaskSpecSemanticError,
@@ -231,17 +232,67 @@ test('canonicalizes an optional bounded Remote Worker PlacementSpec in command s
     preferred: [{ labels: { tier: 'edge' }, weight: 5 }],
   });
   assert.throws(
-    () => registry.normalize(context({
+    () =>
+      registry.normalize(
+        context({
+          spec: {
+            schema: BUILT_IN_COMMAND_TASK_SPEC_SCHEMA,
+            config: {
+              command: { kind: 'argv', file: '/bin/echo', args: [] },
+              placement: {
+                required: {
+                  runtimes: [{ name: 'node', versionRange: 'not-semver' }],
+                },
+              },
+            },
+          },
+        }),
+      ),
+    InvalidTaskSpecSemanticError,
+  );
+});
+
+test('accepts only a same-Project version-pinned environment bundle reference', () => {
+  const registry = createBuiltInTaskSpecSemanticRegistry();
+  const environmentBundleRef = createSecretRef({
+    projectId: 'default',
+    name: 'legacy-env-bundle',
+    version: 3,
+  });
+  const normalized = registry.normalize(
+    context({
       spec: {
         schema: BUILT_IN_COMMAND_TASK_SPEC_SCHEMA,
         config: {
           command: { kind: 'argv', file: '/bin/echo', args: [] },
-          placement: {
-            required: { runtimes: [{ name: 'node', versionRange: 'not-semver' }] },
-          },
+          environmentBundleRef,
         },
       },
-    })),
-    InvalidTaskSpecSemanticError,
+    }),
   );
+  assert.equal(normalized.config.environmentBundleRef, environmentBundleRef);
+  for (const invalidRef of [
+    createSecretRef({ projectId: 'default', name: 'legacy-env-bundle' }),
+    createSecretRef({
+      projectId: 'other',
+      name: 'legacy-env-bundle',
+      version: 3,
+    }),
+  ]) {
+    assert.throws(
+      () =>
+        registry.normalize(
+          context({
+            spec: {
+              schema: BUILT_IN_COMMAND_TASK_SPEC_SCHEMA,
+              config: {
+                command: { kind: 'argv', file: '/bin/echo', args: [] },
+                environmentBundleRef: invalidRef,
+              },
+            },
+          }),
+        ),
+      /environmentBundleRef/,
+    );
+  }
 });

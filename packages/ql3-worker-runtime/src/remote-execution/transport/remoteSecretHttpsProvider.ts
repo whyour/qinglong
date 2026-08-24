@@ -36,7 +36,8 @@ export interface WorkerRemoteSecretHttpsProviderOptions {
 }
 
 export class WorkerRemoteSecretHttpsProvider
-  implements WorkerRemoteSecretEnvironmentProvider {
+  implements WorkerRemoteSecretEnvironmentProvider
+{
   private readonly client: Pick<WorkerIngressHttpsClient, 'postJson'>;
   private readonly inbox: Pick<WorkerRemoteExecutionInbox, 'readOffer'>;
 
@@ -45,13 +46,15 @@ export class WorkerRemoteSecretHttpsProvider
       !options ||
       typeof options.client?.postJson !== 'function' ||
       typeof options.inbox?.readOffer !== 'function'
-    ) throw new WorkerRemoteSecretHttpsProviderError('invalid_configuration');
+    )
+      throw new WorkerRemoteSecretHttpsProviderError('invalid_configuration');
     this.client = options.client;
     this.inbox = options.inbox;
   }
 
-  async resolve(request: Parameters<WorkerRemoteSecretEnvironmentProvider['resolve']>[0])
-    : Promise<WorkerRemoteSecretResolution | undefined> {
+  async resolve(
+    request: Parameters<WorkerRemoteSecretEnvironmentProvider['resolve']>[0],
+  ): Promise<WorkerRemoteSecretResolution | undefined> {
     let record;
     try {
       record = await this.inbox.readOffer(request.offerId);
@@ -68,9 +71,17 @@ export class WorkerRemoteSecretHttpsProvider
       throw new WorkerRemoteSecretHttpsProviderError('authority_mismatch');
     }
     const expectedRefs = Object.freeze([
-      ...new Set(offer.executionRevision.environment.flatMap((binding) =>
-        binding.kind === 'secret' ? [binding.secretRef] : [])),
+      ...new Set(
+        offer.executionRevision.environment.flatMap((binding) =>
+          binding.kind === 'secret' ? [binding.secretRef] : [],
+        ),
+      ),
     ]);
+    const expectedEnvironmentBundleRefs = Object.freeze(
+      offer.executionRevision.environmentBundleRef === undefined
+        ? []
+        : [offer.executionRevision.environmentBundleRef],
+    );
     if (
       offer.offerId !== request.offerId ||
       offer.executionDigest !== request.executionDigest ||
@@ -79,10 +90,14 @@ export class WorkerRemoteSecretHttpsProvider
       offer.candidate.taskRevision !== request.taskRevision ||
       offer.candidate.runId !== request.runId ||
       offer.candidate.attemptId !== request.attemptId ||
-      JSON.stringify(expectedRefs) !== JSON.stringify(request.secretRefs)
-    ) throw new WorkerRemoteSecretHttpsProviderError('authority_mismatch');
+      JSON.stringify(expectedRefs) !== JSON.stringify(request.secretRefs) ||
+      JSON.stringify(expectedEnvironmentBundleRefs) !==
+        JSON.stringify(request.environmentBundleRefs)
+    )
+      throw new WorkerRemoteSecretHttpsProviderError('authority_mismatch');
 
-    const path = `/api/v3/worker-ingress/workers/${offer.worker.workerId}` +
+    const path =
+      `/api/v3/worker-ingress/workers/${offer.worker.workerId}` +
       `/sessions/${offer.worker.sessionId}/secrets`;
     const body = createRemoteWorkerSecretDeliveryRequestBody({
       workerId: offer.worker.workerId,
@@ -99,6 +114,7 @@ export class WorkerRemoteSecretHttpsProvider
       leaseToken: offer.leaseToken,
       expectedLeaseVersion: offer.lease.version,
       secretRefs: expectedRefs,
+      environmentBundleRefs: expectedEnvironmentBundleRefs,
     });
     let serialized: Uint8Array;
     try {
@@ -119,11 +135,21 @@ export class WorkerRemoteSecretHttpsProvider
         offerId: offer.offerId,
         executionDigest: offer.executionDigest,
         secretRefs: expectedRefs,
+        environmentBundleRefs: expectedEnvironmentBundleRefs,
       });
-      const values = Object.freeze(delivered.values.map((entry) =>
-        Object.freeze({ secretRef: entry.secretRef, value: entry.value })));
+      const values = Object.freeze(
+        delivered.values.map((entry) =>
+          Object.freeze({ secretRef: entry.secretRef, value: entry.value }),
+        ),
+      );
+      const environmentBundles = Object.freeze(
+        delivered.environmentBundles.map((entry) =>
+          Object.freeze({ secretRef: entry.secretRef, value: entry.value }),
+        ),
+      );
       return Object.freeze({
         values,
+        environmentBundles,
         dispose() {
           // JavaScript strings cannot be zeroized. Drop all retained references;
           // the transport bytes were already scrubbed by the parser.

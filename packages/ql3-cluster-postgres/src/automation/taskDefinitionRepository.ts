@@ -77,9 +77,7 @@ function unavailable(): TaskDefinitionUnavailableError {
   return new TaskDefinitionUnavailableError();
 }
 
-function taskDefinitionRecord(
-  row: TaskDefinitionRow,
-): TaskDefinitionRecord {
+function taskDefinitionRecord(row: TaskDefinitionRow): TaskDefinitionRecord {
   try {
     const description = row.description;
     if (description !== null && typeof description !== 'string') {
@@ -128,6 +126,9 @@ function executionPlanJson(
   return Object.freeze({
     command: revision.command,
     environment: revision.environment,
+    ...(revision.environmentBundleRef === undefined
+      ? {}
+      : { environmentBundleRef: revision.environmentBundleRef }),
     ...(revision.workingDirectory === undefined
       ? {}
       : { workingDirectory: revision.workingDirectory }),
@@ -140,7 +141,9 @@ function executionPlanJson(
   });
 }
 
-function executionRevision(row: TaskDefinitionRow): ClusterTaskExecutionRevision {
+function executionRevision(
+  row: TaskDefinitionRow,
+): ClusterTaskExecutionRevision {
   try {
     const plan = postgresRequiredJsonObject(row.planJson, unavailable);
     const keys = Object.keys(plan);
@@ -149,9 +152,14 @@ function executionRevision(row: TaskDefinitionRow): ClusterTaskExecutionRevision
       !keys.includes('environment') ||
       keys.some(
         (key) =>
-          !['command', 'environment', 'placement', 'timeoutMs', 'workingDirectory'].includes(
-            key,
-          ),
+          ![
+            'command',
+            'environment',
+            'environmentBundleRef',
+            'placement',
+            'timeoutMs',
+            'workingDirectory',
+          ].includes(key),
       )
     ) {
       throw unavailable();
@@ -176,6 +184,9 @@ function executionRevision(row: TaskDefinitionRow): ClusterTaskExecutionRevision
       command: plan.command as ClusterTaskExecutionRevision['command'],
       environment:
         plan.environment as ClusterTaskExecutionRevision['environment'],
+      ...(plan.environmentBundleRef === undefined
+        ? {}
+        : { environmentBundleRef: plan.environmentBundleRef as string }),
       ...(plan.workingDirectory === undefined
         ? {}
         : { workingDirectory: plan.workingDirectory as string }),
@@ -185,10 +196,9 @@ function executionRevision(row: TaskDefinitionRow): ClusterTaskExecutionRevision
       ...(plan.placement === undefined
         ? {}
         : {
-            placement:
-              plan.placement as unknown as NonNullable<
-                ClusterTaskExecutionRevision['placement']
-              >,
+            placement: plan.placement as unknown as NonNullable<
+              ClusterTaskExecutionRevision['placement']
+            >,
           }),
       contentDigest: postgresRequiredString(row.contentDigest, unavailable),
       createdAtMs: postgresRequiredInteger(row.createdAtMs, unavailable),
@@ -319,7 +329,6 @@ export class PostgresTaskDefinitionSource implements TaskDefinitionSource {
     }
   }
 
-
   async findCurrentTaskDefinition(
     projectId: string,
     taskId: string,
@@ -422,7 +431,9 @@ export class PostgresTaskExecutionRevisionSource
     readonly sourceRevision: number;
   }): Promise<ClusterTaskExecutionRevision | null> {
     if (!identity || typeof identity !== 'object' || Array.isArray(identity)) {
-      throw new TypeError('Cluster Task execution revision identity is invalid');
+      throw new TypeError(
+        'Cluster Task execution revision identity is invalid',
+      );
     }
     assertTaskDefinitionIdentifier(identity.projectId, 'projectId');
     assertTaskDefinitionIdentifier(identity.taskId, 'taskId');
@@ -447,8 +458,7 @@ export class PostgresTaskDefinitionRepository
 {
   constructor(
     pool: PostgresPool,
-    private readonly semanticRegistry: TaskSpecSemanticRegistry =
-      createBuiltInTaskSpecSemanticRegistry(),
+    private readonly semanticRegistry: TaskSpecSemanticRegistry = createBuiltInTaskSpecSemanticRegistry(),
   ) {
     super(pool);
   }
@@ -483,10 +493,7 @@ export class PostgresTaskDefinitionRepository
       command.kind === 'command' &&
       command.spec.schema === BUILT_IN_COMMAND_TASK_SPEC_SCHEMA
         ? compileClusterCommandTaskDefinition(
-            createTaskDefinitionRecord(
-              command,
-              command.occurredAtMs,
-            ),
+            createTaskDefinitionRecord(command, command.occurredAtMs),
             this.semanticRegistry,
           )
         : null;
@@ -560,10 +567,7 @@ export class PostgresTaskDefinitionRepository
            WHERE id = $1`,
           [command.projectId],
         );
-        if (
-          project.rows.length !== 1 ||
-          project.rows[0]?.status !== 'active'
-        ) {
+        if (project.rows.length !== 1 || project.rows[0]?.status !== 'active') {
           throw new TaskDefinitionConflictError();
         }
 
@@ -600,8 +604,9 @@ export class PostgresTaskDefinitionRepository
           unavailable,
         );
         if (
-          (created ? command.expectedRevision !== null :
-            currentRevision !== command.expectedRevision) ||
+          (created
+            ? command.expectedRevision !== null
+            : currentRevision !== command.expectedRevision) ||
           command.occurredAtMs < previousUpdatedAtMs
         ) {
           throw new TaskDefinitionConflictError();

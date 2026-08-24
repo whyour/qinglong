@@ -44,15 +44,55 @@ function definition() {
   });
   return {
     registry,
-    record: createTaskDefinitionRecord({
-      ...command,
-      spec: registry.normalize({
-        projectId: command.projectId,
-        taskId: command.taskId,
-        kind: command.kind,
-        spec: command.spec,
-      }),
-    }, 90),
+    record: createTaskDefinitionRecord(
+      {
+        ...command,
+        spec: registry.normalize({
+          projectId: command.projectId,
+          taskId: command.taskId,
+          kind: command.kind,
+          spec: command.spec,
+        }),
+      },
+      90,
+    ),
+  };
+}
+
+function definitionWithBundle() {
+  const input = definition();
+  const environmentBundleRef = createSecretRef({
+    projectId: 'default',
+    name: 'legacy-env-bundle',
+    version: 4,
+  });
+  const spec = input.registry.normalize({
+    projectId: input.record.projectId,
+    taskId: input.record.taskId,
+    kind: input.record.kind,
+    spec: {
+      ...input.record.spec,
+      config: { ...input.record.spec.config, environmentBundleRef },
+    },
+  });
+  return {
+    registry: input.registry,
+    environmentBundleRef,
+    record: createTaskDefinitionRecord(
+      {
+        projectId: input.record.projectId,
+        taskId: input.record.taskId,
+        expectedRevision: null,
+        mutationId: input.record.mutationId,
+        name: input.record.name,
+        kind: input.record.kind,
+        spec,
+        labels: input.record.labels,
+        enabled: input.record.enabled,
+        occurredAtMs: input.record.updatedAtMs,
+      },
+      input.record.createdAtMs,
+    ),
   };
 }
 
@@ -70,6 +110,17 @@ test('compiles one digest-bound remote Worker execution revision', () => {
   assert.deepEqual(normalizeClusterTaskExecutionRevision(revision), revision);
 });
 
+test('carries only the pinned environment bundle reference into Cluster plans', () => {
+  const input = definitionWithBundle();
+  const revision = compileClusterCommandTaskDefinition(
+    input.record,
+    input.registry,
+  );
+  assert.equal(revision.environmentBundleRef, input.environmentBundleRef);
+  assert.equal(JSON.stringify(revision).includes('legacy env value'), false);
+  assert.deepEqual(normalizeClusterTaskExecutionRevision(revision), revision);
+});
+
 test('rejects digest drift and cross-Project Secret references', () => {
   const input = definition();
   const revision = compileClusterCommandTaskDefinition(
@@ -77,21 +128,25 @@ test('rejects digest drift and cross-Project Secret references', () => {
     input.registry,
   );
   assert.throws(
-    () => normalizeClusterTaskExecutionRevision({
-      ...revision,
-      contentDigest: '0'.repeat(64),
-    }),
+    () =>
+      normalizeClusterTaskExecutionRevision({
+        ...revision,
+        contentDigest: '0'.repeat(64),
+      }),
     InvalidClusterExecutionRevisionError,
   );
   assert.throws(
-    () => normalizeClusterTaskExecutionRevision({
-      ...revision,
-      environment: [{
-        kind: 'secret',
-        name: 'TOKEN',
-        secretRef: createSecretRef({ projectId: 'another', name: 'TOKEN' }),
-      }],
-    }),
+    () =>
+      normalizeClusterTaskExecutionRevision({
+        ...revision,
+        environment: [
+          {
+            kind: 'secret',
+            name: 'TOKEN',
+            secretRef: createSecretRef({ projectId: 'another', name: 'TOKEN' }),
+          },
+        ],
+      }),
     InvalidClusterExecutionRevisionError,
   );
 });

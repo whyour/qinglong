@@ -36,6 +36,7 @@ export interface CommandTaskExecutionPlan {
   readonly sourceContentDigest: string;
   readonly command: LocalDispatchCommand;
   readonly environment: readonly LocalExecutionEnvironmentBinding[];
+  readonly environmentBundleRef?: string;
   readonly workingDirectory?: string;
   readonly timeoutMs?: number;
   readonly placement?: RemoteWorkerPlacementSpec;
@@ -112,13 +113,13 @@ export function parseTaskDefinitionRevisionRef(
   return Object.freeze({ revision, contentDigest });
 }
 
-function canonicalRecord(definition: TaskDefinitionRecord): TaskDefinitionRecord {
+function canonicalRecord(
+  definition: TaskDefinitionRecord,
+): TaskDefinitionRecord {
   try {
     return normalizeTaskDefinitionRecord(definition);
   } catch {
-    throw new InvalidTaskDefinitionCompilationError(
-      'source record is invalid',
-    );
+    throw new InvalidTaskDefinitionCompilationError('source record is invalid');
   }
 }
 
@@ -172,6 +173,7 @@ export function compileCommandTaskDefinition(
   const config = semanticSpec.config as unknown as Readonly<{
     command: LocalDispatchCommand;
     environment: readonly LocalExecutionEnvironmentBinding[];
+    environmentBundleRef?: string;
     workingDirectory?: string;
     timeoutMs?: number;
     placement?: RemoteWorkerPlacementSpec;
@@ -188,6 +190,9 @@ export function compileCommandTaskDefinition(
     sourceContentDigest: source.contentDigest,
     command: config.command,
     environment: config.environment,
+    ...(config.environmentBundleRef === undefined
+      ? {}
+      : { environmentBundleRef: config.environmentBundleRef }),
     ...(config.workingDirectory === undefined
       ? {}
       : { workingDirectory: config.workingDirectory }),
@@ -202,6 +207,9 @@ export function compileLocalCommandTaskDefinition(
   semanticRegistry: TaskSpecSemanticRegistry,
 ): LocalCommandTaskExecutionPlan {
   const source = compileCommandTaskDefinition(definition, semanticRegistry);
+  if (source.environmentBundleRef !== undefined) {
+    throw new UnsupportedTaskDefinitionCompilationError();
+  }
   const contextRecipe = createLocalExecutionContextRecipe({
     environment: source.environment,
     createdAtMs: source.createdAtMs,

@@ -6,9 +6,7 @@ const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 
-const {
-  createSecretRef,
-} = require('@qinglong/runtime-core/secret-reference');
+const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
 const {
   ClusterMountedSecretProviderError,
   createClusterMountedSecretProvider,
@@ -37,6 +35,7 @@ function authority() {
     leaseGeneration: 1,
     leaseVersion: 1,
     secretRefs: Object.freeze([SECRET_REF]),
+    environmentBundleRefs: Object.freeze([]),
   });
 }
 

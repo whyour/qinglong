@@ -110,6 +110,9 @@
       "secret-projection": [
         "dist/secret/secretProjection.d.ts"
       ],
+      "environment-bundle": [
+        "dist/secret/environmentBundle.d.ts"
+      ],
       "plugin-package-task-reconciliation": [
         "dist/plugin-package/pluginPackageTaskReconciliation.d.ts"
       ],
@@ -469,6 +472,11 @@
       "types": "./dist/secret/secretProjection.d.ts",
       "require": "./dist/secret/secretProjection.js",
       "default": "./dist/secret/secretProjection.js"
+    },
+    "./environment-bundle": {
+      "types": "./dist/secret/environmentBundle.d.ts",
+      "require": "./dist/secret/environmentBundle.js",
+      "default": "./dist/secret/environmentBundle.js"
     },
     "./plugin-package-task-reconciliation": {
       "types": "./dist/plugin-package/pluginPackageTaskReconciliation.d.ts",

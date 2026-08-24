@@ -1,6 +1,7 @@
 // Remote Execution owns mounted Secret resolution for authenticated delivery.
 import {
   MAX_REMOTE_SECRET_DELIVERY_TOTAL_VALUE_BYTES,
+  MAX_REMOTE_ENVIRONMENT_BUNDLE_VALUE_BYTES,
   MAX_REMOTE_SECRET_VALUE_BYTES,
   normalizeRemoteWorkerSecretDeliveryAuthority,
   type RemoteWorkerSecretDeliveryAuthority,
@@ -82,7 +83,7 @@ export class ClusterMountedSecretProvider
       this.reader = new PrivateProjectedFileReader({
         rootDirectory: options.rootDirectory,
         minimumBytes: 0,
-        maximumBytes: MAX_REMOTE_SECRET_VALUE_BYTES,
+        maximumBytes: MAX_REMOTE_ENVIRONMENT_BUNDLE_VALUE_BYTES,
         access: 'private_material',
       });
     } catch (error) {
@@ -116,6 +117,7 @@ export class ClusterMountedSecretProvider
     const buffers: Buffer[] = [];
     try {
       const values = [];
+      const environmentBundles = [];
       let totalBytes = 0;
       for (const secretRef of normalized.secretRefs) {
         const bytes = await this.reader
@@ -127,6 +129,9 @@ export class ClusterMountedSecretProvider
             );
           });
         buffers.push(bytes);
+        if (bytes.byteLength > MAX_REMOTE_SECRET_VALUE_BYTES) {
+          throw new ClusterMountedSecretProviderError('material_unavailable');
+        }
         totalBytes += bytes.byteLength;
         if (totalBytes > MAX_REMOTE_SECRET_DELIVERY_TOTAL_VALUE_BYTES) {
           throw new ClusterMountedSecretProviderError('material_unavailable');
@@ -138,9 +143,27 @@ export class ClusterMountedSecretProvider
           }),
         );
       }
+      for (const secretRef of normalized.environmentBundleRefs) {
+        const bytes = await this.reader
+          .read(clusterMountedSecretFileName(secretRef))
+          .catch((error) => {
+            throw new ClusterMountedSecretProviderError(
+              'material_unavailable',
+              { cause: error },
+            );
+          });
+        buffers.push(bytes);
+        environmentBundles.push(
+          Object.freeze({
+            secretRef,
+            value: secretValue(bytes),
+          }),
+        );
+      }
       let disposed = false;
       return Object.freeze({
         values: Object.freeze(values),
+        environmentBundles: Object.freeze(environmentBundles),
         dispose() {
           if (disposed) return;
           disposed = true;

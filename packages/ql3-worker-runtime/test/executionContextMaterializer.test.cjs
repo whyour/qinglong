@@ -11,9 +11,11 @@ const {
 const {
   digestRunDispatchLeaseToken,
 } = require('@qinglong/runtime-core/run-dispatch-lease');
+const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
 const {
-  createSecretRef,
-} = require('@qinglong/runtime-core/secret-reference');
+  ENVIRONMENT_BUNDLE_SCHEMA,
+  serializeEnvironmentBundle,
+} = require('@qinglong/runtime-core/environment-bundle');
 const {
   BoundedWorkerRemoteExecutionContextMaterializer,
 } = require('../dist/remote-execution/remoteOfferDeliveryEntrypoint');
@@ -27,7 +29,7 @@ function secret(name) {
   return createSecretRef({ projectId: 'project-1', name });
 }
 
-function offer(environment) {
+function offer(environment, environmentBundleRef) {
   const executionRevision = createClusterTaskExecutionRevision({
     projectId: 'project-1',
     taskId: 'task-1',
@@ -38,6 +40,7 @@ function offer(environment) {
     planSchema: 'qinglong/command-execution@v1',
     command: { kind: 'argv', file: '/bin/true', args: [] },
     environment,
+    ...(environmentBundleRef === undefined ? {} : { environmentBundleRef }),
     createdAtMs: 1,
   });
   return createClusterRemoteExecutionOffer({
@@ -100,7 +103,10 @@ test('resolves deduplicated Secrets before allocating one Attempt log', async ()
         secretRequest = request;
         return {
           values: [{ secretRef, value: 'resolved-value' }],
-          dispose() { events.push('dispose-secrets'); },
+          environmentBundles: [],
+          dispose() {
+            events.push('dispose-secrets');
+          },
         };
       },
     },
@@ -110,8 +116,13 @@ test('resolves deduplicated Secrets before allocating one Attempt log', async ()
         artifactRequest = request;
         return {
           logArtifactId: 'remote-log-1',
-          takeOutput() { events.push('take-output'); return output; },
-          release() { events.push('release-artifact'); },
+          takeOutput() {
+            events.push('take-output');
+            return output;
+          },
+          release() {
+            events.push('release-artifact');
+          },
         };
       },
     },
@@ -129,6 +140,7 @@ test('resolves deduplicated Secrets before allocating one Attempt log', async ()
     offerId: 'offer-materializer-1',
     executionDigest: acceptedOffer.executionDigest,
     secretRefs: [secretRef],
+    environmentBundleRefs: [],
   });
   assert.deepEqual(artifactRequest, {
     projectId: 'project-1',
@@ -136,7 +148,10 @@ test('resolves deduplicated Secrets before allocating one Attempt log', async ()
     attemptId: 'attempt-1',
     offerId: 'offer-materializer-1',
   });
-  assert.equal(JSON.stringify([secretRequest, artifactRequest]).includes(LEASE_TOKEN), false);
+  assert.equal(
+    JSON.stringify([secretRequest, artifactRequest]).includes(LEASE_TOKEN),
+    false,
+  );
   assert.deepEqual(context.environment, [
     { name: 'PUBLIC', value: 'visible' },
     { name: 'SECRET_A', value: 'resolved-value' },
@@ -149,18 +164,26 @@ test('resolves deduplicated Secrets before allocating one Attempt log', async ()
   await context.dispose();
   await context.dispose();
   assert.deepEqual(events.slice(2).sort(), [
-    'dispose-secrets', 'release-artifact', 'take-output',
+    'dispose-secrets',
+    'release-artifact',
+    'take-output',
   ]);
 });
 
 test('fails before Artifact allocation when Secret authority is unavailable', async () => {
   let artifacts = 0;
   const materializer = new BoundedWorkerRemoteExecutionContextMaterializer({
-    artifacts: { async prepare() { artifacts += 1; } },
+    artifacts: {
+      async prepare() {
+        artifacts += 1;
+      },
+    },
   });
   await assert.rejects(
     materializer.prepare({
-      offer: offer([{ name: 'SECRET', kind: 'secret', secretRef: secret('one') }]),
+      offer: offer([
+        { name: 'SECRET', kind: 'secret', secretRef: secret('one') },
+      ]),
     }),
     /secret_unavailable/,
   );
@@ -179,11 +202,18 @@ test('disposes malformed Secret and Artifact responses without exposing values',
             { secretRef, value: 'first' },
             { secretRef, value: 'duplicate' },
           ],
-          dispose() { disposedSecrets += 1; },
+          environmentBundles: [],
+          dispose() {
+            disposedSecrets += 1;
+          },
         };
       },
     },
-    artifacts: { async prepare() { throw new Error('must not allocate'); } },
+    artifacts: {
+      async prepare() {
+        throw new Error('must not allocate');
+      },
+    },
   });
   await assert.rejects(
     malformedSecrets.prepare({
@@ -196,16 +226,20 @@ test('disposes malformed Secret and Artifact responses without exposing values',
   );
   assert.equal(disposedSecrets, 1);
 
-  const malformedArtifact = new BoundedWorkerRemoteExecutionContextMaterializer({
-    artifacts: {
-      async prepare() {
-        return {
-          logArtifactId: 'x'.repeat(37),
-          release() { releasedArtifact += 1; },
-        };
+  const malformedArtifact = new BoundedWorkerRemoteExecutionContextMaterializer(
+    {
+      artifacts: {
+        async prepare() {
+          return {
+            logArtifactId: 'x'.repeat(37),
+            release() {
+              releasedArtifact += 1;
+            },
+          };
+        },
       },
     },
-  });
+  );
   await assert.rejects(
     malformedArtifact.prepare({
       offer: offer([{ name: 'PUBLIC', kind: 'public', value: 'visible' }]),
@@ -231,11 +265,18 @@ test('enforces the resolved environment byte budget before Artifact allocation',
             secretRef,
             value: 'x'.repeat(16 * 1024),
           })),
-          dispose() { disposed += 1; },
+          environmentBundles: [],
+          dispose() {
+            disposed += 1;
+          },
         };
       },
     },
-    artifacts: { async prepare() { artifacts += 1; } },
+    artifacts: {
+      async prepare() {
+        artifacts += 1;
+      },
+    },
   });
   await assert.rejects(
     materializer.prepare({ offer: offer(bindings) }),
@@ -243,4 +284,70 @@ test('enforces the resolved environment byte budget before Artifact allocation',
   );
   assert.equal(disposed, 1);
   assert.equal(artifacts, 0);
+});
+
+test('expands one opaque bundle in memory and rejects name collisions', async () => {
+  const environmentBundleRef = createSecretRef({
+    projectId: 'project-1',
+    name: 'legacy-env-bundle',
+    version: 2,
+  });
+  const bundle = serializeEnvironmentBundle({
+    schema: ENVIRONMENT_BUNDLE_SCHEMA,
+    entries: [
+      { name: 'LEGACY_TOKEN', value: 'private' },
+      { name: 'LEGACY_MODE', value: 'compat' },
+    ],
+  });
+  const materializer = new BoundedWorkerRemoteExecutionContextMaterializer({
+    secrets: {
+      async resolve(request) {
+        assert.deepEqual(request.secretRefs, []);
+        assert.deepEqual(request.environmentBundleRefs, [environmentBundleRef]);
+        return {
+          values: [],
+          environmentBundles: [
+            { secretRef: environmentBundleRef, value: bundle },
+          ],
+        };
+      },
+    },
+    artifacts: {
+      async prepare() {
+        return {
+          logArtifactId: 'remote-log-bundle',
+          takeOutput() {
+            return {
+              logArtifactId: 'remote-log-bundle',
+              async write() {},
+              async close() {},
+            };
+          },
+          async release() {},
+        };
+      },
+    },
+  });
+  const context = await materializer.prepare({
+    offer: offer(
+      [{ name: 'PUBLIC', kind: 'public', value: 'visible' }],
+      environmentBundleRef,
+    ),
+  });
+  assert.deepEqual(context.environment, [
+    { name: 'PUBLIC', value: 'visible' },
+    { name: 'LEGACY_MODE', value: 'compat' },
+    { name: 'LEGACY_TOKEN', value: 'private' },
+  ]);
+  await context.dispose();
+
+  await assert.rejects(
+    materializer.prepare({
+      offer: offer(
+        [{ name: 'LEGACY_MODE', kind: 'public', value: 'current' }],
+        environmentBundleRef,
+      ),
+    }),
+    /secret_response_invalid/,
+  );
 });

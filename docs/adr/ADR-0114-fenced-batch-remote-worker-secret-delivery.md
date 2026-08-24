@@ -5,6 +5,10 @@
 - 关联 RFC：QL-RFC-0001 D-24、D-72、D-85、D-109、D-111、D-112、D-113
 - 关联 ADR：ADR-0058、ADR-0073、ADR-0108、ADR-0109、ADR-0110、ADR-0113
 
+> 2026-08-24：ADR-0496 为 Cluster Legacy Env 增加 typed environment bundle，wire 已升级为
+> `qinglong/remote-secret-delivery@v2`。本 ADR 的 v1 普通 Secret 围栏、顺序与预算语义继续有效；
+> v2 的双 ref-set、96 KiB bundle carrier 和 256 KiB response cap 以 ADR-0496 为准。
+
 ## 背景
 
 ADR-0113 已固定 Secret-before-Artifact 的 Worker materializer，但只留下抽象 provider。
@@ -20,11 +24,12 @@ Attempt 或被篡改 execution revision 都可能重放同一 Secret capability�
 
 ### 1. 使用一个 exact versioned 批量协议
 
-协议固定为 `qinglong/remote-secret-delivery@v1`。单次 request 最多 64 KiB、64 个唯一
-`qlsecret:v1` reference；response 最多 128 KiB，单值最多 16 KiB、值总量最多 64 KiB。
-response 必须按请求顺序返回 exact `{secretRef,value}`，并回绑 Run、Attempt、offer 与
-execution digest；未知字段、缺项、乱序、重复、跨 Project reference、NUL、超限或身份
-漂移全部 fail closed。
+当前协议为 `qinglong/remote-secret-delivery@v2`；原 v1 是普通 Secret-only 的历史基线。
+单次 request 最多 64 KiB，分为最多 64 个唯一普通 `secretRefs` 与最多一个
+`environmentBundleRefs`，两组不得重叠；response 最多 256 KiB。普通单值最多 16 KiB、值总量
+最多 64 KiB，bundle carrier 最多 96 KiB。response 必须按两组请求顺序分别返回 exact
+`{secretRef,value}`，并回绑 Run、Attempt、offer 与 execution digest；未知字段、缺项、乱序、
+重复、跨 Project reference、NUL、超限或身份漂移全部 fail closed。
 
 Worker 继续复用 ADR-0112 的单一 `WorkerIngressHttpsClient`、TLS 1.3 mTLS credential
 provider 与最多一个 keep-alive socket。现有 offer/activation 的默认 request 上限保持
@@ -39,13 +44,13 @@ provider 与最多一个 keep-alive socket。现有 offer/activation 的默认 r
 - Run、Attempt、Project、Task 与 pinned Task revision；
 - offer ID 与 execution digest；
 - Lease generation、token 与 expected version；
-- 完整且有序的 SecretRef 集合。
+- 完整且有序的普通 SecretRef 与 environment bundle SecretRef 两组集合。
 
 runtime authority repository 在 Attempt advisory transaction lock 下使用 PostgreSQL 时钟，
 要求 Run=`dispatching`、Attempt=`starting`、executor=`remote_worker`、Session 为当前
 `online|draining` 且未过期、Lease=`leased` 且未过期，并逐项比较 Attempt/Session/Lease
 中的 worker、generation、offer、token digest 与 version。随后重新规范化 immutable
-`task_execution_revisions.plan_json`，要求 execution digest 与 SecretRef 集合完全一致。
+`task_execution_revisions.plan_json`，要求 execution digest 与两组 SecretRef 集合完全一致。
 任一漂移都在调用明文 provider 前拒绝。
 
 同一仍然有效的 starting fence 可以因网络丢包进行幂等重试；它不产生“已消费”事实。

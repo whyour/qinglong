@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const {
   CLUSTER_LEGACY_ENV_MIGRATION_PLAN_SCHEMA,
   MAX_CLUSTER_LEGACY_ENV_EFFECTIVE_BYTES,
+  MAX_CLUSTER_LEGACY_ENV_EFFECTIVE_BINDINGS,
   MAX_CLUSTER_LEGACY_ENV_SOURCE_ROWS,
   MAX_CLUSTER_LEGACY_ENV_TASKS,
   MAX_CLUSTER_LEGACY_ENV_TRIGGERS,
@@ -109,6 +110,15 @@ test('enforces source consistency and router-safe bounded targets', () => {
       source: {
         ...intent().source,
         sourceRowCount: MAX_CLUSTER_LEGACY_ENV_SOURCE_ROWS + 1,
+      },
+    },
+    {
+      source: {
+        ...intent().source,
+        sourceRowCount: MAX_CLUSTER_LEGACY_ENV_EFFECTIVE_BINDINGS + 1,
+        activeRowCount: MAX_CLUSTER_LEGACY_ENV_EFFECTIVE_BINDINGS + 1,
+        disabledRowCount: 0,
+        effectiveBindingCount: MAX_CLUSTER_LEGACY_ENV_EFFECTIVE_BINDINGS + 1,
       },
     },
     {

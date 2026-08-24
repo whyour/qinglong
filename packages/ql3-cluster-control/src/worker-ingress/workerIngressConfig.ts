@@ -519,9 +519,9 @@ export function loadClusterWorkerIngressConfig(
       maxResponseBytes: integerValue(
         environment,
         'QL3_WORKER_INGRESS_MAX_RESPONSE_BYTES',
-        64 * 1024,
+        256 * 1024,
         1024,
-        64 * 1024,
+        256 * 1024,
       ),
       maxInFlightRequests: integerValue(
         environment,

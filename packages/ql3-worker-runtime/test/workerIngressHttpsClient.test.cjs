@@ -267,9 +267,18 @@ test('disposes provider-owned credential material on success and rejection', asy
       rejected.postJson({
         path: COMPLETION_PATH,
         body: {},
-        maximumResponseBytes: 1024,
+        maximumResponseBytes: 256 * 1024,
       }),
       /credentials_unavailable/,
+    );
+    assert.equal(rejectedDisposals, 1);
+    await assert.rejects(
+      rejected.postJson({
+        path: COMPLETION_PATH,
+        body: {},
+        maximumResponseBytes: 256 * 1024 + 1,
+      }),
+      /request_rejected/,
     );
     assert.equal(rejectedDisposals, 1);
   } finally {

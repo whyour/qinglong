@@ -1,14 +1,19 @@
-import { digestRunDispatchLeaseToken, assertRunDispatchId } from '../run/runDispatchLease';
+import {
+  digestRunDispatchLeaseToken,
+  assertRunDispatchId,
+} from '../run/runDispatchLease';
 import { parseSecretRef } from '../secret/secretReference';
 import { assertWorkerId, assertWorkerSessionId } from '../worker/workerSession';
 
 export const REMOTE_SECRET_DELIVERY_SCHEMA =
-  'qinglong/remote-secret-delivery@v1';
+  'qinglong/remote-secret-delivery@v2';
 export const MAX_REMOTE_SECRET_DELIVERY_REFS = 64;
+export const MAX_REMOTE_ENVIRONMENT_BUNDLE_REFS = 1;
 export const MAX_REMOTE_SECRET_DELIVERY_REQUEST_BYTES = 64 * 1024;
-export const MAX_REMOTE_SECRET_DELIVERY_RESPONSE_BYTES = 128 * 1024;
+export const MAX_REMOTE_SECRET_DELIVERY_RESPONSE_BYTES = 256 * 1024;
 export const MAX_REMOTE_SECRET_VALUE_BYTES = 16 * 1024;
 export const MAX_REMOTE_SECRET_DELIVERY_TOTAL_VALUE_BYTES = 64 * 1024;
+export const MAX_REMOTE_ENVIRONMENT_BUNDLE_VALUE_BYTES = 96 * 1024;
 
 export interface RemoteWorkerSecretDeliveryCommand {
   readonly workerId: string;
@@ -25,6 +30,7 @@ export interface RemoteWorkerSecretDeliveryCommand {
   readonly leaseToken: string;
   readonly expectedLeaseVersion: number;
   readonly secretRefs: readonly string[];
+  readonly environmentBundleRefs: readonly string[];
 }
 
 export type RemoteWorkerSecretDeliveryRequestBody = Readonly<
@@ -47,6 +53,7 @@ export interface RemoteWorkerSecretDeliveryAuthority {
   readonly leaseGeneration: number;
   readonly leaseVersion: number;
   readonly secretRefs: readonly string[];
+  readonly environmentBundleRefs: readonly string[];
 }
 
 export interface RemoteWorkerSecretValue {
@@ -56,6 +63,7 @@ export interface RemoteWorkerSecretValue {
 
 export interface RemoteWorkerSecretResolution {
   readonly values: readonly RemoteWorkerSecretValue[];
+  readonly environmentBundles: readonly RemoteWorkerSecretValue[];
   readonly dispose?: () => Promise<void> | void;
 }
 
@@ -77,6 +85,7 @@ export interface RemoteWorkerSecretDeliveryResult {
   readonly offerId: string;
   readonly executionDigest: string;
   readonly values: readonly RemoteWorkerSecretValue[];
+  readonly environmentBundles: readonly RemoteWorkerSecretValue[];
   readonly dispose?: () => Promise<void> | void;
 }
 
@@ -134,7 +143,8 @@ function exactKeys(
   if (
     actual.length !== sorted.length ||
     actual.some((key, index) => key !== sorted[index])
-  ) invalid(`${label} shape is invalid`);
+  )
+    invalid(`${label} shape is invalid`);
 }
 
 function identifier(label: string, value: unknown, maximum = 128): string {
@@ -143,7 +153,8 @@ function identifier(label: string, value: unknown, maximum = 128): string {
     value.length < 1 ||
     Buffer.byteLength(value, 'utf8') > maximum ||
     /[\u0000-\u001f\u007f]/.test(value)
-  ) return invalid(`${label} is invalid`);
+  )
+    return invalid(`${label} is invalid`);
   return value;
 }
 
@@ -152,19 +163,18 @@ function positiveInteger(label: string, value: unknown, minimum = 1): number {
     !Number.isSafeInteger(value) ||
     (value as number) < minimum ||
     (value as number) > 2_147_483_647
-  ) return invalid(`${label} is invalid`);
+  )
+    return invalid(`${label} is invalid`);
   return value as number;
 }
 
 function normalizeSecretRefs(
   value: unknown,
   projectId: string,
+  maximum: number,
 ): readonly string[] {
-  if (
-    !Array.isArray(value) ||
-    value.length < 1 ||
-    value.length > MAX_REMOTE_SECRET_DELIVERY_REFS
-  ) return invalid('secretRefs are invalid');
+  if (!Array.isArray(value) || value.length > maximum)
+    return invalid('secretRefs are invalid');
   const seen = new Set<string>();
   const refs = value.map((entry) => {
     if (typeof entry !== 'string' || seen.has(entry)) {
@@ -188,11 +198,27 @@ export function normalizeRemoteWorkerSecretDeliveryCommand(
   value: RemoteWorkerSecretDeliveryCommand,
 ): Readonly<RemoteWorkerSecretDeliveryCommand> {
   const command = object(value, 'command');
-  exactKeys(command, [
-    'attemptId', 'executionDigest', 'expectedLeaseVersion', 'leaseGeneration',
-    'leaseToken', 'offerId', 'projectId', 'runId', 'secretRefs', 'taskId',
-    'taskRevision', 'workerGeneration', 'workerId', 'workerSessionId',
-  ], 'command');
+  exactKeys(
+    command,
+    [
+      'attemptId',
+      'environmentBundleRefs',
+      'executionDigest',
+      'expectedLeaseVersion',
+      'leaseGeneration',
+      'leaseToken',
+      'offerId',
+      'projectId',
+      'runId',
+      'secretRefs',
+      'taskId',
+      'taskRevision',
+      'workerGeneration',
+      'workerId',
+      'workerSessionId',
+    ],
+    'command',
+  );
   try {
     assertWorkerId(command.workerId as string);
     assertWorkerSessionId(command.workerSessionId as string);
@@ -206,7 +232,10 @@ export function normalizeRemoteWorkerSecretDeliveryCommand(
   const normalized = Object.freeze({
     workerId: command.workerId as string,
     workerSessionId: command.workerSessionId as string,
-    workerGeneration: positiveInteger('workerGeneration', command.workerGeneration),
+    workerGeneration: positiveInteger(
+      'workerGeneration',
+      command.workerGeneration,
+    ),
     runId: command.runId as string,
     attemptId: command.attemptId as string,
     projectId,
@@ -214,13 +243,38 @@ export function normalizeRemoteWorkerSecretDeliveryCommand(
     taskRevision: identifier('taskRevision', command.taskRevision),
     executionDigest: identifier('executionDigest', command.executionDigest, 64),
     offerId: command.offerId as string,
-    leaseGeneration: positiveInteger('leaseGeneration', command.leaseGeneration),
+    leaseGeneration: positiveInteger(
+      'leaseGeneration',
+      command.leaseGeneration,
+    ),
     leaseToken: identifier('leaseToken', command.leaseToken, 128),
     expectedLeaseVersion: positiveInteger(
-      'expectedLeaseVersion', command.expectedLeaseVersion, 0,
+      'expectedLeaseVersion',
+      command.expectedLeaseVersion,
+      0,
     ),
-    secretRefs: normalizeSecretRefs(command.secretRefs, projectId),
+    secretRefs: normalizeSecretRefs(
+      command.secretRefs,
+      projectId,
+      MAX_REMOTE_SECRET_DELIVERY_REFS,
+    ),
+    environmentBundleRefs: normalizeSecretRefs(
+      command.environmentBundleRefs,
+      projectId,
+      MAX_REMOTE_ENVIRONMENT_BUNDLE_REFS,
+    ),
   });
+  if (
+    normalized.secretRefs.length + normalized.environmentBundleRefs.length <
+    1
+  )
+    return invalid('Secret reference set is empty');
+  if (
+    normalized.secretRefs.some((reference) =>
+      normalized.environmentBundleRefs.includes(reference),
+    )
+  )
+    return invalid('Secret reference roles overlap');
   if (!/^[0-9a-f]{64}$/.test(normalized.executionDigest)) {
     return invalid('executionDigest is invalid');
   }
@@ -236,11 +290,26 @@ export function normalizeRemoteWorkerSecretDeliveryAuthority(
   value: RemoteWorkerSecretDeliveryAuthority,
 ): Readonly<RemoteWorkerSecretDeliveryAuthority> {
   const authority = object(value, 'authority');
-  exactKeys(authority, [
-    'attemptId', 'executionDigest', 'leaseGeneration', 'leaseVersion',
-    'offerId', 'projectId', 'runId', 'secretRefs', 'taskId', 'taskRevision',
-    'workerGeneration', 'workerId', 'workerSessionId',
-  ], 'authority');
+  exactKeys(
+    authority,
+    [
+      'attemptId',
+      'environmentBundleRefs',
+      'executionDigest',
+      'leaseGeneration',
+      'leaseVersion',
+      'offerId',
+      'projectId',
+      'runId',
+      'secretRefs',
+      'taskId',
+      'taskRevision',
+      'workerGeneration',
+      'workerId',
+      'workerSessionId',
+    ],
+    'authority',
+  );
   try {
     assertWorkerId(authority.workerId as string);
     assertWorkerSessionId(authority.workerSessionId as string);
@@ -255,7 +324,8 @@ export function normalizeRemoteWorkerSecretDeliveryAuthority(
     workerId: authority.workerId as string,
     workerSessionId: authority.workerSessionId as string,
     workerGeneration: positiveInteger(
-      'workerGeneration', authority.workerGeneration,
+      'workerGeneration',
+      authority.workerGeneration,
     ),
     runId: authority.runId as string,
     attemptId: authority.attemptId as string,
@@ -263,15 +333,38 @@ export function normalizeRemoteWorkerSecretDeliveryAuthority(
     taskId: identifier('taskId', authority.taskId),
     taskRevision: identifier('taskRevision', authority.taskRevision),
     executionDigest: identifier(
-      'executionDigest', authority.executionDigest, 64,
+      'executionDigest',
+      authority.executionDigest,
+      64,
     ),
     offerId: authority.offerId as string,
     leaseGeneration: positiveInteger(
-      'leaseGeneration', authority.leaseGeneration,
+      'leaseGeneration',
+      authority.leaseGeneration,
     ),
     leaseVersion: positiveInteger('leaseVersion', authority.leaseVersion, 0),
-    secretRefs: normalizeSecretRefs(authority.secretRefs, projectId),
+    secretRefs: normalizeSecretRefs(
+      authority.secretRefs,
+      projectId,
+      MAX_REMOTE_SECRET_DELIVERY_REFS,
+    ),
+    environmentBundleRefs: normalizeSecretRefs(
+      authority.environmentBundleRefs,
+      projectId,
+      MAX_REMOTE_ENVIRONMENT_BUNDLE_REFS,
+    ),
   });
+  if (
+    normalized.secretRefs.length + normalized.environmentBundleRefs.length <
+    1
+  )
+    return invalid('Secret reference set is empty');
+  if (
+    normalized.secretRefs.some((reference) =>
+      normalized.environmentBundleRefs.includes(reference),
+    )
+  )
+    return invalid('Secret reference roles overlap');
   if (!/^[0-9a-f]{64}$/.test(normalized.executionDigest)) {
     return invalid('executionDigest is invalid');
   }
@@ -282,59 +375,98 @@ export function createRemoteWorkerSecretDeliveryRequestBody(
   command: RemoteWorkerSecretDeliveryCommand,
 ): RemoteWorkerSecretDeliveryRequestBody {
   const normalized = normalizeRemoteWorkerSecretDeliveryCommand(command);
-  const { workerId: _workerId, workerSessionId: _sessionId, ...request } = normalized;
+  const {
+    workerId: _workerId,
+    workerSessionId: _sessionId,
+    ...request
+  } = normalized;
   return Object.freeze({ schema: REMOTE_SECRET_DELIVERY_SCHEMA, ...request });
 }
 
 function normalizeValues(
   value: unknown,
   expectedRefs: readonly string[],
+  maximumValueBytes: number,
+  maximumTotalBytes: number,
+  label: string,
 ): readonly RemoteWorkerSecretValue[] {
   if (!Array.isArray(value) || value.length !== expectedRefs.length) {
-    return invalid('Secret values are invalid');
+    return invalid(`${label} are invalid`);
   }
   let totalValueBytes = 0;
-  return Object.freeze(value.map((entry, index) => {
-    const item = object(entry, `values[${index}]`);
-    exactKeys(item, ['secretRef', 'value'], `values[${index}]`);
-    if (
-      item.secretRef !== expectedRefs[index] ||
-      typeof item.value !== 'string' ||
-      item.value.includes('\0') ||
-      Buffer.byteLength(item.value, 'utf8') > MAX_REMOTE_SECRET_VALUE_BYTES
-    ) return invalid(`values[${index}] is invalid`);
-    totalValueBytes += Buffer.byteLength(item.value, 'utf8');
-    if (totalValueBytes > MAX_REMOTE_SECRET_DELIVERY_TOTAL_VALUE_BYTES) {
-      return invalid('Secret value byte budget exceeded');
-    }
-    return Object.freeze({
-      secretRef: item.secretRef as string,
-      value: item.value,
-    });
-  }));
+  return Object.freeze(
+    value.map((entry, index) => {
+      const item = object(entry, `values[${index}]`);
+      exactKeys(item, ['secretRef', 'value'], `values[${index}]`);
+      if (
+        item.secretRef !== expectedRefs[index] ||
+        typeof item.value !== 'string' ||
+        item.value.includes('\0') ||
+        Buffer.byteLength(item.value, 'utf8') > maximumValueBytes
+      )
+        return invalid(`values[${index}] is invalid`);
+      totalValueBytes += Buffer.byteLength(item.value, 'utf8');
+      if (totalValueBytes > maximumTotalBytes) {
+        return invalid('Secret value byte budget exceeded');
+      }
+      return Object.freeze({
+        secretRef: item.secretRef as string,
+        value: item.value,
+      });
+    }),
+  );
 }
 
 export function createRemoteWorkerSecretDeliveryResponseBody(
   result: Readonly<RemoteWorkerSecretDeliveryResult>,
-  expectedRefs: readonly string[],
+  expected: Readonly<{
+    secretRefs: readonly string[];
+    environmentBundleRefs: readonly string[];
+  }>,
 ): RemoteWorkerSecretDeliveryResponseBody {
   const value = object(result, 'result');
-  const allowed = ['attemptId', 'dispose', 'executionDigest', 'offerId', 'runId', 'values'];
+  const allowed = [
+    'attemptId',
+    'dispose',
+    'environmentBundles',
+    'executionDigest',
+    'offerId',
+    'runId',
+    'values',
+  ];
   if (Object.keys(value).some((key) => !allowed.includes(key))) {
     return invalid('result shape is invalid');
   }
   const runId = identifier('runId', value.runId, 36);
   const attemptId = identifier('attemptId', value.attemptId, 36);
   const offerId = identifier('offerId', value.offerId, 128);
-  const executionDigest = identifier('executionDigest', value.executionDigest, 64);
-  if (!/^[0-9a-f]{64}$/.test(executionDigest)) invalid('executionDigest is invalid');
+  const executionDigest = identifier(
+    'executionDigest',
+    value.executionDigest,
+    64,
+  );
+  if (!/^[0-9a-f]{64}$/.test(executionDigest))
+    invalid('executionDigest is invalid');
   return Object.freeze({
     schema: REMOTE_SECRET_DELIVERY_SCHEMA,
     runId,
     attemptId,
     offerId,
     executionDigest,
-    values: normalizeValues(value.values, expectedRefs),
+    values: normalizeValues(
+      value.values,
+      expected.secretRefs,
+      MAX_REMOTE_SECRET_VALUE_BYTES,
+      MAX_REMOTE_SECRET_DELIVERY_TOTAL_VALUE_BYTES,
+      'Secret values',
+    ),
+    environmentBundles: normalizeValues(
+      value.environmentBundles,
+      expected.environmentBundleRefs,
+      MAX_REMOTE_ENVIRONMENT_BUNDLE_VALUE_BYTES,
+      MAX_REMOTE_ENVIRONMENT_BUNDLE_VALUE_BYTES,
+      'environment bundles',
+    ),
   });
 }
 
@@ -346,15 +478,18 @@ export function parseRemoteWorkerSecretDeliveryResponse(
     offerId: string;
     executionDigest: string;
     secretRefs: readonly string[];
+    environmentBundleRefs: readonly string[];
   }>,
 ): Readonly<RemoteWorkerSecretDeliveryResult> {
-  const bytes = typeof serialized === 'string'
-    ? Buffer.from(serialized, 'utf8')
-    : Buffer.from(serialized);
+  const bytes =
+    typeof serialized === 'string'
+      ? Buffer.from(serialized, 'utf8')
+      : Buffer.from(serialized);
   if (
     bytes.byteLength < 2 ||
     bytes.byteLength > MAX_REMOTE_SECRET_DELIVERY_RESPONSE_BYTES
-  ) return invalid('response byte size is outside the allowed range');
+  )
+    return invalid('response byte size is outside the allowed range');
   let parsed: unknown;
   try {
     parsed = JSON.parse(bytes.toString('utf8')) as unknown;
@@ -364,30 +499,47 @@ export function parseRemoteWorkerSecretDeliveryResponse(
     bytes.fill(0);
   }
   const response = object(parsed, 'response');
-  exactKeys(response, [
-    'attemptId', 'executionDigest', 'offerId', 'runId', 'schema', 'values',
-  ], 'response');
+  exactKeys(
+    response,
+    [
+      'attemptId',
+      'environmentBundles',
+      'executionDigest',
+      'offerId',
+      'runId',
+      'schema',
+      'values',
+    ],
+    'response',
+  );
   if (response.schema !== REMOTE_SECRET_DELIVERY_SCHEMA) {
     return invalid('response schema is invalid');
   }
-  const result = createRemoteWorkerSecretDeliveryResponseBody({
-    runId: response.runId as string,
-    attemptId: response.attemptId as string,
-    offerId: response.offerId as string,
-    executionDigest: response.executionDigest as string,
-    values: response.values as readonly RemoteWorkerSecretValue[],
-  }, expected.secretRefs);
+  const result = createRemoteWorkerSecretDeliveryResponseBody(
+    {
+      runId: response.runId as string,
+      attemptId: response.attemptId as string,
+      offerId: response.offerId as string,
+      executionDigest: response.executionDigest as string,
+      values: response.values as readonly RemoteWorkerSecretValue[],
+      environmentBundles:
+        response.environmentBundles as readonly RemoteWorkerSecretValue[],
+    },
+    expected,
+  );
   if (
     result.runId !== expected.runId ||
     result.attemptId !== expected.attemptId ||
     result.offerId !== expected.offerId ||
     result.executionDigest !== expected.executionDigest
-  ) return invalid('response authority does not match request');
+  )
+    return invalid('response authority does not match request');
   return Object.freeze({
     runId: result.runId,
     attemptId: result.attemptId,
     offerId: result.offerId,
     executionDigest: result.executionDigest,
     values: result.values,
+    environmentBundles: result.environmentBundles,
   });
 }

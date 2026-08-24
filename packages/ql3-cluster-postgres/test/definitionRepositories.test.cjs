@@ -17,6 +17,7 @@ const {
 const {
   compileClusterCommandTaskDefinition,
 } = require('@qinglong/runtime-core/cluster-execution-revision');
+const { createSecretRef } = require('@qinglong/runtime-core/secret-reference');
 const {
   TaskDefinitionAdministrationAuthorizationFenceConflictError,
   TaskDefinitionAdministrationMutationConflictError,
@@ -445,6 +446,34 @@ test('publishes TaskDefinition atomically and replays the exact mutation', async
     replayFixture.events.some((event) => event.includes('INSERT INTO')),
     false,
   );
+});
+
+test('persists only the pinned environment bundle reference in an execution plan', async () => {
+  const environmentBundleRef = createSecretRef({
+    projectId: TASK_COMMAND.projectId,
+    name: 'legacy-env-bundle',
+    version: 7,
+  });
+  const command = {
+    ...TASK_COMMAND,
+    taskId: 'task-bundle-00001',
+    mutationId: '123e4567-e89b-42d3-a456-426614174021',
+    spec: {
+      ...TASK_COMMAND.spec,
+      config: { ...TASK_COMMAND.spec.config, environmentBundleRef },
+    },
+  };
+  const fixture = appendPool('task');
+  await new PostgresTaskDefinitionRepository(
+    fixture.pool,
+  ).appendTaskDefinitionRevision(command);
+  const insert = fixture.queries.find(({ text }) =>
+    text.includes('INSERT INTO "ql3"."task_execution_revisions"'),
+  );
+  const plan = JSON.parse(insert.values[7]);
+  assert.equal(plan.environmentBundleRef, environmentBundleRef);
+  assert.deepEqual(plan.environment, []);
+  assert.equal(JSON.stringify(plan).includes('LEGACY_ENV_NAME'), false);
 });
 
 test('runs TaskDefinition transaction hooks for create and replay before COMMIT', async () => {

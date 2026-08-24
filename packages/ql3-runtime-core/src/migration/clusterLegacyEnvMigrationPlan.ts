@@ -7,6 +7,7 @@ export const CLUSTER_LEGACY_ENV_MIGRATION_PLAN_SCHEMA =
 export const MAX_CLUSTER_LEGACY_ENV_SOURCE_ROWS = 100_000;
 export const MAX_CLUSTER_LEGACY_ENV_TASKS = 100_000;
 export const MAX_CLUSTER_LEGACY_ENV_TRIGGERS = 500_000;
+export const MAX_CLUSTER_LEGACY_ENV_EFFECTIVE_BINDINGS = 256;
 export const MAX_CLUSTER_LEGACY_ENV_EFFECTIVE_BYTES = 64 * 1024;
 export const MAX_CLUSTER_LEGACY_ENV_MIGRATION_PLAN_JSON_BYTES = 8 * 1024;
 
@@ -207,7 +208,7 @@ function sourceEvidence(
   const effectiveBindingCount = count(
     value.effectiveBindingCount,
     'effectiveBindingCount',
-    MAX_CLUSTER_LEGACY_ENV_SOURCE_ROWS,
+    MAX_CLUSTER_LEGACY_ENV_EFFECTIVE_BINDINGS,
   );
   if (
     sourceRowCount < 1 ||

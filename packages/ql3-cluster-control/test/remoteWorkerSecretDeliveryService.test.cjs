@@ -21,7 +21,7 @@ function command() {
     taskId: 'task-1', taskRevision: 'revision-1', executionDigest: DIGEST,
     offerId: 'offer-1', leaseGeneration: 3,
     leaseToken: 'worker_generated_lease_capability_0000000000000001',
-    expectedLeaseVersion: 4, secretRefs: [SECRET_REF],
+    expectedLeaseVersion: 4, secretRefs: [SECRET_REF], environmentBundleRefs: [],
   };
 }
 
@@ -47,6 +47,7 @@ test('resolves plaintext only after repository authority succeeds', async () => 
       assert.equal('leaseToken' in input, false);
       return {
         values: [{ secretRef: SECRET_REF, value: 'resolved-value' }],
+        environmentBundles: [],
         dispose() { events.push('dispose'); },
       };
     },
@@ -56,6 +57,7 @@ test('resolves plaintext only after repository authority succeeds', async () => 
   assert.deepEqual(result.values, [
     { secretRef: SECRET_REF, value: 'resolved-value' },
   ]);
+  assert.deepEqual(result.environmentBundles, []);
   assert.deepEqual(events, ['authorize', 'resolve']);
   await result.dispose();
   assert.deepEqual(events, ['authorize', 'resolve', 'dispose']);
@@ -101,6 +103,7 @@ test('disposes malformed provider output and converts it to unavailable', async 
     async resolve() {
       return {
         values: [{ secretRef: SECRET_REF, value: 'x'.repeat(17 * 1024) }],
+        environmentBundles: [],
         dispose() { disposed += 1; },
       };
     },
@@ -120,6 +123,7 @@ test('rejects extensible provider output and still invokes valid cleanup', async
     async resolve() {
       return {
         values: [{ secretRef: SECRET_REF, value: 'resolved-value' }],
+        environmentBundles: [],
         dispose() { disposed += 1; },
         diagnostic: 'must-not-cross-boundary',
       };

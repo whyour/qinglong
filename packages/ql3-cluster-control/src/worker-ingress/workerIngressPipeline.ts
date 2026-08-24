@@ -465,7 +465,7 @@ export function createWorkerIngressAdmissionPipeline(
                 'schema', 'runId', 'attemptId', 'projectId', 'taskId',
                 'taskRevision', 'executionDigest', 'workerGeneration',
                 'offerId', 'leaseGeneration', 'leaseToken',
-                'expectedLeaseVersion', 'secretRefs',
+                'expectedLeaseVersion', 'secretRefs', 'environmentBundleRefs',
               ]);
               if (value.schema !== REMOTE_SECRET_DELIVERY_SCHEMA) {
                 throw failure(400, 'invalid_worker_request');
@@ -486,12 +486,16 @@ export function createWorkerIngressAdmissionPipeline(
                   leaseToken: value.leaseToken as string,
                   expectedLeaseVersion: value.expectedLeaseVersion as number,
                   secretRefs: value.secretRefs as string[],
+                  environmentBundleRefs: value.environmentBundleRefs as string[],
                 },
               );
               try {
                 const responseBody = createRemoteWorkerSecretDeliveryResponseBody(
                   delivered,
-                  value.secretRefs as string[],
+                  {
+                    secretRefs: value.secretRefs as string[],
+                    environmentBundleRefs: value.environmentBundleRefs as string[],
+                  },
                 );
                 if (
                   responseBody.runId !== value.runId ||

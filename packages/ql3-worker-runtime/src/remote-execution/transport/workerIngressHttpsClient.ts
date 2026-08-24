@@ -17,7 +17,9 @@ const MAX_TLS_MATERIAL_BYTES = 1024 * 1024;
 const MAX_REQUEST_BYTES = 4096;
 const HARD_MAX_REQUEST_BYTES = 64 * 1024;
 const HARD_MAX_STREAM_REQUEST_BYTES = 64 * 1024 * 1024 + 4 * 1024 + 4;
-const MAX_RESPONSE_BYTES = 128 * 1024;
+// JSON routes retain their own smaller requested caps. The shared ceiling must
+// also admit one bounded environment bundle response.
+const MAX_RESPONSE_BYTES = 256 * 1024;
 const CREDENTIAL_POOL_KEY = Symbol('qinglong.worker-ingress-credential-pool-key');
 
 export const WORKER_INGRESS_ARTIFACT_CONTENT_TYPE =
