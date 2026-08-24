@@ -114,6 +114,17 @@ test('bootstraps jobs that previously depended on local modules or artifacts', (
     'pnpm run build:packages:ql3',
     'pnpm test:cloudnativepg-live:ql3',
   ]);
+
+  const vaultKvLive = jobSource(
+    'cluster-vault-kv-worker-secret-live',
+    'cluster-plugin-package-kubernetes-live',
+  );
+  assertOrdered(vaultKvLive, [
+    'pnpm install --frozen-lockfile --ignore-scripts',
+    'pnpm -r --workspace-concurrency=1',
+    '--filter @qinglong/cluster-control...',
+    'node --test',
+  ]);
 });
 
 test('rebuilds the only native legacy binding used by resource evidence', () => {
