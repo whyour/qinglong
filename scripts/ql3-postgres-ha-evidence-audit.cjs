@@ -15,11 +15,47 @@ const REQUIRED_TIMELINE_STATES = Object.freeze([
   'primary_ready',
   'standby_streaming',
   'synchronous_remote_apply_ready',
+  'cluster_legacy_env_application_replicated',
   'replication_partition_and_promotion_guard_verified',
   'old_primary_fenced_and_admission_withdrawn',
+  'cluster_legacy_env_application_replayed_after_promotion',
   'standby_promoted_old_primary_rejoined_endpoint_switched',
   'two_fresh_control_replicas_ready',
 ]);
+const LEGACY_ENV_APPLICATION_FACT_KEYS = Object.freeze(
+  [
+    'executionContentDigest',
+    'planRows',
+    'receiptDigest',
+    'receiptRows',
+    'scheduleClaimVersion',
+    'scheduleRevision',
+    'scheduleStateVersion',
+    'taskContentDigest',
+    'taskCount',
+    'taskItemRows',
+    'taskRevision',
+    'triggerContentDigest',
+    'triggerCount',
+    'triggerItemRows',
+    'triggerRevision',
+    'triggerTaskContentDigest',
+    'triggerTaskRevision',
+  ].sort(),
+);
+const LEGACY_ENV_APPLICATION_KEYS = Object.freeze(
+  [
+    'contentFree',
+    'durableRowsAddedByReplay',
+    'exactReplayAfterPromotion',
+    'mutationStreamsOpenedAfterPromotion',
+    'primaryBeforePromotion',
+    'promotedAfterReplay',
+    'replayStatus',
+    'replicatedBeforePromotion',
+    'standbyBeforePromotion',
+  ].sort(),
+);
 const FORBIDDEN_MATERIAL = Object.freeze([
   'postgresql://',
   'ql3_migration_test',
@@ -36,6 +72,8 @@ const FORBIDDEN_MATERIAL = Object.freeze([
   'ql3_worker_credential_executor_test',
   'ql3_worker_ingress_test',
   'ql3w_',
+  'qlsecret:v1:',
+  'ha-legacy-env-bundle-private',
 ]);
 
 function isObject(value) {
@@ -249,6 +287,86 @@ function auditPostgresHaEvidence(report) {
       0,
     'UNCOMMITTED_WRITE_SURVIVED',
   );
+
+  const legacyEnvApplication = report.clusterLegacyEnvMigrationApplication;
+  add(
+    isObject(legacyEnvApplication),
+    'CLUSTER_LEGACY_ENV_APPLICATION_EVIDENCE_MISSING',
+  );
+  if (isObject(legacyEnvApplication)) {
+    add(
+      JSON.stringify(Object.keys(legacyEnvApplication).sort()) ===
+        JSON.stringify(LEGACY_ENV_APPLICATION_KEYS),
+      'CLUSTER_LEGACY_ENV_APPLICATION_EVIDENCE_WIDENED',
+    );
+    add(
+      legacyEnvApplication.replicatedBeforePromotion === true,
+      'CLUSTER_LEGACY_ENV_APPLICATION_NOT_REPLICATED',
+    );
+    add(
+      legacyEnvApplication.exactReplayAfterPromotion === true &&
+        legacyEnvApplication.replayStatus === 'existing',
+      'CLUSTER_LEGACY_ENV_APPLICATION_REPLAY_INVALID',
+    );
+    add(
+      legacyEnvApplication.mutationStreamsOpenedAfterPromotion === 0 &&
+        legacyEnvApplication.durableRowsAddedByReplay === 0,
+      'CLUSTER_LEGACY_ENV_APPLICATION_REPLAY_SIDE_EFFECT',
+    );
+    add(
+      legacyEnvApplication.contentFree === true,
+      'CLUSTER_LEGACY_ENV_APPLICATION_EVIDENCE_NOT_CONTENT_FREE',
+    );
+    const factSets = [
+      legacyEnvApplication.primaryBeforePromotion,
+      legacyEnvApplication.standbyBeforePromotion,
+      legacyEnvApplication.promotedAfterReplay,
+    ];
+    for (const facts of factSets) {
+      add(isObject(facts), 'CLUSTER_LEGACY_ENV_APPLICATION_FACTS_INVALID');
+      if (!isObject(facts)) continue;
+      add(
+        JSON.stringify(Object.keys(facts).sort()) ===
+          JSON.stringify(LEGACY_ENV_APPLICATION_FACT_KEYS),
+        'CLUSTER_LEGACY_ENV_APPLICATION_FACTS_WIDENED',
+      );
+      add(
+        facts.planRows === 1 &&
+          facts.receiptRows === 1 &&
+          facts.taskItemRows === 1 &&
+          facts.triggerItemRows === 1 &&
+          facts.taskCount === 1 &&
+          facts.triggerCount === 1 &&
+          facts.taskRevision === 3 &&
+          facts.triggerRevision === 2 &&
+          facts.triggerTaskRevision === 3 &&
+          facts.scheduleRevision === 2 &&
+          facts.scheduleStateVersion === 1 &&
+          facts.scheduleClaimVersion === 1,
+        'CLUSTER_LEGACY_ENV_APPLICATION_FACTS_DRIFTED',
+      );
+      for (const key of [
+        'receiptDigest',
+        'taskContentDigest',
+        'executionContentDigest',
+        'triggerContentDigest',
+        'triggerTaskContentDigest',
+      ]) {
+        add(
+          typeof facts[key] === 'string' && SHA256_PATTERN.test(facts[key]),
+          'CLUSTER_LEGACY_ENV_APPLICATION_DIGEST_INVALID',
+        );
+      }
+    }
+    add(
+      factSets.every(
+        (facts) =>
+          isObject(facts) &&
+          JSON.stringify(facts) === JSON.stringify(factSets[0]),
+      ),
+      'CLUSTER_LEGACY_ENV_APPLICATION_FACTS_NOT_EXACT',
+    );
+  }
 
   const gates = report.gates;
   add(isObject(gates), 'GATES_MISSING');

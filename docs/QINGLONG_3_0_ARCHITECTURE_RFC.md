@@ -88,7 +88,7 @@
 
   D-385～D-388 的 `config.sh`/Keyv/SSH data-directory lineage 与 SQLite `Envs` 保持分离；当前无稳定生产 schema 的历史 `Configs` 表继续 sealed+manual，
   不猜字段。ADR-0494 已关闭基础 Cluster mounted-files provider live 子门；后续切片仍必须完成固定低性能设备的真实 Edge 空间/写放大/断电证据，
-  以及 Cluster Legacy Env migration 的专用 PostgreSQL SERIALIZABLE ledger、Task/Trigger revision mutation、直接外部 custody adapter 与 HA promotion 后 receipt replay。D-397 apply
+  以及 Cluster Legacy Env migration 的专用 PostgreSQL SERIALIZABLE ledger、Task/Trigger revision mutation 与直接外部 custody adapter。HA promotion 后 receipt replay 已由 D-403/ADR-0498 关闭。D-397 apply
   只声明 sealed source retained 且 `physicalErasureGuaranteed=false`；明文销毁必须在 restart/
   readiness、观察窗和 rollback retention 之后另行强认证。Cluster 必须使用 PostgreSQL SERIALIZABLE ledger、外部 KMS/Secret provider 与 HA evidence，
   不复用 Local SQLite/POSIX authority，也不得把明文写入 PostgreSQL、ConfigMap、Pod env 或 Job command。
@@ -174,8 +174,33 @@
   `a7c8a05e08c748d677475a09ce2998b741ed9326e27678613e93d431bc3769aa`；
   真实用例覆盖 Trigger 固定 Task r1、Task current r2、原子生成 Task r3/Trigger r2 并重定向 pin，
   同时证明 bundle ref-only execution、schedule reset、无流消费 replay 与数据库角色隔离。D-402
-  关闭 mutation/receipt 边界；direct external custody、promotion 后 receipt replay 和固定低性能 Edge
-  物理证据仍是 ADR-0491 转 Accepted 前的门禁。
+  关闭 mutation/receipt 边界；相邻 D-403 已继续关闭 promotion 后 receipt replay，direct external
+  custody 与固定低性能 Edge 物理证据仍是 ADR-0491 转 Accepted 前的门禁。
+
+- D-403/ADR-0498（已验收）：ADR-0497 application receipt 已进入真实 PostgreSQL 18 physical HA
+  领域门，而不是继续引用通用表存活作为间接证据。主库与 standby 达到
+  `synchronous_commit=remote_apply`/`sync_state=sync` 后，Automation Manager 提交真实 plan 与
+  application；standby 在 recovery 中读取的 receipt、逐项 ledger、Task r3/execution、Trigger r2 与
+  schedule fence 共 17 项 content-free facts 与主库完全一致。随后门禁制造 replication partition、
+  fence 旧主库、把 standby 晋升到 timeline 2，并以 `pg_rewind --write-recovery-conf` 将旧主库重接为
+  同步 standby。
+
+  写入能力恢复后，新的 Automation Manager Pool 重放同一 intent，必须返回 `existing`；Task/Trigger
+  mutation stream factory 打开次数均为 0，application/Task/Trigger ledger 新增行均为 0，晋升后 17 项
+  facts 仍与主库/standby 逐字段相同。独立 fixture 保持 disabled cron Trigger，避免污染 HA scheduler
+  场景的候选集，但仍真实验证 schedule revision、state/claim fence 与 reset。HA private report 只包含
+  count/revision/version/digest；evidence audit 强制 exact key set、三份 facts 同一性、两个 timeline state、
+  replay side-effect 为零，并把 fixture SecretRef marker 加入 forbidden material。
+
+  PostgreSQL 18.6 arm64 HA 为 147/147 gates、timeline `1→2`，独立 audit 为
+  `compatible=true/findings=[]`，最终报告 SHA-256 为
+  `8bb61bc126ba96e7d4e20b1bfad4db960768c03473744d9d24e11b1b5b1a9286`。本切片不改 production
+  source、schema/migration/ACL、package、依赖、镜像或 Edge import；完整 backend 为
+  `1569 total / 1567 pass / 2 conditional skip / 0 fail`，四项 package/依赖/import 边界均 compatible。
+  基础 Edge/Standalone 仍只包含 Local SQLite、runtime-core 与 SemVer，均为 325 files/58 modules，
+  大小 `2,669,390 / 2,669,468 bytes`，距 4 MiB 上限保留 `1,524,914 / 1,524,836 bytes`；它只证明
+  常驻闭包未扩大，不冒充真实设备证据。D-403 关闭 promotion replay；ADR-0491 现在只剩 direct
+  external custody 与固定低性能 Edge 空间/写放大/断电恢复两项硬门。
 
 - D-396/ADR-0490（已验收）：Run History 不再只有永久 `manual_external`，但也没有被错误实现为 Legacy 日志到 3.0 Run ledger 的回灌。
   新的 Local adapter 以 ADR-0482 sealed capture bundle 作为 append-only 保全资产：Legacy history 必须逐事实选择 `retain_both`，Target history

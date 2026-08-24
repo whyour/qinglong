@@ -380,6 +380,11 @@ const {
   verifyPromotedCancellationDispatchHaFixture,
 } = require('./ql3-postgres-ha-cancellation-dispatch-fixture.cjs');
 const {
+  clusterLegacyEnvMigrationApplicationFacts,
+  persistClusterLegacyEnvMigrationApplicationBeforePromotion,
+  verifyPromotedClusterLegacyEnvMigrationApplication,
+} = require('./ql3-postgres-ha-legacy-env-application-fixture.cjs');
+const {
   activateInstall,
   pluginPackageTaskReconciliationFixture,
   publisherProvenanceInstallRepository,
@@ -11405,6 +11410,7 @@ async function main(argv = process.argv.slice(2)) {
   let runAttemptLogRetention;
   let manualRunRetry;
   let cancellationDispatch;
+  let clusterLegacyEnvMigrationApplication;
   const startedAt = performance.now();
   const timeline = [];
   let report;
@@ -11918,6 +11924,43 @@ async function main(argv = process.argv.slice(2)) {
     }, 'synchronous standby readiness');
     timeline.push({
       state: 'synchronous_remote_apply_ready',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+    const legacyEnvAutomationDatabase = await databaseOpener(
+      'automation-manager',
+      databaseUrl(
+        AUTOMATION_MANAGER_USER,
+        AUTOMATION_MANAGER_PASSWORD,
+        primaryPort,
+      ),
+      'ql3-ha-legacy-env-application-primary',
+    )();
+    try {
+      clusterLegacyEnvMigrationApplication =
+        await persistClusterLegacyEnvMigrationApplicationBeforePromotion({
+          migrationPool: primaryDatabase.pool,
+          automationPool: legacyEnvAutomationDatabase.pool,
+        });
+    } finally {
+      await legacyEnvAutomationDatabase.close();
+    }
+    const replicatedLegacyEnvApplication = await waitFor(async () => {
+      const facts = await clusterLegacyEnvMigrationApplicationFacts(
+        standbyDatabase.pool,
+        clusterLegacyEnvMigrationApplication.fixture,
+      );
+      return JSON.stringify(facts) ===
+        JSON.stringify(
+          clusterLegacyEnvMigrationApplication.report.primaryBeforePromotion,
+        )
+        ? facts
+        : null;
+    }, 'Cluster Legacy Env migration application WAL replay');
+    clusterLegacyEnvMigrationApplication.report.standbyBeforePromotion =
+      replicatedLegacyEnvApplication;
+    clusterLegacyEnvMigrationApplication.report.replicatedBeforePromotion = true;
+    timeline.push({
+      state: 'cluster_legacy_env_application_replicated',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
     });
     await waitFor(async () => {
@@ -13465,11 +13508,20 @@ async function main(argv = process.argv.slice(2)) {
         database: recoveredAutomationManagerDatabase,
         report: automationManagementInspection,
       });
+      await verifyPromotedClusterLegacyEnvMigrationApplication({
+        automationPool: recoveredAutomationManagerDatabase.pool,
+        promotedPool: promotedDatabase.pool,
+        evidence: clusterLegacyEnvMigrationApplication,
+      });
     } finally {
       await recoveredAutomationManagerDatabase.close();
     }
     timeline.push({
       state: 'automation_management_inspection_survived_promotion',
+      atMs: Number((performance.now() - startedAt).toFixed(3)),
+    });
+    timeline.push({
+      state: 'cluster_legacy_env_application_replayed_after_promotion',
       atMs: Number((performance.now() - startedAt).toFixed(3)),
     });
     await verifyPluginPackageQuarantineAfterPromotion({
@@ -13954,6 +14006,8 @@ async function main(argv = process.argv.slice(2)) {
       approvalIdentityKeysetLedger,
       runManagementIdentityKeysetLedger,
       automationManagementInspection,
+      clusterLegacyEnvMigrationApplication:
+        clusterLegacyEnvMigrationApplication.report,
       pluginPackageLifecycle: pluginPackageLifecycle.report,
       pluginPackageQuarantine: pluginPackageQuarantine.report,
       pluginPackagePromptExecution: pluginPackageQuarantine.promptExecution,
@@ -14312,6 +14366,30 @@ async function main(argv = process.argv.slice(2)) {
             .successfulReadAuditCount === 4 &&
           automationManagementInspection.afterPromotion.taskRevision === 1 &&
           automationManagementInspection.afterPromotion.triggerRevision === 1,
+        clusterLegacyEnvMigrationApplicationExactlyReplaysAfterPromotion:
+          clusterLegacyEnvMigrationApplication.report
+            .replicatedBeforePromotion === true &&
+          clusterLegacyEnvMigrationApplication.report
+            .exactReplayAfterPromotion === true &&
+          clusterLegacyEnvMigrationApplication.report.replayStatus ===
+            'existing' &&
+          clusterLegacyEnvMigrationApplication.report
+            .mutationStreamsOpenedAfterPromotion === 0 &&
+          clusterLegacyEnvMigrationApplication.report
+            .durableRowsAddedByReplay === 0 &&
+          JSON.stringify(
+            clusterLegacyEnvMigrationApplication.report.primaryBeforePromotion,
+          ) ===
+            JSON.stringify(
+              clusterLegacyEnvMigrationApplication.report
+                .standbyBeforePromotion,
+            ) &&
+          JSON.stringify(
+            clusterLegacyEnvMigrationApplication.report.primaryBeforePromotion,
+          ) ===
+            JSON.stringify(
+              clusterLegacyEnvMigrationApplication.report.promotedAfterReplay,
+            ),
         pluginPackageLifecycleCommitResponseLossConvergesExactlyOnce: true,
         pluginPackageLifecycleRunAndToolFencesTransitionAtomically: true,
         pluginPackageAutomationPublicationTransitionsAtomically:
