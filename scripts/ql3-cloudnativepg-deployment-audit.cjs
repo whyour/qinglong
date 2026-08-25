@@ -439,8 +439,9 @@ function assertRuntimeBinding(readFile, root, findings) {
   );
   const env = envByName(container);
   const caVolume = podSpec?.volumes?.find(
-    (candidate) => candidate?.name === 'postgres-runtime-ca',
+    (candidate) => candidate?.name === 'postgres-runtime-projected',
   );
+  const projectedSources = caVolume?.projected?.sources;
   if (
     !exactFailClosedApplicationImage(kustomization) ||
     env.get('QL3_POSTGRES_RUNTIME_URL')?.$patch !== 'delete' ||
@@ -458,9 +459,28 @@ function assertRuntimeBinding(readFile, root, findings) {
       'password',
     ) ||
     env.get('QL3_POSTGRES_TLS_SERVERNAME')?.value !== PRIMARY_DNS ||
-    caVolume?.secret?.secretName !== 'ql3-postgres-ca' ||
-    JSON.stringify(caVolume?.secret?.items) !==
-      JSON.stringify([{ key: 'ca.crt', path: 'ca.crt' }])
+    caVolume?.secret !== null ||
+    caVolume?.projected?.defaultMode !== 292 ||
+    JSON.stringify(projectedSources) !==
+      JSON.stringify([
+        {
+          secret: {
+            name: 'ql3-postgres-ca',
+            items: [{ key: 'ca.crt', path: 'ca.crt' }],
+          },
+        },
+        {
+          secret: {
+            name: 'ql3-cluster-control-runtime',
+            items: [
+              {
+                key: 'api-credential-pepper-keyring.json',
+                path: 'api-credential-pepper-keyring.json',
+              },
+            ],
+          },
+        },
+      ])
   ) {
     findings.push(
       finding(

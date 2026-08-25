@@ -126,6 +126,27 @@ test('rejects runtime DSN authority or a non-primary endpoint', () => {
   );
 });
 
+test('rejects a runtime projection without both operator CA and keyring', () => {
+  const report = auditCloudNativePgDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/kubernetes/ql3-cluster/overlays/cloudnative-pg/postgres-runtime-patch.yaml',
+      (source) =>
+        source.replace(
+          '                  name: ql3-postgres-ca',
+          '                  name: ql3-cluster-control-runtime',
+        ),
+    ),
+  });
+  assert.equal(report.compatible, false);
+  assert.equal(
+    report.findings.some(
+      (candidate) => candidate.code === 'QL3_CNPG_RUNTIME_BINDING',
+    ),
+    true,
+  );
+});
+
 test('rejects migration credentials or CA from the runtime domain', () => {
   const report = auditCloudNativePgDeployment({
     root: ROOT,

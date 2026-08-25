@@ -51,12 +51,21 @@ spec:
               value: ql3-postgres-rw.qinglong3-system.svc
               valueFrom: null
       volumes:
-        - name: postgres-runtime-ca
-          secret:
-            secretName: ql3-postgres-ca
-            items:
-              - key: ca.crt
-                path: ca.crt
+        - name: postgres-runtime-projected
+          secret: null
+          projected:
+            defaultMode: 292
+            sources:
+              - secret:
+                  name: ql3-postgres-ca
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - secret:
+                  name: ql3-cluster-control-runtime
+                  items:
+                    - key: api-credential-pepper-keyring.json
+                      path: api-credential-pepper-keyring.json
         - name: postgres-worker-ingress-ca
           secret:
             secretName: ql3-postgres-ca
