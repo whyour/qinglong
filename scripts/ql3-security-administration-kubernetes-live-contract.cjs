@@ -327,6 +327,37 @@ function administrationFailureEvidence(snapshot) {
   }
 }
 
+function migrationFailureEvidence(snapshot) {
+  const status = snapshot.pod.status.containerStatuses?.find(
+    (container) => container.name === 'migration',
+  );
+  const terminated = status?.state?.terminated;
+  const evidence = {
+    jobComplete: snapshot.complete,
+    jobFailed: snapshot.failed,
+    podPhase: snapshot.pod.status.phase ?? null,
+    exitCode: terminated?.exitCode ?? null,
+    reason: terminated?.reason ?? status?.state?.waiting?.reason ?? null,
+  };
+  const message = (terminated?.message || '').trim();
+  if (!message) return evidence;
+  try {
+    const parsed = JSON.parse(message);
+    const allowedKeys = ['schemaVersion', 'component', 'event', 'name', 'code'];
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed) ||
+      Object.keys(parsed).some((key) => !allowedKeys.includes(key))
+    ) {
+      return { ...evidence, failureMessage: 'rejected' };
+    }
+    return { ...evidence, failureMessage: parsed };
+  } catch {
+    return { ...evidence, failureMessage: 'unparseable' };
+  }
+}
+
 async function terminalJobSnapshot(fixture, name, timeoutMs = 180_000) {
   return (
     await waitFor(`${name} terminal`, timeoutMs, () => {
@@ -858,17 +889,24 @@ async function main(argv = process.argv.slice(2)) {
       'registry.example.com/qinglong/qinglong3-cluster-control',
       controlImage,
     );
-    fixture.kubectl(['create', '-f', '-'], {
-      input: `${migrationManifest}\n`,
-    });
-    fixture.kubectl([
-      '-n',
-      NAMESPACE,
-      'wait',
-      '--for=condition=Complete',
-      'job/ql3-cluster-migration',
-      '--timeout=10m',
-    ]);
+    const migrationJob = yaml.load(migrationManifest);
+    assert.equal(migrationJob?.kind, 'Job');
+    const migrationContainer = findNamed(
+      migrationJob.spec.template.spec.containers,
+      'migration',
+    );
+    migrationContainer.terminationMessagePolicy = 'FallbackToLogsOnError';
+    fixture.create(migrationJob);
+    const migrationSnapshot = await terminalJobSnapshot(
+      fixture,
+      'ql3-cluster-migration',
+      10 * 60_000,
+    );
+    const migrationEvidence = JSON.stringify(
+      migrationFailureEvidence(migrationSnapshot),
+    );
+    assert.equal(migrationSnapshot.complete, true, migrationEvidence);
+    assert.equal(migrationSnapshot.failed, false, migrationEvidence);
     const primary = currentPrimaryPod(fixture);
     const migrationState = JSON.parse(
       psql(
@@ -1386,4 +1424,5 @@ module.exports = {
   identity,
   identityRegisterCommand,
   inputAuthorityEvidenceSource,
+  migrationFailureEvidence,
 };

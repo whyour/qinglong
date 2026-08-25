@@ -14,6 +14,7 @@ const {
   identity,
   identityRegisterCommand,
   inputAuthorityEvidenceSource,
+  migrationFailureEvidence,
 } = require('../../scripts/ql3-security-administration-kubernetes-live-contract.cjs');
 
 const values = Object.freeze({
@@ -110,6 +111,57 @@ test('constrains only the exact local-path fixture root without network authorit
   assert.match(source, /after\.mode!==['"]2770['"]/);
   assert.doesNotMatch(source, /child_process/);
   assert.doesNotMatch(source, /net|fetch|http/);
+});
+
+test('keeps migration failure evidence content-free', () => {
+  const base = {
+    complete: false,
+    failed: true,
+    pod: {
+      status: {
+        phase: 'Failed',
+        containerStatuses: [
+          {
+            name: 'migration',
+            state: {
+              terminated: {
+                exitCode: 1,
+                reason: 'Error',
+                message: JSON.stringify({
+                  schemaVersion: 1,
+                  component: 'qinglong3-cluster-migration',
+                  event: 'migration_failed',
+                  name: 'Error',
+                  code: 'EAI_AGAIN',
+                }),
+              },
+            },
+          },
+        ],
+      },
+    },
+  };
+  assert.deepEqual(migrationFailureEvidence(base), {
+    jobComplete: false,
+    jobFailed: true,
+    podPhase: 'Failed',
+    exitCode: 1,
+    reason: 'Error',
+    failureMessage: {
+      schemaVersion: 1,
+      component: 'qinglong3-cluster-migration',
+      event: 'migration_failed',
+      name: 'Error',
+      code: 'EAI_AGAIN',
+    },
+  });
+  const rejected = structuredClone(base);
+  rejected.pod.status.containerStatuses[0].state.terminated.message =
+    JSON.stringify({ code: 'EAI_AGAIN', secret: 'must-not-escape' });
+  assert.equal(
+    migrationFailureEvidence(rejected).failureMessage,
+    'rejected',
+  );
 });
 
 test('live runner remains opt-in, reviewed, cleanup-bound and log-free', () => {
