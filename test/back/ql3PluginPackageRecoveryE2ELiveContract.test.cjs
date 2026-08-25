@@ -7,6 +7,10 @@ const {
   createFixture,
 } = require('../../scripts/ql3-plugin-package-recovery-e2e-fixture.cjs');
 const {
+  runtimeDeploymentResources,
+  runtimeKeyringMaterializationSource,
+} = require('../../scripts/ql3-plugin-package-recovery-e2e-live-contract.cjs');
+const {
   CONTRACT_VERSION,
   MIGRATION_COUNT,
 } = require('../../scripts/ql3-plugin-package-recovery-e2e-live-audit.cjs');
@@ -173,6 +177,40 @@ test('deployment controller rejects the upgrade before creating runtime', () => 
   assert.match(
     live,
     /new Set\(pods\.items\.map\(\(pod\) => pod\.spec\.nodeName\)\)/,
+  );
+});
+
+test('runtime deployment preserves private regular-file keyring materialization', () => {
+  const resources = runtimeDeploymentResources({
+    'qinglong.io/test': 'runtime-materialization',
+  });
+  const deployment = resources.find(
+    (resource) => resource.kind === 'Deployment',
+  );
+  const pod = deployment.spec.template.spec;
+  const materializer = pod.initContainers[0];
+  const container = pod.containers[0];
+  assert.equal(materializer.name, 'materialize-runtime-files');
+  assert.equal(materializer.image, container.image);
+  assert.equal(materializer.imagePullPolicy, 'Never');
+  assert.deepEqual(materializer.command.slice(0, 2), ['node', '-e']);
+  assert.equal(materializer.command[2], runtimeKeyringMaterializationSource());
+  assert.match(materializer.command[2], /realpathSync/);
+  assert.match(materializer.command[2], /COPYFILE_EXCL/);
+  assert.match(materializer.command[2], /chmodSync\(output,0o400\)/);
+  assert.equal(
+    container.env.find(
+      (entry) => entry.name === 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
+    ).value,
+    '/var/run/secrets/qinglong3/runtime/keyring.json',
+  );
+  assert.equal(
+    container.volumeMounts.some((mount) => mount.name.includes('projected')),
+    false,
+  );
+  assert.deepEqual(
+    pod.volumes.map((volume) => volume.name),
+    ['tmp', 'api-credential-keyring-projected', 'runtime-private'],
   );
 });
 

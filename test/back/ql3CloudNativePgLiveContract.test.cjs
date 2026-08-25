@@ -41,7 +41,7 @@ test('derives a normal tagged preload reference from a reviewed image', () => {
   assert.throws(() => imageTag('registry.example/operand:18.4'));
 });
 
-test('replaces exactly one fail-closed application image only in live rendering', () => {
+test('replaces the exact fail-closed application image count only in live rendering', () => {
   const placeholder = `registry.example.com/qinglong/qinglong3-cluster-control@sha256:${'0'.repeat(
     64,
   )}`;
@@ -52,6 +52,12 @@ test('replaces exactly one fail-closed application image only in live rendering'
   );
   assert.throws(() => localApplicationManifest('kind: Deployment\n'));
   assert.throws(() => localApplicationManifest(`${rendered}---\n${rendered}`));
+  assert.equal(
+    localApplicationManifest(`${rendered}---\n${rendered}`, 2),
+    `kind: Deployment\nspec:\n  image: registry.example.com/qinglong/qinglong3-cluster-control:${VERSION}\n---\nkind: Deployment\nspec:\n  image: registry.example.com/qinglong/qinglong3-cluster-control:${VERSION}\n`,
+  );
+  assert.throws(() => localApplicationManifest(rendered, 2));
+  assert.throws(() => localApplicationManifest(rendered, 0));
 });
 
 test('accepts uniform runtime reporting of the reviewed index or platform digest', () => {

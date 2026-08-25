@@ -442,13 +442,19 @@ function imageTag(reference) {
   return tag;
 }
 
-function localApplicationManifest(rendered) {
+function localApplicationManifest(rendered, expectedPlaceholderCount = 1) {
+  assert.ok(
+    Number.isInteger(expectedPlaceholderCount) &&
+      expectedPlaceholderCount >= 1 &&
+      expectedPlaceholderCount <= 2,
+    'expected application image placeholder count must be one or two',
+  );
   assert.equal(
     rendered.split(APP_IMAGE_PLACEHOLDER).length - 1,
-    1,
-    'rendered application manifest must contain exactly one fail-closed image placeholder',
+    expectedPlaceholderCount,
+    `rendered application manifest must contain exactly ${expectedPlaceholderCount} fail-closed image placeholder(s)`,
   );
-  const local = rendered.replace(APP_IMAGE_PLACEHOLDER, APP_IMAGE);
+  const local = rendered.replaceAll(APP_IMAGE_PLACEHOLDER, APP_IMAGE);
   assert.ok(
     !local.includes(`@sha256:${'0'.repeat(64)}`),
     'rendered application manifest retained a fail-closed image placeholder',
@@ -859,6 +865,7 @@ async function main() {
         ['kustomize', 'deploy/kubernetes/ql3-cluster/overlays/cloudnative-pg'],
         { capture: true, quiet: true },
       ),
+      2,
     );
     kubectl(['apply', '-f', '-'], { input: runtimeManifest });
     kubectl([

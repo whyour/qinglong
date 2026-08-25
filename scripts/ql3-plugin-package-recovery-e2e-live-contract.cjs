@@ -1450,6 +1450,122 @@ function recoveryRbacEvidence() {
   return Object.freeze(decisions);
 }
 
+function runtimeKeyringMaterializationSource() {
+  return [
+    "const fs=require('node:fs')",
+    "const path=require('node:path')",
+    "const source=fs.realpathSync('/var/run/secrets/qinglong3/api-credential-projected/..data')",
+    "const output='/var/run/secrets/qinglong3/runtime/keyring.json'",
+    "fs.copyFileSync(path.join(source,'keyring.json'),output,fs.constants.COPYFILE_EXCL)",
+    'fs.chmodSync(output,0o400)',
+  ].join(';');
+}
+
+function runtimeDeploymentResources(annotation) {
+  const names = [
+    'service-account.yaml',
+    'service.yaml',
+    'pod-disruption-budget.yaml',
+    'deployment.yaml',
+  ];
+  const resources = names.flatMap((name) =>
+    readYamlDocuments(
+      path.join(ROOT, 'deploy/kubernetes/ql3-cluster/base', name),
+    ),
+  );
+  for (const resource of resources) {
+    resource.metadata.namespace = NAMESPACE;
+    if (resource.kind !== 'Deployment') continue;
+    resource.metadata.annotations = annotation;
+    const pod = resource.spec.template.spec;
+    const container = pod.containers[0];
+    const materializer = pod.initContainers[0];
+    container.image = CONTROL_IMAGE;
+    container.imagePullPolicy = 'Never';
+    materializer.image = CONTROL_IMAGE;
+    materializer.imagePullPolicy = 'Never';
+    materializer.command = [
+      'node',
+      '-e',
+      runtimeKeyringMaterializationSource(),
+    ];
+    materializer.volumeMounts = [
+      {
+        name: 'api-credential-keyring-projected',
+        mountPath: '/var/run/secrets/qinglong3/api-credential-projected',
+        readOnly: true,
+      },
+      {
+        name: 'runtime-private',
+        mountPath: '/var/run/secrets/qinglong3/runtime',
+      },
+    ];
+    container.env = [
+      { name: 'QL_DEPLOYMENT_PROFILE', value: 'cluster-control' },
+      { name: 'QL3_CLUSTER_CONTROL_ENABLED', value: 'true' },
+      { name: 'QL3_CLUSTER_HTTP_HOST', value: '0.0.0.0' },
+      { name: 'QL3_CLUSTER_HTTP_PORT', value: '5800' },
+      { name: 'QL3_CLUSTER_HTTP_DRAIN_TIMEOUT_MS', value: '10000' },
+      { name: 'QL3_POSTGRES_TLS_MODE', value: 'disable' },
+      { name: 'QL3_POSTGRES_ALLOW_INSECURE', value: 'true' },
+      { name: 'QL3_POSTGRES_MAX_CONNECTIONS', value: '4' },
+      {
+        name: 'QL3_POSTGRES_APPLICATION_NAME',
+        value: 'qinglong3-plugin-recovery-e2e-runtime',
+      },
+      {
+        name: 'QL3_CLUSTER_REPLICA_ID',
+        valueFrom: {
+          fieldRef: { apiVersion: 'v1', fieldPath: 'metadata.name' },
+        },
+      },
+      {
+        name: 'QL3_POSTGRES_RUNTIME_URL',
+        valueFrom: {
+          secretKeyRef: {
+            name: 'ql3-cluster-control-runtime',
+            key: 'postgres-runtime-url',
+          },
+        },
+      },
+      {
+        name: 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
+        value: '/var/run/secrets/qinglong3/runtime/keyring.json',
+      },
+    ];
+    container.volumeMounts = [
+      { name: 'tmp', mountPath: '/tmp' },
+      {
+        name: 'runtime-private',
+        mountPath: '/var/run/secrets/qinglong3/runtime',
+        readOnly: true,
+      },
+    ];
+    pod.volumes = [
+      {
+        name: 'tmp',
+        emptyDir: { medium: 'Memory', sizeLimit: '16Mi' },
+      },
+      {
+        name: 'api-credential-keyring-projected',
+        secret: {
+          secretName: 'ql3-cluster-control-runtime',
+          defaultMode: 288,
+          items: [{
+            key: 'api-credential-pepper-keyring.json',
+            path: 'keyring.json',
+          }],
+        },
+      },
+      {
+        name: 'runtime-private',
+        emptyDir: { medium: 'Memory', sizeLimit: '1Mi' },
+      },
+    ];
+  }
+  return resources;
+}
+
 function applyRuntimeAfterRecovery(recoveryJob, migrationJobValue, secrets) {
   const recoveryComplete = recoveryJob.status.conditions.find(
     (condition) => condition.type === 'Complete' && condition.status === 'True',
@@ -1495,83 +1611,7 @@ function applyRuntimeAfterRecovery(recoveryJob, migrationJobValue, secrets) {
     },
     'create runtime-only credential after recovery success',
   );
-  const names = [
-    'service-account.yaml',
-    'service.yaml',
-    'pod-disruption-budget.yaml',
-    'deployment.yaml',
-  ];
-  const resources = names.flatMap((name) =>
-    readYamlDocuments(
-      path.join(ROOT, 'deploy/kubernetes/ql3-cluster/base', name),
-    ),
-  );
-  for (const resource of resources) {
-    resource.metadata.namespace = NAMESPACE;
-    if (resource.kind !== 'Deployment') continue;
-    resource.metadata.annotations = annotation;
-    const container = resource.spec.template.spec.containers[0];
-    container.image = CONTROL_IMAGE;
-    container.imagePullPolicy = 'Never';
-    container.env = [
-      { name: 'QL_DEPLOYMENT_PROFILE', value: 'cluster-control' },
-      { name: 'QL3_CLUSTER_CONTROL_ENABLED', value: 'true' },
-      { name: 'QL3_CLUSTER_HTTP_HOST', value: '0.0.0.0' },
-      { name: 'QL3_CLUSTER_HTTP_PORT', value: '5800' },
-      { name: 'QL3_CLUSTER_HTTP_DRAIN_TIMEOUT_MS', value: '10000' },
-      { name: 'QL3_POSTGRES_TLS_MODE', value: 'disable' },
-      { name: 'QL3_POSTGRES_ALLOW_INSECURE', value: 'true' },
-      { name: 'QL3_POSTGRES_MAX_CONNECTIONS', value: '4' },
-      {
-        name: 'QL3_POSTGRES_APPLICATION_NAME',
-        value: 'qinglong3-plugin-recovery-e2e-runtime',
-      },
-      {
-        name: 'QL3_CLUSTER_REPLICA_ID',
-        valueFrom: {
-          fieldRef: { apiVersion: 'v1', fieldPath: 'metadata.name' },
-        },
-      },
-      {
-        name: 'QL3_POSTGRES_RUNTIME_URL',
-        valueFrom: {
-          secretKeyRef: {
-            name: 'ql3-cluster-control-runtime',
-            key: 'postgres-runtime-url',
-          },
-        },
-      },
-      {
-        name: 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
-        value: '/var/run/secrets/qinglong3/api-credential/keyring.json',
-      },
-    ];
-    container.volumeMounts = [
-      { name: 'tmp', mountPath: '/tmp' },
-      {
-        name: 'api-credential-keyring',
-        mountPath: '/var/run/secrets/qinglong3/api-credential',
-        readOnly: true,
-      },
-    ];
-    resource.spec.template.spec.volumes = [
-      {
-        name: 'tmp',
-        emptyDir: { medium: 'Memory', sizeLimit: '16Mi' },
-      },
-      {
-        name: 'api-credential-keyring',
-        secret: {
-          secretName: 'ql3-cluster-control-runtime',
-          defaultMode: 288,
-          items: [{
-            key: 'api-credential-pepper-keyring.json',
-            path: 'keyring.json',
-          }],
-        },
-      },
-    ];
-  }
+  const resources = runtimeDeploymentResources(annotation);
   for (const resource of resources) {
     apply(resource, `deployment controller apply ${resource.kind}`);
   }
@@ -2060,5 +2100,7 @@ module.exports = {
   REPORT_SCHEMA,
   buildOrderingEvidence,
   privateReportPath,
+  runtimeDeploymentResources,
+  runtimeKeyringMaterializationSource,
   writePrivateReport,
 };
