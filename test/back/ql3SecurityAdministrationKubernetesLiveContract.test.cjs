@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
@@ -20,6 +21,7 @@ const {
   inputAuthorityEvidenceSource,
   migrationFailureEvidence,
   networkPolicyReadinessSource,
+  runtimeFileMaterializationSource,
 } = require('../../scripts/ql3-security-administration-kubernetes-live-contract.cjs');
 
 const values = Object.freeze({
@@ -205,6 +207,21 @@ test('runs the credential ceremony against two real anti-affine control replicas
     deployment.spec.template.spec.containers[0].terminationMessagePolicy,
     'FallbackToLogsOnError',
   );
+  const materializer = deployment.spec.template.spec.initContainers[0];
+  assert.equal(materializer.name, 'materialize-runtime-files');
+  assert.deepEqual(materializer.command.slice(0, 2), ['node', '-e']);
+  assert.match(materializer.command[2], /realpathSync/);
+  assert.match(materializer.command[2], /COPYFILE_EXCL/);
+  assert.match(materializer.command[2], /chmodSync\(output,0o400\)/);
+  assert.equal(materializer.securityContext.runAsNonRoot, undefined);
+  assert.equal(materializer.securityContext.readOnlyRootFilesystem, true);
+  assert.deepEqual(materializer.securityContext.capabilities.drop, ['ALL']);
+  assert.equal(
+    deployment.spec.template.spec.containers[0].volumeMounts.some(
+      (mount) => mount.name.includes('projected'),
+    ),
+    false,
+  );
   assert.equal(
     deployment.spec.template.spec.affinity.podAntiAffinity
       .requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey,
@@ -215,13 +232,51 @@ test('runs the credential ceremony against two real anti-affine control replicas
     environment.some(
       (entry) =>
         entry.name === 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE' &&
-        entry.value.endsWith('/keyring.json'),
+        entry.value === '/var/run/secrets/qinglong3/runtime/keyring.json',
     ),
   );
   assert.equal(
     environment.some((entry) => entry.name === 'QL3_API_CREDENTIAL_PEPPER'),
     false,
   );
+});
+
+test('materializes kubelet symlink projections as private regular files', (context) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-runtime-files-'));
+  context.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const postgresDirectory = path.join(directory, 'postgres-projected');
+  const keyringDirectory = path.join(directory, 'keyring-projected');
+  const targetDirectory = path.join(directory, 'runtime');
+  for (const [projectedDirectory, name, value] of [
+    [postgresDirectory, 'ca.crt', 'test-ca'],
+    [keyringDirectory, 'keyring.json', '{"schemaVersion":1}'],
+  ]) {
+    const generation = path.join(projectedDirectory, '..2026_08_26');
+    fs.mkdirSync(generation, { recursive: true });
+    fs.writeFileSync(path.join(generation, name), value);
+    fs.symlinkSync('..2026_08_26', path.join(projectedDirectory, '..data'));
+  }
+  fs.mkdirSync(targetDirectory);
+  const result = spawnSync(
+    process.execPath,
+    ['-e', runtimeFileMaterializationSource({
+      postgresDirectory,
+      keyringDirectory,
+      targetDirectory,
+    })],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  for (const [name, value] of [
+    ['ca.crt', 'test-ca'],
+    ['keyring.json', '{"schemaVersion":1}'],
+  ]) {
+    const output = path.join(targetDirectory, name);
+    assert.equal(fs.lstatSync(output).isFile(), true);
+    assert.equal(fs.lstatSync(output).isSymbolicLink(), false);
+    assert.equal(fs.statSync(output).mode & 0o777, 0o400);
+    assert.equal(fs.readFileSync(output, 'utf8'), value);
+  }
 });
 
 test('keeps failed control rollout evidence bounded and content-free', () => {

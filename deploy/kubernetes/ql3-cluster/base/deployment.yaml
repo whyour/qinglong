@@ -45,6 +45,42 @@ spec:
                 matchLabels:
                   app.kubernetes.io/name: ql3-cluster-control
                   app.kubernetes.io/component: control-plane
+      initContainers:
+        - name: materialize-runtime-files
+          image: qinglong3-cluster-control:3.0.0-alpha.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - -e
+            - |
+              const fs = require('node:fs');
+              const path = require('node:path');
+              const source = fs.realpathSync('/var/run/secrets/qinglong3/postgres-runtime-projected/..data');
+              const target = '/var/run/secrets/qinglong3/postgres-runtime';
+              for (const name of ['ca.crt', 'api-credential-pepper-keyring.json']) {
+                const output = path.join(target, name);
+                fs.copyFileSync(path.join(source, name), output, fs.constants.COPYFILE_EXCL);
+                fs.chmodSync(output, 0o400);
+              }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: postgres-runtime-projected
+              mountPath: /var/run/secrets/qinglong3/postgres-runtime-projected
+              readOnly: true
+            - name: postgres-runtime-private
+              mountPath: /var/run/secrets/qinglong3/postgres-runtime
       containers:
         - name: cluster-control
           image: qinglong3-cluster-control:3.0.0-alpha.1
@@ -223,7 +259,7 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            - name: postgres-runtime-ca
+            - name: postgres-runtime-private
               mountPath: /var/run/secrets/qinglong3/postgres-runtime
               readOnly: true
             - name: postgres-worker-ingress-ca
@@ -240,7 +276,7 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 16Mi
-        - name: postgres-runtime-ca
+        - name: postgres-runtime-projected
           secret:
             secretName: ql3-cluster-control-runtime
             defaultMode: 292
@@ -249,6 +285,10 @@ spec:
                 path: ca.crt
               - key: api-credential-pepper-keyring.json
                 path: api-credential-pepper-keyring.json
+        - name: postgres-runtime-private
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
         - name: postgres-worker-ingress-ca
           secret:
             secretName: ql3-cluster-worker-ingress

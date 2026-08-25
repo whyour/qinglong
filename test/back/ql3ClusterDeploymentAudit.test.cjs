@@ -47,6 +47,44 @@ test('accepts the exact locked non-root multi-replica cluster deployment', () =>
   ]);
 });
 
+test('rejects exposing symlink-backed runtime keyring projections to Cluster Control', () => {
+  const withoutMaterializer = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/kubernetes/ql3-cluster/base/deployment.yaml',
+      (source) => source.replace(
+        '        - name: materialize-runtime-files\n',
+        '        - name: materialize-runtime-files-disabled\n',
+      ),
+    ),
+  });
+  assert.equal(withoutMaterializer.compatible, false);
+  assert.equal(
+    withoutMaterializer.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_KUBERNETES_POSTGRES_CA_BINDING',
+    ),
+    true,
+  );
+
+  const projectedIntoRuntime = auditClusterDeployment({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/kubernetes/ql3-cluster/base/deployment.yaml',
+      (source) => source.replace(
+        '            - name: postgres-runtime-private\n              mountPath: /var/run/secrets/qinglong3/postgres-runtime\n              readOnly: true\n',
+        '            - name: postgres-runtime-projected\n              mountPath: /var/run/secrets/qinglong3/postgres-runtime\n              readOnly: true\n',
+      ),
+    ),
+  });
+  assert.equal(projectedIntoRuntime.compatible, false);
+  assert.equal(
+    projectedIntoRuntime.findings.some(
+      ({ code }) => code === 'QL3_CLUSTER_KUBERNETES_POSTGRES_CA_BINDING',
+    ),
+    true,
+  );
+});
+
 test('keeps Cluster Copilot MCP external, digest-pinned and resource-bounded', () => {
   const widened = auditClusterDeployment({
     root: ROOT,
@@ -237,7 +275,7 @@ test('keeps Cluster AI optional with projected authority and an independent dige
     readFile: intercept(
       'deploy/kubernetes/ql3-cluster/base/deployment.yaml',
       (source) =>
-        source.replace(
+        source.replaceAll(
           `image: qinglong3-cluster-control:${VERSION}`,
           `image: qinglong3-cluster-control-ai:${VERSION}`,
         ),
@@ -1261,7 +1299,7 @@ test('rejects inline runtime credentials and a privileged container', () => {
             /valueFrom:\n\s+secretKeyRef:\n\s+name: ql3-cluster-control-runtime\n\s+key: postgres-runtime-url/,
             'value: postgresql://inline-secret',
           )
-          .replace(
+          .replaceAll(
             'allowPrivilegeEscalation: false',
             'allowPrivilegeEscalation: true',
           ),

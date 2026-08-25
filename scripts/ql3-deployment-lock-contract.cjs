@@ -28,7 +28,7 @@ const IMAGE_NAMES = Object.freeze({
   worker: 'qinglong3-worker',
 });
 const EXPECTED_SOURCE_SURFACES = Object.freeze({
-  control: 2,
+  control: 3,
   'control-ai': 1,
   admin: 28,
   worker: 2,

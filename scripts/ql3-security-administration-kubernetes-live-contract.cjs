@@ -731,6 +731,27 @@ async function runCustodyEvidence({
   }
 }
 
+function runtimeFileMaterializationSource({
+  postgresDirectory = '/var/run/secrets/qinglong3/postgres-projected',
+  keyringDirectory = '/var/run/secrets/qinglong3/api-credential-projected',
+  targetDirectory = '/var/run/secrets/qinglong3/runtime',
+} = {}) {
+  for (const value of [
+    postgresDirectory,
+    keyringDirectory,
+    targetDirectory,
+  ]) {
+    assert.equal(path.isAbsolute(value), true);
+  }
+  return [
+    "const fs=require('node:fs')",
+    "const path=require('node:path')",
+    `const target=${JSON.stringify(targetDirectory)}`,
+    `const files=[[${JSON.stringify(postgresDirectory + '/..data')},'ca.crt'],[${JSON.stringify(keyringDirectory + '/..data')},'keyring.json']]`,
+    "for(const [directory,name] of files){const source=fs.realpathSync(directory);const output=path.join(target,name);fs.copyFileSync(path.join(source,name),output,fs.constants.COPYFILE_EXCL);fs.chmodSync(output,0o400)}",
+  ].join(';');
+}
+
 function clusterControlResources(controlImage) {
   const labels = Object.freeze({
     'app.kubernetes.io/name': CONTROL_NAME,
@@ -803,7 +824,7 @@ function clusterControlResources(controlImage) {
                 { name: 'QL3_POSTGRES_TLS_MODE', value: 'verify-full' },
                 {
                   name: 'QL3_POSTGRES_TLS_CA_FILE',
-                  value: '/var/run/secrets/qinglong3/postgres/ca.crt',
+                  value: '/var/run/secrets/qinglong3/runtime/ca.crt',
                 },
                 {
                   name: 'QL3_POSTGRES_TLS_SERVERNAME',
@@ -834,7 +855,7 @@ function clusterControlResources(controlImage) {
                 },
                 {
                   name: 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
-                  value: '/var/run/secrets/qinglong3/api-credential/keyring.json',
+                  value: '/var/run/secrets/qinglong3/runtime/keyring.json',
                 },
               ],
               ports: [{ name: 'http', containerPort: 5800 }],
@@ -857,14 +878,44 @@ function clusterControlResources(controlImage) {
               volumeMounts: [
                 { name: 'tmp', mountPath: '/tmp' },
                 {
-                  name: 'postgres-ca',
-                  mountPath: '/var/run/secrets/qinglong3/postgres',
+                  name: 'runtime-private',
+                  mountPath: '/var/run/secrets/qinglong3/runtime',
+                  readOnly: true,
+                },
+              ],
+            }],
+            initContainers: [{
+              name: 'materialize-runtime-files',
+              image: controlImage,
+              imagePullPolicy: 'Never',
+              command: [
+                'node',
+                '-e',
+                runtimeFileMaterializationSource(),
+              ],
+              securityContext: {
+                allowPrivilegeEscalation: false,
+                readOnlyRootFilesystem: true,
+                capabilities: { drop: ['ALL'] },
+              },
+              resources: {
+                requests: { cpu: '10m', memory: '32Mi' },
+                limits: { cpu: '100m', memory: '64Mi' },
+              },
+              volumeMounts: [
+                {
+                  name: 'postgres-ca-projected',
+                  mountPath: '/var/run/secrets/qinglong3/postgres-projected',
                   readOnly: true,
                 },
                 {
-                  name: 'api-credential-keyring',
-                  mountPath: '/var/run/secrets/qinglong3/api-credential',
+                  name: 'api-credential-keyring-projected',
+                  mountPath: '/var/run/secrets/qinglong3/api-credential-projected',
                   readOnly: true,
+                },
+                {
+                  name: 'runtime-private',
+                  mountPath: '/var/run/secrets/qinglong3/runtime',
                 },
               ],
             }],
@@ -874,7 +925,7 @@ function clusterControlResources(controlImage) {
                 emptyDir: { medium: 'Memory', sizeLimit: '16Mi' },
               },
               {
-                name: 'postgres-ca',
+                name: 'postgres-ca-projected',
                 secret: {
                   secretName: 'ql3-postgres-ca',
                   defaultMode: 292,
@@ -882,7 +933,7 @@ function clusterControlResources(controlImage) {
                 },
               },
               {
-                name: 'api-credential-keyring',
+                name: 'api-credential-keyring-projected',
                 secret: {
                   secretName: CONTROL_RUNTIME_SECRET,
                   defaultMode: 292,
@@ -891,6 +942,10 @@ function clusterControlResources(controlImage) {
                     path: 'keyring.json',
                   }],
                 },
+              },
+              {
+                name: 'runtime-private',
+                emptyDir: { medium: 'Memory', sizeLimit: '1Mi' },
               },
             ],
           },
@@ -2353,6 +2408,7 @@ if (require.main === module) {
 module.exports = {
   auditListCommand,
   clusterControlResources,
+  runtimeFileMaterializationSource,
   controlRolloutFailureEvidence,
   controlTerminationFact,
   credentialAuthenticationProbeSource,

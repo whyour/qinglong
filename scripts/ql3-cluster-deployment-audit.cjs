@@ -846,18 +846,66 @@ function assertKubernetes(readFile, root, findings) {
       ),
     );
   }
-  const runtimeCaMount = namedEntry(
-    container?.volumeMounts,
-    'postgres-runtime-ca',
+  const runtimeFileMaterializer = namedEntry(
+    pod?.initContainers,
+    'materialize-runtime-files',
   );
-  const runtimeCaVolume = namedEntry(pod?.volumes, 'postgres-runtime-ca');
+  const runtimePrivateMount = namedEntry(
+    container?.volumeMounts,
+    'postgres-runtime-private',
+  );
+  const projectedMount = namedEntry(
+    runtimeFileMaterializer?.volumeMounts,
+    'postgres-runtime-projected',
+  );
+  const materializedMount = namedEntry(
+    runtimeFileMaterializer?.volumeMounts,
+    'postgres-runtime-private',
+  );
+  const projectedVolume = namedEntry(
+    pod?.volumes,
+    'postgres-runtime-projected',
+  );
+  const privateVolume = namedEntry(pod?.volumes, 'postgres-runtime-private');
+  const materializerSource = runtimeFileMaterializer?.command?.[2];
   if (
-    runtimeCaMount?.mountPath !==
+    runtimePrivateMount?.mountPath !==
       '/var/run/secrets/qinglong3/postgres-runtime' ||
-    runtimeCaMount?.readOnly !== true ||
-    runtimeCaVolume?.secret?.secretName !== 'ql3-cluster-control-runtime' ||
-    runtimeCaVolume?.secret?.defaultMode !== 0o444 ||
-    JSON.stringify(runtimeCaVolume?.secret?.items) !==
+    runtimePrivateMount?.readOnly !== true ||
+    container?.volumeMounts?.some(
+      (mount) => mount?.name === 'postgres-runtime-projected',
+    ) ||
+    runtimeFileMaterializer?.image !== container?.image ||
+    runtimeFileMaterializer?.imagePullPolicy !== container?.imagePullPolicy ||
+    JSON.stringify(runtimeFileMaterializer?.command?.slice(0, 2)) !==
+      JSON.stringify(['node', '-e']) ||
+    typeof materializerSource !== 'string' ||
+    !materializerSource.includes(
+      "realpathSync('/var/run/secrets/qinglong3/postgres-runtime-projected/..data')",
+    ) ||
+    !materializerSource.includes('COPYFILE_EXCL') ||
+    !materializerSource.includes('chmodSync(output, 0o400)') ||
+    materializerSource.includes('console.') ||
+    runtimeFileMaterializer?.securityContext?.allowPrivilegeEscalation !==
+      false ||
+    runtimeFileMaterializer?.securityContext?.readOnlyRootFilesystem !== true ||
+    JSON.stringify(
+      runtimeFileMaterializer?.securityContext?.capabilities?.drop,
+    ) !== JSON.stringify(['ALL']) ||
+    runtimeFileMaterializer?.resources?.requests?.cpu !== '10m' ||
+    runtimeFileMaterializer?.resources?.requests?.memory !== '32Mi' ||
+    runtimeFileMaterializer?.resources?.limits?.cpu !== '100m' ||
+    runtimeFileMaterializer?.resources?.limits?.memory !== '64Mi' ||
+    runtimeFileMaterializer?.volumeMounts?.length !== 2 ||
+    projectedMount?.mountPath !==
+      '/var/run/secrets/qinglong3/postgres-runtime-projected' ||
+    projectedMount?.readOnly !== true ||
+    materializedMount?.mountPath !==
+      '/var/run/secrets/qinglong3/postgres-runtime' ||
+    materializedMount?.readOnly === true ||
+    projectedVolume?.secret?.secretName !== 'ql3-cluster-control-runtime' ||
+    projectedVolume?.secret?.defaultMode !== 0o444 ||
+    JSON.stringify(projectedVolume?.secret?.items) !==
       JSON.stringify([
         { key: 'postgres-ca.crt', path: 'ca.crt' },
         {
@@ -865,12 +913,14 @@ function assertKubernetes(readFile, root, findings) {
           path: 'api-credential-pepper-keyring.json',
         },
       ]) ||
+    privateVolume?.emptyDir?.medium !== 'Memory' ||
+    privateVolume?.emptyDir?.sizeLimit !== '1Mi' ||
     env.has('QL3_API_CREDENTIAL_PEPPER')
   ) {
     findings.push(
       finding(
         'QL3_CLUSTER_KUBERNETES_POSTGRES_CA_BINDING',
-        'runtime PostgreSQL trust must use the reviewed read-only projected CA file',
+        'runtime trust and API credential keyring must be copied from one projected Secret generation into bounded Pod-private regular files before the control process starts',
       ),
     );
   }

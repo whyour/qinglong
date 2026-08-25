@@ -921,7 +921,7 @@ test('source-surface audit freezes every reviewed cluster and worker authority',
     schemaVersion: 1,
     deploymentYamlFiles: 241,
     imageOccurrences: {
-      control: 2,
+      control: 3,
       'control-ai': 1,
       admin: 28,
       worker: 2,
