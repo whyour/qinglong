@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/local-owner-maintenance",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "private": true,
   "description": "QingLong 3.0 short-lived Local Owner maintenance authorities and GC command adapter",
   "license": "Apache-2.0",

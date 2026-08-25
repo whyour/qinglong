@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/runtime-core",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "private": true,
   "description": "QingLong 3.0 profile-neutral runtime contracts",
   "license": "Apache-2.0",

@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/local-mcp-server",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "private": true,
   "description": "QingLong 3.0 optional authenticated local MCP stdio server",
   "license": "Apache-2.0",

@@ -42,7 +42,7 @@ deploy/console/ql3-cluster-copilot/verify-release.sh \
   ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:REPLACE_64_HEX \
   replace-owner/qinglong \
   REPLACE_40_HEX_SOURCE_REVISION \
-  refs/tags/v3.0.0-alpha.1
+  refs/tags/v3.0.0-alpha.2
 ```
 
 For a release acceptance ceremony, prefer the source-tag workstation runner.
@@ -57,7 +57,7 @@ node scripts/ql3-cluster-admin-release-workstation-ceremony.cjs \
   --image=ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:REPLACE_64_HEX \
   --repository=replace-owner/qinglong \
   --source-revision=REPLACE_40_HEX_SOURCE_REVISION \
-  --source-ref=refs/tags/v3.0.0-alpha.1 \
+  --source-ref=refs/tags/v3.0.0-alpha.2 \
   --cosign=/canonical/absolute/cosign \
   --gh=/canonical/absolute/gh \
   --docker=/canonical/absolute/docker \
@@ -81,7 +81,7 @@ node scripts/ql3-cluster-admin-release-workstation-ceremony-audit.cjs \
   --image=ghcr.io/replace-owner/qinglong3-cluster-admin@sha256:REPLACE_64_HEX \
   --repository=replace-owner/qinglong \
   --source-revision=REPLACE_40_HEX_SOURCE_REVISION \
-  --source-ref=refs/tags/v3.0.0-alpha.1
+  --source-ref=refs/tags/v3.0.0-alpha.2
 ```
 
 The offline audit verifies canonical encoding, exact structure, tool and

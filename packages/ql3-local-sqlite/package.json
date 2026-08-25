@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/local-sqlite",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "private": true,
   "description": "QingLong 3.0 Node 24 SQLite storage adapter for local Profiles",
   "license": "Apache-2.0",

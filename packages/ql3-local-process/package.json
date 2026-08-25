@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/local-process",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "private": true,
   "description": "QingLong 3.0 durable local process launcher and receipt lifecycle",
   "license": "Apache-2.0",

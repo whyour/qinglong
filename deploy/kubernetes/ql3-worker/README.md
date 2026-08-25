@@ -26,7 +26,7 @@ Build the image from the repository root:
 node scripts/ql3-worker-image-lock.cjs
 docker build \
   --file deploy/containers/ql3-worker/Dockerfile \
-  --tag qinglong3-worker:3.0.0-alpha.1 \
+  --tag qinglong3-worker:3.0.0-alpha.2 \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
   .
 ```

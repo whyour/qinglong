@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/local-command-file",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "private": true,
   "description": "QingLong 3.0 bounded private local file authorities",
   "license": "Apache-2.0",

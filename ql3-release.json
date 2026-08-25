@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "schema": "qinglong/release-identity@v2",
   "product": "qinglong3",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "node": {
     "version": "24.18.0",
     "engine": ">=24.18.0 <25"

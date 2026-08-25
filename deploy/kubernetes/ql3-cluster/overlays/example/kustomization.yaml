@@ -7,4 +7,4 @@ resources:
 images:
   - name: qinglong3-cluster-control
     newName: registry.example.com/qinglong/qinglong3-cluster-control
-    newTag: 3.0.0-alpha.1
+    newTag: 3.0.0-alpha.2

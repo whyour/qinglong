@@ -30,7 +30,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: migration
-          image: qinglong3-cluster-control:3.0.0-alpha.1
+          image: qinglong3-cluster-control:3.0.0-alpha.2
           imagePullPolicy: IfNotPresent
           command:
             - node

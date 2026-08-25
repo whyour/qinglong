@@ -47,7 +47,7 @@ spec:
                   app.kubernetes.io/component: control-plane
       initContainers:
         - name: materialize-runtime-files
-          image: qinglong3-cluster-control:3.0.0-alpha.1
+          image: qinglong3-cluster-control:3.0.0-alpha.2
           imagePullPolicy: IfNotPresent
           command:
             - node
@@ -83,7 +83,7 @@ spec:
               mountPath: /var/run/secrets/qinglong3/postgres-runtime
       containers:
         - name: cluster-control
-          image: qinglong3-cluster-control:3.0.0-alpha.1
+          image: qinglong3-cluster-control:3.0.0-alpha.2
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

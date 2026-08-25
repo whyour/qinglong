@@ -34,7 +34,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: wait-for-manager
-          image: qinglong3-cluster-admin:3.0.0-alpha.1
+          image: qinglong3-cluster-admin:3.0.0-alpha.2
           imagePullPolicy: IfNotPresent
           command:
             - node
@@ -109,7 +109,7 @@ spec:
               readOnly: true
       containers:
         - name: client
-          image: qinglong3-cluster-admin:3.0.0-alpha.1
+          image: qinglong3-cluster-admin:3.0.0-alpha.2
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh

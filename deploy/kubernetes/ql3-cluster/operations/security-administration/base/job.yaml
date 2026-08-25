@@ -34,7 +34,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: stage-private-input
-          image: qinglong3-cluster-admin:3.0.0-alpha.1
+          image: qinglong3-cluster-admin:3.0.0-alpha.2
           imagePullPolicy: IfNotPresent
           command:
             - node
@@ -63,7 +63,7 @@ spec:
               mountPath: /var/run/qinglong3/security-administration-private
       containers:
         - name: administrator
-          image: qinglong3-cluster-admin:3.0.0-alpha.1
+          image: qinglong3-cluster-admin:3.0.0-alpha.2
           imagePullPolicy: IfNotPresent
           command:
             - node

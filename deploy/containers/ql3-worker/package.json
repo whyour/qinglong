@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/worker-image-dependencies",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.2",
   "private": true,
   "description": "Locked external build and runtime dependencies for the QingLong 3.0 Worker image",
   "license": "Apache-2.0",
