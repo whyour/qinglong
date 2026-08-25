@@ -42,6 +42,8 @@ const NAMESPACE = 'qinglong3-system';
 const NAME = 'ql3-security-administration';
 const POSTGRES_CLUSTER = 'ql3-postgres';
 const DELIVERY_CLAIM = 'ql3-security-administration-delivery';
+const CONTROL_NAME = 'ql3-security-live-control';
+const CONTROL_RUNTIME_SECRET = 'ql3-security-live-control-runtime';
 const ADMIN_IMAGE_BASE = 'ql3-security-administration-live';
 const CONTROL_IMAGE_BASE = 'ql3-security-administration-migration-live';
 const ISSUER = 'https://identity.qinglong.test/';
@@ -85,6 +87,23 @@ function randomSecret() {
   return crypto.randomBytes(32).toString('base64url');
 }
 
+function apiCredentialPepperKeyring(activePepperKeyId, keys) {
+  assert.ok(keys.length === 1 || keys.length === 2);
+  assert.ok(keys.some((key) => key.pepperKeyId === activePepperKeyId));
+  return Object.freeze({
+    schemaVersion: 1,
+    activePepperKeyId,
+    keys: Object.freeze(
+      keys.map((key) =>
+        Object.freeze({
+          pepperKeyId: key.pepperKeyId,
+          pepper: key.pepper,
+        }),
+      ),
+    ),
+  });
+}
+
 function sqlString(value) {
   assert.equal(typeof value, 'string');
   return `'${value.replaceAll("'", "''")}'`;
@@ -111,6 +130,14 @@ function auditListCommand() {
       limit: 25,
       filter: Object.freeze({ outcome: 'allowed' }),
     }),
+  });
+}
+
+function pepperReferencesCommand(pepperKeyId) {
+  return Object.freeze({
+    schemaVersion: 1,
+    operation: 'pepper.references',
+    request: Object.freeze({ pepperKeyId, limit: 64 }),
   });
 }
 
@@ -153,7 +180,7 @@ function credentialRevokeCommand(values) {
     request: Object.freeze({
       mutationId: values.revokeMutationId,
       requestId: values.revokeRequestId,
-      expectedCurrentVersion: 2,
+      expectedCurrentVersion: values.expectedCurrentVersion ?? 2,
       credentialId: values.credentialId,
       subject: values.subject,
     }),
@@ -221,7 +248,7 @@ function findNamed(values, name) {
 }
 
 function inputAuthorityEvidenceSource() {
-  return `'use strict';const fs=require('node:fs');const path=require('node:path');const names=['command.json','assertion.jwt','keyset.json','pepper'];const source='/var/run/secrets/qinglong3/security-administration-projected';const parent='/var/run/qinglong3/security-administration-private';const target=parent+'/input';const deliveryRoot='/var/lib/qinglong3/security-administration-delivery';const deliveryPrivate=deliveryRoot+'/private';const facts=(value)=>{const status=fs.lstatSync(value);return{mode:(status.mode&0o7777).toString(8),uid:status.uid,gid:status.gid,directory:status.isDirectory(),file:status.isFile(),symlink:status.isSymbolicLink()}};const sourceReal=fs.realpathSync(source);const files=names.map((name)=>{const candidate=source+'/'+name;const resolved=fs.realpathSync(candidate);const relative=path.relative(sourceReal,resolved);return{name,link:facts(candidate),resolved:facts(resolved),confined:relative!==''&&relative!=='..'&&!relative.startsWith('../')&&!path.isAbsolute(relative)}});fs.writeFileSync('/dev/termination-log',JSON.stringify({schema:'qinglong/security-administration-input-authority@v1',source:facts(source),parent:facts(parent),targetExists:fs.existsSync(target),deliveryRoot:fs.existsSync(deliveryRoot)?facts(deliveryRoot):null,deliveryPrivateExists:fs.existsSync(deliveryPrivate),files}));`;
+  return `'use strict';const fs=require('node:fs');const path=require('node:path');const names=['command.json','assertion.jwt','keyset.json','pepper-keyring.json'];const source='/var/run/secrets/qinglong3/security-administration-projected';const parent='/var/run/qinglong3/security-administration-private';const target=parent+'/input';const deliveryRoot='/var/lib/qinglong3/security-administration-delivery';const deliveryPrivate=deliveryRoot+'/private';const facts=(value)=>{const status=fs.lstatSync(value);return{mode:(status.mode&0o7777).toString(8),uid:status.uid,gid:status.gid,directory:status.isDirectory(),file:status.isFile(),symlink:status.isSymbolicLink()}};const sourceReal=fs.realpathSync(source);const files=names.map((name)=>{const candidate=source+'/'+name;const resolved=fs.realpathSync(candidate);const relative=path.relative(sourceReal,resolved);return{name,link:facts(candidate),resolved:facts(resolved),confined:relative!==''&&relative!=='..'&&!relative.startsWith('../')&&!path.isAbsolute(relative)}});fs.writeFileSync('/dev/termination-log',JSON.stringify({schema:'qinglong/security-administration-input-authority@v1',source:facts(source),parent:facts(parent),targetExists:fs.existsSync(target),deliveryRoot:fs.existsSync(deliveryRoot)?facts(deliveryRoot):null,deliveryPrivateExists:fs.existsSync(deliveryPrivate),files}));`;
 }
 
 function deliveryVolumeProvisionSource() {
@@ -508,7 +535,7 @@ async function runAdministrationJob({
   command,
   assertion,
   keyset,
-  pepper,
+  pepperKeyring,
   deliveryFile,
   expectedComplete,
   projectedMode,
@@ -533,7 +560,7 @@ async function runAdministrationJob({
       'command.json': `${JSON.stringify(command)}\n`,
       'assertion.jwt': `${assertion}\n`,
       'keyset.json': `${JSON.stringify(keyset)}\n`,
-      pepper: `${pepper}\n`,
+      'pepper-keyring.json': `${JSON.stringify(pepperKeyring)}\n`,
     },
   });
   createdSecrets.add(inputSecretName);
@@ -697,6 +724,346 @@ async function runCustodyEvidence({
     assert.equal(evidence.databaseConnected, true);
     assert.equal(evidence.kubernetesApiConnected, false);
     assert.equal(evidence.publicInternetConnected, false);
+    return evidence;
+  } finally {
+    deleteResource(fixture, `job/${name}`);
+    createdEvidenceJobs.delete(name);
+  }
+}
+
+function clusterControlResources(controlImage) {
+  const labels = Object.freeze({
+    'app.kubernetes.io/name': CONTROL_NAME,
+    'app.kubernetes.io/component': 'control-plane',
+    'app.kubernetes.io/part-of': 'qinglong3',
+  });
+  return Object.freeze([
+    {
+      apiVersion: 'v1',
+      kind: 'Service',
+      metadata: { name: CONTROL_NAME, namespace: NAMESPACE, labels },
+      spec: {
+        selector: labels,
+        ports: [{ name: 'http', port: 5800, targetPort: 'http' }],
+      },
+    },
+    {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: { name: CONTROL_NAME, namespace: NAMESPACE, labels },
+      spec: {
+        replicas: 2,
+        minReadySeconds: 2,
+        progressDeadlineSeconds: 300,
+        strategy: {
+          type: 'RollingUpdate',
+          rollingUpdate: { maxUnavailable: 0, maxSurge: 1 },
+        },
+        selector: { matchLabels: labels },
+        template: {
+          metadata: { labels },
+          spec: {
+            serviceAccountName: 'ql3-cluster-control',
+            automountServiceAccountToken: false,
+            enableServiceLinks: false,
+            terminationGracePeriodSeconds: 20,
+            securityContext: {
+              runAsNonRoot: true,
+              runAsUser: 10001,
+              runAsGroup: 10001,
+              fsGroup: 10001,
+              fsGroupChangePolicy: 'OnRootMismatch',
+              seccompProfile: { type: 'RuntimeDefault' },
+            },
+            affinity: {
+              podAntiAffinity: {
+                requiredDuringSchedulingIgnoredDuringExecution: [{
+                  topologyKey: 'kubernetes.io/hostname',
+                  labelSelector: { matchLabels: labels },
+                }],
+              },
+            },
+            containers: [{
+              name: 'cluster-control',
+              image: controlImage,
+              imagePullPolicy: 'Never',
+              securityContext: {
+                allowPrivilegeEscalation: false,
+                readOnlyRootFilesystem: true,
+                capabilities: { drop: ['ALL'] },
+              },
+              env: [
+                { name: 'QL_DEPLOYMENT_PROFILE', value: 'cluster-control' },
+                { name: 'QL3_CLUSTER_CONTROL_ENABLED', value: 'true' },
+                { name: 'QL3_CLUSTER_HTTP_HOST', value: '0.0.0.0' },
+                { name: 'QL3_CLUSTER_HTTP_PORT', value: '5800' },
+                { name: 'QL3_CLUSTER_HTTP_DRAIN_TIMEOUT_MS', value: '10000' },
+                { name: 'QL3_WORKER_INGRESS_ENABLED', value: 'false' },
+                { name: 'QL3_POSTGRES_TLS_MODE', value: 'verify-full' },
+                {
+                  name: 'QL3_POSTGRES_TLS_CA_FILE',
+                  value: '/var/run/secrets/qinglong3/postgres/ca.crt',
+                },
+                {
+                  name: 'QL3_POSTGRES_TLS_SERVERNAME',
+                  value: 'ql3-postgres-rw.qinglong3-system.svc',
+                },
+                { name: 'QL3_POSTGRES_MAX_CONNECTIONS', value: '2' },
+                {
+                  name: 'QL3_POSTGRES_APPLICATION_NAME',
+                  value: 'qinglong3-security-live-control',
+                },
+                {
+                  name: 'QL3_CLUSTER_REPLICA_ID',
+                  valueFrom: {
+                    fieldRef: {
+                      apiVersion: 'v1',
+                      fieldPath: 'metadata.name',
+                    },
+                  },
+                },
+                {
+                  name: 'QL3_POSTGRES_RUNTIME_URL',
+                  valueFrom: {
+                    secretKeyRef: {
+                      name: CONTROL_RUNTIME_SECRET,
+                      key: 'postgres-runtime-url',
+                    },
+                  },
+                },
+                {
+                  name: 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
+                  value: '/var/run/secrets/qinglong3/api-credential/keyring.json',
+                },
+              ],
+              ports: [{ name: 'http', containerPort: 5800 }],
+              startupProbe: {
+                httpGet: { path: '/livez', port: 'http' },
+                periodSeconds: 2,
+                timeoutSeconds: 1,
+                failureThreshold: 60,
+              },
+              readinessProbe: {
+                httpGet: { path: '/readyz', port: 'http' },
+                periodSeconds: 2,
+                timeoutSeconds: 1,
+                failureThreshold: 10,
+              },
+              resources: {
+                requests: { cpu: '25m', memory: '96Mi' },
+                limits: { cpu: '500m', memory: '256Mi' },
+              },
+              volumeMounts: [
+                { name: 'tmp', mountPath: '/tmp' },
+                {
+                  name: 'postgres-ca',
+                  mountPath: '/var/run/secrets/qinglong3/postgres',
+                  readOnly: true,
+                },
+                {
+                  name: 'api-credential-keyring',
+                  mountPath: '/var/run/secrets/qinglong3/api-credential',
+                  readOnly: true,
+                },
+              ],
+            }],
+            volumes: [
+              {
+                name: 'tmp',
+                emptyDir: { medium: 'Memory', sizeLimit: '16Mi' },
+              },
+              {
+                name: 'postgres-ca',
+                secret: {
+                  secretName: 'ql3-postgres-ca',
+                  defaultMode: 292,
+                  items: [{ key: 'ca.crt', path: 'ca.crt' }],
+                },
+              },
+              {
+                name: 'api-credential-keyring',
+                secret: {
+                  secretName: CONTROL_RUNTIME_SECRET,
+                  defaultMode: 292,
+                  items: [{
+                    key: 'api-credential-pepper-keyring.json',
+                    path: 'keyring.json',
+                  }],
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  ]);
+}
+
+function applyControlRuntimeSecret(fixture, runtimeDatabaseUrl, keyring) {
+  applySecret(fixture, CONTROL_RUNTIME_SECRET, 'Opaque', {
+    'postgres-runtime-url': runtimeDatabaseUrl,
+    'api-credential-pepper-keyring.json': `${JSON.stringify(keyring)}\n`,
+  });
+}
+
+async function waitForControlRollout(fixture, restart) {
+  if (restart) {
+    fixture.kubectl([
+      '-n',
+      NAMESPACE,
+      'rollout',
+      'restart',
+      `deployment/${CONTROL_NAME}`,
+    ]);
+  }
+  fixture.kubectl([
+    '-n',
+    NAMESPACE,
+    'rollout',
+    'status',
+    `deployment/${CONTROL_NAME}`,
+    '--timeout=5m',
+  ]);
+  return (
+    await waitFor('two ready Cluster Control replicas', 120_000, () => {
+      const deployment = fixture.kubectlJson([
+        '-n',
+        NAMESPACE,
+        'get',
+        'deployment',
+        CONTROL_NAME,
+      ]);
+      const pods = fixture.kubectlJson([
+        '-n',
+        NAMESPACE,
+        'get',
+        'pods',
+        '-l',
+        `app.kubernetes.io/name=${CONTROL_NAME}`,
+      ]).items;
+      const ready = pods.filter(podReady);
+      return deployment.status.availableReplicas === 2 && ready.length === 2
+        ? {
+            ready: true,
+            value: Object.freeze({
+              replicas: ready.length,
+              nodes: Object.freeze(
+                ready.map((pod) => pod.spec.nodeName).sort(),
+              ),
+            }),
+          }
+        : {
+            ready: false,
+            fact: JSON.stringify({
+              availableReplicas: deployment.status.availableReplicas ?? 0,
+              readyPods: ready.length,
+            }),
+          };
+    })
+  ).value;
+}
+
+function credentialAuthenticationProbeSource() {
+  return String.raw`
+const fs=require('node:fs');const http=require('node:http');
+const finish=(value,status)=>{fs.writeFileSync('/dev/termination-log',JSON.stringify(value),{encoding:'utf8',mode:0o600});process.exitCode=status};
+const sleep=(milliseconds)=>new Promise((resolve)=>setTimeout(resolve,milliseconds));
+const request=(token,requestId)=>new Promise((resolve)=>{let settled=false;const done=(status)=>{if(settled)return;settled=true;resolve(status)};const call=http.get({host:'ql3-security-live-control',port:5800,path:'/api/v3/projects/prj_default/runs?limit=1',headers:{authorization:'Bearer '+token,'x-request-id':requestId}},(response)=>{const status=response.statusCode??null;response.resume();response.once('end',()=>done(status));response.once('error',()=>done(null))});call.setTimeout(5000,()=>{call.destroy();done(null)});call.once('error',()=>done(null))});
+(async()=>{let bytes;try{const file='/delivery/private/'+process.argv[1];const expected=Number(process.argv[2]);const requestId=process.argv[3];const status=fs.lstatSync(file);if(!status.isFile()||status.isSymbolicLink()||(status.mode&0o777)!==0o600||status.uid!==process.geteuid()||status.size<1||status.size>32768)throw new Error('FILE');bytes=fs.readFileSync(file);const delivery=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));if(typeof delivery.token!=='string'||!/^ql3c_[A-Za-z0-9_-]+_[A-Za-z0-9_-]{43}$/.test(delivery.token)||!Number.isSafeInteger(delivery.notBeforeAtMs)||!Number.isSafeInteger(delivery.expiresAtMs))throw new Error('SCHEMA');const wait=Math.max(0,delivery.notBeforeAtMs-Date.now()+1000);if(wait>360000||Date.now()+wait>=delivery.expiresAtMs)throw new Error('LIFETIME');if(wait>0)await sleep(wait);const observed=await request(delivery.token,requestId);if(observed!==expected)throw Object.assign(new Error('STATUS'),{observed});finish({schemaVersion:1,passed:true,expectedStatus:expected,observedStatus:observed},0)}catch(error){finish({schemaVersion:1,passed:false,code:error instanceof Error&&/^[A-Z]+$/.test(error.message)?error.message:'UNAVAILABLE',observedStatus:Number.isInteger(error?.observed)?error.observed:null},1)}finally{bytes?.fill(0)}})();`;
+}
+
+async function runCredentialAuthenticationProbe({
+  fixture,
+  adminImage,
+  name,
+  deliveryFile,
+  expectedStatus,
+  requestId,
+  createdEvidenceJobs,
+}) {
+  fixture.create({
+    apiVersion: 'batch/v1',
+    kind: 'Job',
+    metadata: { name, namespace: NAMESPACE },
+    spec: {
+      backoffLimit: 0,
+      activeDeadlineSeconds: 420,
+      ttlSecondsAfterFinished: 600,
+      template: {
+        metadata: {
+          labels: {
+            'app.kubernetes.io/name': NAME,
+            'app.kubernetes.io/component': 'credential-authentication-evidence',
+            'ql3.live/evidence': 'credential-authentication',
+          },
+        },
+        spec: {
+          serviceAccountName: NAME,
+          automountServiceAccountToken: false,
+          enableServiceLinks: false,
+          restartPolicy: 'Never',
+          securityContext: {
+            runAsNonRoot: true,
+            runAsUser: 10001,
+            runAsGroup: 10001,
+            fsGroup: 10001,
+            fsGroupChangePolicy: 'OnRootMismatch',
+            seccompProfile: { type: 'RuntimeDefault' },
+          },
+          containers: [{
+            name: 'authentication-evidence',
+            image: adminImage,
+            imagePullPolicy: 'Never',
+            command: [
+              'node',
+              '-e',
+              credentialAuthenticationProbeSource(),
+              deliveryFile,
+              String(expectedStatus),
+              requestId,
+            ],
+            terminationMessagePolicy: 'File',
+            securityContext: {
+              allowPrivilegeEscalation: false,
+              readOnlyRootFilesystem: true,
+              capabilities: { drop: ['ALL'] },
+            },
+            resources: {
+              requests: { cpu: '5m', memory: '16Mi' },
+              limits: { cpu: '100m', memory: '64Mi' },
+            },
+            volumeMounts: [{
+              name: 'delivery',
+              mountPath: '/delivery',
+              readOnly: true,
+            }],
+          }],
+          volumes: [{
+            name: 'delivery',
+            persistentVolumeClaim: { claimName: DELIVERY_CLAIM },
+          }],
+        },
+      },
+    },
+  });
+  createdEvidenceJobs.add(name);
+  try {
+    const snapshot = await terminalJobSnapshot(fixture, name, 480_000);
+    const state = snapshot.pod.status.containerStatuses?.[0]?.state?.terminated;
+    const statusEvidence = state?.message || JSON.stringify({
+      exitCode: state?.exitCode ?? null,
+      reason: state?.reason ?? null,
+    });
+    assert.equal(snapshot.complete, true, statusEvidence);
+    assert.equal(snapshot.failed, false, statusEvidence);
+    assert.equal(state?.exitCode, 0, state?.message);
+    const evidence = JSON.parse(state.message);
+    assert.deepEqual(evidence, {
+      schemaVersion: 1,
+      passed: true,
+      expectedStatus,
+      observedStatus: expectedStatus,
+    });
     return evidence;
   } finally {
     deleteResource(fixture, `job/${name}`);
@@ -900,6 +1267,7 @@ async function main(argv = process.argv.slice(2)) {
       fixture.loadImage(image, archive);
     }
     const adminImageInfo = fixture.inspectImage(adminImage);
+    const controlImageInfo = fixture.inspectImage(controlImage);
     const postgresImageInfo = fixture.inspectImage(POSTGRES_IMAGE);
     const k3sImageInfo = fixture.inspectImage(fixture.k3sImage);
 
@@ -1098,21 +1466,70 @@ async function main(argv = process.argv.slice(2)) {
 
     const values = Object.freeze({
       subject: Object.freeze({ type: 'api_app', id: `d406-live-${suffix}` }),
-      credentialId: `d406-live-${suffix}`,
       identityMutationId: crypto.randomUUID(),
+      registerRequestId: `d406-register-${suffix}`,
+    });
+    const oldCredential = Object.freeze({
+      subject: values.subject,
+      credentialId: `d407-old-${suffix}`,
+      issueMutationId: crypto.randomUUID(),
+      revokeMutationId: crypto.randomUUID(),
+      issueRequestId: `d407-old-issue-${suffix}`,
+      revokeRequestId: `d407-old-revoke-${suffix}`,
+    });
+    const newCredential = Object.freeze({
+      subject: values.subject,
+      credentialId: `d407-new-${suffix}`,
       issueMutationId: crypto.randomUUID(),
       rotateMutationId: crypto.randomUUID(),
-      revokeMutationId: crypto.randomUUID(),
-      registerRequestId: `d406-register-${suffix}`,
-      issueRequestId: `d406-issue-${suffix}`,
-      rotateRequestId: `d406-rotate-${suffix}`,
-      revokeRequestId: `d406-revoke-${suffix}`,
+      issueRequestId: `d407-new-issue-${suffix}`,
+      rotateRequestId: `d407-new-rotate-${suffix}`,
+    });
+    const authenticationRequestIds = Object.freeze({
+      oldBeforeActivation: `d407-auth-old-before-${suffix}`,
+      oldDuringOverlap: `d407-auth-old-overlap-${suffix}`,
+      newDuringOverlap: `d407-auth-new-overlap-${suffix}`,
+      oldAfterConvergence: `d407-auth-old-contracted-${suffix}`,
+      newAfterContraction: `d407-auth-new-contracted-${suffix}`,
     });
     const key = identity.reviewedKey('security-administration-live-key-1');
     const keyset = identity.keyset(1, [key]);
-    const pepper = randomSecret();
+    const oldPepperKeyId = 'd407-old';
+    const newPepperKeyId = 'd407-new';
+    const oldPepper = randomSecret();
+    const newPepper = randomSecret();
+    const overlapOldActive = apiCredentialPepperKeyring(oldPepperKeyId, [
+      { pepperKeyId: oldPepperKeyId, pepper: oldPepper },
+      { pepperKeyId: newPepperKeyId, pepper: newPepper },
+    ]);
+    const overlapNewActive = apiCredentialPepperKeyring(newPepperKeyId, [
+      { pepperKeyId: oldPepperKeyId, pepper: oldPepper },
+      { pepperKeyId: newPepperKeyId, pepper: newPepper },
+    ]);
+    const contractedNew = apiCredentialPepperKeyring(newPepperKeyId, [
+      { pepperKeyId: newPepperKeyId, pepper: newPepper },
+    ]);
     const register = identityRegisterCommand(values);
-    const revoke = credentialRevokeCommand(values);
+    const revokeOld = credentialRevokeCommand({
+      ...oldCredential,
+      expectedCurrentVersion: 1,
+    });
+    const runtimeDatabaseUrl =
+      `postgresql://ql3_runtime:${passwords.ql3_runtime}` +
+      '@ql3-postgres-rw.qinglong3-system.svc:5432/qinglong';
+    applyControlRuntimeSecret(
+      fixture,
+      runtimeDatabaseUrl,
+      overlapOldActive,
+    );
+    for (const resource of clusterControlResources(controlImage)) {
+      fixture.apply(resource);
+    }
+    const controlBeforeActivation = await waitForControlRollout(
+      fixture,
+      false,
+    );
+    assert.equal(new Set(controlBeforeActivation.nodes).size, 2);
 
     await runAdministrationJob({
       fixture,
@@ -1121,7 +1538,7 @@ async function main(argv = process.argv.slice(2)) {
       command: register,
       assertion: identity.assertion(key, 'invalid-input'),
       keyset,
-      pepper,
+      pepperKeyring: overlapOldActive,
       expectedComplete: false,
       projectedMode: 0o444,
       createdJobs,
@@ -1134,7 +1551,7 @@ async function main(argv = process.argv.slice(2)) {
       command: register,
       assertion: identity.assertion(key, 'register'),
       keyset,
-      pepper,
+      pepperKeyring: overlapOldActive,
       expectedComplete: true,
       createdJobs,
       createdSecrets,
@@ -1146,27 +1563,30 @@ async function main(argv = process.argv.slice(2)) {
       command: auditListCommand(),
       assertion: identity.assertion(key, 'audit'),
       keyset,
-      pepper,
+      pepperKeyring: overlapOldActive,
       expectedComplete: true,
       createdJobs,
       createdSecrets,
     });
-    const issueNotBeforeAtMs = Date.now() + 5 * 60 * 1000;
-    const issue = credentialIssueCommand({
-      ...values,
-      notBeforeAtMs: issueNotBeforeAtMs,
-      expiresAtMs: issueNotBeforeAtMs + 60 * 60 * 1000,
+    const oldIssueNotBeforeAtMs = Date.now() + 2 * 60 * 1000;
+    const issueOld = credentialIssueCommand({
+      ...oldCredential,
+      notBeforeAtMs: oldIssueNotBeforeAtMs,
+      expiresAtMs: oldIssueNotBeforeAtMs + 60 * 60 * 1000,
     });
-    const issueAssertion = identity.assertion(key, 'issue-response-loss');
+    const oldIssueAssertion = identity.assertion(
+      key,
+      'old-issue-response-loss',
+    );
     await runAdministrationJob({
       fixture,
       template: deliveryTemplate,
-      name: 'ql3-security-live-issue',
-      command: issue,
-      assertion: issueAssertion,
+      name: 'ql3-security-live-old-issue',
+      command: issueOld,
+      assertion: oldIssueAssertion,
       keyset,
-      pepper,
-      deliveryFile: 'issue.json',
+      pepperKeyring: overlapOldActive,
+      deliveryFile: 'old-issue.json',
       expectedComplete: true,
       createdJobs,
       createdSecrets,
@@ -1182,19 +1602,19 @@ async function main(argv = process.argv.slice(2)) {
       fixture,
       adminImage,
       name: 'ql3-security-live-evidence-issued',
-      expected: [{ name: 'issue.json', operation: 'credential.issue' }],
+      expected: [{ name: 'old-issue.json', operation: 'credential.issue' }],
       kubernetesServiceIp,
       createdEvidenceJobs,
     });
     await runAdministrationJob({
       fixture,
       template: deliveryTemplate,
-      name: 'ql3-security-live-issue-replay',
-      command: issue,
-      assertion: issueAssertion,
+      name: 'ql3-security-live-old-issue-replay',
+      command: issueOld,
+      assertion: oldIssueAssertion,
       keyset,
-      pepper,
-      deliveryFile: 'issue.json',
+      pepperKeyring: overlapOldActive,
+      deliveryFile: 'old-issue.json',
       expectedComplete: true,
       createdJobs,
       createdSecrets,
@@ -1203,26 +1623,142 @@ async function main(argv = process.argv.slice(2)) {
       fixture,
       adminImage,
       name: 'ql3-security-live-evidence-replay',
-      expected: [{ name: 'issue.json', operation: 'credential.issue' }],
+      expected: [{ name: 'old-issue.json', operation: 'credential.issue' }],
       kubernetesServiceIp,
       createdEvidenceJobs,
     });
     assert.deepEqual(replayEvidence.files, issuedEvidence.files);
-    const rotateNotBeforeAtMs = Date.now() + 5 * 60 * 1000;
-    const rotate = credentialRotateCommand({
-      ...values,
-      notBeforeAtMs: rotateNotBeforeAtMs,
-      expiresAtMs: rotateNotBeforeAtMs + 60 * 60 * 1000,
+    const oldAuthenticationBeforeActivation =
+      await runCredentialAuthenticationProbe({
+        fixture,
+        adminImage,
+        name: 'ql3-security-live-auth-old-before-activate',
+        deliveryFile: 'old-issue.json',
+        expectedStatus: 403,
+        requestId: authenticationRequestIds.oldBeforeActivation,
+        createdEvidenceJobs,
+      });
+    await runAdministrationJob({
+      fixture,
+      template: baseTemplate,
+      name: 'ql3-security-live-old-references-before-activate',
+      command: pepperReferencesCommand(oldPepperKeyId),
+      assertion: identity.assertion(key, 'old-references-before-activate'),
+      keyset,
+      pepperKeyring: overlapOldActive,
+      expectedComplete: true,
+      createdJobs,
+      createdSecrets,
+    });
+    const referencesBeforeActivate = Number(
+      psql(
+        fixture,
+        currentPrimaryPod(fixture).metadata.name,
+        `SELECT count(*)::integer FROM "ql3"."api_credentials" current_record WHERE credential_id = ${sqlString(
+          oldCredential.credentialId,
+        )} AND pepper_key_id = ${sqlString(
+          oldPepperKeyId,
+        )} AND state = 'active' AND expires_at_ms > (extract(epoch FROM statement_timestamp()) * 1000)::bigint AND NOT EXISTS (SELECT 1 FROM "ql3"."api_credentials" newer WHERE newer.credential_id = current_record.credential_id AND newer.version > current_record.version)`,
+      ),
+    );
+    assert.equal(referencesBeforeActivate, 1);
+    applyControlRuntimeSecret(
+      fixture,
+      runtimeDatabaseUrl,
+      overlapNewActive,
+    );
+    const controlDuringOverlap = await waitForControlRollout(fixture, true);
+    assert.equal(new Set(controlDuringOverlap.nodes).size, 2);
+    const oldAuthenticationDuringOverlap =
+      await runCredentialAuthenticationProbe({
+        fixture,
+        adminImage,
+        name: 'ql3-security-live-auth-old-overlap',
+        deliveryFile: 'old-issue.json',
+        expectedStatus: 403,
+        requestId: authenticationRequestIds.oldDuringOverlap,
+        createdEvidenceJobs,
+      });
+    const newIssueNotBeforeAtMs = Date.now() + 2 * 60 * 1000;
+    const issueNew = credentialIssueCommand({
+      ...newCredential,
+      notBeforeAtMs: newIssueNotBeforeAtMs,
+      expiresAtMs: newIssueNotBeforeAtMs + 60 * 60 * 1000,
     });
     await runAdministrationJob({
       fixture,
       template: deliveryTemplate,
-      name: 'ql3-security-live-rotate',
-      command: rotate,
-      assertion: identity.assertion(key, 'rotate'),
+      name: 'ql3-security-live-new-issue',
+      command: issueNew,
+      assertion: identity.assertion(key, 'new-issue'),
       keyset,
-      pepper,
-      deliveryFile: 'rotate.json',
+      pepperKeyring: overlapNewActive,
+      deliveryFile: 'new-issue.json',
+      expectedComplete: true,
+      createdJobs,
+      createdSecrets,
+    });
+    const newRotateNotBeforeAtMs = Date.now() + 2 * 60 * 1000;
+    const rotateNew = credentialRotateCommand({
+      ...newCredential,
+      notBeforeAtMs: newRotateNotBeforeAtMs,
+      expiresAtMs: newRotateNotBeforeAtMs + 60 * 60 * 1000,
+    });
+    await runAdministrationJob({
+      fixture,
+      template: deliveryTemplate,
+      name: 'ql3-security-live-new-rotate',
+      command: rotateNew,
+      assertion: identity.assertion(key, 'new-rotate'),
+      keyset,
+      pepperKeyring: overlapNewActive,
+      deliveryFile: 'new-rotate.json',
+      expectedComplete: true,
+      createdJobs,
+      createdSecrets,
+    });
+    const newAuthenticationDuringOverlap =
+      await runCredentialAuthenticationProbe({
+        fixture,
+        adminImage,
+        name: 'ql3-security-live-auth-new-overlap',
+        deliveryFile: 'new-rotate.json',
+        expectedStatus: 403,
+        requestId: authenticationRequestIds.newDuringOverlap,
+        createdEvidenceJobs,
+      });
+    await runAdministrationJob({
+      fixture,
+      template: baseTemplate,
+      name: 'ql3-security-live-old-references-after-activate',
+      command: pepperReferencesCommand(oldPepperKeyId),
+      assertion: identity.assertion(key, 'old-references-after-activate'),
+      keyset,
+      pepperKeyring: overlapNewActive,
+      expectedComplete: true,
+      createdJobs,
+      createdSecrets,
+    });
+    const referencesAfterActivate = Number(
+      psql(
+        fixture,
+        currentPrimaryPod(fixture).metadata.name,
+        `SELECT count(*)::integer FROM "ql3"."api_credentials" current_record WHERE credential_id = ${sqlString(
+          oldCredential.credentialId,
+        )} AND pepper_key_id = ${sqlString(
+          oldPepperKeyId,
+        )} AND version = (SELECT max(version) FROM "ql3"."api_credentials" WHERE credential_id = current_record.credential_id) AND state = 'active' AND expires_at_ms > (extract(epoch FROM statement_timestamp()) * 1000)::bigint`,
+      ),
+    );
+    assert.equal(referencesAfterActivate, 1);
+    await runAdministrationJob({
+      fixture,
+      template: baseTemplate,
+      name: 'ql3-security-live-old-revoke',
+      command: revokeOld,
+      assertion: identity.assertion(key, 'old-revoke'),
+      keyset,
+      pepperKeyring: overlapNewActive,
       expectedComplete: true,
       createdJobs,
       createdSecrets,
@@ -1230,32 +1766,68 @@ async function main(argv = process.argv.slice(2)) {
     await runAdministrationJob({
       fixture,
       template: baseTemplate,
-      name: 'ql3-security-live-revoke',
-      command: revoke,
-      assertion: identity.assertion(key, 'revoke'),
+      name: 'ql3-security-live-old-references-after-converge',
+      command: pepperReferencesCommand(oldPepperKeyId),
+      assertion: identity.assertion(key, 'old-references-after-converge'),
       keyset,
-      pepper,
+      pepperKeyring: overlapNewActive,
       expectedComplete: true,
       createdJobs,
       createdSecrets,
     });
+    const referencesAfterConvergence = Number(
+      psql(
+        fixture,
+        currentPrimaryPod(fixture).metadata.name,
+        `SELECT count(*)::integer FROM "ql3"."api_credentials" current_record WHERE credential_id = ${sqlString(
+          oldCredential.credentialId,
+        )} AND pepper_key_id = ${sqlString(
+          oldPepperKeyId,
+        )} AND version = (SELECT max(version) FROM "ql3"."api_credentials" WHERE credential_id = current_record.credential_id) AND state = 'active' AND expires_at_ms > (extract(epoch FROM statement_timestamp()) * 1000)::bigint`,
+      ),
+    );
+    assert.equal(referencesAfterConvergence, 0);
+    applyControlRuntimeSecret(fixture, runtimeDatabaseUrl, contractedNew);
+    const controlAfterContraction = await waitForControlRollout(fixture, true);
+    assert.equal(new Set(controlAfterContraction.nodes).size, 2);
+    const oldAuthenticationAfterConvergence =
+      await runCredentialAuthenticationProbe({
+        fixture,
+        adminImage,
+        name: 'ql3-security-live-auth-old-contracted',
+        deliveryFile: 'old-issue.json',
+        expectedStatus: 401,
+        requestId: authenticationRequestIds.oldAfterConvergence,
+        createdEvidenceJobs,
+      });
+    const newAuthenticationAfterContraction =
+      await runCredentialAuthenticationProbe({
+        fixture,
+        adminImage,
+        name: 'ql3-security-live-auth-new-contracted',
+        deliveryFile: 'new-rotate.json',
+        expectedStatus: 403,
+        requestId: authenticationRequestIds.newAfterContraction,
+        createdEvidenceJobs,
+      });
     const finalEvidence = await runCustodyEvidence({
       fixture,
       adminImage,
       name: 'ql3-security-live-evidence-final',
       expected: [
-        { name: 'issue.json', operation: 'credential.issue' },
-        { name: 'rotate.json', operation: 'credential.rotate' },
+        { name: 'old-issue.json', operation: 'credential.issue' },
+        { name: 'new-issue.json', operation: 'credential.issue' },
+        { name: 'new-rotate.json', operation: 'credential.rotate' },
       ],
       kubernetesServiceIp,
       createdEvidenceJobs,
     });
-    assert.equal(finalEvidence.files.length, 2);
+    assert.equal(finalEvidence.files.length, 3);
     const issueFile = finalEvidence.files.find(
-      (file) => file.name === 'issue.json',
+      (file) => file.name === 'old-issue.json',
     );
     const rotationFile = finalEvidence.files.find(
-      (file) => file.name === 'rotate.json',
+      (file) => file.name === 'new-rotate.json',
     );
     assert.ok(issueFile && rotationFile);
     assert.notEqual(issueFile.digest, rotationFile.digest);
@@ -1274,45 +1846,82 @@ async function main(argv = process.argv.slice(2)) {
           `  'identityStatus', (SELECT status FROM "ql3"."identity_subjects" WHERE subject_type = ${sqlString(
             values.subject.type,
           )} AND subject_id = ${sqlString(values.subject.id)}),`,
-          `  'credentialVersion', (SELECT max(version)::integer FROM "ql3"."api_credentials" WHERE credential_id = ${sqlString(
-            values.credentialId,
+          `  'oldCredentialVersion', (SELECT max(version)::integer FROM "ql3"."api_credentials" WHERE credential_id = ${sqlString(
+            oldCredential.credentialId,
           )}),`,
-          `  'credentialState', (SELECT state FROM "ql3"."api_credentials" WHERE credential_id = ${sqlString(
-            values.credentialId,
+          `  'oldCredentialState', (SELECT state FROM "ql3"."api_credentials" WHERE credential_id = ${sqlString(
+            oldCredential.credentialId,
+          )} ORDER BY version DESC LIMIT 1),`,
+          `  'newCredentialVersion', (SELECT max(version)::integer FROM "ql3"."api_credentials" WHERE credential_id = ${sqlString(
+            newCredential.credentialId,
+          )}),`,
+          `  'newCredentialState', (SELECT state FROM "ql3"."api_credentials" WHERE credential_id = ${sqlString(
+            newCredential.credentialId,
           )} ORDER BY version DESC LIMIT 1),`,
           `  'identityMutationCount', (SELECT count(*)::integer FROM "ql3"."identity_subject_mutations" WHERE subject_type = ${sqlString(
             values.subject.type,
           )} AND subject_id = ${sqlString(values.subject.id)}),`,
-          `  'credentialMutationCount', (SELECT count(*)::integer FROM "ql3"."api_credential_mutations" WHERE credential_id = ${sqlString(
-            values.credentialId,
-          )}),`,
+          `  'credentialMutationCount', (SELECT count(*)::integer FROM "ql3"."api_credential_mutations" WHERE credential_id IN (${[
+            oldCredential.credentialId,
+            newCredential.credentialId,
+          ].map(sqlString).join(',')})),`,
           `  'issueMutationCount', (SELECT count(*)::integer FROM "ql3"."api_credential_mutations" WHERE mutation_id = ${sqlString(
-            values.issueMutationId,
+            oldCredential.issueMutationId,
           )}::uuid),`,
-          `  'credentialVersionCount', (SELECT count(*)::integer FROM "ql3"."api_credentials" WHERE credential_id = ${sqlString(
-            values.credentialId,
-          )}),`,
+          `  'credentialVersionCount', (SELECT count(*)::integer FROM "ql3"."api_credentials" WHERE credential_id IN (${[
+            oldCredential.credentialId,
+            newCredential.credentialId,
+          ].map(sqlString).join(',')})),`,
+          `  'oldGenerationVersionCount', (SELECT count(*)::integer FROM "ql3"."api_credentials" WHERE credential_id IN (${[
+            oldCredential.credentialId,
+            newCredential.credentialId,
+          ].map(sqlString).join(',')}) AND pepper_key_id = ${sqlString(oldPepperKeyId)}),`,
+          `  'newGenerationVersionCount', (SELECT count(*)::integer FROM "ql3"."api_credentials" WHERE credential_id IN (${[
+            oldCredential.credentialId,
+            newCredential.credentialId,
+          ].map(sqlString).join(',')}) AND pepper_key_id = ${sqlString(newPepperKeyId)}),`,
+          `  'latestGenerationsAreNew', (SELECT count(*) = 2 FROM "ql3"."api_credentials" current_record WHERE credential_id IN (${[
+            oldCredential.credentialId,
+            newCredential.credentialId,
+          ].map(sqlString).join(',')}) AND version = (SELECT max(version) FROM "ql3"."api_credentials" WHERE credential_id = current_record.credential_id) AND pepper_key_id = ${sqlString(newPepperKeyId)}),`,
           `  'allowedAuditCount', (SELECT count(*)::integer FROM "ql3"."security_audit_events" WHERE request_id IN (${[
             values.registerRequestId,
-            values.issueRequestId,
-            values.rotateRequestId,
-            values.revokeRequestId,
+            oldCredential.issueRequestId,
+            newCredential.issueRequestId,
+            newCredential.rotateRequestId,
+            oldCredential.revokeRequestId,
           ]
             .map(sqlString)
-            .join(',')}) AND outcome = 'allowed'))`,
+            .join(',')}) AND outcome = 'allowed'),`,
+          `  'authenticationDeniedAuditCount', (SELECT count(*)::integer FROM "ql3"."security_audit_events" WHERE request_id IN (${[
+            authenticationRequestIds.oldBeforeActivation,
+            authenticationRequestIds.oldDuringOverlap,
+            authenticationRequestIds.newDuringOverlap,
+            authenticationRequestIds.newAfterContraction,
+          ].map(sqlString).join(',')}) AND outcome = 'denied'),`,
+          `  'authenticationRejectedAuditCount', (SELECT count(*)::integer FROM "ql3"."security_audit_events" WHERE request_id = ${sqlString(
+            authenticationRequestIds.oldAfterConvergence,
+          )} AND outcome = 'authentication_rejected'))`,
         ].join('\n'),
       ),
     );
     assert.deepEqual(durable, {
       identityVersion: 1,
       identityStatus: 'active',
-      credentialVersion: 3,
-      credentialState: 'revoked',
+      oldCredentialVersion: 2,
+      oldCredentialState: 'revoked',
+      newCredentialVersion: 2,
+      newCredentialState: 'active',
       identityMutationCount: 1,
-      credentialMutationCount: 3,
+      credentialMutationCount: 4,
       issueMutationCount: 1,
-      credentialVersionCount: 3,
-      allowedAuditCount: 4,
+      credentialVersionCount: 4,
+      oldGenerationVersionCount: 1,
+      newGenerationVersionCount: 3,
+      latestGenerationsAreNew: true,
+      allowedAuditCount: 5,
+      authenticationDeniedAuditCount: 4,
+      authenticationRejectedAuditCount: 1,
     });
     const adminRole = JSON.parse(
       psql(
@@ -1365,6 +1974,9 @@ async function main(argv = process.argv.slice(2)) {
     assert.equal(createdJobs.size, 0);
     assert.equal(createdSecrets.size, 0);
     assert.equal(createdEvidenceJobs.size, 0);
+    deleteResource(fixture, `deployment/${CONTROL_NAME}`);
+    deleteResource(fixture, `service/${CONTROL_NAME}`);
+    deleteResource(fixture, `secret/${CONTROL_RUNTIME_SECRET}`);
     deleteResource(fixture, `persistentvolumeclaim/${DELIVERY_CLAIM}`);
     await waitFor('delivery PVC deletion', 60_000, () =>
       resourceAbsent(
@@ -1399,6 +2011,18 @@ async function main(argv = process.argv.slice(2)) {
         fixture,
         `persistentvolumeclaim/${DELIVERY_CLAIM}`,
       ),
+      controlDeploymentDeleted: resourceAbsent(
+        fixture,
+        `deployment/${CONTROL_NAME}`,
+      ),
+      controlServiceDeleted: resourceAbsent(
+        fixture,
+        `service/${CONTROL_NAME}`,
+      ),
+      controlRuntimeSecretDeleted: resourceAbsent(
+        fixture,
+        `secret/${CONTROL_RUNTIME_SECRET}`,
+      ),
     };
     assert.equal(Object.values(cleanup).every(Boolean), true);
 
@@ -1412,6 +2036,7 @@ async function main(argv = process.argv.slice(2)) {
         architecture,
         kubernetesImageId: imageIdDigest(k3sImageInfo),
         administrationImageId: imageIdDigest(adminImageInfo),
+        controlImageId: imageIdDigest(controlImageInfo),
         cniName: 'flannel',
         cniDistributionBinding: fixture.k3sImage,
         controlPlaneNodes: 1,
@@ -1437,13 +2062,24 @@ async function main(argv = process.argv.slice(2)) {
         operations: [
           'identity.register',
           'audit.list',
-          'credential.issue',
-          'credential.issue.replay',
-          'credential.rotate',
-          'credential.revoke',
+          'credential.issue.old',
+          'credential.issue.old.replay',
+          'credential.key-references.before-activate',
+          'credential.issue.new',
+          'credential.rotate.new',
+          'credential.key-references.after-activate',
+          'credential.revoke.old',
+          'credential.key-references.after-converge',
         ],
-        completedJobs: 6,
+        completedJobs: 10,
         failedJobs: 1,
+        authenticationProbeJobs: 5,
+        controlReplicas: controlAfterContraction.replicas,
+        controlRollouts: 3,
+        controlReplicaAntiAffinity:
+          new Set(controlBeforeActivation.nodes).size === 2 &&
+          new Set(controlDuringOverlap.nodes).size === 2 &&
+          new Set(controlAfterContraction.nodes).size === 2,
         callerDriven: true,
         backoffLimit: baseTemplate.spec.backoffLimit,
         activeDeadlineSeconds: baseTemplate.spec.activeDeadlineSeconds,
@@ -1452,6 +2088,29 @@ async function main(argv = process.argv.slice(2)) {
         serviceAccountTokenMounted: false,
         rbacGranted: false,
         responseLossReplayObserved: true,
+        overlapGenerationCount: overlapOldActive.keys.length,
+        contractedGenerationCount: contractedNew.keys.length,
+        activeGenerationChanged:
+          overlapOldActive.activePepperKeyId !==
+          overlapNewActive.activePepperKeyId,
+        oldReferencesBeforeActivation: referencesBeforeActivate,
+        oldReferencesAfterActivation: referencesAfterActivate,
+        oldReferencesAfterConvergence: referencesAfterConvergence,
+        oldAuthenticationBeforeActivation:
+          oldAuthenticationBeforeActivation.observedStatus === 403,
+        oldAuthenticationDuringOverlap:
+          oldAuthenticationDuringOverlap.observedStatus === 403,
+        newAuthenticationDuringOverlap:
+          newAuthenticationDuringOverlap.observedStatus === 403,
+        oldAuthenticationRejectedAfterConvergence:
+          oldAuthenticationAfterConvergence.observedStatus === 401,
+        newAuthenticationAfterContraction:
+          newAuthenticationAfterContraction.observedStatus === 403,
+        contractedToActiveGeneration:
+          contractedNew.activePepperKeyId ===
+            overlapNewActive.activePepperKeyId &&
+          contractedNew.keys[0]?.pepperKeyId ===
+            contractedNew.activePepperKeyId,
         sensitiveMaterialReported: false,
       },
       inputBoundary: {
@@ -1500,7 +2159,10 @@ async function main(argv = process.argv.slice(2)) {
           Number(finalCluster.status.readyInstances) === 3,
         realKubeletSecretProjection: true,
         realAdministrationProductCommands: true,
-        realPersistentCredentialCustody: finalEvidence.files.length === 2,
+        realPersistentCredentialCustody: finalEvidence.files.length === 3,
+        realClusterControlAuthenticationRotation:
+          durable.authenticationDeniedAuditCount === 4 &&
+          durable.authenticationRejectedAuditCount === 1,
         responseLossReplay: durable.issueMutationCount === 1,
         failedInputStageClosed: true,
         leastPrivilege: true,
@@ -1555,6 +2217,8 @@ if (require.main === module) {
 
 module.exports = {
   auditListCommand,
+  clusterControlResources,
+  credentialAuthenticationProbeSource,
   credentialIssueCommand,
   credentialRevokeCommand,
   credentialRotateCommand,

@@ -958,22 +958,25 @@ stringData:
     -----BEGIN CERTIFICATE-----
     REPLACE_WITH_OPERATOR_CA_BUNDLE
     -----END CERTIFICATE-----
-  api-credential-pepper: REPLACE_WITH_CANONICAL_32_BYTE_BASE64URL
+  api-credential-pepper-keyring.json: |
+    {"schemaVersion":1,"activePepperKeyId":"legacy-v1","keys":[{"pepperKeyId":"legacy-v1","pepper":"REPLACE_WITH_CANONICAL_32_BYTE_BASE64URL"}]}
 ```
 
 The URL must not contain `ssl*` query parameters. TLS is configured separately
 and is fixed to `verify-full` in the committed deployment. The servername is
 mandatory, must be an explicit DNS name rather than an IP literal, and must
 match the endpoint certificate SAN. Only
-`postgres-ca.crt` is projected from this Secret into the runtime trust mount;
-the URL, servername and pepper remain environment-only values. The CA loader
-requires an absolute path to a regular file that is not group/world writable,
-1–256 KiB, and contains 1–16 unique PEM X.509 CA certificates with no trailing
-data.
+`postgres-ca.crt` and `api-credential-pepper-keyring.json` are projected from
+this Secret into the runtime private mount; only the URL and servername remain
+environment values. The keyring is a canonical, bounded 1–2 generation file;
+the singleton above is the bootstrap form. The CA loader requires an absolute
+path to a regular file that is not group/world writable, 1–256 KiB, and
+contains 1–16 unique PEM X.509 CA certificates with no trailing data.
 
-The trust bundle is loaded once for each new application activation. Rotate the
-Secret and perform a controlled Deployment rollout; an active Pool never
-silently changes trust roots in place. Use the
+The trust bundle and API credential keyring are loaded once for each new
+application activation. Rotate the Secret and perform a controlled Deployment
+rollout; an active process never silently changes either authority in place.
+Use the
 [old → overlap → new runbook](operations/postgres-ca-rotation.md) and its
 `audit:postgres-ca-overlap:ql3` preflight rather than replacing a trust root in
 one step.

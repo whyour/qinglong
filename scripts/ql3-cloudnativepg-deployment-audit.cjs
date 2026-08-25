@@ -354,13 +354,13 @@ function assertSecretBoundary(readFile, root, findings) {
     if (name === 'ql3-cluster-control-runtime') {
       if (
         secret?.type !== 'Opaque' ||
-        secret?.stringData?.['api-credential-pepper'] !==
-          'REPLACE_WITH_CANONICAL_32_BYTE_BASE64URL'
+        secret?.stringData?.['api-credential-pepper-keyring.json'] !==
+          '{"schemaVersion":1,"activePepperKeyId":"REPLACE_WITH_ACTIVE_KEY_ID","keys":[{"pepperKeyId":"REPLACE_WITH_ACTIVE_KEY_ID","pepper":"REPLACE_WITH_CANONICAL_32_BYTE_BASE64URL"}]}\n'
       ) {
         findings.push(
           finding(
             'QL3_CNPG_RUNTIME_SECRET_EXAMPLE',
-            'runtime Secret example may contain only the placeholder credential pepper',
+            'runtime Secret example must contain only the bounded placeholder credential pepper keyring',
           ),
         );
       }
@@ -503,6 +503,7 @@ function assertMigrationBinding(readFile, root, findings) {
     env.has('QL3_POSTGRES_MIGRATION_URL') ||
     env.has('QL3_POSTGRES_RUNTIME_URL') ||
     env.has('QL3_API_CREDENTIAL_PEPPER') ||
+    env.has('QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE') ||
     env.get('QL3_POSTGRES_MIGRATION_HOST')?.value !== PRIMARY_DNS ||
     env.get('QL3_POSTGRES_MIGRATION_PORT')?.value !== '5432' ||
     env.get('QL3_POSTGRES_MIGRATION_DATABASE')?.value !== 'qinglong' ||

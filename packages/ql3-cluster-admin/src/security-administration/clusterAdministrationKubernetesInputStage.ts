@@ -27,7 +27,7 @@ const INPUTS = Object.freeze([
   Object.freeze({ name: 'command.json', maximumBytes: 64 * 1024 }),
   Object.freeze({ name: 'assertion.jwt', maximumBytes: 16 * 1024 }),
   Object.freeze({ name: 'keyset.json', maximumBytes: 256 * 1024 }),
-  Object.freeze({ name: 'pepper', maximumBytes: 256 }),
+  Object.freeze({ name: 'pepper-keyring.json', maximumBytes: 2 * 1024 }),
 ]);
 
 export interface ClusterAdministrationKubernetesInputStagePaths {

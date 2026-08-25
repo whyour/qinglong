@@ -17,7 +17,7 @@ QingLong 3.0 同时服务低配路由设备与集群节点。pepper rotation 只
 
 `runtime-core` 提供 schema v1 keyring：一个 `activePepperKeyId` 和 1–2 个唯一 `{pepperKeyId,pepper}`。每个 ID 与 32-byte canonical base64url material 都使用既有 credential contract 校验，active ID 必须存在于 keys。原单 pepper 配置只通过显式 `legacy-v1` singleton bridge 保持兼容，不允许自动发现、环境合并或第三代历史 key。
 
-Cluster Control 可从 `QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE` 读取不超过 2 KiB 的 canonical 私有 JSON；它与旧 `QL3_API_CREDENTIAL_PEPPER` 必须二选一。文件必须是 canonical absolute regular file、不可为 symlink、不可向 group/world 开放，并在稳定 inode/mtime/size 下读取。运行时不安装 watcher；切换 keyring 后由部署系统执行受控滚动重启。
+Cluster Control 可从 `QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE` 读取不超过 2 KiB 的 canonical 私有 JSON；它与旧 `QL3_API_CREDENTIAL_PEPPER` 必须二选一。文件必须是 canonical absolute regular file、不可为 symlink、不可向 group/world 写入，并在稳定 inode/mtime/size 下读取。Kubernetes 以只读 Secret volume 和 Pod 专属 fsGroup 提供该文件。运行时不安装 watcher；切换 keyring 后由部署系统执行受控滚动重启。
 
 ### 2. 认证严格按 durable key ID 选择
 
@@ -70,10 +70,12 @@ CLI 在 `--pepper` 与 `--pepper-keyring` 中必须精确选择一个。keyring 
 - Cluster Control 覆盖 old/new overlap、stored key exact selection、unknown stored key fail-closed、旧环境变量 bridge、私有 keyring 文件与双来源拒绝；
 - Security Administration 覆盖新 credential 绑定 active key、keyring CLI、引用查询 exact command/result 与旧单 pepper bridge；
 - PostgreSQL repository 覆盖数据库时间、latest active/unexpired 过滤、limit+1、空引用与畸形行 fail-closed；
-- 当前 `cluster-admin` 完整回归为 458 total / 455 pass / 3 conditional skip / 0 fail，`cluster-control` 为 281 total / 279 pass / 2 conditional skip / 0 fail；D-407 聚焦构建与 33 项测试通过，`3.0.0-alpha.1` 身份下 18-package clean build/test 退出 0，backend 为 1592 total / 1590 pass / 2 conditional skip / 0 fail。
+- Kubernetes Security Administration 只投影 `pepper-keyring.json`，stager 以 2 KiB 边界私有化到 memory-backed `0700/0600` 目录；常驻 Cluster Control 同样只挂载 keyring 文件，不再从 Secret 注入旧单值环境变量；
+- overlap-old-active、activate-new、旧代引用 1→0 与 contract-new 的三节点 K3s/CloudNativePG live 合同已经编码；它在三次 rollout 中保持两个反亲和 Cluster Control 副本，并以真实 `/api/v3` 请求证明 old/new 在 overlap 期间认证成功但因无 Project role 返回 403、old 在 contract 后返回 401、new 仍返回 403。content-free schema 只记录状态码、引用计数、1 个旧代/3 个新代 durable version 与审计计数；远程 live 门通过前不得宣称该 ceremony 已验收；
+- 当前 `cluster-admin` 完整回归为 459 total / 456 pass / 3 conditional skip / 0 fail，`cluster-control` 为 281 total / 279 pass / 2 conditional skip / 0 fail；本轮 Kubernetes/report/stager 聚焦测试 23 项、相关共享 live fixture 静态测试 54 项以及三个部署审计通过，`3.0.0-alpha.1` 身份下 18-package clean build/test 完成（Worker Runtime 3 个 loopback 用例在沙箱外复验为 135/135），backend 为 1594 total / 1592 pass / 2 conditional skip / 0 fail。
 
 ## 影响与剩余门禁
 
 D-407 关闭了“数据库记录 key ID、运行时却只能使用一个固定 pepper”的结构性缺口。Edge/Standalone package、依赖和常驻路径零变化；Cluster 每个认证请求仍只解析 record 并计算一个摘要，管理引用检查只在显式短命令中打开一个 admin connection。
 
-D-406 Kubernetes stager/Job 仍只接受单 `pepper` 文件，不能用它执行双代 ceremony；在增加 keyring Secret 投影、失败注入和真实 K3s/CNPG overlap→activate→contract 验收前，Kubernetes 部署继续停留在 singleton bridge。远程管理 API/UI、双人复核/break-glass、material GC、audit retention/export/alert 和大规模引用查询计划也仍未完成。
+D-406 Kubernetes stager/Job 与常驻 Cluster Control manifest 已收敛为 keyring-only；旧单 pepper 只存在于通用 CLI/进程配置兼容桥。真实 K3s/CNPG overlap→activate→contract live 合同已实现但仍需在受审远程门中验收，因此当前不能把实现完成解释为 live ceremony 已关闭。远程管理 API/UI、双人复核/break-glass、material GC、audit retention/export/alert 和大规模引用查询计划也仍未完成。

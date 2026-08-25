@@ -676,7 +676,14 @@ function postgresRestoreApplicationProbeResources({
     kind: 'List',
     items: Object.freeze([
       kubernetesSecret('ql3-dr', secretName, {
-        'api-credential-pepper': apiCredentialPepper,
+        'api-credential-pepper-keyring.json': `${JSON.stringify({
+          schemaVersion: 1,
+          activePepperKeyId: 'legacy-v1',
+          keys: [{
+            pepperKeyId: 'legacy-v1',
+            pepper: apiCredentialPepper,
+          }],
+        })}\n`,
       }),
       {
         apiVersion: 'apps/v1',
@@ -753,11 +760,10 @@ function postgresRestoreApplicationProbeResources({
                       value: `qinglong3-dr-${suffix}`,
                     },
                     { name: 'QL3_POSTGRES_MAX_CONNECTIONS', value: '2' },
-                    secretValue(
-                      'QL3_API_CREDENTIAL_PEPPER',
-                      secretName,
-                      'api-credential-pepper',
-                    ),
+                    {
+                      name: 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
+                      value: '/var/run/secrets/qinglong3/api-credential/keyring.json',
+                    },
                   ],
                   ports: [{ name: 'http', containerPort: 5800 }],
                   startupProbe: {
@@ -794,6 +800,11 @@ function postgresRestoreApplicationProbeResources({
                       mountPath: '/var/run/secrets/qinglong3/postgres',
                       readOnly: true,
                     },
+                    {
+                      name: 'api-credential-keyring',
+                      mountPath: '/var/run/secrets/qinglong3/api-credential',
+                      readOnly: true,
+                    },
                   ],
                 },
               ],
@@ -808,6 +819,17 @@ function postgresRestoreApplicationProbeResources({
                     secretName: `${clusterName}-ca`,
                     defaultMode: 292,
                     items: [{ key: 'ca.crt', path: 'ca.crt' }],
+                  },
+                },
+                {
+                  name: 'api-credential-keyring',
+                  secret: {
+                    secretName,
+                    defaultMode: 288,
+                    items: [{
+                      key: 'api-credential-pepper-keyring.json',
+                      path: 'keyring.json',
+                    }],
                   },
                 },
               ],

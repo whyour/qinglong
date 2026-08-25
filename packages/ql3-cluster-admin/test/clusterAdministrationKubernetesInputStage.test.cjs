@@ -39,7 +39,11 @@ function projectedInput() {
     'command.json': '{"schemaVersion":1,"operation":"audit.list"}\n',
     'assertion.jwt': 'signed.assertion.value',
     'keyset.json': '{"keys":[]}',
-    pepper: 'A'.repeat(43),
+    'pepper-keyring.json': JSON.stringify({
+      schemaVersion: 1,
+      activePepperKeyId: 'legacy-v1',
+      keys: [{ pepperKeyId: 'legacy-v1', pepper: 'A'.repeat(43) }],
+    }),
   };
   for (const [name, value] of Object.entries(inputs)) {
     const versionFile = join(versionDirectory, name);
@@ -86,6 +90,31 @@ test('copies a Kubernetes projected Secret into a private immutable input bounda
     false,
   );
   assert.equal(JSON.stringify(result).includes('A'.repeat(43)), false);
+});
+
+test('rejects a projected pepper keyring larger than the runtime boundary', () => {
+  const fixture = projectedInput();
+  const keyringFile = resolve(
+    fixture.sourceDirectory,
+    '..data',
+    'pepper-keyring.json',
+  );
+  chmodSync(keyringFile, 0o640);
+  writeFileSync(
+    keyringFile,
+    'A'.repeat(2 * 1024 + 1),
+  );
+  chmodSync(keyringFile, 0o440);
+
+  assert.throws(
+    () =>
+      stageClusterAdministrationKubernetesInputs({
+        sourceDirectory: fixture.sourceDirectory,
+        targetDirectory: fixture.targetDirectory,
+      }),
+    /file authority is invalid/,
+  );
+  assert.throws(() => lstatSync(fixture.targetDirectory));
 });
 
 test('accepts only the exact root-owned sticky Kubernetes mount authority', () => {

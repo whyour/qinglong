@@ -150,7 +150,7 @@ function auditSecurityAdministrationKubernetes(options = {}) {
       `--command=${PRIVATE_ROOT}/input/command.json`,
       `--assertion=${PRIVATE_ROOT}/input/assertion.jwt`,
       `--keyset=${PRIVATE_ROOT}/input/keyset.json`,
-      `--pepper=${PRIVATE_ROOT}/input/pepper`,
+      `--pepper-keyring=${PRIVATE_ROOT}/input/pepper-keyring.json`,
     ];
     if (
       JSON.stringify(stager?.command) !==
@@ -181,7 +181,7 @@ function auditSecurityAdministrationKubernetes(options = {}) {
           'command.json',
           'assertion.jwt',
           'keyset.json',
-          'pepper',
+          'pepper-keyring.json',
         ]) ||
       privateInput?.emptyDir?.medium !== 'Memory' ||
       privateInput?.emptyDir?.sizeLimit !== '1Mi' ||
@@ -241,7 +241,12 @@ function auditSecurityAdministrationKubernetes(options = {}) {
       inputExample?.metadata?.name !== 'ql3-security-administration-input' ||
       JSON.stringify(Object.keys(inputExample?.stringData ?? {}).sort()) !==
         JSON.stringify(
-          ['command.json', 'assertion.jwt', 'keyset.json', 'pepper'].sort(),
+          [
+            'command.json',
+            'assertion.jwt',
+            'keyset.json',
+            'pepper-keyring.json',
+          ].sort(),
         ) ||
       JSON.stringify(aggregate).includes('security-administration')
     ) {

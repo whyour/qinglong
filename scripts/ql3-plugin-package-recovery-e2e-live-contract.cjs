@@ -1483,7 +1483,14 @@ function applyRuntimeAfterRecovery(recoveryJob, migrationJobValue, secrets) {
       type: 'Opaque',
       stringData: {
         'postgres-runtime-url': `postgresql://ql3_runtime:${secrets.runtime}@${POSTGRES_NAME}:5432/qinglong`,
-        'api-credential-pepper': randomBytes(32).toString('base64url'),
+        'api-credential-pepper-keyring.json': `${JSON.stringify({
+          schemaVersion: 1,
+          activePepperKeyId: 'legacy-v1',
+          keys: [{
+            pepperKeyId: 'legacy-v1',
+            pepper: randomBytes(32).toString('base64url'),
+          }],
+        })}\n`,
       },
     },
     'create runtime-only credential after recovery success',
@@ -1535,20 +1542,33 @@ function applyRuntimeAfterRecovery(recoveryJob, migrationJobValue, secrets) {
         },
       },
       {
-        name: 'QL3_API_CREDENTIAL_PEPPER',
-        valueFrom: {
-          secretKeyRef: {
-            name: 'ql3-cluster-control-runtime',
-            key: 'api-credential-pepper',
-          },
-        },
+        name: 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
+        value: '/var/run/secrets/qinglong3/api-credential/keyring.json',
       },
     ];
-    container.volumeMounts = [{ name: 'tmp', mountPath: '/tmp' }];
+    container.volumeMounts = [
+      { name: 'tmp', mountPath: '/tmp' },
+      {
+        name: 'api-credential-keyring',
+        mountPath: '/var/run/secrets/qinglong3/api-credential',
+        readOnly: true,
+      },
+    ];
     resource.spec.template.spec.volumes = [
       {
         name: 'tmp',
         emptyDir: { medium: 'Memory', sizeLimit: '16Mi' },
+      },
+      {
+        name: 'api-credential-keyring',
+        secret: {
+          secretName: 'ql3-cluster-control-runtime',
+          defaultMode: 288,
+          items: [{
+            key: 'api-credential-pepper-keyring.json',
+            path: 'keyring.json',
+          }],
+        },
       },
     ];
   }

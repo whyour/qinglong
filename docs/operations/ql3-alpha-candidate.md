@@ -12,6 +12,18 @@
 
 只有第一等级可以称为本阶段“用户可试运行产物”。Cluster archive 是工程集成产物，因为离线 per-architecture tag 不满足正式 Kubernetes deployment-lock 的 GHCR immutable digest 与 catalog provenance。
 
+## 当前阶段实物（2026-08-26）
+
+当前已经存在一份 owner-private、可重新加载的 Local arm64 候选，而不是只有源码或 Dockerfile：
+
+- source revision：`b45a5e04b7f49ffdadd5117b6b5253c6f1c05430`；
+- image：`qinglong3-local-application:ci-arm64`，image ID `sha256:59e39cd0c71e5a5c2bc99c599d5aa240c59f215008f8d12fde4243c984274426`；
+- archive SHA-256：`58bbc250833c9e86321718aea70ac0a637699b84c18531fa7a82b35e90b7fa83`；
+- 同目录包含 `manifest.json`、`verification-evidence.json`、CycloneDX 1.5 SBOM、`README.md` 与 `SHA256SUMS`，全套 checksum 和 `docker load` 后身份/smoke 已复验；
+- HIGH/CRITICAL OS vulnerability 为 0；128 MiB、0.5 CPU、read-only、no-network、drop-all 下的 Edge/Standalone fresh lifecycle 与 SQLite integrity 已通过；原生 Linux arm64 CI 另行覆盖 macOS bind-mount 无法等价证明的 Local API cancellation。
+
+该实物保存在工作区忽略目录，不进入 Git，也尚未上传 GitHub。远端 40/40 CI 与原生 arm64 image job 已通过；公开下载仍需维护者明确授权上传。它足以作为单架构内部试运行材料，但在 amd64 同级 archive 和远端 artifact identity 未齐全前，不得把它升级为完整双架构阶段里程碑或公开 release。
+
 ## 生成
 
 在 GitHub Actions 手动运行 `QingLong 3.0 CI`，选择目标 `next` 提交并设置 `produce_alpha_artifacts=true`。普通 push/PR 不上传大镜像，避免每次开发提交都制造伪里程碑和额外存储成本。

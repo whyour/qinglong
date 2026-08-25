@@ -1617,6 +1617,25 @@ async function main(argv = process.argv.slice(2)) {
         'tls.crt': pkiMaterial.oldClientCertificate,
       },
     });
+    apply({
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: {
+        name: 'ql3-worker-control-live-runtime',
+        namespace: NAMESPACE,
+      },
+      type: 'Opaque',
+      stringData: {
+        'api-credential-pepper-keyring.json': `${JSON.stringify({
+          schemaVersion: 1,
+          activePepperKeyId: 'legacy-v1',
+          keys: [{
+            pepperKeyId: 'legacy-v1',
+            pepper: Buffer.alloc(32, 29).toString('base64url'),
+          }],
+        })}\n`,
+      },
+    });
     const workerArchitecture = remoteWorkerArchitectureForNodeRuntime(
       process.arch, process.config.variables.arm_version,
     );
@@ -1700,8 +1719,8 @@ async function main(argv = process.argv.slice(2)) {
                 { name: 'QL3_POSTGRES_ALLOW_INSECURE', value: 'true' },
                 { name: 'QL3_POSTGRES_MAX_CONNECTIONS', value: '2' },
                 {
-                  name: 'QL3_API_CREDENTIAL_PEPPER',
-                  value: Buffer.alloc(32, 29).toString('base64url'),
+                  name: 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
+                  value: '/var/run/secrets/qinglong3/api-credential/keyring.json',
                 },
                 { name: 'QL3_WORKER_INGRESS_ENABLED', value: 'true' },
                 { name: 'QL3_WORKER_INGRESS_HOST', value: '0.0.0.0' },
@@ -1738,12 +1757,35 @@ async function main(argv = process.argv.slice(2)) {
                 timeoutSeconds: 1,
                 failureThreshold: 20,
               },
-              volumeMounts: [{ name: 'tls', mountPath: '/tls', readOnly: true }],
+              volumeMounts: [
+                { name: 'tls', mountPath: '/tls', readOnly: true },
+                {
+                  name: 'api-credential-keyring',
+                  mountPath: '/var/run/secrets/qinglong3/api-credential',
+                  readOnly: true,
+                },
+              ],
             }],
-            volumes: [{
-              name: 'tls',
-              secret: { secretName: 'ql3-worker-ingress-tls-live', defaultMode: 288 },
-            }],
+            volumes: [
+              {
+                name: 'tls',
+                secret: {
+                  secretName: 'ql3-worker-ingress-tls-live',
+                  defaultMode: 288,
+                },
+              },
+              {
+                name: 'api-credential-keyring',
+                secret: {
+                  secretName: 'ql3-worker-control-live-runtime',
+                  defaultMode: 288,
+                  items: [{
+                    key: 'api-credential-pepper-keyring.json',
+                    path: 'keyring.json',
+                  }],
+                },
+              },
+            ],
           },
         },
       },

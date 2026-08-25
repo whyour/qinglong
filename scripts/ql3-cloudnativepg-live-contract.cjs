@@ -760,7 +760,11 @@ async function main() {
       );
     }
     applySecret('ql3-cluster-control-runtime', 'Opaque', {
-      'api-credential-pepper': randomSecret(),
+      'api-credential-pepper-keyring.json': `${JSON.stringify({
+        schemaVersion: 1,
+        activePepperKeyId: 'legacy-v1',
+        keys: [{ pepperKeyId: 'legacy-v1', pepper: randomSecret() }],
+      })}\n`,
     });
     const workerIngressTls = createWorkerIngressTls(tempDirectory);
     applySecret('ql3-cluster-worker-ingress', 'Opaque', {

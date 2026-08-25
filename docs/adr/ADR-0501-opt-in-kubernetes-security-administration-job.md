@@ -23,7 +23,7 @@ ServiceAccount 和 Pod 都关闭自动 token 挂载，不创建 Role、RoleBindi
 
 Secret volume 必须兼容 kubelet 的版本目录与 symlink 投影，默认 `0440` 以便固定的非 root group 读取；但 ADR-0500 的命令拒绝 symlink 和 group/world 权限。因此在既有 `@qinglong/cluster-admin/security-administration` 内增加专用 init stager，而不新建 package。
 
-stager 只接受固定的 `command.json`、`assertion.jwt`、`keyset.json` 和 `pepper`，分别有 64 KiB、16 KiB、256 KiB 与 256 B 上限。它解析 kubelet symlink 后仍要求 realpath 留在投影 authority 内，以 `O_NOFOLLOW` 打开最终文件，复验类型、权限、大小和读前/读后 inode 状态，再清零源 Buffer。目标目录必须不存在，由 stager 创建为 `0700`；文件以 `0600`、`fsync` 和 hard-link no-replace 发布到 1 MiB memory-backed `emptyDir`。任何输入失败都清理已发布目标，主容器不会启动。
+stager 只接受固定的 `command.json`、`assertion.jwt`、`keyset.json` 和 `pepper-keyring.json`，分别有 64 KiB、16 KiB、256 KiB 与 2 KiB 上限。Kubernetes 路径以 D-407 keyring 为唯一 canonical 输入；旧单 pepper 只保留在通用 CLI 兼容桥，不形成第二套 Kubernetes 配置模式。stager 解析 kubelet symlink 后仍要求 realpath 留在投影 authority 内，以 `O_NOFOLLOW` 打开最终文件，复验类型、权限、大小和读前/读后 inode 状态，再清零源 Buffer。目标目录必须不存在，由 stager 创建为 `0700`；文件以 `0600`、`fsync` 和 hard-link no-replace 发布到 1 MiB memory-backed `emptyDir`。任何输入失败都清理已发布目标，主容器不会启动。
 
 ### 3. 数据库和进程权限保持最小化
 
@@ -57,7 +57,7 @@ Identity 变更、revoke 和 audit query 使用无 delivery 的 base。只有 `c
 
 ## 验证
 
-- stager 聚焦测试覆盖真实 kubelet symlink 布局、`0700/0600` 收紧、持久 delivery 目录复验、realpath 逃逸、world-readable material、目标不可覆盖和 CLI 无敏感回显。
+- stager 聚焦测试覆盖真实 kubelet symlink 布局、2 KiB keyring 边界、`0700/0600` 收紧、持久 delivery 目录复验、realpath 逃逸、world-readable material、目标不可覆盖和 CLI 无敏感回显。
 - 部署审计冻结无 API token/RBAC、caller-driven/零重试/deadline/TTL、non-root/read-only/drop-all、资源上限、固定 CLI、内存私有输入、独立 admin credential、CloudNativePG egress、PVC delivery 和默认聚合不可达；失败注入覆盖权限扩大、非持久 delivery 与误入共享 aggregate。
 - `kubectl kustomize` 已分别渲染 base、CloudNativePG、credential-delivery 和 CloudNativePG + delivery 四个入口。
 - 18-package clean build/test 退出 0；当前 `cluster-admin` 为 456 total / 453 pass / 3 conditional skip / 0 fail，backend 为 1590 total / 1588 pass / 2 conditional skip / 0 fail。

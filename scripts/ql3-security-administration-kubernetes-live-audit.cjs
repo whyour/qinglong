@@ -13,6 +13,7 @@ const LIMITATIONS = Object.freeze([
   'CloudNativePG inside one Docker host is not infrastructure STONITH or disaster-recovery evidence',
   'the local-path ReadWriteOnce volume is not encrypted production CSI custody evidence',
   'a dedicated root storage-fixture Job constrains the local-path volume root before every non-root administration Job',
+  'the credential probe reaches the production HTTP surface inside the isolated cluster and is not external ingress TLS evidence',
 ]);
 const BANNED_KEYS = new Set([
   'assertion',
@@ -143,6 +144,7 @@ function validateSecurityAdministrationKubernetesLiveReport(report) {
       'architecture',
       'kubernetesImageId',
       'administrationImageId',
+      'controlImageId',
       'cniName',
       'cniDistributionBinding',
       'controlPlaneNodes',
@@ -154,6 +156,7 @@ function validateSecurityAdministrationKubernetesLiveReport(report) {
     !['amd64', 'arm64'].includes(platform?.architecture) ||
     !isSha256(platform?.kubernetesImageId) ||
     !isSha256(platform?.administrationImageId) ||
+    !isSha256(platform?.controlImageId) ||
     platform?.cniName !== 'flannel' ||
     platform?.cniDistributionBinding !== 'rancher/k3s:v1.34.3-k3s1' ||
     platform?.controlPlaneNodes !== 1 ||
@@ -213,6 +216,10 @@ function validateSecurityAdministrationKubernetesLiveReport(report) {
       'operations',
       'completedJobs',
       'failedJobs',
+      'authenticationProbeJobs',
+      'controlReplicas',
+      'controlRollouts',
+      'controlReplicaAntiAffinity',
       'callerDriven',
       'backoffLimit',
       'activeDeadlineSeconds',
@@ -221,19 +228,39 @@ function validateSecurityAdministrationKubernetesLiveReport(report) {
       'serviceAccountTokenMounted',
       'rbacGranted',
       'responseLossReplayObserved',
+      'overlapGenerationCount',
+      'contractedGenerationCount',
+      'activeGenerationChanged',
+      'oldReferencesBeforeActivation',
+      'oldReferencesAfterActivation',
+      'oldReferencesAfterConvergence',
+      'oldAuthenticationBeforeActivation',
+      'oldAuthenticationDuringOverlap',
+      'newAuthenticationDuringOverlap',
+      'oldAuthenticationRejectedAfterConvergence',
+      'newAuthenticationAfterContraction',
+      'contractedToActiveGeneration',
       'sensitiveMaterialReported',
     ]) ||
     JSON.stringify(ceremony?.operations) !==
       JSON.stringify([
         'identity.register',
         'audit.list',
-        'credential.issue',
-        'credential.issue.replay',
-        'credential.rotate',
-        'credential.revoke',
+        'credential.issue.old',
+        'credential.issue.old.replay',
+        'credential.key-references.before-activate',
+        'credential.issue.new',
+        'credential.rotate.new',
+        'credential.key-references.after-activate',
+        'credential.revoke.old',
+        'credential.key-references.after-converge',
       ]) ||
-    ceremony?.completedJobs !== 6 ||
+    ceremony?.completedJobs !== 10 ||
     ceremony?.failedJobs !== 1 ||
+    ceremony?.authenticationProbeJobs !== 5 ||
+    ceremony?.controlReplicas !== 2 ||
+    ceremony?.controlRollouts !== 3 ||
+    ceremony?.controlReplicaAntiAffinity !== true ||
     ceremony?.callerDriven !== true ||
     ceremony?.backoffLimit !== 0 ||
     ceremony?.activeDeadlineSeconds !== 300 ||
@@ -242,12 +269,24 @@ function validateSecurityAdministrationKubernetesLiveReport(report) {
     ceremony?.serviceAccountTokenMounted !== false ||
     ceremony?.rbacGranted !== false ||
     ceremony?.responseLossReplayObserved !== true ||
+    ceremony?.overlapGenerationCount !== 2 ||
+    ceremony?.contractedGenerationCount !== 1 ||
+    ceremony?.activeGenerationChanged !== true ||
+    ceremony?.oldReferencesBeforeActivation !== 1 ||
+    ceremony?.oldReferencesAfterActivation !== 1 ||
+    ceremony?.oldReferencesAfterConvergence !== 0 ||
+    ceremony?.oldAuthenticationBeforeActivation !== true ||
+    ceremony?.oldAuthenticationDuringOverlap !== true ||
+    ceremony?.newAuthenticationDuringOverlap !== true ||
+    ceremony?.oldAuthenticationRejectedAfterConvergence !== true ||
+    ceremony?.newAuthenticationAfterContraction !== true ||
+    ceremony?.contractedToActiveGeneration !== true ||
     ceremony?.sensitiveMaterialReported !== false
   ) {
     findings.push(
       finding(
         'QL3_SECURITY_ADMINISTRATION_KUBERNETES_LIVE_CEREMONY',
-        'six serial caller-created commands plus one failed input stage must use the exact tokenless Job contract',
+        'ten serial caller-created commands, five content-free authentication probes and one failed input stage must prove the exact two-replica overlap, activation, convergence and contraction contract',
       ),
     );
   }
@@ -299,7 +338,7 @@ function validateSecurityAdministrationKubernetesLiveReport(report) {
     delivery?.fixtureProvisionerRanAsRoot !== true ||
     delivery?.privateDirectoryMode !== '0700' ||
     delivery?.fileMode !== '0600' ||
-    delivery?.fileCount !== 2 ||
+    delivery?.fileCount !== 3 ||
     !isSha256(delivery?.issueDigest) ||
     !isSha256(delivery?.rotationDigest) ||
     delivery?.issueDigest === delivery?.rotationDigest ||
@@ -342,28 +381,42 @@ function validateSecurityAdministrationKubernetesLiveReport(report) {
     !exactKeys(durability, [
       'identityVersion',
       'identityStatus',
-      'credentialVersion',
-      'credentialState',
+      'oldCredentialVersion',
+      'oldCredentialState',
+      'newCredentialVersion',
+      'newCredentialState',
       'identityMutationCount',
       'credentialMutationCount',
       'issueMutationCount',
       'credentialVersionCount',
+      'oldGenerationVersionCount',
+      'newGenerationVersionCount',
+      'latestGenerationsAreNew',
       'allowedAuditCount',
+      'authenticationDeniedAuditCount',
+      'authenticationRejectedAuditCount',
     ]) ||
     durability?.identityVersion !== 1 ||
     durability?.identityStatus !== 'active' ||
-    durability?.credentialVersion !== 3 ||
-    durability?.credentialState !== 'revoked' ||
+    durability?.oldCredentialVersion !== 2 ||
+    durability?.oldCredentialState !== 'revoked' ||
+    durability?.newCredentialVersion !== 2 ||
+    durability?.newCredentialState !== 'active' ||
     durability?.identityMutationCount !== 1 ||
-    durability?.credentialMutationCount !== 3 ||
+    durability?.credentialMutationCount !== 4 ||
     durability?.issueMutationCount !== 1 ||
-    durability?.credentialVersionCount !== 3 ||
-    durability?.allowedAuditCount !== 4
+    durability?.credentialVersionCount !== 4 ||
+    durability?.oldGenerationVersionCount !== 1 ||
+    durability?.newGenerationVersionCount !== 3 ||
+    durability?.latestGenerationsAreNew !== true ||
+    durability?.allowedAuditCount !== 5 ||
+    durability?.authenticationDeniedAuditCount !== 4 ||
+    durability?.authenticationRejectedAuditCount !== 1
   ) {
     findings.push(
       finding(
         'QL3_SECURITY_ADMINISTRATION_KUBERNETES_LIVE_DURABILITY',
-        'the database must retain one identity mutation and exactly three credential generations without replay duplication',
+        'the database must retain one old-key version followed by three new-key versions across two credentials, exact replay and the expected authentication audits',
       ),
     );
   }
@@ -375,6 +428,9 @@ function validateSecurityAdministrationKubernetesLiveReport(report) {
       'evidenceJobsDeleted',
       'storageProvisionJobDeleted',
       'deliveryVolumeClaimDeleted',
+      'controlDeploymentDeleted',
+      'controlServiceDeleted',
+      'controlRuntimeSecretDeleted',
     ])
   ) {
     findings.push(
@@ -392,6 +448,7 @@ function validateSecurityAdministrationKubernetesLiveReport(report) {
       'realKubeletSecretProjection',
       'realAdministrationProductCommands',
       'realPersistentCredentialCustody',
+      'realClusterControlAuthenticationRotation',
       'responseLossReplay',
       'failedInputStageClosed',
       'leastPrivilege',

@@ -6,6 +6,8 @@ const { test } = require('node:test');
 
 const {
   auditListCommand,
+  clusterControlResources,
+  credentialAuthenticationProbeSource,
   credentialIssueCommand,
   credentialRevokeCommand,
   credentialRotateCommand,
@@ -188,6 +190,43 @@ test('waits for per-Pod network policy before mounting private material', () => 
   assert.doesNotMatch(source, /readFile|process\.env|console\.log/);
 });
 
+test('runs the credential ceremony against two real anti-affine control replicas', () => {
+  const [service, deployment] = clusterControlResources(
+    'qinglong3-cluster-control:test',
+  );
+  assert.equal(service.kind, 'Service');
+  assert.equal(service.spec.ports[0].port, 5800);
+  assert.equal(deployment.kind, 'Deployment');
+  assert.equal(deployment.spec.replicas, 2);
+  assert.equal(deployment.spec.strategy.rollingUpdate.maxUnavailable, 0);
+  assert.equal(
+    deployment.spec.template.spec.affinity.podAntiAffinity
+      .requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey,
+    'kubernetes.io/hostname',
+  );
+  const environment = deployment.spec.template.spec.containers[0].env;
+  assert.ok(
+    environment.some(
+      (entry) =>
+        entry.name === 'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE' &&
+        entry.value.endsWith('/keyring.json'),
+    ),
+  );
+  assert.equal(
+    environment.some((entry) => entry.name === 'QL3_API_CREDENTIAL_PEPPER'),
+    false,
+  );
+});
+
+test('keeps the real authentication probe content-free', () => {
+  const source = credentialAuthenticationProbeSource();
+  assert.match(source, /ql3-security-live-control/);
+  assert.match(source, /\/api\/v3\/projects\/prj_default\/runs\?limit=1/);
+  assert.match(source, /observedStatus:observed/);
+  assert.match(source, /bytes\?\.fill\(0\)/);
+  assert.doesNotMatch(source, /console\.log|process\.env/);
+});
+
 test('live runner remains opt-in, reviewed, cleanup-bound and log-free', () => {
   const source = fs.readFileSync(
     path.resolve(
@@ -206,7 +245,15 @@ test('live runner remains opt-in, reviewed, cleanup-bound and log-free', () => {
   assert.match(source, /net\.bridge\.bridge-nf-call-iptables=1/);
   assert.match(source, /wait-network-policy/);
   assert.match(source, /projectedMode: 0o444/);
-  assert.match(source, /credential\.issue\.replay/);
+  assert.match(source, /credential\.issue\.old\.replay/);
+  assert.match(source, /ql3-security-live-auth-old-before-activate/);
+  assert.match(source, /ql3-security-live-auth-old-overlap/);
+  assert.match(source, /ql3-security-live-auth-new-overlap/);
+  assert.match(source, /ql3-security-live-auth-old-contracted/);
+  assert.match(source, /ql3-security-live-auth-new-contracted/);
+  assert.match(source, /expectedStatus: 401/);
+  assert.match(source, /expectedStatus: 403/);
+  assert.match(source, /controlRollouts: 3/);
   assert.match(source, /FallbackToLogsOnError/);
   assert.match(source, /failureMessage: 'rejected'/);
   assert.match(

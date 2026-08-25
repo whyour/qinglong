@@ -72,7 +72,7 @@ spec:
             - --command=/var/run/qinglong3/security-administration-private/input/command.json
             - --assertion=/var/run/qinglong3/security-administration-private/input/assertion.jwt
             - --keyset=/var/run/qinglong3/security-administration-private/input/keyset.json
-            - --pepper=/var/run/qinglong3/security-administration-private/input/pepper
+            - --pepper-keyring=/var/run/qinglong3/security-administration-private/input/pepper-keyring.json
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -120,8 +120,8 @@ spec:
                 path: assertion.jwt
               - key: keyset.json
                 path: keyset.json
-              - key: pepper
-                path: pepper
+              - key: pepper-keyring.json
+                path: pepper-keyring.json
         - name: private-input
           emptyDir:
             medium: Memory

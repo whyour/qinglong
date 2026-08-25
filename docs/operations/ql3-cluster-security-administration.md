@@ -170,7 +170,7 @@ Cluster Control 使用 `QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE`；它与旧 `QL3
 - `credential-delivery`：在 base 上增加调用方提供的 RWO PVC；
 - `cloudnative-pg-credential-delivery`：CloudNativePG 与 PVC 交付的组合。
 
-把 `input-secret.example.yaml` 复制到仓库外的私有目录，替换四个占位值，并保持 `immutable: true`。示例不属于任何 Kustomization。非签发操作不要选择 delivery overlay；`credential.issue` / `credential.rotate` 必须先按 `delivery-pvc.example.yaml` 创建受加密、受访问控制的 PVC，并把 manifest 中的 `replace-with-unique-delivery.json` 改为本次唯一文件名。
+把 `input-secret.example.yaml` 复制到仓库外的私有目录，替换四个占位值，并保持 `immutable: true`。第四项必须是最多 old/new 两代、2 KiB 内的 canonical `pepper-keyring.json`；Kubernetes 不接受旧单 pepper 文件。示例不属于任何 Kustomization。非签发操作不要选择 delivery overlay；`credential.issue` / `credential.rotate` 必须先按 `delivery-pvc.example.yaml` 创建受加密、受访问控制的 PVC，并把 manifest 中的 `replace-with-unique-delivery.json` 改为本次唯一文件名。
 
 以 CloudNativePG 的无 delivery audit query 为例：
 
@@ -189,4 +189,4 @@ kubectl logs job/ql3-security-administration -n qinglong3-system \
 
 ## 当前边界
 
-本入口没有远程 API/UI、双人复核或 break-glass、自动 pepper rotation/material GC、audit retention/export/alert。D-407 已提供 old/new 双代 keyring、active issuance、exact-key authentication 和退休前引用检查，但 active 切换仍由显式配置更新加滚动重启完成。现有 Kubernetes Job stager 只接受单 pepper，尚未完成 keyring Secret 投影和真实 overlap→activate→contract live gate，因此不能用 D-406 模板宣称 Kubernetes pepper rotation 已完成。可选 Job 的静态契约与单主机 K3s + PostgreSQL/PVC ceremony 已验收，但仍不默认安装，也不证明生产基础设施 HA/DR 或存储加密；admin database credential 始终不得进入常驻 Cluster Control。命令决策见 [ADR-0500](../adr/ADR-0500-short-lived-cluster-security-administration-command.md)，部署决策见 [ADR-0501](../adr/ADR-0501-opt-in-kubernetes-security-administration-job.md)，双代 keyring 见 [ADR-0502](../adr/ADR-0502-bounded-cluster-api-credential-pepper-keyring.md)。
+本入口没有远程管理 API/UI、双人复核或 break-glass、自动 pepper rotation/material GC、audit retention/export/alert。D-407 已提供 old/new 双代 keyring、active issuance、exact-key authentication 和退休前引用检查；active 切换仍由显式 Secret 更新加受控滚动重启完成。Kubernetes Job stager 与常驻 Cluster Control manifest 已收敛为 keyring-only；overlap→activate→contract live 合同会在三次 rollout 中保持两个反亲和 Control 副本，并用真实 `/api/v3` 请求区分“认证成功但未授权”的 403 与旧 credential 收缩后被拒绝的 401。该合同已编码并通过聚焦/静态门，但远程三节点 K3s/CNPG live 验收仍待执行，因此不能宣称 Kubernetes pepper rotation 已完成；它的内部 HTTP probe 也不替代外部 ingress TLS 验收。可选 Job 仍不默认安装，也不证明生产基础设施 HA/DR 或存储加密；admin database credential 始终不得进入常驻 Cluster Control。命令决策见 [ADR-0500](../adr/ADR-0500-short-lived-cluster-security-administration-command.md)，部署决策见 [ADR-0501](../adr/ADR-0501-opt-in-kubernetes-security-administration-job.md)，双代 keyring 见 [ADR-0502](../adr/ADR-0502-bounded-cluster-api-credential-pepper-keyring.md)。

@@ -796,6 +796,10 @@ function assertKubernetes(readFile, root, findings) {
       'QL3_POSTGRES_TLS_CA_FILE',
       '/var/run/secrets/qinglong3/postgres-runtime/ca.crt',
     ],
+    [
+      'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
+      '/var/run/secrets/qinglong3/postgres-runtime/api-credential-pepper-keyring.json',
+    ],
     ['QL3_WORKER_INGRESS_ENABLED', 'true'],
     ['QL3_WORKER_INGRESS_HOST', '0.0.0.0'],
     ['QL3_WORKER_INGRESS_PORT', '5801'],
@@ -854,7 +858,14 @@ function assertKubernetes(readFile, root, findings) {
     runtimeCaVolume?.secret?.secretName !== 'ql3-cluster-control-runtime' ||
     runtimeCaVolume?.secret?.defaultMode !== 0o444 ||
     JSON.stringify(runtimeCaVolume?.secret?.items) !==
-      JSON.stringify([{ key: 'postgres-ca.crt', path: 'ca.crt' }])
+      JSON.stringify([
+        { key: 'postgres-ca.crt', path: 'ca.crt' },
+        {
+          key: 'api-credential-pepper-keyring.json',
+          path: 'api-credential-pepper-keyring.json',
+        },
+      ]) ||
+    env.has('QL3_API_CREDENTIAL_PEPPER')
   ) {
     findings.push(
       finding(
@@ -866,7 +877,6 @@ function assertKubernetes(readFile, root, findings) {
   for (const [name, key] of [
     ['QL3_POSTGRES_RUNTIME_URL', 'postgres-runtime-url'],
     ['QL3_POSTGRES_TLS_SERVERNAME', 'postgres-tls-servername'],
-    ['QL3_API_CREDENTIAL_PEPPER', 'api-credential-pepper'],
   ]) {
     const secret = env.get(name)?.valueFrom?.secretKeyRef;
     if (secret?.name !== 'ql3-cluster-control-runtime' || secret?.key !== key) {
