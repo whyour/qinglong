@@ -87,6 +87,7 @@ jobs:
 
       - name: Recheck static Security Administration and evidence contracts
         run: |
+          pnpm --filter @qinglong/runtime-core build
           pnpm --filter @qinglong/cluster-postgres build
           pnpm audit:security-administration-kubernetes:ql3
           node --test \
