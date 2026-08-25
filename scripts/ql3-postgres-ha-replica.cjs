@@ -68,7 +68,16 @@ async function main() {
         },
       },
       security: {
-        apiCredentialPepper: 'A'.repeat(43),
+        apiCredentialPepperKeyring: {
+          schemaVersion: 1,
+          activePepperKeyId: 'legacy-v1',
+          keys: [
+            {
+              pepperKeyId: 'legacy-v1',
+              pepper: 'A'.repeat(43),
+            },
+          ],
+        },
       },
     },
     recovery: {
