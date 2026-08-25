@@ -7,6 +7,8 @@ const { test } = require('node:test');
 const {
   auditListCommand,
   clusterControlResources,
+  controlRolloutFailureEvidence,
+  controlTerminationFact,
   credentialAuthenticationProbeSource,
   credentialIssueCommand,
   credentialRevokeCommand,
@@ -200,6 +202,10 @@ test('runs the credential ceremony against two real anti-affine control replicas
   assert.equal(deployment.spec.replicas, 2);
   assert.equal(deployment.spec.strategy.rollingUpdate.maxUnavailable, 0);
   assert.equal(
+    deployment.spec.template.spec.containers[0].terminationMessagePolicy,
+    'FallbackToLogsOnError',
+  );
+  assert.equal(
     deployment.spec.template.spec.affinity.podAntiAffinity
       .requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey,
     'kubernetes.io/hostname',
@@ -216,6 +222,79 @@ test('runs the credential ceremony against two real anti-affine control replicas
     environment.some((entry) => entry.name === 'QL3_API_CREDENTIAL_PEPPER'),
     false,
   );
+});
+
+test('keeps failed control rollout evidence bounded and content-free', () => {
+  const failure = JSON.stringify({
+    schemaVersion: 1,
+    component: 'qinglong3-cluster-control',
+    level: 'error',
+    event: 'process_failed',
+    name: 'ClusterControlDatabaseUnavailableError',
+    code: 'ECONNREFUSED',
+  });
+  assert.deepEqual(controlTerminationFact(`ignored\n${failure}\n`), {
+    name: 'ClusterControlDatabaseUnavailableError',
+    code: 'ECONNREFUSED',
+  });
+  assert.equal(
+    controlTerminationFact(
+      JSON.stringify({
+        schemaVersion: 1,
+        component: 'qinglong3-cluster-control',
+        level: 'error',
+        event: 'process_failed',
+        name: 'Error',
+        secret: 'must-not-escape',
+      }),
+    ),
+    'rejected',
+  );
+
+  const evidence = controlRolloutFailureEvidence({
+    kubectlJson(arguments_) {
+      if (arguments_.includes('deployment')) {
+        return {
+          metadata: { generation: 3 },
+          status: {
+            observedGeneration: 3,
+            replicas: 2,
+            updatedReplicas: 2,
+            unavailableReplicas: 2,
+            conditions: [
+              { type: 'Available', status: 'False', reason: 'MinimumReplicasUnavailable' },
+            ],
+          },
+        };
+      }
+      return {
+        items: [{
+          metadata: { name: 'control-1' },
+          spec: { nodeName: 'worker-1' },
+          status: {
+            phase: 'Running',
+            conditions: [
+              { type: 'Ready', status: 'False', reason: 'ContainersNotReady' },
+            ],
+            containerStatuses: [{
+              name: 'cluster-control',
+              ready: false,
+              restartCount: 2,
+              state: { waiting: { reason: 'CrashLoopBackOff' } },
+              lastState: { terminated: { exitCode: 1, reason: 'Error', message: failure } },
+            }],
+          },
+        }],
+      };
+    },
+  });
+  assert.equal(evidence.deployment.availableReplicas, 0);
+  assert.equal(evidence.pods[0].containers[0].state.reason, 'CrashLoopBackOff');
+  assert.deepEqual(evidence.pods[0].containers[0].failure, {
+    name: 'ClusterControlDatabaseUnavailableError',
+    code: 'ECONNREFUSED',
+  });
+  assert.doesNotMatch(JSON.stringify(evidence), /must-not-escape/);
 });
 
 test('keeps the real authentication probe content-free', () => {

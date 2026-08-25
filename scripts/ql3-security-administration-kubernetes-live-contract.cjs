@@ -787,6 +787,7 @@ function clusterControlResources(controlImage) {
               name: 'cluster-control',
               image: controlImage,
               imagePullPolicy: 'Never',
+              terminationMessagePolicy: 'FallbackToLogsOnError',
               securityContext: {
                 allowPrivilegeEscalation: false,
                 readOnlyRootFilesystem: true,
@@ -906,6 +907,130 @@ function applyControlRuntimeSecret(fixture, runtimeDatabaseUrl, keyring) {
   });
 }
 
+function controlTerminationFact(message) {
+  if (typeof message !== 'string' || message.length < 1 || message.length > 4096) {
+    return 'rejected';
+  }
+  const lines = message.trim().split('\n');
+  try {
+    const fact = JSON.parse(lines.at(-1));
+    const keys = Object.keys(fact).sort();
+    const expected = [
+      'component',
+      'event',
+      'level',
+      'name',
+      'schemaVersion',
+      ...(fact.code === undefined ? [] : ['code']),
+    ].sort();
+    if (
+      JSON.stringify(keys) !== JSON.stringify(expected) ||
+      fact.schemaVersion !== 1 ||
+      fact.component !== 'qinglong3-cluster-control' ||
+      fact.level !== 'error' ||
+      fact.event !== 'process_failed' ||
+      typeof fact.name !== 'string' ||
+      !/^[A-Za-z][A-Za-z0-9]{0,127}$/.test(fact.name) ||
+      (fact.code !== undefined &&
+        (typeof fact.code !== 'string' ||
+          !/^[A-Z][A-Z0-9_]{0,127}$/.test(fact.code)))
+    ) {
+      return 'rejected';
+    }
+    return Object.freeze({
+      name: fact.name,
+      ...(fact.code === undefined ? {} : { code: fact.code }),
+    });
+  } catch {
+    return 'rejected';
+  }
+}
+
+function controlRolloutFailureEvidence(fixture) {
+  const deployment = fixture.kubectlJson([
+    '-n',
+    NAMESPACE,
+    'get',
+    'deployment',
+    CONTROL_NAME,
+  ]);
+  const pods = fixture.kubectlJson([
+    '-n',
+    NAMESPACE,
+    'get',
+    'pods',
+    '-l',
+    `app.kubernetes.io/name=${CONTROL_NAME}`,
+  ]).items;
+  return Object.freeze({
+    deployment: Object.freeze({
+      generation: deployment.metadata.generation ?? null,
+      observedGeneration: deployment.status?.observedGeneration ?? null,
+      replicas: deployment.status?.replicas ?? 0,
+      updatedReplicas: deployment.status?.updatedReplicas ?? 0,
+      availableReplicas: deployment.status?.availableReplicas ?? 0,
+      unavailableReplicas: deployment.status?.unavailableReplicas ?? 0,
+      conditions: Object.freeze(
+        (deployment.status?.conditions ?? []).map((condition) =>
+          Object.freeze({
+            type: condition.type,
+            status: condition.status,
+            reason: condition.reason ?? null,
+          }),
+        ),
+      ),
+    }),
+    pods: Object.freeze(
+      pods.map((pod) =>
+        Object.freeze({
+          name: pod.metadata.name,
+          node: pod.spec.nodeName ?? null,
+          phase: pod.status?.phase ?? null,
+          conditions: Object.freeze(
+            (pod.status?.conditions ?? []).map((condition) =>
+              Object.freeze({
+                type: condition.type,
+                status: condition.status,
+                reason: condition.reason ?? null,
+              }),
+            ),
+          ),
+          containers: Object.freeze(
+            (pod.status?.containerStatuses ?? []).map((container) => {
+              const terminated =
+                container.state?.terminated ??
+                container.lastState?.terminated;
+              return Object.freeze({
+                name: container.name,
+                ready: container.ready,
+                restartCount: container.restartCount,
+                state: container.state?.waiting
+                  ? Object.freeze({
+                      kind: 'waiting',
+                      reason: container.state.waiting.reason ?? null,
+                    })
+                  : container.state?.running
+                    ? Object.freeze({ kind: 'running' })
+                    : terminated
+                      ? Object.freeze({
+                          kind: 'terminated',
+                          reason: terminated.reason ?? null,
+                          exitCode: terminated.exitCode,
+                        })
+                      : Object.freeze({ kind: 'unknown' }),
+                failure:
+                  terminated?.message === undefined
+                    ? null
+                    : controlTerminationFact(terminated.message),
+              });
+            }),
+          ),
+        }),
+      ),
+    ),
+  });
+}
+
 async function waitForControlRollout(fixture, restart) {
   if (restart) {
     fixture.kubectl([
@@ -916,14 +1041,24 @@ async function waitForControlRollout(fixture, restart) {
       `deployment/${CONTROL_NAME}`,
     ]);
   }
-  fixture.kubectl([
-    '-n',
-    NAMESPACE,
-    'rollout',
-    'status',
-    `deployment/${CONTROL_NAME}`,
-    '--timeout=5m',
-  ]);
+  const rollout = fixture.kubectl(
+    [
+      '-n',
+      NAMESPACE,
+      'rollout',
+      'status',
+      `deployment/${CONTROL_NAME}`,
+      '--timeout=5m',
+    ],
+    { capture: true, quiet: true, allowFailure: true },
+  );
+  if (rollout.status !== 0) {
+    throw new Error(
+      `Cluster Control rollout unavailable: ${JSON.stringify(
+        controlRolloutFailureEvidence(fixture),
+      )}`,
+    );
+  }
   return (
     await waitFor('two ready Cluster Control replicas', 120_000, () => {
       const deployment = fixture.kubectlJson([
@@ -2218,6 +2353,8 @@ if (require.main === module) {
 module.exports = {
   auditListCommand,
   clusterControlResources,
+  controlRolloutFailureEvidence,
+  controlTerminationFact,
   credentialAuthenticationProbeSource,
   credentialIssueCommand,
   credentialRevokeCommand,
