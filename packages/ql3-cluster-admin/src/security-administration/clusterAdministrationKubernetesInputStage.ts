@@ -119,13 +119,23 @@ function sameFileState(
   );
 }
 
+export function isClusterAdministrationProjectedSourceDirectoryAuthority(
+  status: Readonly<{ mode: number; uid: number }>,
+): boolean {
+  const permissions = status.mode & 0o1777;
+  return (
+    (permissions & 0o002) === 0 ||
+    (status.uid === 0 && permissions === 0o1777)
+  );
+}
+
 function verifySourceDirectory(sourceDirectory: string): string {
   const status = lstatSync(sourceDirectory, { throwIfNoEntry: false });
   if (
     status === undefined ||
     !status.isDirectory() ||
     status.isSymbolicLink() ||
-    (status.mode & 0o002) !== 0
+    !isClusterAdministrationProjectedSourceDirectoryAuthority(status)
   ) {
     throw new ClusterAdministrationKubernetesInputStageError(
       'projected source directory authority is invalid',
@@ -245,7 +255,7 @@ function verifyWritableParent(parent: string, label: string): void {
     status === undefined ||
     !status.isDirectory() ||
     status.isSymbolicLink() ||
-    (status.mode & 0o002) !== 0
+    !isClusterAdministrationProjectedSourceDirectoryAuthority(status)
   ) {
     throw new ClusterAdministrationKubernetesInputStageError(
       `${label} parent authority is invalid`,
@@ -290,6 +300,7 @@ function createPrivateDirectory(directory: string, label: string): void {
 }
 
 function prepareDeliveryDirectory(directory: string): void {
+  verifyWritableParent(dirname(directory), 'delivery directory');
   const existing = lstatSync(directory, { throwIfNoEntry: false });
   if (existing === undefined) {
     createPrivateDirectory(directory, 'delivery directory');

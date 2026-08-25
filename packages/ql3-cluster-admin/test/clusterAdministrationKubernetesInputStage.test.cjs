@@ -17,6 +17,7 @@ const { afterEach, test } = require('node:test');
 
 const {
   ClusterAdministrationKubernetesInputStageError,
+  isClusterAdministrationProjectedSourceDirectoryAuthority,
   stageClusterAdministrationKubernetesInputs,
 } = require('../dist/security-administration/clusterAdministrationKubernetesInputStage.js');
 
@@ -87,6 +88,44 @@ test('copies a Kubernetes projected Secret into a private immutable input bounda
   assert.equal(JSON.stringify(result).includes('A'.repeat(43)), false);
 });
 
+test('accepts only the exact root-owned sticky Kubernetes mount authority', () => {
+  assert.equal(
+    isClusterAdministrationProjectedSourceDirectoryAuthority({
+      mode: 0o41777,
+      uid: 0,
+    }),
+    true,
+  );
+  assert.equal(
+    isClusterAdministrationProjectedSourceDirectoryAuthority({
+      mode: 0o43777,
+      uid: 0,
+    }),
+    true,
+  );
+  assert.equal(
+    isClusterAdministrationProjectedSourceDirectoryAuthority({
+      mode: 0o40777,
+      uid: 0,
+    }),
+    false,
+  );
+  assert.equal(
+    isClusterAdministrationProjectedSourceDirectoryAuthority({
+      mode: 0o41777,
+      uid: 10001,
+    }),
+    false,
+  );
+  assert.equal(
+    isClusterAdministrationProjectedSourceDirectoryAuthority({
+      mode: 0o40755,
+      uid: 10001,
+    }),
+    true,
+  );
+});
+
 test('prepares a private persistent delivery directory without weakening it', () => {
   const fixture = projectedInput();
 
@@ -107,6 +146,26 @@ test('prepares a private persistent delivery directory without weakening it', ()
   });
   assert.equal(second.deliveryDirectoryPrepared, true);
   assert.equal(mode(fixture.deliveryDirectory), 0o700);
+});
+
+test('rejects a precreated private delivery directory under an unsafe parent', () => {
+  const fixture = projectedInput();
+  const unsafeParent = join(fixture.root, 'unsafe-delivery-parent');
+  mkdirSync(unsafeParent, { mode: 0o777 });
+  chmodSync(unsafeParent, 0o777);
+  const deliveryDirectory = join(unsafeParent, 'private');
+  mkdirSync(deliveryDirectory, { mode: 0o700 });
+
+  assert.throws(
+    () =>
+      stageClusterAdministrationKubernetesInputs({
+        sourceDirectory: fixture.sourceDirectory,
+        targetDirectory: fixture.targetDirectory,
+        deliveryDirectory,
+      }),
+    /delivery directory parent authority is invalid/,
+  );
+  assert.equal(mode(deliveryDirectory), 0o700);
 });
 
 test('rejects a projected input symlink that escapes the Secret authority', () => {

@@ -60,10 +60,12 @@ Identity 变更、revoke 和 audit query 使用无 delivery 的 base。只有 `c
 - stager 聚焦测试覆盖真实 kubelet symlink 布局、`0700/0600` 收紧、持久 delivery 目录复验、realpath 逃逸、world-readable material、目标不可覆盖和 CLI 无敏感回显。
 - 部署审计冻结无 API token/RBAC、caller-driven/零重试/deadline/TTL、non-root/read-only/drop-all、资源上限、固定 CLI、内存私有输入、独立 admin credential、CloudNativePG egress、PVC delivery 和默认聚合不可达；失败注入覆盖权限扩大、非持久 delivery 与误入共享 aggregate。
 - `kubectl kustomize` 已分别渲染 base、CloudNativePG、credential-delivery 和 CloudNativePG + delivery 四个入口。
-- 18-package clean build/test 退出 0；当前 `cluster-admin` 为 454 total / 451 pass / 3 conditional skip / 0 fail，backend 为 1579 total / 1577 pass / 2 conditional skip / 0 fail。Edge import 仍为 122 modules，Cluster dependency、package boundary、deployment、deployment-lock source surface 与 release-version 审计均 compatible。
-- 本地构建的 Cluster Admin 镜像 digest 为 `sha256:5464f0bbf5aa1302c080b13c9f18aaa89ba418ab5d09a917f5b5b4937c0ede2f`；新 stager 在 non-root、read-only rootfs、`network=none`、drop-all、no-new-privileges、32 PID、128 MiB 与 0.25 CPU 下完成独立 `--help` smoke，证明发布镜像包含该固定入口。
-- 真实 K3s Pod、PostgreSQL admin operation、PVC token custody、response loss 与清理演练尚未执行，因此不得把本 ADR 解释为 live ceremony 已验收。
+- 18-package clean build/test 退出 0；当前 `cluster-admin` 为 456 total / 453 pass / 3 conditional skip / 0 fail，backend 为 1590 total / 1588 pass / 2 conditional skip / 0 fail。
+- opt-in live gate 在本机 arm64 建立 1 control-plane + 2 worker 的 K3s `v1.34.3+k3s1`/Flannel、CloudNativePG 1.30.0 和 3 个 PostgreSQL 18.4 实例；migration 71 与 control-core capability 70 通过后，6 个串行产品 Job 完成 register、audit query、issue、exact replay、rotate 与 revoke，另一个 `0444` 输入 Job 按预期在 init 阶段失败且主容器未启动。
+- live gate 证明 immutable Secret 的真实 kubelet Atomic Writer 投影、memory-backed 私有 stage、PVC 跨 Job persistence/no-replace replay、不同 rotation material、TLS 与单连接最小权限；同时实测拒绝 Kubernetes API/公网 egress、Secret read/Job mutation RBAC，并在 finally 删除 Job、Secret、证据 Job、fixture root Job、PVC、K3s 容器、网络与卷。
+- 所有 Security Administration Job 继续以 UID/GID 10001 运行并使用 `fsGroupChangePolicy=OnRootMismatch`，避免后续只读证据 Pod 递归改写 `0700/0600` custody。K3s local-path 实现把新 PVC 根暴露为 `02777 root:10001`，live gate 因此先用一个专用、无网络、无 API token、drop-all 的 root fixture Job 精确收紧为 `02770`；该 fixture 例外不是产品管理 authority，也不证明生产 CSI 加密或权限模型。
+- content-free 报告权限为 `0600`，独立审计结果为 `compatible=true/findings=[]`，SHA-256 为 `e5c24af77034e1a2efee062107176e218c11a9f9f0d6c8c7308fdc280b0a82cf`。可手动触发的专用 CI workflow 固定 K3s/CNPG/PostgreSQL 供应链并重复同一 ceremony。
 
 ## 影响与剩余门禁
 
-D-406 关闭“每个部署者都要从零编写一次性 Admin Job”的静态部署缺口，且 Edge/Standalone 和默认 Cluster 常驻资源保持不变。下一门是以临时 K3s + PostgreSQL 执行 register/query/issue/replay/revoke、证明 token 仅存在于 PVC no-replace 文件、Pod 无 API authority、失败清理和证据 content-free；之后仍有双人复核/break-glass、pepper rotation、audit retention/export/alert、并发 dispatch 和远程管理 UI/API。
+D-406 已关闭“每个部署者都要从零编写一次性 Admin Job”及其单主机 K3s/CNPG/PVC live 缺口，且 Edge/Standalone 和默认 Cluster 常驻资源保持不变。该 gate 不代表生产 Kubernetes control-plane HA、跨主机故障隔离/STONITH、灾备恢复、加密 CSI custody 或外部 IdP 已完成；之后仍有双人复核/break-glass、pepper rotation、audit retention/export/alert、并发 dispatch 和远程管理 UI/API。

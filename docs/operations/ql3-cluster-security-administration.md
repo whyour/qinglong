@@ -149,8 +149,8 @@ kubectl logs job/ql3-security-administration -n qinglong3-system \
   -c administrator
 ```
 
-当前固定资源名只允许串行执行。收集 content-free 结果和（仅 issue/rotate）PVC 中的 `0600` delivery 文件后，删除 Job 与本次 immutable input Secret；不得重用 assertion、把 token 复制到终端输出，或以 `kubectl apply` 修改旧 Job。真实 K3s + PostgreSQL live ceremony 尚未验收，生产启用前仍需完成 ADR-0501 的 live gate。
+当前固定资源名只允许串行执行。收集 content-free 结果和（仅 issue/rotate）PVC 中的 `0600` delivery 文件后，删除 Job 与本次 immutable input Secret；不得重用 assertion、把 token 复制到终端输出，或以 `kubectl apply` 修改旧 Job。ADR-0501 已由三节点 K3s、三实例 CloudNativePG/PostgreSQL、真实 kubelet Secret 投影和 RWO PVC 完成一次端到端 live 验收；它验证的是应用契约与权限边界，不替代生产 control-plane HA、跨主机 STONITH/DR、加密 CSI 和外部 IdP 验收。
 
 ## 当前边界
 
-本入口没有远程 API/UI、双人复核或 break-glass、pepper rotation、audit retention/export/alert。可选 Job 已有受审静态部署契约，但不默认安装，真实 K3s + PostgreSQL/PVC ceremony 仍待验收；admin database credential 始终不得进入常驻 Cluster Control。命令决策见 [ADR-0500](../adr/ADR-0500-short-lived-cluster-security-administration-command.md)，部署决策见 [ADR-0501](../adr/ADR-0501-opt-in-kubernetes-security-administration-job.md)。
+本入口没有远程 API/UI、双人复核或 break-glass、pepper rotation、audit retention/export/alert。可选 Job 的静态契约与单主机 K3s + PostgreSQL/PVC ceremony 已验收，但仍不默认安装，也不证明生产基础设施 HA/DR 或存储加密；admin database credential 始终不得进入常驻 Cluster Control。命令决策见 [ADR-0500](../adr/ADR-0500-short-lived-cluster-security-administration-command.md)，部署决策见 [ADR-0501](../adr/ADR-0501-opt-in-kubernetes-security-administration-job.md)。

@@ -48,6 +48,26 @@ test('rejects Kubernetes API token authority in the administration Job', () => {
   );
 });
 
+test('rejects recursive fsGroup rewrites of persistent credential custody', () => {
+  const report = auditSecurityAdministrationKubernetes({
+    root: ROOT,
+    readFile: intercept(
+      'deploy/kubernetes/ql3-cluster/operations/security-administration/base/job.yaml',
+      (value) => value.replace(
+        'fsGroupChangePolicy: OnRootMismatch',
+        'fsGroupChangePolicy: Always',
+      ),
+    ),
+  });
+
+  assert.equal(report.compatible, false);
+  assert.ok(
+    report.findings.some(
+      ({ code }) => code === 'QL3_SECURITY_ADMIN_KUBERNETES_JOB_BOUNDARY_INVALID',
+    ),
+  );
+});
+
 test('rejects a non-persistent credential delivery boundary', () => {
   const report = auditSecurityAdministrationKubernetes({
     root: ROOT,

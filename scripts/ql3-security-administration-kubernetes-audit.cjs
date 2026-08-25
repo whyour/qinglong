@@ -123,6 +123,7 @@ function auditSecurityAdministrationKubernetes(options = {}) {
       pod?.securityContext?.runAsUser !== 10001 ||
       pod?.securityContext?.runAsGroup !== 10001 ||
       pod?.securityContext?.fsGroup !== 10001 ||
+      pod?.securityContext?.fsGroupChangePolicy !== 'OnRootMismatch' ||
       pod?.securityContext?.seccompProfile?.type !== 'RuntimeDefault'
     ) {
       findings.push(

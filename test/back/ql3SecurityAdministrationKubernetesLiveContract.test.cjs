@@ -1,0 +1,140 @@
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const { test } = require('node:test');
+
+const {
+  auditListCommand,
+  credentialIssueCommand,
+  credentialRevokeCommand,
+  credentialRotateCommand,
+  custodyEvidenceSource,
+  deliveryVolumeProvisionSource,
+  identity,
+  identityRegisterCommand,
+  inputAuthorityEvidenceSource,
+} = require('../../scripts/ql3-security-administration-kubernetes-live-contract.cjs');
+
+const values = Object.freeze({
+  subject: Object.freeze({ type: 'api_app', id: 'd406-test-client' }),
+  credentialId: 'd406-test-client',
+  identityMutationId: '10000000-0000-4000-8000-000000000001',
+  issueMutationId: '10000000-0000-4000-8000-000000000002',
+  rotateMutationId: '10000000-0000-4000-8000-000000000003',
+  revokeMutationId: '10000000-0000-4000-8000-000000000004',
+  registerRequestId: 'd406-register-test',
+  issueRequestId: 'd406-issue-test',
+  rotateRequestId: 'd406-rotate-test',
+  revokeRequestId: 'd406-revoke-test',
+  notBeforeAtMs: 2_000_000_000_000,
+  expiresAtMs: 2_000_003_600_000,
+});
+
+test('requires a private report path before any Docker or Kubernetes mutation', () => {
+  const script = path.resolve(
+    __dirname,
+    '../../scripts/ql3-security-administration-kubernetes-live-contract.cjs',
+  );
+  const result = spawnSync(process.execPath, [script], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      QL3_SECURITY_ADMINISTRATION_KUBERNETES_LIVE: '1',
+    },
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /--report=\/absolute\/private-report\.json/);
+  assert.doesNotMatch(result.stderr, /Docker\/Kubernetes/);
+});
+
+test('builds the exact register, audit, issue, rotate and revoke commands', () => {
+  assert.deepEqual(identityRegisterCommand(values), {
+    schemaVersion: 1,
+    operation: 'identity.register',
+    request: {
+      mutationId: values.identityMutationId,
+      requestId: values.registerRequestId,
+      expectedCurrentVersion: 0,
+      subject: values.subject,
+    },
+  });
+  assert.deepEqual(auditListCommand(), {
+    schemaVersion: 1,
+    operation: 'audit.list',
+    request: { limit: 25, filter: { outcome: 'allowed' } },
+  });
+  assert.equal(credentialIssueCommand(values).request.expectedCurrentVersion, 0);
+  assert.equal(credentialRotateCommand(values).request.expectedCurrentVersion, 1);
+  assert.equal(credentialRevokeCommand(values).request.expectedCurrentVersion, 2);
+  assert.equal('notBeforeAtMs' in credentialRevokeCommand(values).request, false);
+});
+
+test('binds the live assertion to the isolated Security Administration purpose', () => {
+  const key = identity.reviewedKey('security-administration-unit-key');
+  const document = identity.keyset(1, [key]);
+  assert.equal(document.audience, 'qinglong3-security-administration');
+  const assertion = identity.assertion(key, 'unit-test');
+  const header = JSON.parse(Buffer.from(assertion.split('.')[0], 'base64url'));
+  const payload = JSON.parse(Buffer.from(assertion.split('.')[1], 'base64url'));
+  assert.equal(header.typ, 'ql3-security-administration+jwt');
+  assert.equal(payload.ql3_purpose, 'security-administration');
+  assert.equal(payload.sub, 'security-owner');
+  assert.equal(payload.acr, 'urn:ql3:mfa');
+  assert.deepEqual(payload.amr, ['pwd', 'otp']);
+});
+
+test('keeps the in-Pod custody verifier content-free and fail-closed', () => {
+  const source = custodyEvidenceSource();
+  assert.match(source, /bytes\.fill\(0\)/);
+  assert.match(source, /kubernetesApiConnected/);
+  assert.match(source, /publicInternetConnected/);
+  assert.match(source, /status\.nlink!==1/);
+  assert.doesNotMatch(source, /value\.token[,}]/);
+  assert.doesNotMatch(source, /console\.log/);
+});
+
+test('inspects projected input authority without reading private material', () => {
+  const source = inputAuthorityEvidenceSource();
+  assert.match(source, /lstatSync/);
+  assert.match(source, /realpathSync/);
+  assert.match(source, /confined/);
+  assert.doesNotMatch(source, /readFile/);
+  assert.doesNotMatch(source, /createReadStream/);
+});
+
+test('constrains only the exact local-path fixture root without network authority', () => {
+  const source = deliveryVolumeProvisionSource();
+  assert.match(source, /before\.mode!==['"]2777['"]/);
+  assert.match(source, /chmodSync\(root,0o2770\)/);
+  assert.match(source, /after\.mode!==['"]2770['"]/);
+  assert.doesNotMatch(source, /child_process/);
+  assert.doesNotMatch(source, /net|fetch|http/);
+});
+
+test('live runner remains opt-in, reviewed, cleanup-bound and log-free', () => {
+  const source = fs.readFileSync(
+    path.resolve(
+      __dirname,
+      '../../scripts/ql3-security-administration-kubernetes-live-contract.cjs',
+    ),
+    'utf8',
+  );
+  assert.match(
+    source,
+    /QL3_SECURITY_ADMINISTRATION_KUBERNETES_LIVE !== '1'/,
+  );
+  assert.match(source, /reviewedOperatorManifest\(operatorManifestFile\)/);
+  assert.match(source, /validateSecurityAdministrationKubernetesLiveReport/);
+  assert.match(source, /projectedMode: 0o444/);
+  assert.match(source, /credential\.issue\.replay/);
+  assert.match(source, /FallbackToLogsOnError/);
+  assert.match(source, /failureMessage: 'rejected'/);
+  assert.match(
+    source,
+    /deploy\/kubernetes\/ql3-cluster\/base\/service-account\.yaml/,
+  );
+  assert.match(source, /persistentvolumeclaim\/\$\{DELIVERY_CLAIM\}/);
+  assert.match(source, /await fixture\.cleanup\(\)/);
+  assert.doesNotMatch(source, /kubectl\([^)]*logs/);
+});
