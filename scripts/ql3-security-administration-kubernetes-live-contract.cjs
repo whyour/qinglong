@@ -744,6 +744,18 @@ async function main(argv = process.argv.slice(2)) {
   const createdEvidenceJobs = new Set();
   try {
     const nodes = await fixture.start();
+    for (const node of fixture.nodes) {
+      for (const setting of [
+        'net.ipv4.ip_forward=1',
+        'net.bridge.bridge-nf-call-iptables=1',
+      ]) {
+        const configured = fixture.dockerRun(
+          ['exec', node, 'sysctl', '-w', setting],
+          { capture: true, quiet: true },
+        ).stdout;
+        assert.equal(configured.trim().endsWith(' = 1'), true);
+      }
+    }
     const architecture = fixture.inspectImage(fixture.k3sImage).Architecture;
     assert.ok(['amd64', 'arm64'].includes(architecture));
     for (const reviewedImage of [OPERATOR_IMAGE, POSTGRES_IMAGE]) {

@@ -178,6 +178,8 @@ test('live runner remains opt-in, reviewed, cleanup-bound and log-free', () => {
   );
   assert.match(source, /reviewedOperatorManifest\(operatorManifestFile\)/);
   assert.match(source, /validateSecurityAdministrationKubernetesLiveReport/);
+  assert.match(source, /net\.ipv4\.ip_forward=1/);
+  assert.match(source, /net\.bridge\.bridge-nf-call-iptables=1/);
   assert.match(source, /projectedMode: 0o444/);
   assert.match(source, /credential\.issue\.replay/);
   assert.match(source, /FallbackToLogsOnError/);
