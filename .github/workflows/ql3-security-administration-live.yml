@@ -97,6 +97,15 @@ jobs:
       - name: Preload the digest-bound K3s distribution
         run: docker pull rancher/k3s:v1.34.3-k3s1
 
+      - name: Prepare Linux bridge netfilter for nested K3s
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo modprobe br_netfilter
+          test -e /proc/sys/net/bridge/bridge-nf-call-iptables
+          sudo sysctl -w net.ipv4.ip_forward=1
+          sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
+
       - name: Prove Security Administration through K3s, PostgreSQL and PVC
         env:
           QL3_SECURITY_ADMINISTRATION_KUBERNETES_LIVE: '1'
