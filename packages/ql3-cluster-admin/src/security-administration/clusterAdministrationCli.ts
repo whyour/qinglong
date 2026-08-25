@@ -6,7 +6,7 @@ import {
 } from './clusterAdministrationCommand';
 
 const USAGE =
-  'Usage: ql3-security-admin --command=/absolute/command.json --assertion=/absolute/assertion.jwt --keyset=/absolute/keyset.json --pepper=/absolute/pepper [--delivery=/absolute/token.json]';
+  'Usage: ql3-security-admin --command=/absolute/command.json --assertion=/absolute/assertion.jwt --keyset=/absolute/keyset.json (--pepper=/absolute/pepper | --pepper-keyring=/absolute/keyring.json) [--delivery=/absolute/token.json]';
 
 function argumentsFrom(argv: readonly string[]) {
   if (argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h')) {
@@ -14,9 +14,10 @@ function argumentsFrom(argv: readonly string[]) {
   }
   const values = new Map<string, string>();
   for (const argument of argv) {
-    const match = /^--(command|assertion|keyset|pepper|delivery)=(\/.+)$/.exec(
-      argument,
-    );
+    const match =
+      /^--(command|assertion|keyset|pepper|pepper-keyring|delivery)=(\/.+)$/.exec(
+        argument,
+      );
     if (!match || values.has(match[1]!)) {
       throw new ClusterAdministrationCommandError('CLI arguments are invalid');
     }
@@ -26,7 +27,7 @@ function argumentsFrom(argv: readonly string[]) {
     !values.has('command') ||
     !values.has('assertion') ||
     !values.has('keyset') ||
-    !values.has('pepper')
+    values.has('pepper') === values.has('pepper-keyring')
   ) {
     throw new ClusterAdministrationCommandError('CLI arguments are invalid');
   }
@@ -36,7 +37,9 @@ function argumentsFrom(argv: readonly string[]) {
       commandFile: values.get('command')!,
       assertionFile: values.get('assertion')!,
       keysetFile: values.get('keyset')!,
-      pepperFile: values.get('pepper')!,
+      ...(values.has('pepper')
+        ? { pepperFile: values.get('pepper')! }
+        : { pepperKeyringFile: values.get('pepper-keyring')! }),
       ...(values.has('delivery')
         ? { deliveryFile: values.get('delivery')! }
         : {}),

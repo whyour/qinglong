@@ -166,6 +166,7 @@ export interface ProductionClusterControlApplicationOptions
     | 'enabled'
     | 'profile'
     | 'apiCredentialPepper'
+    | 'apiCredentialPepperKeyring'
     | 'openDatabase'
     | 'availability'
     | 'http'
@@ -436,7 +437,7 @@ export function startProductionClusterControlApplication(
     ...applicationOptions,
     enabled: true,
     profile: 'cluster-control',
-    apiCredentialPepper: config.security.apiCredentialPepper,
+    apiCredentialPepperKeyring: config.security.apiCredentialPepperKeyring,
     http: config.http,
     ...(workerIngress === undefined
       ? {}

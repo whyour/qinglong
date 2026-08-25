@@ -33,6 +33,7 @@ export {
 } from '../connection/certificateAuthority';
 export * from '../security/identityAdministrationRepository';
 export * from '../security/apiCredentialAdministrationRepository';
+export * from '../security/apiCredentialPepperReferenceRepository';
 export * from '../security/securityAuditQueryRepository';
 export * from '../worker-credential/workerCredentialAdministrationRepository';
 export * from '../automation/automationAdministrationRepository';

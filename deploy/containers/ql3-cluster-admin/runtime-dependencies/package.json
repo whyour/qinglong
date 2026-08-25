@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/cluster-admin-image-dependencies",
-  "version": "3.0.0-alpha.0",
+  "version": "3.0.0-alpha.1",
   "private": true,
   "description": "Production-only external dependency root for QingLong 3.0 cluster operations and bounded Copilot surfaces",
   "license": "Apache-2.0",

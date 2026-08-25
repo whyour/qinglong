@@ -122,6 +122,29 @@ test('issues one token, stores only its digest and clears mutable secret bytes',
   );
 });
 
+test('binds newly issued credentials to the selected active pepper key', async () => {
+  const repos = repositories();
+  const nextPepper = Buffer.alloc(32, 2).toString('base64url');
+  const generated = Buffer.alloc(32, 9);
+  const service = createClusterAdministrationService(
+    repos.identities,
+    repos.credentials,
+    { pepperKeyId: 'rotation-2026-08', pepper: nextPepper },
+    { now: () => NOW, randomBytes: () => generated },
+  );
+
+  const result = await service.issueCredential(request());
+  const secret = result.token.split('_').at(-1);
+  assert.equal(
+    repos.credentialCommands[0].credential.pepperKeyId,
+    'rotation-2026-08',
+  );
+  assert.equal(
+    repos.credentialCommands[0].credential.secretDigest,
+    apiCredentialSecretDigest(nextPepper, 'credential_primary', secret),
+  );
+});
+
 test('semantic mutation replay returns no token and does not generate a new secret', async () => {
   const repos = repositories();
   let randomCalls = 0;

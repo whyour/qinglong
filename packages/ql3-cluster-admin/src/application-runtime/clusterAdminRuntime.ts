@@ -3,6 +3,8 @@ import type {
   PostgresDatabaseResource,
 } from '@qinglong/runtime-core';
 import { assertApiCredentialPepper } from '@qinglong/runtime-core/api-credential-token';
+import { createSingletonApiCredentialPepperKeyring } from '@qinglong/runtime-core/api-credential-pepper-keyring';
+import { LEGACY_API_CREDENTIAL_PEPPER_KEY_ID } from '@qinglong/runtime-core/api-credential';
 import { assertWorkerCredentialPepper } from '@qinglong/runtime-core/worker-credential-token';
 import type { SecurityAuditQueryRepository } from '@qinglong/runtime-core/security-audit-query';
 import {
@@ -97,7 +99,10 @@ export async function bootstrapClusterAdmin(
       administration: createClusterAdministrationService(
         identities,
         credentials,
-        options.apiCredentialPepper,
+        createSingletonApiCredentialPepperKeyring(
+          options.apiCredentialPepper,
+          LEGACY_API_CREDENTIAL_PEPPER_KEY_ID,
+        ).keys[0]!,
         {
           ...(options.now ? { now: options.now } : {}),
           ...(options.randomBytes ? { randomBytes: options.randomBytes } : {}),

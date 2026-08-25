@@ -41,7 +41,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: materialize-worker-authority
-          image: qinglong3-worker:3.0.0-alpha.0
+          image: qinglong3-worker:3.0.0-alpha.1
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
@@ -81,7 +81,7 @@ spec:
               mountPath: /state
       containers:
         - name: worker
-          image: qinglong3-worker:3.0.0-alpha.0
+          image: qinglong3-worker:3.0.0-alpha.1
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

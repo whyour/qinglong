@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const {
@@ -112,7 +114,16 @@ test('builds an exact runtime-only TLS-verified Pool configuration', async () =>
     },
   });
   assert.deepEqual(config.security, {
-    apiCredentialPepper: BASE_ENV.QL3_API_CREDENTIAL_PEPPER,
+    apiCredentialPepperKeyring: {
+      schemaVersion: 1,
+      activePepperKeyId: 'legacy-v1',
+      keys: [
+        {
+          pepperKeyId: 'legacy-v1',
+          pepper: BASE_ENV.QL3_API_CREDENTIAL_PEPPER,
+        },
+      ],
+    },
   });
   assert.deepEqual(config.logRetention, {
     enabled: true,
@@ -131,6 +142,50 @@ test('builds an exact runtime-only TLS-verified Pool configuration', async () =>
   assert.equal(binding.availability.status, 'available');
   const database = await binding.openDatabase();
   await database.close();
+});
+
+test('loads an exact private dual-generation pepper keyring file', (context) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-keyring-'));
+  context.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.chmodSync(directory, 0o700);
+  const keyringFile = path.join(directory, 'api-credential-keyring.json');
+  const nextPepper = Buffer.alloc(32, 2).toString('base64url');
+  fs.writeFileSync(
+    keyringFile,
+    JSON.stringify({
+      schemaVersion: 1,
+      activePepperKeyId: 'rotation-2026-08',
+      keys: [
+        { pepperKeyId: 'legacy-v1', pepper: 'A'.repeat(43) },
+        { pepperKeyId: 'rotation-2026-08', pepper: nextPepper },
+      ],
+    }),
+    { mode: 0o600 },
+  );
+  const environment = {
+    ...BASE_ENV,
+    QL3_API_CREDENTIAL_PEPPER: undefined,
+    QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE: keyringFile,
+  };
+
+  assert.equal(
+    loadClusterControlConfig(environment).security.apiCredentialPepperKeyring
+      .activePepperKeyId,
+    'rotation-2026-08',
+  );
+  assert.throws(
+    () =>
+      loadClusterControlConfig({
+        ...environment,
+        QL3_API_CREDENTIAL_PEPPER: 'A'.repeat(43),
+      }),
+    /exactly one API credential pepper source/,
+  );
+  fs.chmodSync(keyringFile, 0o622);
+  assert.throws(
+    () => loadClusterControlConfig(environment),
+    /file authority is invalid/,
+  );
 });
 
 test('loads discrete operator-managed runtime credentials without a DSN copy', () => {

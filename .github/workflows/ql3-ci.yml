@@ -8,6 +8,12 @@ on:
     branches:
       - next
   workflow_dispatch:
+    inputs:
+      produce_alpha_artifacts:
+        description: Package tested native images as commit-bound Alpha artifacts
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -471,6 +477,65 @@ jobs:
             --report="${{ runner.temp }}/ql3-local-api-cancellation/edge.json"
           node scripts/ql3-local-api-cancellation-live-audit.cjs \
             --report="${{ runner.temp }}/ql3-local-api-cancellation/standalone.json"
+      - name: Package the tested native Local Alpha image
+        if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts
+        env:
+          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+          IMAGE_ARCH: ${{ matrix.image_arch }}
+          BUNDLE_ROOT: ${{ runner.temp }}/ql3-alpha-local-${{ matrix.image_arch }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "${BUNDLE_ROOT}"
+          archive="${BUNDLE_ROOT}/qinglong3-local-application-${IMAGE_ARCH}.docker.tar"
+          docker image save --output "${archive}" "${IMAGE}"
+          cp "${RUNNER_TEMP}/ql3-local-application.cdx.json" \
+            "${BUNDLE_ROOT}/qinglong3-local-application.cdx.json"
+          cp docs/operations/ql3-alpha-candidate.md "${BUNDLE_ROOT}/README.md"
+          archive_sha256="sha256:$(sha256sum "${archive}" | cut -d ' ' -f 1)"
+          ARCHIVE="${archive}" ARCHIVE_SHA256="${archive_sha256}" \
+            MANIFEST="${BUNDLE_ROOT}/manifest.json" \
+            node <<'NODE'
+          const fs = require('node:fs');
+          const childProcess = require('node:child_process');
+          const release = require('./ql3-release.json');
+          const imageId = childProcess
+            .execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', process.env.IMAGE], { encoding: 'utf8' })
+            .trim();
+          const manifest = {
+            schemaVersion: 1,
+            schema: 'qinglong/alpha-native-image@v1',
+            maturity: 'alpha_candidate_not_public_release',
+            product: 'local',
+            version: release.version,
+            sourceRevision: process.env.GITHUB_SHA,
+            architecture: process.env.IMAGE_ARCH,
+            image: process.env.IMAGE,
+            imageId,
+            archive: process.env.ARCHIVE.split('/').pop(),
+            archiveSha256: process.env.ARCHIVE_SHA256,
+            verification: {
+              osVulnerabilityPolicy: 'passed',
+              sbomInventoryReconciliation: 'passed',
+              router128MiBEntrypoint: 'passed',
+              edgeFreshLifecycle: 'passed',
+              standaloneFreshLifecycle: 'passed',
+              localApiCancellation: 'passed',
+            },
+          };
+          fs.writeFileSync(process.env.MANIFEST, `${JSON.stringify(manifest)}\n`, { mode: 0o600, flag: 'wx' });
+          NODE
+      - name: Upload the tested native Local Alpha image
+        if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-local-${{ matrix.image_arch }}
+          path: ${{ runner.temp }}/ql3-alpha-local-${{ matrix.image_arch }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
 
   cluster-image:
     name: Cluster ${{ matrix.image }} image (${{ matrix.image_arch }})
@@ -663,6 +728,66 @@ jobs:
           scripts/ql3-cluster-image-sbom.cjs
           --image=${{ matrix.image }}
           --inventory-root=/opt/qinglong/node_modules
+      - name: Package the tested native Cluster Alpha image
+        if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts
+        env:
+          IMAGE: ${{ matrix.repository }}:ci-${{ matrix.image_arch }}
+          IMAGE_ARCH: ${{ matrix.image_arch }}
+          IMAGE_ROLE: ${{ matrix.image }}
+          IMAGE_REPOSITORY: ${{ matrix.repository }}
+          BUNDLE_ROOT: ${{ runner.temp }}/ql3-alpha-${{ matrix.image }}-${{ matrix.image_arch }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "${BUNDLE_ROOT}"
+          archive="${BUNDLE_ROOT}/${IMAGE_REPOSITORY}-${IMAGE_ARCH}.docker.tar"
+          docker image save --output "${archive}" "${IMAGE}"
+          cp "${RUNNER_TEMP}/ql3-cluster-${IMAGE_ROLE}.cdx.json" \
+            "${BUNDLE_ROOT}/${IMAGE_REPOSITORY}.cdx.json"
+          cp docs/operations/ql3-alpha-candidate.md "${BUNDLE_ROOT}/README.md"
+          archive_sha256="sha256:$(sha256sum "${archive}" | cut -d ' ' -f 1)"
+          ARCHIVE="${archive}" ARCHIVE_SHA256="${archive_sha256}" \
+            MANIFEST="${BUNDLE_ROOT}/manifest.json" \
+            node <<'NODE'
+          const fs = require('node:fs');
+          const childProcess = require('node:child_process');
+          const release = require('./ql3-release.json');
+          const imageId = childProcess
+            .execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', process.env.IMAGE], { encoding: 'utf8' })
+            .trim();
+          const manifest = {
+            schemaVersion: 1,
+            schema: 'qinglong/alpha-native-image@v1',
+            maturity: 'alpha_candidate_not_public_release',
+            product: 'cluster',
+            role: process.env.IMAGE_ROLE,
+            version: release.version,
+            sourceRevision: process.env.GITHUB_SHA,
+            architecture: process.env.IMAGE_ARCH,
+            image: process.env.IMAGE,
+            imageId,
+            archive: process.env.ARCHIVE.split('/').pop(),
+            archiveSha256: process.env.ARCHIVE_SHA256,
+            verification: {
+              osVulnerabilityPolicy: 'passed',
+              sbomInventoryReconciliation: 'passed',
+              nonRootRuntimeIdentity: 'passed',
+              clusterAdminProductFacade: process.env.IMAGE_ROLE === 'admin' ? 'passed' : 'not_applicable',
+            },
+          };
+          fs.writeFileSync(process.env.MANIFEST, `${JSON.stringify(manifest)}\n`, { mode: 0o600, flag: 'wx' });
+          NODE
+      - name: Upload the tested native Cluster Alpha image
+        if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-${{ matrix.image }}-${{ matrix.image_arch }}
+          path: ${{ runner.temp }}/ql3-alpha-${{ matrix.image }}-${{ matrix.image_arch }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
 
   cluster-console-capacity-release-evidence:
     name: Cross-architecture Cluster Copilot Console capacity evidence

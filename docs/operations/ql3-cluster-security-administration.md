@@ -48,7 +48,20 @@ keyset 使用既有 generation/revocation 协议，例如：
 
 JWT header 必须使用 `typ=ql3-security-administration+jwt`；payload 的 issuer/audience 必须匹配 keyset，并包含 `ql3_purpose=security-administration`。只接受当前、未撤销的强认证 principal。其他管理面即使使用同一签名 key，也会因 type/purpose/audience 不同而被拒绝。
 
-pepper 是现有 API credential digest authority 要求的 32-byte canonical base64url 值。它必须与已存 credential 的 pepper authority 一致，不要为了单次命令临时生成新值，也不要写入 command JSON。
+单 pepper 是现有 API credential digest authority 要求的 32-byte canonical base64url 值。它必须与已存 credential 的 pepper authority 一致，不要为了单次命令临时生成新值，也不要写入 command JSON。D-407 后也可以提供最多两代的私有 keyring：
+
+```json
+{
+  "schemaVersion": 1,
+  "activePepperKeyId": "api-pepper-2026-08",
+  "keys": [
+    { "pepperKeyId": "legacy-v1", "pepper": "REPLACE_WITH_32_BYTE_BASE64URL" },
+    { "pepperKeyId": "api-pepper-2026-08", "pepper": "REPLACE_WITH_32_BYTE_BASE64URL" }
+  ]
+}
+```
+
+keyring 不超过 2 KiB，文件必须为 canonical、non-symlink、私有 regular file。`--pepper` 与 `--pepper-keyring` 必须且只能选择一个；单 pepper 明确映射到 `legacy-v1`，不会自动猜测历史 key。
 
 ## 精确命令
 
@@ -104,6 +117,21 @@ pepper 是现有 API credential digest authority 要求的 32-byte canonical bas
 
 limit 范围为 1–200。可选 filter 只有 projectId、subject 和 outcome；翻页使用上一页的 exact `{occurredAtMs,eventId}` 作为 `before`，不支持 offset、自由文本或无界导出。
 
+退休旧 pepper 前检查当前引用：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "pepper.references",
+  "request": {
+    "pepperKeyId": "legacy-v1",
+    "limit": 64
+  }
+}
+```
+
+结果只含数据库观察时间、请求的 key ID、有界 credential ID 列表和 `hasMore`。它不返回 token/digest/material，也不删除任何对象。必须继续分页和轮换/撤销旧 credential，直到在稳定部署下得到空引用结果，才能进入 material contraction。
+
 ## 执行
 
 生产默认要求 TLS hostname verification：
@@ -120,6 +148,14 @@ ql3-cluster-admin security \
   --pepper=/secure/qinglong3/api-credential-pepper \
   --delivery=/secure/qinglong3/delivery/new-api-credential.json
 ```
+
+双代轮换时把 `--pepper` 替换为：
+
+```sh
+  --pepper-keyring=/secure/qinglong3/api-credential-pepper-keyring.json
+```
+
+Cluster Control 使用 `QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE`；它与旧 `QL3_API_CREDENTIAL_PEPPER` 同样二选一。认证严格使用 credential record 保存的 key ID，不尝试 active/legacy fallback，也不遍历 keyring。
 
 也可以直接调用同镜像内的 `ql3-security-admin`。测试环境只有同时设置 `QL3_POSTGRES_ADMIN_TLS_MODE=disable` 与 `QL3_POSTGRES_ADMIN_ALLOW_INSECURE=true` 才能关闭 TLS；生产禁止这样部署。
 
@@ -153,4 +189,4 @@ kubectl logs job/ql3-security-administration -n qinglong3-system \
 
 ## 当前边界
 
-本入口没有远程 API/UI、双人复核或 break-glass、pepper rotation、audit retention/export/alert。可选 Job 的静态契约与单主机 K3s + PostgreSQL/PVC ceremony 已验收，但仍不默认安装，也不证明生产基础设施 HA/DR 或存储加密；admin database credential 始终不得进入常驻 Cluster Control。命令决策见 [ADR-0500](../adr/ADR-0500-short-lived-cluster-security-administration-command.md)，部署决策见 [ADR-0501](../adr/ADR-0501-opt-in-kubernetes-security-administration-job.md)。
+本入口没有远程 API/UI、双人复核或 break-glass、自动 pepper rotation/material GC、audit retention/export/alert。D-407 已提供 old/new 双代 keyring、active issuance、exact-key authentication 和退休前引用检查，但 active 切换仍由显式配置更新加滚动重启完成。现有 Kubernetes Job stager 只接受单 pepper，尚未完成 keyring Secret 投影和真实 overlap→activate→contract live gate，因此不能用 D-406 模板宣称 Kubernetes pepper rotation 已完成。可选 Job 的静态契约与单主机 K3s + PostgreSQL/PVC ceremony 已验收，但仍不默认安装，也不证明生产基础设施 HA/DR 或存储加密；admin database credential 始终不得进入常驻 Cluster Control。命令决策见 [ADR-0500](../adr/ADR-0500-short-lived-cluster-security-administration-command.md)，部署决策见 [ADR-0501](../adr/ADR-0501-opt-in-kubernetes-security-administration-job.md)，双代 keyring 见 [ADR-0502](../adr/ADR-0502-bounded-cluster-api-credential-pepper-keyring.md)。

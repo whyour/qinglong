@@ -196,7 +196,7 @@ test('rejects tag, version and source identity drift', () => {
       }),
     /Git SHA-1/,
   );
-  const nextVersion = `${version.slice(0, version.lastIndexOf('.') + 1)}1`;
+  const nextVersion = `${version}-drift`;
   assert.throws(
     () =>
       createReleaseCandidateContract({

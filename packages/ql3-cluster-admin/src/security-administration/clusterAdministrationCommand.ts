@@ -1,7 +1,17 @@
 import { createHash } from 'node:crypto';
 import { basename } from 'node:path';
 
-import { assertApiCredentialPepper } from '@qinglong/runtime-core/api-credential-token';
+import {
+  createSingletonApiCredentialPepperKeyring,
+  normalizeApiCredentialPepperKeyring,
+  type ApiCredentialPepperKeyring,
+} from '@qinglong/runtime-core/api-credential-pepper-keyring';
+import { LEGACY_API_CREDENTIAL_PEPPER_KEY_ID } from '@qinglong/runtime-core/api-credential';
+import {
+  normalizeApiCredentialPepperReferenceKeyId,
+  normalizeApiCredentialPepperReferenceLimit,
+  type ApiCredentialPepperReferenceRepository,
+} from '@qinglong/runtime-core/api-credential-pepper-reference';
 import { normalizeIdentityAdministrationSubject } from '@qinglong/runtime-core/identity-administration';
 import {
   normalizeSecurityAuditQuery,
@@ -34,6 +44,7 @@ const MAX_VERSION = 2_147_483_646;
 const MAX_COMMAND_BYTES = 64 * 1024;
 const MAX_ASSERTION_BYTES = 16 * 1024;
 const MAX_PEPPER_BYTES = 256;
+const MAX_PEPPER_KEYRING_BYTES = 2 * 1024;
 
 export type ClusterAdministrationCommandOperation =
   | 'identity.register'
@@ -42,6 +53,7 @@ export type ClusterAdministrationCommandOperation =
   | 'credential.issue'
   | 'credential.rotate'
   | 'credential.revoke'
+  | 'pepper.references'
   | 'audit.list';
 
 interface BaseMutationRequest {
@@ -79,16 +91,27 @@ interface AuditCommand {
   readonly request: SecurityAuditQuery;
 }
 
+interface PepperReferenceCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'pepper.references';
+  readonly request: Readonly<{
+    readonly pepperKeyId: string;
+    readonly limit: number;
+  }>;
+}
+
 export type ClusterAdministrationCommand =
   | IdentityCommand
   | CredentialCommand
+  | PepperReferenceCommand
   | AuditCommand;
 
 export interface ClusterAdministrationCommandPaths {
   readonly commandFile: string;
   readonly assertionFile: string;
   readonly keysetFile: string;
-  readonly pepperFile: string;
+  readonly pepperFile?: string;
+  readonly pepperKeyringFile?: string;
   readonly deliveryFile?: string;
 }
 
@@ -115,18 +138,27 @@ export type ClusterAdministrationCommandResult =
       schemaVersion: 1;
       operation: 'audit.list';
       page: Readonly<SecurityAuditQueryPage>;
+    }>
+  | Readonly<{
+      schemaVersion: 1;
+      operation: 'pepper.references';
+      pepperKeyId: string;
+      observedAtMs: number;
+      credentialIds: readonly string[];
+      hasMore: boolean;
     }>;
 
 export interface ClusterAdministrationCommandAuthority {
   readonly administration: ClusterAdministrationService;
   readonly audit: SecurityAuditQueryRepository;
+  readonly pepperReferences: ApiCredentialPepperReferenceRepository;
   close(): Promise<void>;
 }
 
 export interface ClusterAdministrationCommandDependencies {
   readonly openAuthority: (
     environment: Readonly<Record<string, string | undefined>>,
-    pepper: string,
+    pepperKeyring: Readonly<ApiCredentialPepperKeyring>,
   ) => Promise<Readonly<ClusterAdministrationCommandAuthority>>;
   readonly authenticate: (
     keysetFile: string,
@@ -243,6 +275,7 @@ export function normalizeClusterAdministrationCommand(
     'credential.issue',
     'credential.rotate',
     'credential.revoke',
+    'pepper.references',
     'audit.list',
   ];
   if (
@@ -257,6 +290,28 @@ export function normalizeClusterAdministrationCommand(
     );
   }
   const operation = value.operation as ClusterAdministrationCommandOperation;
+  if (operation === 'pepper.references') {
+    exactObject(value.request, ['limit', 'pepperKeyId'], 'pepper reference');
+    try {
+      return Object.freeze({
+        schemaVersion: 1 as const,
+        operation,
+        request: Object.freeze({
+          pepperKeyId: normalizeApiCredentialPepperReferenceKeyId(
+            value.request.pepperKeyId as string,
+          ),
+          limit: normalizeApiCredentialPepperReferenceLimit(
+            value.request.limit as number,
+          ),
+        }),
+      });
+    } catch (error) {
+      throw new ClusterAdministrationCommandError(
+        'pepper reference query is invalid',
+        error,
+      );
+    }
+  }
   if (operation === 'audit.list') {
     let request: Readonly<SecurityAuditQuery>;
     try {
@@ -370,9 +425,11 @@ export function createClusterAdministrationCommandRunner(
         MAX_ASSERTION_BYTES,
         true,
       );
-      const pepperBytes = dependencies.readFile(
-        paths.pepperFile,
-        MAX_PEPPER_BYTES,
+      const pepperKeyringBytes = dependencies.readFile(
+        paths.pepperKeyringFile ?? paths.pepperFile!,
+        paths.pepperKeyringFile === undefined
+          ? MAX_PEPPER_BYTES
+          : MAX_PEPPER_KEYRING_BYTES,
         true,
       );
       let authority:
@@ -380,13 +437,46 @@ export function createClusterAdministrationCommandRunner(
         | undefined;
       try {
         const assertion = strictUtf8(assertionBytes, 'assertion file').trim();
-        const pepper = strictUtf8(pepperBytes, 'pepper file').trim();
-        assertApiCredentialPepper(pepper);
+        let pepperKeyring: Readonly<ApiCredentialPepperKeyring>;
+        if (paths.pepperKeyringFile === undefined) {
+          pepperKeyring = createSingletonApiCredentialPepperKeyring(
+            strictUtf8(pepperKeyringBytes, 'pepper file').trim(),
+            LEGACY_API_CREDENTIAL_PEPPER_KEY_ID,
+          );
+        } else {
+          try {
+            pepperKeyring = normalizeApiCredentialPepperKeyring(
+              JSON.parse(
+                strictUtf8(pepperKeyringBytes, 'pepper keyring file'),
+              ),
+            );
+          } catch (error) {
+            throw new ClusterAdministrationCommandError(
+              'pepper keyring file is invalid',
+              error,
+            );
+          }
+        }
         const principal = await dependencies.authenticate(
           paths.keysetFile,
           assertion,
         );
-        authority = await dependencies.openAuthority(environment, pepper);
+        authority = await dependencies.openAuthority(
+          environment,
+          pepperKeyring,
+        );
+        if (command.operation === 'pepper.references') {
+          void principal;
+          const inspection = await authority.pepperReferences.inspect(
+            command.request.pepperKeyId,
+            command.request.limit,
+          );
+          return Object.freeze({
+            schemaVersion: 1 as const,
+            operation: command.operation,
+            ...inspection,
+          });
+        }
         if (command.operation === 'audit.list') {
           // Successful verification is the short-lived admin admission. Audit
           // queries remain read-only and use the repository's bounded contract.
@@ -460,7 +550,7 @@ export function createClusterAdministrationCommandRunner(
         });
       } finally {
         assertionBytes.fill(0);
-        pepperBytes.fill(0);
+        pepperKeyringBytes.fill(0);
         await authority?.close();
       }
     },

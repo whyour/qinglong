@@ -17,7 +17,7 @@ Build from the repository root:
 ```bash
 docker build \
   --file deploy/containers/ql3-cluster-control/Dockerfile \
-  --tag qinglong3-cluster-control:3.0.0-alpha.0 \
+  --tag qinglong3-cluster-control:3.0.0-alpha.1 \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
   .
 ```
@@ -28,7 +28,7 @@ control-plane image:
 ```bash
 docker build \
   --file deploy/containers/ql3-cluster-admin/Dockerfile \
-  --tag qinglong3-cluster-admin:3.0.0-alpha.0 \
+  --tag qinglong3-cluster-admin:3.0.0-alpha.1 \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
   .
 ```

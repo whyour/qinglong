@@ -114,6 +114,17 @@ function authority(overrides = {}) {
         return { records: [], nextCursor: null };
       },
     },
+    pepperReferences: {
+      async inspect(pepperKeyId, limit) {
+        calls.push(['pepper.references', { pepperKeyId, limit }]);
+        return {
+          pepperKeyId,
+          observedAtMs: 1_000,
+          credentialIds: ['automation-primary'],
+          hasMore: false,
+        };
+      },
+    },
     async close() {
       closes += 1;
     },
@@ -175,7 +186,11 @@ test('executes one strongly authenticated identity mutation and closes authority
       assertion: 'signed.assertion.value',
     },
   ]);
-  assert.equal(execution.opens[0].pepper, 'A'.repeat(43));
+  assert.deepEqual(execution.opens[0].pepper, {
+    schemaVersion: 1,
+    activePepperKeyId: 'legacy-v1',
+    keys: [{ pepperKeyId: 'legacy-v1', pepper: 'A'.repeat(43) }],
+  });
   assert.equal(target.calls[0][1].principal, PRINCIPAL);
   assert.equal(target.closes(), 1);
   assert.equal(
@@ -309,6 +324,73 @@ test('keeps audit query bounded and rejects widened command shapes before admiss
         request: { limit: 201, filter: {} },
       }),
     /audit query is invalid/,
+  );
+});
+
+test('loads a dual-generation keyring and exposes bounded retirement references', async () => {
+  const target = authority();
+  const nextPepper = Buffer.alloc(32, 2).toString('base64url');
+  const command = {
+    schemaVersion: 1,
+    operation: 'pepper.references',
+    request: { pepperKeyId: 'legacy-v1', limit: 32 },
+  };
+  const paths = {
+    commandFile: PATHS.commandFile,
+    assertionFile: PATHS.assertionFile,
+    keysetFile: PATHS.keysetFile,
+    pepperKeyringFile: '/private/pepper-keyring.json',
+  };
+  const buffers = [];
+  const opens = [];
+  const files = new Map([
+    [paths.commandFile, JSON.stringify(command)],
+    [paths.assertionFile, 'signed.assertion.value'],
+    [
+      paths.pepperKeyringFile,
+      JSON.stringify({
+        schemaVersion: 1,
+        activePepperKeyId: 'rotation-2026-08',
+        keys: [
+          { pepperKeyId: 'legacy-v1', pepper: 'A'.repeat(43) },
+          { pepperKeyId: 'rotation-2026-08', pepper: nextPepper },
+        ],
+      }),
+    ],
+  ]);
+  const instance = createClusterAdministrationCommandRunner({
+    async openAuthority(environment, keyring) {
+      opens.push({ environment, keyring });
+      return target.value;
+    },
+    async authenticate() {
+      return PRINCIPAL;
+    },
+    readFile(filePath) {
+      const buffer = Buffer.from(files.get(filePath));
+      buffers.push(buffer);
+      return buffer;
+    },
+    publishDelivery() {
+      throw new Error('unexpected delivery');
+    },
+  });
+
+  assert.deepEqual(await instance.run(paths, {}), {
+    schemaVersion: 1,
+    operation: 'pepper.references',
+    pepperKeyId: 'legacy-v1',
+    observedAtMs: 1_000,
+    credentialIds: ['automation-primary'],
+    hasMore: false,
+  });
+  assert.equal(opens[0].keyring.activePepperKeyId, 'rotation-2026-08');
+  assert.equal(opens[0].keyring.keys.length, 2);
+  assert.equal(target.calls[0][0], 'pepper.references');
+  assert.equal(target.closes(), 1);
+  assert.equal(
+    buffers.every((buffer) => buffer.every((byte) => byte === 0)),
+    true,
   );
 });
 

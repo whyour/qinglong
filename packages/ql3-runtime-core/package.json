@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/runtime-core",
-  "version": "3.0.0-alpha.0",
+  "version": "3.0.0-alpha.1",
   "private": true,
   "description": "QingLong 3.0 profile-neutral runtime contracts",
   "license": "Apache-2.0",
@@ -960,6 +960,16 @@
       "types": "./dist/security/identity-credential/apiCredentialToken.d.ts",
       "require": "./dist/security/identity-credential/apiCredentialToken.js",
       "default": "./dist/security/identity-credential/apiCredentialToken.js"
+    },
+    "./api-credential-pepper-keyring": {
+      "types": "./dist/security/identity-credential/apiCredentialPepperKeyring.d.ts",
+      "require": "./dist/security/identity-credential/apiCredentialPepperKeyring.js",
+      "default": "./dist/security/identity-credential/apiCredentialPepperKeyring.js"
+    },
+    "./api-credential-pepper-reference": {
+      "types": "./dist/security/identity-credential/apiCredentialPepperReference.d.ts",
+      "require": "./dist/security/identity-credential/apiCredentialPepperReference.js",
+      "default": "./dist/security/identity-credential/apiCredentialPepperReference.js"
     },
     "./identity-administration": {
       "types": "./dist/security/identity-credential/identityAdministration.d.ts",

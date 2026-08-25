@@ -13,9 +13,11 @@ import {
   formatApiCredentialToken,
 } from '@qinglong/runtime-core/api-credential-token';
 import {
-  LEGACY_API_CREDENTIAL_PEPPER_KEY_ID,
+  assertApiCredentialPepperKeyId,
   type ApiCredentialRecord,
+  LEGACY_API_CREDENTIAL_PEPPER_KEY_ID,
 } from '@qinglong/runtime-core/api-credential';
+import type { ApiCredentialPepperKey } from '@qinglong/runtime-core/api-credential-pepper-keyring';
 import {
   type AppendIdentitySubjectResult,
   IdentityAdministrationMutationConflictError,
@@ -283,7 +285,7 @@ function sameCredentialReplay(
 export function createClusterAdministrationService(
   identities: IdentityAdministrationRepository,
   credentials: ApiCredentialAdministrationRepository,
-  pepper: string,
+  activePepperKeyValue: Readonly<ApiCredentialPepperKey> | string,
   options: ClusterAdministrationOptions = {},
 ): ClusterAdministrationService {
   if (
@@ -305,10 +307,28 @@ export function createClusterAdministrationService(
       'credential repository is invalid',
     );
   }
+  const activePepperKey =
+    typeof activePepperKeyValue === 'string'
+      ? Object.freeze({
+          pepperKeyId: LEGACY_API_CREDENTIAL_PEPPER_KEY_ID,
+          pepper: activePepperKeyValue,
+        })
+      : activePepperKeyValue;
   try {
-    assertApiCredentialPepper(pepper);
+    if (
+      !activePepperKey ||
+      typeof activePepperKey !== 'object' ||
+      Array.isArray(activePepperKey) ||
+      Object.keys(activePepperKey).sort().join(',') !== 'pepper,pepperKeyId'
+    ) {
+      throw new TypeError();
+    }
+    assertApiCredentialPepper(activePepperKey.pepper);
+    assertApiCredentialPepperKeyId(activePepperKey.pepperKeyId);
   } catch {
-    throw new ClusterAdministrationConfigurationError('pepper is invalid');
+    throw new ClusterAdministrationConfigurationError(
+      'active pepper key is invalid',
+    );
   }
   exactObject(options, 'options');
   const optionKeys = Object.keys(options);
@@ -442,7 +462,7 @@ export function createClusterAdministrationService(
       try {
         secretBase64Url = secret.toString('base64url');
         secretDigest = apiCredentialSecretDigest(
-          pepper,
+          activePepperKey.pepper,
           request.credentialId,
           secretBase64Url,
         );
@@ -454,7 +474,7 @@ export function createClusterAdministrationService(
     const credential: ApiCredentialRecord = {
       credentialId: request.credentialId,
       version: request.expectedCurrentVersion + 1,
-      pepperKeyId: LEGACY_API_CREDENTIAL_PEPPER_KEY_ID,
+      pepperKeyId: activePepperKey.pepperKeyId,
       state: operation === 'revoke' ? 'revoked' : 'active',
       subject: request.subject,
       subjectStatus: identity.status,

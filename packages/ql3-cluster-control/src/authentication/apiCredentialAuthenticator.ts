@@ -8,6 +8,13 @@ import {
   type ApiCredentialRepository,
 } from '@qinglong/runtime-core/api-credential';
 import {
+  activeApiCredentialPepperKey,
+  createSingletonApiCredentialPepperKeyring,
+  normalizeApiCredentialPepperKeyring,
+  resolveApiCredentialPepperKey,
+  type ApiCredentialPepperKeyring,
+} from '@qinglong/runtime-core/api-credential-pepper-keyring';
+import {
   normalizeSecurityPrincipal,
   type SecurityPrincipal,
 } from '@qinglong/runtime-core/security';
@@ -137,7 +144,7 @@ function parseAuthorization(
 
 export function createClusterControlApiCredentialAuthenticator(
   repository: ApiCredentialRepository,
-  pepperBase64Url: string,
+  pepperKeyringValue: Readonly<ApiCredentialPepperKeyring> | string,
   options: ClusterControlApiCredentialAuthenticatorOptions = {},
 ): ClusterControlRequestAuthenticator {
   if (!repository || typeof repository.resolve !== 'function') {
@@ -164,16 +171,25 @@ export function createClusterControlApiCredentialAuthenticator(
   if (options.now !== undefined && typeof options.now !== 'function') {
     throw new ClusterControlApiCredentialConfigurationError('now is invalid');
   }
-  const pepperKeyId =
-    options.pepperKeyId ?? LEGACY_API_CREDENTIAL_PEPPER_KEY_ID;
+  let pepperKeyring: Readonly<ApiCredentialPepperKeyring>;
   try {
-    assertApiCredentialPepperKeyId(pepperKeyId);
+    if (typeof pepperKeyringValue === 'string') {
+      const pepperKeyId =
+        options.pepperKeyId ?? LEGACY_API_CREDENTIAL_PEPPER_KEY_ID;
+      assertApiCredentialPepperKeyId(pepperKeyId);
+      pepperKeyring = createSingletonApiCredentialPepperKeyring(
+        pepperKeyringValue,
+        pepperKeyId,
+      );
+    } else {
+      if (options.pepperKeyId !== undefined) throw new TypeError();
+      pepperKeyring = normalizeApiCredentialPepperKeyring(pepperKeyringValue);
+    }
   } catch {
     throw new ClusterControlApiCredentialConfigurationError(
-      'pepperKeyId is invalid',
+      'pepper keyring is invalid',
     );
   }
-  const pepper = decodeSecret('pepper', pepperBase64Url);
   const ttlMs = principalTtl(options.principalTtlMs);
   const now = options.now ?? Date.now;
 
@@ -183,37 +199,42 @@ export function createClusterControlApiCredentialAuthenticator(
     ): Promise<Readonly<SecurityPrincipal> | null> {
       const parsed = parseAuthorization(metadata);
       if (!parsed) return null;
-      const presentedDigest = digest(
-        pepper,
-        parsed.credentialId,
-        parsed.secret,
-      );
-      parsed.secret.fill(0);
       let candidate;
       try {
         candidate = await repository.resolve(parsed.credentialId);
       } catch (error) {
-        presentedDigest.fill(0);
+        parsed.secret.fill(0);
         if (error instanceof ApiCredentialUnavailableError) {
           throw new ClusterControlApiCredentialUnavailableError();
         }
         throw new ClusterControlApiCredentialUnavailableError();
       }
       if (metadata.signal.aborted) {
-        presentedDigest.fill(0);
+        parsed.secret.fill(0);
         throw new ClusterControlApiCredentialUnavailableError();
       }
       let record;
       try {
         record = candidate ? normalizeApiCredentialRecord(candidate) : null;
       } catch {
-        presentedDigest.fill(0);
+        parsed.secret.fill(0);
         throw new ClusterControlApiCredentialUnavailableError();
       }
-      if (record && record.pepperKeyId !== pepperKeyId) {
-        presentedDigest.fill(0);
+      const key = record
+        ? resolveApiCredentialPepperKey(pepperKeyring, record.pepperKeyId)
+        : activeApiCredentialPepperKey(pepperKeyring);
+      if (!key) {
+        parsed.secret.fill(0);
         throw new ClusterControlApiCredentialUnavailableError();
       }
+      const pepper = decodeSecret('pepper', key.pepper);
+      const presentedDigest = digest(
+        pepper,
+        parsed.credentialId,
+        parsed.secret,
+      );
+      pepper.fill(0);
+      parsed.secret.fill(0);
       const storedDigest = record
         ? Buffer.from(record.secretDigest, 'hex')
         : Buffer.alloc(32);

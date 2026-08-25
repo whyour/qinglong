@@ -505,6 +505,7 @@
 | [ADR-0499](./ADR-0499-direct-vault-kv-worker-secret-custody.md)                                      | 直接 Vault KV Worker Secret 外部托管                                                                                                                                                                             | Accepted |
 | [ADR-0500](./ADR-0500-short-lived-cluster-security-administration-command.md)                        | 短生命周期 Cluster Security Administration 产品命令                                                                                                                                                              | Accepted |
 | [ADR-0501](./ADR-0501-opt-in-kubernetes-security-administration-job.md)                              | 可选的一次性 Kubernetes Security Administration Job                                                                                                                                                              | Accepted |
+| [ADR-0502](./ADR-0502-bounded-cluster-api-credential-pepper-keyring.md)                             | 有界 Cluster API Credential Pepper Keyring                                                                                                                                                                        | Accepted |
 
 ## 规则
 

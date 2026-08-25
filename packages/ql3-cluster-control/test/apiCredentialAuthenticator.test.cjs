@@ -13,6 +13,7 @@ const {
 
 const NOW = 10_000;
 const PEPPER = Buffer.alloc(32, 1).toString('base64url');
+const NEXT_PEPPER = Buffer.alloc(32, 3).toString('base64url');
 const SECRET = Buffer.alloc(32, 2).toString('base64url');
 const CREDENTIAL_ID = 'app_primary';
 
@@ -84,6 +85,53 @@ test('derives a domain-separated HMAC digest and user assurance', async () => {
     credential({ subject: { type: 'user', id: 'usr_primary' } }),
   ).authenticate(metadata());
   assert.equal(principal.assurance, 'single_factor');
+});
+
+test('authenticates overlap generations by exact stored key id without fallback', async () => {
+  const keyring = {
+    schemaVersion: 1,
+    activePepperKeyId: 'rotation-2026-08',
+    keys: [
+      { pepperKeyId: 'legacy-v1', pepper: PEPPER },
+      { pepperKeyId: 'rotation-2026-08', pepper: NEXT_PEPPER },
+    ],
+  };
+  const records = new Map([
+    [
+      'legacy',
+      credential({
+        credentialId: 'legacy',
+        secretDigest: apiCredentialSecretDigest(PEPPER, 'legacy', SECRET),
+      }),
+    ],
+    [
+      'next',
+      credential({
+        credentialId: 'next',
+        pepperKeyId: 'rotation-2026-08',
+        secretDigest: apiCredentialSecretDigest(
+          NEXT_PEPPER,
+          'next',
+          SECRET,
+        ),
+      }),
+    ],
+    ['unknown', credential({ credentialId: 'unknown', pepperKeyId: 'missing' })],
+  ]);
+  const verifier = createClusterControlApiCredentialAuthenticator(
+    { async resolve(credentialId) { return records.get(credentialId) ?? null; } },
+    keyring,
+    { now: () => NOW },
+  );
+  const request = (credentialId) =>
+    metadata(`Bearer ql3c_${credentialId}_${SECRET}`);
+
+  assert.equal((await verifier.authenticate(request('legacy'))).subject.id, 'app_primary');
+  assert.equal((await verifier.authenticate(request('next'))).subject.id, 'app_primary');
+  await assert.rejects(
+    verifier.authenticate(request('unknown')),
+    ClusterControlApiCredentialUnavailableError,
+  );
 });
 
 test('rejects missing, malformed, wrong, inactive and disabled credentials', async () => {

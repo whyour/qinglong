@@ -20,9 +20,13 @@ import {
   resolve,
 } from 'node:path';
 
-import { assertApiCredentialPepper } from '@qinglong/runtime-core/api-credential-token';
+import {
+  activeApiCredentialPepperKey,
+  type ApiCredentialPepperKeyring,
+} from '@qinglong/runtime-core/api-credential-pepper-keyring';
 import {
   PostgresApiCredentialAdministrationRepository,
+  PostgresApiCredentialPepperReferenceRepository,
   PostgresIdentityAdministrationRepository,
   PostgresSecurityAuditQueryRepository,
   assertPostgresAdminSchemaReady,
@@ -249,9 +253,9 @@ function defaultDatabaseOpener(
 
 async function openDefaultAuthority(
   environment: Readonly<Record<string, string | undefined>>,
-  pepper: string,
+  pepperKeyring: Readonly<ApiCredentialPepperKeyring>,
 ): Promise<Readonly<ClusterAdministrationCommandAuthority>> {
-  assertApiCredentialPepper(pepper);
+  const activePepperKey = activeApiCredentialPepperKey(pepperKeyring);
   const database = await defaultDatabaseOpener(environment)();
   let closePromise: Promise<void> | undefined;
   const close = (): Promise<void> => {
@@ -264,9 +268,12 @@ async function openDefaultAuthority(
       administration: createClusterAdministrationService(
         new PostgresIdentityAdministrationRepository(database.pool),
         new PostgresApiCredentialAdministrationRepository(database.pool),
-        pepper,
+        activePepperKey,
       ),
       audit: new PostgresSecurityAuditQueryRepository(database.pool),
+      pepperReferences: new PostgresApiCredentialPepperReferenceRepository(
+        database.pool,
+      ),
       close,
     });
   } catch (error) {
@@ -388,11 +395,20 @@ export function normalizeClusterAdministrationCommandPaths(
       'command paths must be an object',
     );
   }
+  const pepperPathKeys = [
+    value.pepperFile === undefined ? null : 'pepperFile',
+    value.pepperKeyringFile === undefined ? null : 'pepperKeyringFile',
+  ].filter((key): key is string => key !== null);
+  if (pepperPathKeys.length !== 1) {
+    throw new ClusterAdministrationCommandError(
+      'exactly one pepper source is required',
+    );
+  }
   const expected = [
     'assertionFile',
     'commandFile',
     'keysetFile',
-    'pepperFile',
+    pepperPathKeys[0]!,
     ...(requiresDelivery ? ['deliveryFile'] : []),
   ].sort();
   const actual = Object.keys(value).sort();
@@ -417,10 +433,19 @@ export function normalizeClusterAdministrationCommandPaths(
       value.keysetFile,
       'identity keyset file',
     ),
-    pepperFile: boundedClusterAdministrationFile(
-      value.pepperFile,
-      'pepper file',
-    ),
+    ...(value.pepperFile === undefined
+      ? {
+          pepperKeyringFile: boundedClusterAdministrationFile(
+            value.pepperKeyringFile,
+            'pepper keyring file',
+          ),
+        }
+      : {
+          pepperFile: boundedClusterAdministrationFile(
+            value.pepperFile,
+            'pepper file',
+          ),
+        }),
     ...(requiresDelivery
       ? {
           deliveryFile: boundedClusterAdministrationFile(
@@ -441,11 +466,18 @@ export function clusterAdministrationCommandFileBeforeAdmission(
     );
   }
   const candidate = value as Record<string, unknown>;
-  const required = ['assertionFile', 'commandFile', 'keysetFile', 'pepperFile'];
+  const required = ['assertionFile', 'commandFile', 'keysetFile'];
+  const pepperSources = ['pepperFile', 'pepperKeyringFile'].filter((key) =>
+    Object.hasOwn(candidate, key),
+  );
   if (
     required.some((key) => !Object.hasOwn(candidate, key)) ||
+    pepperSources.length !== 1 ||
     Object.keys(candidate).some(
-      (key) => !required.includes(key) && key !== 'deliveryFile',
+      (key) =>
+        !required.includes(key) &&
+        !pepperSources.includes(key) &&
+        key !== 'deliveryFile',
     )
   ) {
     throw new ClusterAdministrationCommandError(

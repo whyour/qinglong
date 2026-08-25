@@ -9,6 +9,12 @@ import type {
   OpenPostgresDatabase,
 } from '@qinglong/runtime-core';
 import {
+  createSingletonApiCredentialPepperKeyring,
+  normalizeApiCredentialPepperKeyring,
+  type ApiCredentialPepperKeyring,
+} from '@qinglong/runtime-core/api-credential-pepper-keyring';
+import { LEGACY_API_CREDENTIAL_PEPPER_KEY_ID } from '@qinglong/runtime-core/api-credential';
+import {
   bootstrapClusterControlRuntime,
   type ClusterControlAssemblyInput,
   type ClusterControlRecoveryRuntimeOptions,
@@ -17,13 +23,13 @@ import {
   type ClusterSchedulerRuntimeOptions,
   type ClusterWorkerRuntimeDependencies,
 } from './clusterControlRuntime';
-import { assertClusterControlApiCredentialPepper } from '../authentication/apiCredentialAuthenticator';
 import {
   startClusterControlHttpSurface,
   type ClusterControlAdmissionPipeline,
   type ClusterControlHttpAddress,
   type ClusterControlHttpSurfaceOptions,
 } from '../transport/httpSurface';
+import { ClusterControlApiCredentialConfigurationError } from '../authentication/apiCredentialAuthenticator';
 import type { ClusterControlAvailabilitySource } from '../database/availability';
 
 export interface ClusterControlApplicationStack {
@@ -36,7 +42,9 @@ export interface ClusterControlApplicationStack {
 export interface ClusterControlApplicationOptions {
   readonly enabled?: boolean;
   readonly profile: DeploymentProfile;
+  /** Explicit singleton compatibility bridge; production config emits a keyring. */
   readonly apiCredentialPepper?: string;
+  readonly apiCredentialPepperKeyring?: Readonly<ApiCredentialPepperKeyring>;
   readonly recovery?: ClusterControlRecoveryRuntimeOptions;
   readonly scheduler?: ClusterSchedulerRuntimeOptions;
   readonly cancellationConvergence?: ClusterRunCancellationConvergenceRuntimeOptions;
@@ -83,6 +91,9 @@ function inactiveBootstrap(
     ...(options.apiCredentialPepper === undefined
       ? {}
       : { apiCredentialPepper: options.apiCredentialPepper }),
+    ...(options.apiCredentialPepperKeyring === undefined
+      ? {}
+      : { apiCredentialPepperKeyring: options.apiCredentialPepperKeyring }),
     ...(options.recovery === undefined ? {} : { recovery: options.recovery }),
     ...(options.scheduler === undefined
       ? {}
@@ -121,8 +132,30 @@ export async function startClusterControlApplication(
     return inactive;
   }
 
-  assertClusterControlApiCredentialPepper(options.apiCredentialPepper ?? '');
-  const apiCredentialPepper = options.apiCredentialPepper!;
+  if (
+    (options.apiCredentialPepper === undefined) ===
+    (options.apiCredentialPepperKeyring === undefined)
+  ) {
+    throw new TypeError(
+      'Cluster-control API credential configuration is invalid',
+    );
+  }
+  let apiCredentialPepperKeyring: Readonly<ApiCredentialPepperKeyring>;
+  try {
+    apiCredentialPepperKeyring =
+      options.apiCredentialPepperKeyring === undefined
+        ? createSingletonApiCredentialPepperKeyring(
+            options.apiCredentialPepper!,
+            LEGACY_API_CREDENTIAL_PEPPER_KEY_ID,
+          )
+        : normalizeApiCredentialPepperKeyring(
+            options.apiCredentialPepperKeyring,
+          );
+  } catch {
+    throw new ClusterControlApiCredentialConfigurationError(
+      'pepper keyring is invalid',
+    );
+  }
   if (
     !options.availability ||
     typeof options.availability.subscribe !== 'function'
@@ -160,7 +193,7 @@ export async function startClusterControlApplication(
     activation = await bootstrapClusterControlRuntime({
       enabled: true,
       profile: options.profile,
-      apiCredentialPepper,
+      apiCredentialPepperKeyring,
       ...(options.recovery === undefined ? {} : { recovery: options.recovery }),
       ...(options.scheduler === undefined
         ? {}

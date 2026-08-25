@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: network-policy-ready
-          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          image: qinglong3-cluster-admin:3.0.0-alpha.1
           imagePullPolicy: IfNotPresent
           command:
             - node
@@ -110,7 +110,7 @@ spec:
               memory: 64Mi
       containers:
         - name: retirement
-          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          image: qinglong3-cluster-admin:3.0.0-alpha.1
           imagePullPolicy: IfNotPresent
           command:
             - node

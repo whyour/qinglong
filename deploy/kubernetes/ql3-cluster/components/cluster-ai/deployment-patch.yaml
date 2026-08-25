@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: cluster-control
-          image: qinglong3-cluster-control-ai:3.0.0-alpha.0
+          image: qinglong3-cluster-control-ai:3.0.0-alpha.1
           env:
             - name: QL3_CLUSTER_AI_ENABLED
               value: "true"

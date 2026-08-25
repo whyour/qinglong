@@ -48,7 +48,7 @@ spec:
                   app.kubernetes.io/component: plugin-package-management
       containers:
         - name: management
-          image: qinglong3-cluster-admin:3.0.0-alpha.0
+          image: qinglong3-cluster-admin:3.0.0-alpha.1
           imagePullPolicy: IfNotPresent
           command:
             - node

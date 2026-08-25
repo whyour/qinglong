@@ -3,6 +3,20 @@ import type {
   OpenPostgresDatabase,
 } from '@qinglong/runtime-core';
 import {
+  createSingletonApiCredentialPepperKeyring,
+  normalizeApiCredentialPepperKeyring,
+  type ApiCredentialPepperKeyring,
+} from '@qinglong/runtime-core/api-credential-pepper-keyring';
+import { LEGACY_API_CREDENTIAL_PEPPER_KEY_ID } from '@qinglong/runtime-core/api-credential';
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  openSync,
+  readFileSync,
+} from 'node:fs';
+import { isAbsolute, normalize } from 'node:path';
+import {
   createPostgresDatabaseOpener,
   isPostgresTlsDnsServername,
   loadPostgresConnectionEnvironment,
@@ -41,7 +55,7 @@ export interface EnabledClusterControlConfig {
     pool: PostgresPoolOptions;
   }>;
   readonly security: Readonly<{
-    apiCredentialPepper: string;
+    apiCredentialPepperKeyring: Readonly<ApiCredentialPepperKeyring>;
   }>;
   readonly logRetention:
     | Readonly<{ readonly enabled: false }>
@@ -224,26 +238,88 @@ function runtimeConnection(
   });
 }
 
-function apiCredentialPepper(environment: ClusterControlEnvironment): string {
-  const value = boundedValue(
+function apiCredentialPepperKeyring(
+  environment: ClusterControlEnvironment,
+): Readonly<ApiCredentialPepperKeyring> {
+  const legacyPepper = boundedValue(
     environment,
     'QL3_API_CREDENTIAL_PEPPER',
     64,
-    true,
-  )!;
-  if (!/^[A-Za-z0-9_-]{43}$/.test(value)) {
+  );
+  const keyringFile = boundedValue(
+    environment,
+    'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE',
+    4_096,
+  );
+  if ((legacyPepper === undefined) === (keyringFile === undefined)) {
     throw new ClusterControlConfigError(
-      'QL3_API_CREDENTIAL_PEPPER must be canonical base64url for 32 bytes',
+      'exactly one API credential pepper source is required',
     );
   }
-  const decoded = Buffer.from(value, 'base64url');
-  if (decoded.byteLength !== 32 || decoded.toString('base64url') !== value) {
+  if (legacyPepper !== undefined) {
+    try {
+      return createSingletonApiCredentialPepperKeyring(
+        legacyPepper,
+        LEGACY_API_CREDENTIAL_PEPPER_KEY_ID,
+      );
+    } catch {
+      throw new ClusterControlConfigError(
+        'QL3_API_CREDENTIAL_PEPPER must be canonical base64url for 32 bytes',
+      );
+    }
+  }
+  if (
+    !isAbsolute(keyringFile!) ||
+    normalize(keyringFile!) !== keyringFile ||
+    keyringFile!.includes('\0')
+  ) {
     throw new ClusterControlConfigError(
-      'QL3_API_CREDENTIAL_PEPPER must be canonical base64url for 32 bytes',
+      'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE must be a normalized absolute path',
     );
   }
-  decoded.fill(0);
-  return value;
+  let descriptor: number | undefined;
+  let bytes: Buffer | undefined;
+  try {
+    descriptor = openSync(
+      keyringFile!,
+      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+    );
+    const before = fstatSync(descriptor);
+    if (
+      !before.isFile() ||
+      before.size < 1 ||
+      before.size > 2_048 ||
+      (before.mode & 0o022) !== 0
+    ) {
+      throw new ClusterControlConfigError(
+        'API credential pepper keyring file authority is invalid',
+      );
+    }
+    bytes = readFileSync(descriptor);
+    const after = fstatSync(descriptor);
+    if (
+      before.dev !== after.dev ||
+      before.ino !== after.ino ||
+      before.size !== after.size ||
+      before.mtimeMs !== after.mtimeMs ||
+      bytes.byteLength !== before.size
+    ) {
+      throw new ClusterControlConfigError(
+        'API credential pepper keyring changed while being read',
+      );
+    }
+    return normalizeApiCredentialPepperKeyring(
+      JSON.parse(bytes.toString('utf8')),
+    );
+  } catch (error) {
+    if (error instanceof ClusterControlConfigError) throw error;
+    throw new ClusterControlConfigError(
+      'QL3_API_CREDENTIAL_PEPPER_KEYRING_FILE is invalid',
+    );
+  } finally {
+    bytes?.fill(0);
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
 }
 
 function logRetentionConfig(
@@ -443,7 +519,7 @@ export function loadClusterControlConfig(
       }),
     }),
     security: Object.freeze({
-      apiCredentialPepper: apiCredentialPepper(environment),
+      apiCredentialPepperKeyring: apiCredentialPepperKeyring(environment),
     }),
     logRetention: logRetentionConfig(environment),
   };

@@ -1,6 +1,6 @@
 {
   "name": "@qinglong/local-application-image",
-  "version": "3.0.0-alpha.0",
+  "version": "3.0.0-alpha.1",
   "private": true,
   "description": "Locked build dependencies for the QingLong 3.0 AI-excluded local application image",
   "license": "Apache-2.0",
