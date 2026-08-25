@@ -47,7 +47,10 @@ contract 还会携带 identity schema 与 canonical SHA-256，使发布证明能
 
 目标必须是严格单调递增的 exact QingLong 3 SemVer；降级、相等版本、build metadata 和非 canonical SemVer 均拒绝。
 plan 精确列出每个 path、mode、替换次数、before/after bytes 与 SHA-256，并对 unsigned canonical 内容形成自身 digest。
-当前 `3.0.0-alpha.0 → 3.0.0-alpha.1` 计划覆盖 65 个文件、83 处替换，根 2.x package 不在集合中。
+首轮 `3.0.0-alpha.0 → 3.0.0-alpha.1` 计划覆盖 65 个文件、83 处替换；当前
+`3.0.0-alpha.1 → 3.0.0-alpha.2` 计划覆盖 66 个文件、86 处替换，plan digest 为
+`sha256:1c4d4401934b0ea26fe99eb21d70193de1ca07a72ad60f60540ea0ed15e1fa1c`，apply report digest 为
+`sha256:ca035e396c738269c575c58ecb272729ed15b46985dafca09c468e38e3e4bbbd`。两次迁移都明确排除根 2.x package。
 
 ### 4. apply 必须先全量预检，再允许逐文件收敛
 
@@ -57,7 +60,7 @@ apply 在第一次写入前验证 plan 自身、legacy 版本、完整文件集�
 原 plan 可原样重放直至全部 target，成功后再运行完整 identity audit。report 区分 changed/already-current，并以 canonical
 SHA-256 绑定 plan 和结果。
 
-该协议提供进程中断后的幂等恢复，不宣称跨 65 个文件的单事务原子性，也不替代 Git review/commit。机器断电时的目录项
+该协议提供进程中断后的幂等恢复，不宣称跨整个受管文件集合的单事务原子性，也不替代 Git review/commit。机器断电时的目录项
 持久性由文件系统和 Git 工作区恢复承担；apply 不自动 commit、tag、push 或触发 release。
 
 ## 资源与权限边界
