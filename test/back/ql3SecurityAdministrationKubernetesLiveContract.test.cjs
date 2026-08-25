@@ -15,6 +15,7 @@ const {
   identityRegisterCommand,
   inputAuthorityEvidenceSource,
   migrationFailureEvidence,
+  networkPolicyReadinessSource,
 } = require('../../scripts/ql3-security-administration-kubernetes-live-contract.cjs');
 
 const values = Object.freeze({
@@ -164,6 +165,21 @@ test('keeps migration failure evidence content-free', () => {
   );
 });
 
+test('waits for per-Pod network policy before mounting private material', () => {
+  const source = networkPolicyReadinessSource();
+  assert.match(source, /NETWORK_POLICY_NOT_ENFORCED/);
+  assert.match(source, /databaseConnected/);
+  assert.match(source, /kubernetesApiConnected/);
+  assert.match(source, /publicInternetConnected/);
+  assert.match(source, /attempt<=120/);
+  assert.match(source, /consecutive>=2/);
+  assert.ok(
+    source.indexOf('kubernetesApiConnected=await connect') <
+      source.indexOf('databaseConnected=await connect'),
+  );
+  assert.doesNotMatch(source, /readFile|process\.env|console\.log/);
+});
+
 test('live runner remains opt-in, reviewed, cleanup-bound and log-free', () => {
   const source = fs.readFileSync(
     path.resolve(
@@ -180,6 +196,7 @@ test('live runner remains opt-in, reviewed, cleanup-bound and log-free', () => {
   assert.match(source, /validateSecurityAdministrationKubernetesLiveReport/);
   assert.match(source, /net\.ipv4\.ip_forward=1/);
   assert.match(source, /net\.bridge\.bridge-nf-call-iptables=1/);
+  assert.match(source, /wait-network-policy/);
   assert.match(source, /projectedMode: 0o444/);
   assert.match(source, /credential\.issue\.replay/);
   assert.match(source, /FallbackToLogsOnError/);

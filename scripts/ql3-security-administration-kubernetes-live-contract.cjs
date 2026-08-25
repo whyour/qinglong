@@ -228,9 +228,48 @@ function deliveryVolumeProvisionSource() {
   return `'use strict';const fs=require('node:fs');const root='/delivery';const facts=()=>{const status=fs.lstatSync(root);return{mode:(status.mode&0o7777).toString(8),uid:status.uid,gid:status.gid,directory:status.isDirectory(),symlink:status.isSymbolicLink()}};const before=facts();if(!before.directory||before.symlink||before.uid!==0||before.gid!==10001||before.mode!=='2777')throw new Error('UNEXPECTED_VOLUME_ROOT');fs.chmodSync(root,0o2770);const descriptor=fs.openSync(root,fs.constants.O_RDONLY|(fs.constants.O_DIRECTORY??0));try{fs.fsyncSync(descriptor)}finally{fs.closeSync(descriptor)}const after=facts();if(!after.directory||after.symlink||after.uid!==0||after.gid!==10001||after.mode!=='2770')throw new Error('VOLUME_ROOT_NOT_CONSTRAINED');fs.writeFileSync('/dev/termination-log',JSON.stringify({schema:'qinglong/security-administration-delivery-volume-provision@v1',beforeMode:before.mode,afterMode:after.mode,uid:after.uid,gid:after.gid,passed:true}));`;
 }
 
+function networkPolicyReadinessSource() {
+  return String.raw`
+const fs=require('node:fs');const net=require('node:net');
+const connect=(host,port)=>new Promise((resolve)=>{let settled=false;const socket=net.createConnection({host,port});const done=(ok)=>{if(settled)return;settled=true;socket.destroy();resolve(ok)};socket.setTimeout(500);socket.once('connect',()=>done(true));socket.once('timeout',()=>done(false));socket.once('error',()=>done(false));});
+const sleep=(milliseconds)=>new Promise((resolve)=>setTimeout(resolve,milliseconds));
+(async()=>{let consecutive=0;let networkEvidence={databaseConnected:false,kubernetesApiConnected:false,publicInternetConnected:false};for(let attempt=1;attempt<=120;attempt+=1){const kubernetesApiConnected=await connect(process.argv[2],443);const publicInternetConnected=await connect('1.1.1.1',443);const databaseConnected=await connect(process.argv[1],5432);networkEvidence={databaseConnected,kubernetesApiConnected,publicInternetConnected};consecutive=databaseConnected&&!kubernetesApiConnected&&!publicInternetConnected?consecutive+1:0;if(consecutive>=2){fs.writeFileSync('/dev/termination-log',JSON.stringify({schemaVersion:1,passed:true,attempt,consecutive,...networkEvidence}));return}await sleep(250)}fs.writeFileSync('/dev/termination-log',JSON.stringify({schemaVersion:1,passed:false,code:'NETWORK_POLICY_NOT_ENFORCED',...networkEvidence}));process.exitCode=1})().catch(()=>{fs.writeFileSync('/dev/termination-log',JSON.stringify({schemaVersion:1,passed:false,code:'NETWORK_POLICY_READINESS_UNAVAILABLE'}));process.exitCode=1});`;
+}
+
+function networkPolicyReadinessContainer(adminImage, kubernetesServiceIp) {
+  return {
+    name: 'wait-network-policy',
+    image: adminImage,
+    imagePullPolicy: 'Never',
+    command: [
+      'node',
+      '-e',
+      networkPolicyReadinessSource(),
+      'ql3-postgres-rw.qinglong3-system.svc',
+      kubernetesServiceIp,
+    ],
+    terminationMessagePolicy: 'File',
+    securityContext: {
+      allowPrivilegeEscalation: false,
+      readOnlyRootFilesystem: true,
+      capabilities: { drop: ['ALL'] },
+    },
+    resources: {
+      requests: { cpu: '5m', memory: '16Mi' },
+      limits: { cpu: '100m', memory: '64Mi' },
+    },
+  };
+}
+
 function administrationJob(
   template,
-  { name, inputSecretName, deliveryFile, projectedMode },
+  {
+    name,
+    inputSecretName,
+    deliveryFile,
+    projectedMode,
+    kubernetesServiceIp,
+  },
 ) {
   const job = structuredClone(template);
   job.metadata.name = name;
@@ -256,6 +295,9 @@ function administrationJob(
     ),
   );
   job.spec.template.spec.initContainers.unshift(inspector);
+  job.spec.template.spec.initContainers.unshift(
+    networkPolicyReadinessContainer(stager.image, kubernetesServiceIp),
+  );
   const administrator = findNamed(
     job.spec.template.spec.containers,
     'administrator',
@@ -275,6 +317,10 @@ function administrationJob(
 }
 
 function administrationFailureEvidence(snapshot) {
+  const readinessStatus = snapshot.pod.status.initContainerStatuses?.find(
+    (container) => container.name === 'wait-network-policy',
+  );
+  const readinessTerminated = readinessStatus?.state?.terminated;
   const inspectorStatus = snapshot.pod.status.initContainerStatuses?.find(
     (container) => container.name === 'inspect-input-authority',
   );
@@ -289,6 +335,11 @@ function administrationFailureEvidence(snapshot) {
   const evidence = {
     jobComplete: snapshot.complete,
     jobFailed: snapshot.failed,
+    networkPolicyExitCode: readinessTerminated?.exitCode ?? null,
+    networkPolicyReason:
+      readinessTerminated?.reason ??
+      readinessStatus?.state?.waiting?.reason ??
+      null,
     initExitCode: initTerminated?.exitCode ?? null,
     initReason:
       initTerminated?.reason ?? initStatus?.state?.waiting?.reason ?? null,
@@ -378,13 +429,36 @@ async function terminalJobSnapshot(fixture, name, timeoutMs = 180_000) {
         '-l',
         `batch.kubernetes.io/job-name=${name}`,
       ]).items;
+      const podFacts = pods.map((pod) => ({
+        phase: pod.status.phase ?? null,
+        nodeAssigned: typeof pod.spec.nodeName === 'string',
+        init: (pod.status.initContainerStatuses ?? []).map((container) => ({
+          name: container.name,
+          waitingReason: container.state?.waiting?.reason ?? null,
+          terminatedReason: container.state?.terminated?.reason ?? null,
+          exitCode: container.state?.terminated?.exitCode ?? null,
+        })),
+        containers: (pod.status.containerStatuses ?? []).map((container) => ({
+          name: container.name,
+          waitingReason: container.state?.waiting?.reason ?? null,
+          terminatedReason: container.state?.terminated?.reason ?? null,
+          exitCode: container.state?.terminated?.exitCode ?? null,
+        })),
+      }));
       return (complete || failed) && pods.length === 1
         ? { ready: true, value: { job, pod: pods[0], complete, failed } }
         : {
             ready: false,
-            fact: `${pods.length} Pods; status=${JSON.stringify(
-              job.status ?? {},
-            )}`,
+            fact: JSON.stringify({
+              podCount: pods.length,
+              job: {
+                active: job.status?.active ?? 0,
+                ready: job.status?.ready ?? 0,
+                succeeded: job.status?.succeeded ?? 0,
+                failed: job.status?.failed ?? 0,
+              },
+              pods: podFacts,
+            }),
           };
     })
   ).value;
@@ -428,6 +502,13 @@ async function runAdministrationJob({
   createdJobs,
   createdSecrets,
 }) {
+  const kubernetesServiceIp = fixture.kubectlJson([
+    '-n',
+    'default',
+    'get',
+    'service',
+    'kubernetes',
+  ]).spec.clusterIP;
   const inputSecretName = `${name}-input`;
   fixture.create({
     apiVersion: 'v1',
@@ -448,6 +529,7 @@ async function runAdministrationJob({
     inputSecretName,
     deliveryFile,
     projectedMode,
+    kubernetesServiceIp,
   });
   fixture.create(job);
   createdJobs.add(name);
@@ -540,6 +622,9 @@ async function runCustodyEvidence({
             fsGroupChangePolicy: 'OnRootMismatch',
             seccompProfile: { type: 'RuntimeDefault' },
           },
+          initContainers: [
+            networkPolicyReadinessContainer(adminImage, kubernetesServiceIp),
+          ],
           containers: [
             {
               name: 'evidence',
@@ -584,7 +669,7 @@ async function runCustodyEvidence({
   });
   createdEvidenceJobs.add(name);
   try {
-    const snapshot = await terminalJobSnapshot(fixture, name, 120_000);
+    const snapshot = await terminalJobSnapshot(fixture, name, 180_000);
     const state = snapshot.pod.status.containerStatuses?.[0]?.state?.terminated;
     const statusEvidence = state?.message || JSON.stringify({
       exitCode: state?.exitCode ?? null,
@@ -680,7 +765,7 @@ async function provisionDeliveryVolume({
   });
   createdEvidenceJobs.add(name);
   try {
-    const snapshot = await terminalJobSnapshot(fixture, name, 120_000);
+    const snapshot = await terminalJobSnapshot(fixture, name, 180_000);
     assert.equal(snapshot.complete, true);
     assert.equal(snapshot.failed, false);
     const state = snapshot.pod.status.containerStatuses?.[0]?.state?.terminated;
@@ -1437,4 +1522,5 @@ module.exports = {
   identityRegisterCommand,
   inputAuthorityEvidenceSource,
   migrationFailureEvidence,
+  networkPolicyReadinessSource,
 };
