@@ -390,10 +390,20 @@ function migrationFailureEvidence(snapshot) {
     exitCode: terminated?.exitCode ?? null,
     reason: terminated?.reason ?? status?.state?.waiting?.reason ?? null,
   };
-  const message = (terminated?.message || '').trim();
-  if (!message) return evidence;
-  try {
-    const parsed = JSON.parse(message);
+  const lines = (terminated?.message || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .reverse();
+  if (lines.length === 0) return evidence;
+  let rejected = false;
+  for (const line of lines) {
+    let parsed;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
+    }
     const allowedKeys = ['schemaVersion', 'component', 'event', 'name', 'code'];
     if (
       !parsed ||
@@ -401,12 +411,15 @@ function migrationFailureEvidence(snapshot) {
       Array.isArray(parsed) ||
       Object.keys(parsed).some((key) => !allowedKeys.includes(key))
     ) {
-      return { ...evidence, failureMessage: 'rejected' };
+      rejected = true;
+      continue;
     }
     return { ...evidence, failureMessage: parsed };
-  } catch {
-    return { ...evidence, failureMessage: 'unparseable' };
   }
+  return {
+    ...evidence,
+    failureMessage: rejected ? 'rejected' : 'unparseable',
+  };
 }
 
 async function terminalJobSnapshot(fixture, name, timeoutMs = 180_000) {
@@ -974,6 +987,35 @@ async function main(argv = process.argv.slice(2)) {
           : { ready: false, fact: `${pods.length}/3 Ready database Pods` };
       })
     ).value;
+    await waitFor('CloudNativePG managed resources', 5 * 60_000, () => {
+      const roles = fixture.kubectlJson([
+        '-n',
+        NAMESPACE,
+        'get',
+        'databaseroles.postgresql.cnpg.io',
+      ]).items;
+      const readyRoles = roles.filter(
+        (role) =>
+          role.status?.applied === true &&
+          role.status?.observedGeneration === role.metadata.generation,
+      );
+      const database = fixture.kubectlJson([
+        '-n',
+        NAMESPACE,
+        'get',
+        'database.postgresql.cnpg.io/ql3-postgres-qinglong',
+      ]);
+      const databaseReady =
+        database.status?.applied === true &&
+        database.status?.observedGeneration === database.metadata.generation;
+      return readyRoles.length === ROLE_NAMES.length && databaseReady
+        ? { ready: true, value: true }
+        : {
+            ready: false,
+            fact: `${readyRoles.length}/${ROLE_NAMES.length} roles applied; ` +
+              `databaseApplied=${String(databaseReady)}`,
+          };
+    });
 
     const migrationManifest = localManifest(
       fixture.kubectl(

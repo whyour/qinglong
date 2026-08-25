@@ -128,13 +128,21 @@ test('keeps migration failure evidence content-free', () => {
               terminated: {
                 exitCode: 1,
                 reason: 'Error',
-                message: JSON.stringify({
-                  schemaVersion: 1,
-                  component: 'qinglong3-cluster-migration',
-                  event: 'migration_failed',
-                  name: 'Error',
-                  code: 'EAI_AGAIN',
-                }),
+                message: [
+                  JSON.stringify({
+                    schemaVersion: 1,
+                    component: 'qinglong3-cluster-migration',
+                    event: 'migration_started',
+                    migrationCount: 0,
+                  }),
+                  JSON.stringify({
+                    schemaVersion: 1,
+                    component: 'qinglong3-cluster-migration',
+                    event: 'migration_failed',
+                    name: 'Error',
+                    code: 'EAI_AGAIN',
+                  }),
+                ].join('\n'),
               },
             },
           },
