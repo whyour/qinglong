@@ -1,6 +1,25 @@
 name: QingLong 3.0 Security Administration Kubernetes live evidence
 
 on:
+  push:
+    branches:
+      - next
+    paths:
+      - .github/workflows/ql3-security-administration-live.yml
+      - deploy/containers/ql3-cluster-admin/**
+      - deploy/containers/ql3-cluster-control/**
+      - deploy/kubernetes/ql3-cluster/base/**
+      - deploy/kubernetes/ql3-cluster/operations/cloudnative-pg/**
+      - deploy/kubernetes/ql3-cluster/operations/security-administration/**
+      - package.json
+      - packages/ql3-cluster-admin/**
+      - packages/ql3-cluster-control/**
+      - packages/ql3-cluster-postgres/**
+      - packages/ql3-runtime-core/**
+      - pnpm-lock.yaml
+      - scripts/lib/ql3-k3s-docker-live.cjs
+      - scripts/ql3-security-administration-kubernetes-*.cjs
+      - test/back/ql3SecurityAdministrationKubernetes*.test.cjs
   workflow_dispatch:
 
 permissions:
