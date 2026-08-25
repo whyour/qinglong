@@ -1078,7 +1078,18 @@ if (!migrationConnectionString || !runtimeConnectionString) {
               applicationName: 'ql3-cluster-availability-integration',
             },
           },
-          security: { apiCredentialPepper: 'A'.repeat(43) },
+          security: {
+            apiCredentialPepperKeyring: {
+              schemaVersion: 1,
+              activePepperKeyId: 'legacy-v1',
+              keys: [
+                {
+                  pepperKeyId: 'legacy-v1',
+                  pepper: 'A'.repeat(43),
+                },
+              ],
+            },
+          },
         },
         recovery: {
           ownerId: 'availability-integration-replica',
