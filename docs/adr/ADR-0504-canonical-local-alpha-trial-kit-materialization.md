@@ -66,5 +66,5 @@ manifest 中的 `verification` 是该 artifact 生成位置之前已通过的 wo
 
 - 单元测试覆盖正常物化/审计、错误 source revision、archive 篡改、额外文件和 SBOM 替换；
 - Local operator 静态审计要求 workflow 同时调用 `create` 和 `audit`；
-- 当前提交的真实 arm64 Application/operator 必须由该入口生成本地私有 Trial Kit，并再次执行离线审计和加载后最小 smoke；
+- 提交 `2620be0587c29c2384e7f587c490dc11e357dfc8` 的真实 arm64 Application/operator 已由该入口生成本地私有 Trial Kit；178,765,312-byte archive 的 SHA-256 为 `7456202efb252e665d658664d69693cfbc170e02ec19923302d5c354bcaa140f`，离线审计、SBOM/库存对账、reload 与 128 MiB 最小 smoke 均通过；
 - 正式 downloadable 双架构 artifact 仍由维护者授权的手动 workflow 生成。

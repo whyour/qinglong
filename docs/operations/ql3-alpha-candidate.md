@@ -28,6 +28,14 @@
 
 ADR-0503 已增加独立的 `qinglong3-local-operator`：它复用现有统一 `ql3` CLI，每次执行一个 command-file 命令后退出，不进入常驻 Application。提交 `2253b99066e0c221e11dc01384f496ec2a50e4bd` 的原生 Linux amd64/arm64 已同时通过 fresh setup、首 Owner ceremony、Application active/stop 和 SQLite integrity，CI run `32918632202` 为 40/40。ADR-0504 又把一次 `docker image save`、manifest、SBOM、README、`SHA256SUMS` 和离线审计收敛为同一个 materializer；下一项未完成的外部里程碑是维护者授权生成并保留两个可下载 archive。
 
+提交 `2620be0587c29c2384e7f587c490dc11e357dfc8` 已通过该 materializer 生成新的本地私有 arm64 Trial Kit，位于 `.tmp/ql3-alpha-2620be0587c29c2384e7f587c490dc11e357dfc8-local-arm64/`：
+
+- 单一双镜像 archive 为 178,765,312 bytes，SHA-256 `7456202efb252e665d658664d69693cfbc170e02ec19923302d5c354bcaa140f`；
+- Application image ID 为 `sha256:88c3027609c5f18a15111cb5820e34191d758ac6b4a41fc46d4a6bdf41fd71dd`，operator image ID 为 `sha256:529b86b85e18d6bd4ec8644d9da82d49ea45902534da27a99ee65ad4058e513b`；
+- 两份 CycloneDX SBOM 均与镜像内实际 package inventory 对账为 `inventoryVerified=true`；闭合目录离线审计、`SHA256SUMS`、archive reload 及 128 MiB 无网络只读 entrypoint smoke 全部通过。
+
+这证明当前提交已经存在可重复生成和离线复核的单架构完整 Trial Kit 实物，但它仍只在维护者工作区，不等于 amd64/arm64 两份可下载 GitHub artifact。
+
 ## 生成
 
 在 GitHub Actions 手动运行 `QingLong 3.0 CI`，选择目标 `next` 提交并设置 `produce_alpha_artifacts=true`。普通 push/PR 不上传大镜像，避免每次开发提交都制造伪里程碑和额外存储成本。
