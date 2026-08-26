@@ -506,6 +506,7 @@
 | [ADR-0500](./ADR-0500-short-lived-cluster-security-administration-command.md)                        | 短生命周期 Cluster Security Administration 产品命令                                                                                                                                                              | Accepted |
 | [ADR-0501](./ADR-0501-opt-in-kubernetes-security-administration-job.md)                              | 可选的一次性 Kubernetes Security Administration Job                                                                                                                                                              | Accepted |
 | [ADR-0502](./ADR-0502-bounded-cluster-api-credential-pepper-keyring.md)                             | 有界 Cluster API Credential Pepper Keyring                                                                                                                                                                        | Accepted |
+| [ADR-0503](./ADR-0503-downloadable-local-alpha-trial-kit.md)                                        | 可下载的 Local Alpha 试运行套件                                                                                                                                                                                     | Proposed（实现完成；原生 Linux 双架构与实际归档待验收） |
 
 ## 规则
 

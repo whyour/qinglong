@@ -76,6 +76,28 @@ const IMAGE_PROFILES = Object.freeze({
       'drizzle-orm': '1.0.0-rc.4',
     }),
   }),
+  'local-operator': Object.freeze({
+    id: 'local-operator',
+    buildManifestPath: 'deploy/containers/ql3-local-operator/package.json',
+    buildLockPath: 'deploy/containers/ql3-local-operator/package-lock.json',
+    imageManifestPath:
+      'deploy/containers/ql3-local-operator/runtime-dependencies/package.json',
+    imageLockPath:
+      'deploy/containers/ql3-local-operator/runtime-dependencies/package-lock.json',
+    internalManifestPaths: Object.freeze([
+      'packages/ql3-runtime-core/package.json',
+      'packages/ql3-ai/package.json',
+      'packages/ql3-local-admin/package.json',
+      'packages/ql3-local-command-file/package.json',
+      'packages/ql3-local-owner-cli/package.json',
+      'packages/ql3-local-owner-console/package.json',
+      'packages/ql3-local-secret/package.json',
+      'packages/ql3-local-sqlite/package.json',
+    ]),
+    buildOnlyDependencies: Object.freeze({
+      'drizzle-orm': '1.0.0-rc.4',
+    }),
+  }),
   worker: Object.freeze({
     id: 'worker',
     buildManifestPath: 'deploy/containers/ql3-worker/package.json',
@@ -110,7 +132,7 @@ function resolveImageProfile(value = 'control') {
   const profile = IMAGE_PROFILES[value];
   if (!profile) {
     throw new Error(
-      'image profile must be exactly control, control-ai, admin, local or worker',
+      'image profile must be exactly control, control-ai, admin, local, local-operator or worker',
     );
   }
   return profile;

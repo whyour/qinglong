@@ -365,7 +365,9 @@ jobs:
       - name: Audit immutable local image inputs
         run: |
           node --test test/back/ql3LocalImageAudit.test.cjs
+          node --test test/back/ql3LocalOperatorImageAudit.test.cjs
           pnpm audit:local-image:ql3
+          pnpm audit:local-operator-image:ql3
       - name: Build the native AI-excluded image
         env:
           IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
@@ -374,6 +376,15 @@ jobs:
           --file deploy/containers/ql3-local-application/Dockerfile
           --build-arg SOURCE_REVISION=${{ github.sha }}
           --tag "${IMAGE}"
+          .
+      - name: Build the native short-lived Local operator image
+        env:
+          OPERATOR_IMAGE: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+        run: >-
+          docker build
+          --file deploy/containers/ql3-local-operator/Dockerfile
+          --build-arg SOURCE_REVISION=${{ github.sha }}
+          --tag "${OPERATOR_IMAGE}"
           .
       - name: Materialize the reviewed local OS vulnerability exceptions
         run: >-
@@ -395,6 +406,21 @@ jobs:
           timeout: '10m0s'
           cache: 'false'
           trivyignores: ${{ runner.temp }}/ql3-local-${{ matrix.image_arch }}.trivyignore.yaml
+      - name: Reject high or critical Local operator OS vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+          scanners: 'vuln'
+          vuln-type: 'os'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: 'false'
+          exit-code: '1'
+          format: 'table'
+          hide-progress: 'true'
+          timeout: '10m0s'
+          cache: 'false'
+          trivyignores: ${{ runner.temp }}/ql3-local-${{ matrix.image_arch }}.trivyignore.yaml
       - name: Verify non-root identity and architecture
         env:
           IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
@@ -404,6 +430,17 @@ jobs:
           actual="$(docker image inspect --format '{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.local.application-config"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-min"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-max"}} {{index .Config.Labels "io.qinglong.local.sqlite-write-contract"}} {{index .Config.Labels "io.qinglong.local.compose-selection"}}' "${IMAGE}")"
           if [[ "${actual}" != "${EXPECTED}" ]]; then
             echo "unexpected image contract: ${actual}" >&2
+            exit 1
+          fi
+      - name: Verify the short-lived Local operator identity
+        env:
+          OPERATOR_IMAGE: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+          EXPECTED: ${{ matrix.image_arch }} 65532:65532 short-lived local-owner-management none-by-default
+        run: |
+          set -euo pipefail
+          actual="$(docker image inspect --format '{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.lifecycle"}} {{index .Config.Labels "io.qinglong.authority"}} {{index .Config.Labels "io.qinglong.network"}}' "${OPERATOR_IMAGE}")"
+          if [[ "${actual}" != "${EXPECTED}" ]]; then
+            echo "unexpected Local operator image contract: ${actual}" >&2
             exit 1
           fi
       - name: Reconcile the exact production package inventory
@@ -419,6 +456,20 @@ jobs:
           --entrypoint node
           "${IMAGE}"
           scripts/ql3-local-image-inventory.cjs
+          --inventory-root=/opt/qinglong/node_modules
+      - name: Reconcile the short-lived Local operator package inventory
+        env:
+          OPERATOR_IMAGE: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+        run: >-
+          docker run --rm --read-only
+          --network none
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --volume "${{ github.workspace }}:/audit:ro"
+          --workdir /audit
+          --entrypoint node
+          "${OPERATOR_IMAGE}"
+          scripts/ql3-local-operator-image-inventory.cjs
           --inventory-root=/opt/qinglong/node_modules
       - name: Generate and reconcile the reviewed CycloneDX SBOM
         env:
@@ -438,6 +489,24 @@ jobs:
             scripts/ql3-cluster-image-sbom.cjs \
             --image=local \
             --inventory-root=/opt/qinglong/node_modules
+      - name: Generate and reconcile the Local operator CycloneDX SBOM
+        env:
+          OPERATOR_IMAGE: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+        run: |
+          node scripts/ql3-cluster-image-sbom.cjs \
+            --image=local-operator \
+            --output="${{ runner.temp }}/ql3-local-operator.cdx.json"
+          docker run --rm --read-only \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --volume "${{ github.workspace }}:/audit:ro" \
+            --workdir /audit \
+            --entrypoint node \
+            "${OPERATOR_IMAGE}" \
+            scripts/ql3-cluster-image-sbom.cjs \
+            --image=local-operator \
+            --inventory-root=/opt/qinglong/node_modules
       - name: Exercise the entrypoint under the router stress envelope
         env:
           IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
@@ -453,6 +522,30 @@ jobs:
           --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m
           "${IMAGE}"
           --help
+      - name: Exercise the short-lived Local operator entrypoint
+        env:
+          OPERATOR_IMAGE: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+        run: |
+          docker run --rm --read-only \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --memory=128m \
+            --memory-swap=128m \
+            --cpus=0.5 \
+            --pids-limit=32 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
+            "${OPERATOR_IMAGE}" --version
+          docker run --rm --read-only \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --memory=128m \
+            --memory-swap=128m \
+            --cpus=0.5 \
+            --pids-limit=32 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
+            "${OPERATOR_IMAGE}" setup --help
       - name: Build the short-lived fresh deployment authority
         working-directory: packages/ql3-local-owner-cli
         run: node ../../scripts/ql3-build-package-closure.cjs
@@ -462,6 +555,19 @@ jobs:
         run: |
           node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=edge
           node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=standalone
+      - name: Run the downloadable Local Alpha trial kit journey
+        env:
+          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+          OPERATOR_IMAGE: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+        run: |
+          node scripts/ql3-local-alpha-trial-kit-live-contract.cjs \
+            --application-image="${IMAGE}" \
+            --operator-image="${OPERATOR_IMAGE}" \
+            --profile=edge
+          node scripts/ql3-local-alpha-trial-kit-live-contract.cjs \
+            --application-image="${IMAGE}" \
+            --operator-image="${OPERATOR_IMAGE}" \
+            --profile=standalone
       - name: Run authenticated Local API cancellation through real Linux processes
         env:
           QL3_LOCAL_API_CANCELLATION_LIVE: '1'
@@ -487,10 +593,14 @@ jobs:
           set -euo pipefail
           umask 077
           mkdir "${BUNDLE_ROOT}"
-          archive="${BUNDLE_ROOT}/qinglong3-local-application-${IMAGE_ARCH}.docker.tar"
-          docker image save --output "${archive}" "${IMAGE}"
+          archive="${BUNDLE_ROOT}/qinglong3-local-trial-kit-${IMAGE_ARCH}.docker.tar"
+          docker image save --output "${archive}" \
+            "${IMAGE}" \
+            "qinglong3-local-operator:ci-${IMAGE_ARCH}"
           cp "${RUNNER_TEMP}/ql3-local-application.cdx.json" \
             "${BUNDLE_ROOT}/qinglong3-local-application.cdx.json"
+          cp "${RUNNER_TEMP}/ql3-local-operator.cdx.json" \
+            "${BUNDLE_ROOT}/qinglong3-local-operator.cdx.json"
           cp docs/operations/ql3-alpha-candidate.md "${BUNDLE_ROOT}/README.md"
           archive_sha256="sha256:$(sha256sum "${archive}" | cut -d ' ' -f 1)"
           ARCHIVE="${archive}" ARCHIVE_SHA256="${archive_sha256}" \
@@ -502,9 +612,13 @@ jobs:
           const imageId = childProcess
             .execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', process.env.IMAGE], { encoding: 'utf8' })
             .trim();
+          const operatorImage = `qinglong3-local-operator:ci-${process.env.IMAGE_ARCH}`;
+          const operatorImageId = childProcess
+            .execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', operatorImage], { encoding: 'utf8' })
+            .trim();
           const manifest = {
-            schemaVersion: 1,
-            schema: 'qinglong/alpha-native-image@v1',
+            schemaVersion: 2,
+            schema: 'qinglong/alpha-local-trial-kit@v1',
             maturity: 'alpha_candidate_not_public_release',
             product: 'local',
             version: release.version,
@@ -514,10 +628,21 @@ jobs:
             imageId,
             archive: process.env.ARCHIVE.split('/').pop(),
             archiveSha256: process.env.ARCHIVE_SHA256,
+            operator: {
+              lifecycle: 'short-lived',
+              network: 'none-by-default',
+              image: operatorImage,
+              imageId: operatorImageId,
+              archive: process.env.ARCHIVE.split('/').pop(),
+              archiveSha256: process.env.ARCHIVE_SHA256,
+            },
             verification: {
               osVulnerabilityPolicy: 'passed',
               sbomInventoryReconciliation: 'passed',
               router128MiBEntrypoint: 'passed',
+              operator128MiBEntrypoint: 'passed',
+              operatorPackageInventory: 'passed',
+              freshOwnerJourney: 'passed',
               edgeFreshLifecycle: 'passed',
               standaloneFreshLifecycle: 'passed',
               localApiCancellation: 'passed',
