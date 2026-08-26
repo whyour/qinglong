@@ -26,7 +26,7 @@
 
 该实物保存在工作区忽略目录，不进入 Git，也尚未上传 GitHub。公开下载仍需维护者明确授权上传。它只含 headless Application，没有可下载的 `ql3 setup/owner/task/...` 管理制品；因此它足以证明 runtime 工程可用性，但不能独立完成部署用户旅程。此前“单架构内部试运行材料”的表述按 D-408 收紧为“运行时工程候选”。
 
-ADR-0503 已增加独立的 `qinglong3-local-operator`：它复用现有统一 `ql3` CLI，每次执行一个 command-file 命令后退出，不进入常驻 Application。后续手动 Alpha run 会把 Application 与 operator 通过一次 `docker image save` 写入同一架构的去重 archive；只有原生 Linux amd64/arm64 都完成 fresh setup、首 Owner ceremony、Application active/stop 和 SQLite integrity 后，才能升级为 Local Alpha Trial Kit。
+ADR-0503 已增加独立的 `qinglong3-local-operator`：它复用现有统一 `ql3` CLI，每次执行一个 command-file 命令后退出，不进入常驻 Application。提交 `2253b99066e0c221e11dc01384f496ec2a50e4bd` 的原生 Linux amd64/arm64 已同时通过 fresh setup、首 Owner ceremony、Application active/stop 和 SQLite integrity，CI run `32918632202` 为 40/40。ADR-0504 又把一次 `docker image save`、manifest、SBOM、README、`SHA256SUMS` 和离线审计收敛为同一个 materializer；下一项未完成的外部里程碑是维护者授权生成并保留两个可下载 archive。
 
 ## 生成
 
@@ -40,9 +40,9 @@ ADR-0503 已增加独立的 `qinglong3-local-operator`：它复用现有统一 `
 Local artifact 含：
 
 - 一个包含 Application 与短生命周期 operator 的 `qinglong3-local-trial-kit-<arch>.docker.tar`；共享 Node 基础层在 archive 中去重；
-- schema 为 `qinglong/alpha-local-trial-kit@v1` 的 `manifest.json`，绑定版本、完整 source commit、架构、两个 image tag/image ID、共同 archive SHA-256 与已通过 gate；
+- schema 为 `qinglong/alpha-local-trial-kit@v1` 的 `manifest.json`，通过 `archive/images/sboms/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID、文件长度/SHA-256 与已通过 gate；
 - 与实际只读镜像 inventory 对账过的 CycloneDX SBOM；
-- 本说明。
+- 面向 Local 用户的 README 与覆盖全部内容文件的 `SHA256SUMS`。
 
 Cluster artifact 仍是每个角色一个 native Docker archive 和各自 manifest。
 
@@ -53,17 +53,15 @@ Cluster artifact 仍是每个角色一个 native Docker archive 和各自 manife
 在同架构 Linux Docker 主机上进入解压后的 artifact 目录：
 
 ```sh
-archive="$(find . -maxdepth 1 -name '*.docker.tar' -type f -print -quit)"
-expected="$(node -p "require('./manifest.json').archiveSha256")"
-actual="sha256:$(sha256sum "${archive}" | cut -d ' ' -f 1)"
-test "${actual}" = "${expected}"
+sha256sum --check SHA256SUMS
 
+archive="$(node -p "require('./manifest.json').archive.file")"
 docker load --input "${archive}"
-image="$(node -p "require('./manifest.json').image")"
-expected_id="$(node -p "require('./manifest.json').imageId")"
+image="$(node -p "require('./manifest.json').images.application.reference")"
+expected_id="$(node -p "require('./manifest.json').images.application.id")"
 test "$(docker image inspect --format '{{.Id}}' "${image}")" = "${expected_id}"
-operator_image="$(node -p "require('./manifest.json').operator.image")"
-operator_expected_id="$(node -p "require('./manifest.json').operator.imageId")"
+operator_image="$(node -p "require('./manifest.json').images.operator.reference")"
+operator_expected_id="$(node -p "require('./manifest.json').images.operator.id")"
 test "$(docker image inspect --format '{{.Id}}' "${operator_image}")" = "${operator_expected_id}"
 docker run --rm --read-only --network none --cap-drop ALL \
   --security-opt no-new-privileges "${image}" --help

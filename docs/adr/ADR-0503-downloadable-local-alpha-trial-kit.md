@@ -1,6 +1,6 @@
 # ADR-0503：可下载的 Local Alpha 试运行套件
 
-- 状态：Proposed（实现完成，原生 Linux x64/arm64 CI 与实际归档待验收）
+- 状态：Proposed（原生 Linux x64/arm64 已通过，实际可下载归档待维护者授权）
 - 日期：2026-08-26
 - 决策：D-408
 - 关联：ADR-0193、ADR-0195、ADR-0196、ADR-0425
@@ -84,4 +84,4 @@ Docker Desktop 的 bind mount 根目录可能把宿主当前 UID 映射为容器
 - `ql3 --version` 与 `ql3 setup --help` 在 read-only、network none、128 MiB、0.5 CPU、32 PID 下通过；
 - Docker Desktop 完整旅程因 mount root UID 非等价失败，临时 credential/pepper 目录已删除；未把该结果记为通过。
 
-转为 Accepted 前必须取得同一提交的原生 Linux amd64/arm64 完整旅程成功记录，并重新执行 package、backend、artifact、dependency 和 release workflow 审计。实际双架构 trial-kit archive 仍需维护者明确授权手动生成；Public Release Set 是否把 operator 纳入正式签名/catalog，留给后续独立 release-set schema 决策。
+提交 `2253b99066e0c221e11dc01384f496ec2a50e4bd` 的 CI run `32918632202` 已在原生 Linux amd64/arm64 同时通过完整 fresh Owner、Edge/Standalone lifecycle 和 SQLite integrity，40 个 required job 全部成功且无重试。实际双架构 trial-kit archive 仍需维护者明确授权手动生成；转为 Accepted 前还必须记录两个可下载 artifact 的 digest 与离线复核结果。Public Release Set 是否把 operator 纳入正式签名/catalog，留给后续独立 release-set schema 决策。

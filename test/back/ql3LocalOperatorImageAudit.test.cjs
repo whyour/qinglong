@@ -102,7 +102,7 @@ test('rejects removal of the fresh Owner journey or two-image manifest', () => {
         'removed-live-contract.cjs',
       )
       .replace(
-        "schema: 'qinglong/alpha-local-trial-kit@v1'",
+        'scripts/ql3-local-alpha-trial-kit-bundle.cjs',
         "schema: 'single-image'",
       );
     fs.writeFileSync(

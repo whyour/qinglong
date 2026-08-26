@@ -189,10 +189,12 @@ function auditWorkflow(contents, findings) {
     'image-ref: qinglong3-local-operator:ci-${{ matrix.image_arch }}',
     '"${OPERATOR_IMAGE}" --version',
     'scripts/ql3-local-alpha-trial-kit-live-contract.cjs',
-    'qinglong3-local-trial-kit-${IMAGE_ARCH}.docker.tar',
-    "schema: 'qinglong/alpha-local-trial-kit@v1'",
-    'operatorImageId',
-    "freshOwnerJourney: 'passed'",
+    'scripts/ql3-local-alpha-trial-kit-bundle.cjs',
+    '--mode=create',
+    '--mode=audit',
+    '--application-sbom="${RUNNER_TEMP}/ql3-local-application.cdx.json"',
+    '--operator-sbom="${RUNNER_TEMP}/ql3-local-operator.cdx.json"',
+    '--readme=docs/operations/ql3-local-alpha-trial-kit.md',
   ];
   for (const value of required) {
     if (!contents.includes(value))

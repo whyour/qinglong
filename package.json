@@ -39,6 +39,7 @@
     "audit:run-management-kubernetes-live:ql3": "node scripts/ql3-run-management-kubernetes-live-audit.cjs",
     "test:local-api-cancellation-live:ql3": "node scripts/ql3-local-api-cancellation-live-contract.cjs",
     "test:local-alpha-trial-kit:ql3": "node scripts/ql3-local-alpha-trial-kit-live-contract.cjs",
+    "bundle:local-alpha-trial-kit:ql3": "node scripts/ql3-local-alpha-trial-kit-bundle.cjs",
     "audit:local-api-cancellation-live:ql3": "node scripts/ql3-local-api-cancellation-live-audit.cjs",
     "test:provider-credential-test-kubernetes-live:ql3": "pnpm --filter @qinglong/cluster-admin build && node scripts/ql3-provider-credential-test-kubernetes-live-contract.cjs",
     "audit:provider-credential-test-kubernetes-live:ql3": "node scripts/ql3-provider-credential-test-kubernetes-live-audit.cjs",
