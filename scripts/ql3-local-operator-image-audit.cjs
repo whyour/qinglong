@@ -196,15 +196,40 @@ function auditWorkflow(contents, findings) {
     '"${OPERATOR_IMAGE}" --version',
     'scripts/ql3-local-alpha-trial-kit-live-contract.cjs',
     'scripts/ql3-local-alpha-trial-kit-bundle.cjs',
+    '--mode=record-verification',
     '--mode=create',
     '--mode=audit',
     '--application-sbom="${RUNNER_TEMP}/ql3-local-application.cdx.json"',
     '--operator-sbom="${RUNNER_TEMP}/ql3-local-operator.cdx.json"',
+    '--verification-evidence="${RUNNER_TEMP}/ql3-local-alpha-verification-${{ matrix.image_arch }}.json"',
     '--readme=docs/operations/ql3-local-alpha-trial-kit.md',
+    '--repository=${{ github.repository }}',
+    '--workflow-ref="${{ github.workflow_ref }}"',
+    '--workflow-sha=${{ github.workflow_sha }}',
+    '--event=${{ github.event_name }}',
+    '--job=${{ github.job }}',
+    '--run-id=${{ github.run_id }}',
+    '--run-attempt=${{ github.run_attempt }}',
   ];
   for (const value of required) {
     if (!contents.includes(value))
       finding(findings, 'LOCAL_OPERATOR_CI_CONTRACT_DRIFT', value);
+  }
+  let cursor = -1;
+  for (const value of [
+    'name: Run the downloadable Local Alpha trial kit journey',
+    'name: Run authenticated Local API cancellation through real Linux processes',
+    '--mode=record-verification',
+    '--mode=create',
+    '--mode=audit',
+    'name: Upload the tested native Local Alpha trial kit',
+  ]) {
+    const index = contents.indexOf(value, cursor + 1);
+    if (index <= cursor) {
+      finding(findings, 'LOCAL_OPERATOR_CI_GATE_ORDER_DRIFT', value);
+      break;
+    }
+    cursor = index;
   }
 }
 

@@ -13,28 +13,18 @@
 
 只有 `Local Alpha Trial Kit` 可以称为本阶段“用户可试运行产物”。单个 headless runtime 和 Cluster archive 都只是工程候选；后者还不满足正式 Kubernetes deployment-lock 的 GHCR immutable digest 与 catalog provenance。
 
-## 当前阶段实物（2026-08-26）
+## 当前阶段实物（2026-08-27）
 
-当前已经存在一份与 `3.0.0-alpha.2` 源码身份一致、owner-private、可重新加载的 Local arm64 runtime engineering candidate，而不是只有源码或 Dockerfile：
+提交 `4239464af6937d56528a0a2c573d12329bc7ca55` 已形成最新 owner-private arm64 工程候选：
 
-- source revision：`e3c05862b8c2690d69f58b098cdc128a09c83f97`；
-- image：`qinglong3-local-application:alpha2-e3c05862-arm64`，image ID `sha256:dfce2cc9d70044d75f72f2cc3075e1f24569fb9fe279d9c25a45698c19c3bde9`；
-- archive SHA-256：`01afb30cbe0c21f980ca083ad98fd316e659941f940dd8930ffd9ccfa7153edf`；
-- 工作区目录 `.tmp/ql3-alpha-e3c05862b8c2690d69f58b098cdc128a09c83f97-local-arm64/` 包含 `manifest.json`、`verification-evidence.json`、release-candidate contract、CycloneDX 1.5 SBOM、`README.md` 与 `SHA256SUMS`；全套 checksum、`docker load` 后身份和资源约束 smoke 已复验；
-- HIGH/CRITICAL OS vulnerability 为 0；128 MiB、0.5 CPU、read-only、no-network、drop-all 下的 Edge/Standalone fresh lifecycle、graceful stop 与 SQLite integrity 已通过；本机 Edge 首次运行曾在 Docker Desktop 文件桥上出现一次 startup receipt 发布瞬态，精确重跑通过，未将首次失败隐藏为成功；
-- 原生 Linux arm64 Local image job `97986754052` 已覆盖 Docker Desktop 无法等价证明的 Local API cancellation。完整 CI run `32903679764` attempt 2 为 40/40，独立 Kubernetes deployment run `32903679644` 与三节点 Security Administration run `32903679570` 同源通过。首轮 CI 的两项 `pnpm/action-setup` 内部 DNS 失败和一次 PostgreSQL 18 x64 scheduler 并发断言均在 failed-only rerun 收敛。
+- Application image ID `sha256:0d1d4b80ee46e9bb671d846f93d9a6d832c9856a91eed03f299055904da88a50`，operator image ID `sha256:b9122f481b1ba60d7eee9a3ed5ca57c9c141cbc389e7c7dbe19c6f6b1c98b49e`；
+- 单一双镜像 archive 为 184,648,192 bytes，SHA-256 `145544c4a753192821bfbbb92000bb64af5978db57181595c9ffa9f404c1fd72`；
+- checksum、旧 v1 离线内容审计、archive reload、实际 package inventory/SBOM 对账和 128 MiB 无网络只读入口 smoke 均通过；
+- 同提交远端主 CI run `32990652047` 为 40/40，原生 Linux amd64/arm64 均通过 Application/operator Trivy、fresh Edge/Standalone、完整 Trial Kit journey 和 Local API cancellation；Kubernetes deployment run `32990652416` 与三节点 Security Administration run `32990653482` 同源通过。
 
-该实物保存在工作区忽略目录，不进入 Git，也尚未上传 GitHub。公开下载仍需维护者明确授权上传。它只含 headless Application，没有可下载的 `ql3 setup/owner/task/...` 管理制品；因此它足以证明 runtime 工程可用性，但不能独立完成部署用户旅程。此前“单架构内部试运行材料”的表述按 D-408 收紧为“运行时工程候选”。
+该本地 archive 不是新的 v2 Local Alpha Trial Kit。它在 ADR-0506 前生成，manifest v1 会无条件写入 `passed`，且 macOS Docker Desktop 因 bind-mount UID 映射无法对 exact 本地 archive 完成 Owner pepper 旅程；原生 CI 证明同源码实现，不自动证明另一个 archive 的 exact image bytes。它因此保留为工程候选，不冒充已获 workflow evidence 的用户 Alpha。
 
-ADR-0503 已增加独立的 `qinglong3-local-operator`：它复用现有统一 `ql3` CLI，每次执行一个 command-file 命令后退出，不进入常驻 Application。提交 `2253b99066e0c221e11dc01384f496ec2a50e4bd` 的原生 Linux amd64/arm64 已同时通过 fresh setup、首 Owner ceremony、Application active/stop 和 SQLite integrity，CI run `32918632202` 为 40/40。ADR-0504 又把一次 `docker image save`、manifest、SBOM、README、`SHA256SUMS` 和离线审计收敛为同一个 materializer；下一项未完成的外部里程碑是维护者授权生成并保留两个可下载 archive。
-
-提交 `2620be0587c29c2384e7f587c490dc11e357dfc8` 已通过该 materializer 生成新的本地私有 arm64 Trial Kit，位于 `.tmp/ql3-alpha-2620be0587c29c2384e7f587c490dc11e357dfc8-local-arm64/`：
-
-- 单一双镜像 archive 为 178,765,312 bytes，SHA-256 `7456202efb252e665d658664d69693cfbc170e02ec19923302d5c354bcaa140f`；
-- Application image ID 为 `sha256:88c3027609c5f18a15111cb5820e34191d758ac6b4a41fc46d4a6bdf41fd71dd`，operator image ID 为 `sha256:529b86b85e18d6bd4ec8644d9da82d49ea45902534da27a99ee65ad4058e513b`；
-- 两份 CycloneDX SBOM 均与镜像内实际 package inventory 对账为 `inventoryVerified=true`；闭合目录离线审计、`SHA256SUMS`、archive reload 及 128 MiB 无网络只读 entrypoint smoke 全部通过。
-
-这证明当前提交已经存在可重复生成和离线复核的单架构完整 Trial Kit 实物，但它仍只在维护者工作区，不等于 amd64/arm64 两份可下载 GitHub artifact。
+ADR-0506 现要求 `qinglong/alpha-local-trial-kit@v2` 额外包含 `verification-evidence.json`，绑定显式 `workflow_dispatch` 的 source、workflow SHA/ref、run/attempt、架构和两个 image ID。旧 `e3c05862` runtime-only archive、`2620be05` v1 Trial Kit 与 `4239464a` v1 archive 均为历史工程证据，不能通过 v2 auditor。下一项外部里程碑仍是维护者授权 `produce_alpha_artifacts=true`，由同一次原生 milestone job 生成 exact-image evidence 和双架构可下载 archive。
 
 ## 生成
 
@@ -48,7 +38,8 @@ ADR-0503 已增加独立的 `qinglong3-local-operator`：它复用现有统一 `
 Local artifact 含：
 
 - 一个包含 Application 与短生命周期 operator 的 `qinglong3-local-trial-kit-<arch>.docker.tar`；共享 Node 基础层在 archive 中去重；
-- schema 为 `qinglong/alpha-local-trial-kit@v1` 的 `manifest.json`，通过 `archive/images/sboms/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID、文件长度/SHA-256 与已通过 gate；
+- schema 为 `qinglong/alpha-local-trial-kit@v2` 的 `manifest.json`，通过 `archive/images/sboms/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
+- `verification-evidence.json` 绑定 `workflow_dispatch` 的 workflow ref/SHA、run ID/attempt、同架构两个 exact image ID 和完整 gate 集；下载者仍须到 GitHub 交叉检查 run，它不替代正式签名；
 - 与实际只读镜像 inventory 对账过的 CycloneDX SBOM；
 - 面向 Local 用户的 README 与覆盖全部内容文件的 `SHA256SUMS`。
 

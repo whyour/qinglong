@@ -10,7 +10,8 @@ const { auditClusterImageSbom } = require('./ql3-cluster-image-sbom.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-trial-kit@v1';
+const SCHEMA = 'qinglong/alpha-local-trial-kit@v2';
+const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v1';
 const ARCHITECTURES = Object.freeze(['amd64', 'arm64']);
 const ARCHIVE_MIN_BYTES = 1024;
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
@@ -20,6 +21,7 @@ const REVISION_PATTERN = /^[0-9a-f]{40}$/u;
 const FILES = Object.freeze({
   applicationSbom: 'qinglong3-local-application.cdx.json',
   operatorSbom: 'qinglong3-local-operator.cdx.json',
+  verificationEvidence: 'verification-evidence.json',
   readme: 'README.md',
   manifest: 'manifest.json',
   checksums: 'SHA256SUMS',
@@ -35,6 +37,14 @@ const VERIFICATION = Object.freeze({
   standaloneFreshLifecycle: 'passed',
   localApiCancellation: 'passed',
 });
+const WORKFLOW_IDENTITY = Object.freeze({
+  repository: 'whyour/qinglong',
+  workflowRef: 'whyour/qinglong/.github/workflows/ql3-ci.yml@refs/heads/next',
+  event: 'workflow_dispatch',
+  job: 'local-image',
+});
+const DECIMAL_ID_PATTERN = /^[1-9][0-9]{0,19}$/u;
+const ATTEMPT_PATTERN = /^[1-9][0-9]{0,5}$/u;
 
 function fail(message) {
   throw new Error(message);
@@ -230,6 +240,145 @@ function validateOfflineSbom(document, profile, version) {
   }
 }
 
+function validateVerificationEvidence(document, expected) {
+  if (
+    !exactKeys(document, [
+      'schemaVersion',
+      'schema',
+      'subject',
+      'workflow',
+      'gates',
+    ]) ||
+    document.schemaVersion !== 1 ||
+    document.schema !== VERIFICATION_SCHEMA ||
+    !exactKeys(document.subject, [
+      'version',
+      'sourceRevision',
+      'architecture',
+      'applicationImageId',
+      'operatorImageId',
+    ]) ||
+    document.subject.version !== expected.version ||
+    document.subject.sourceRevision !== expected.sourceRevision ||
+    document.subject.architecture !== expected.architecture ||
+    document.subject.applicationImageId !== expected.applicationImageId ||
+    document.subject.operatorImageId !== expected.operatorImageId ||
+    document.subject.applicationImageId === document.subject.operatorImageId ||
+    !exactKeys(document.workflow, [
+      'repository',
+      'workflowRef',
+      'workflowSha',
+      'event',
+      'job',
+      'runId',
+      'runAttempt',
+    ]) ||
+    document.workflow.repository !== WORKFLOW_IDENTITY.repository ||
+    document.workflow.workflowRef !== WORKFLOW_IDENTITY.workflowRef ||
+    document.workflow.workflowSha !== expected.sourceRevision ||
+    document.workflow.event !== WORKFLOW_IDENTITY.event ||
+    document.workflow.job !== WORKFLOW_IDENTITY.job ||
+    !DECIMAL_ID_PATTERN.test(document.workflow.runId || '') ||
+    !ATTEMPT_PATTERN.test(document.workflow.runAttempt || '') ||
+    !exactKeys(document.gates, Object.keys(VERIFICATION)) ||
+    JSON.stringify(document.gates) !== JSON.stringify(VERIFICATION)
+  ) {
+    fail('trial kit verification evidence is incompatible');
+  }
+  return document;
+}
+
+function validateVerificationOptions(options) {
+  const root = fs.realpathSync(path.resolve(options.root || DEFAULT_ROOT));
+  const output = path.resolve(options.output || '');
+  const parent = path.dirname(output);
+  if (
+    !ARCHITECTURES.includes(options.architecture) ||
+    !REVISION_PATTERN.test(options.sourceRevision || '') ||
+    !path.isAbsolute(output) ||
+    fs.existsSync(output) ||
+    fs.realpathSync(parent) !== parent ||
+    options.repository !== WORKFLOW_IDENTITY.repository ||
+    options.workflowRef !== WORKFLOW_IDENTITY.workflowRef ||
+    options.workflowSha !== options.sourceRevision ||
+    options.eventName !== WORKFLOW_IDENTITY.event ||
+    options.job !== WORKFLOW_IDENTITY.job ||
+    !DECIMAL_ID_PATTERN.test(options.runId || '') ||
+    !ATTEMPT_PATTERN.test(options.runAttempt || '')
+  ) {
+    fail('verification evidence identity or output is invalid');
+  }
+  return {
+    root,
+    output,
+    architecture: options.architecture,
+    sourceRevision: options.sourceRevision,
+    applicationImage: validateImageReference(
+      options.applicationImage,
+      'application',
+    ),
+    operatorImage: validateImageReference(options.operatorImage, 'operator'),
+    repository: options.repository,
+    workflowRef: options.workflowRef,
+    workflowSha: options.workflowSha,
+    eventName: options.eventName,
+    job: options.job,
+    runId: options.runId,
+    runAttempt: options.runAttempt,
+  };
+}
+
+function createLocalAlphaTrialKitVerificationEvidence(options, adapters = {}) {
+  const normalized = validateVerificationOptions(options);
+  const release = readReleaseIdentity(normalized.root);
+  const inspectImage = adapters.inspectImage || inspectDockerImage;
+  const application = normalizeImageInspection(
+    inspectImage(normalized.applicationImage),
+    {
+      architecture: normalized.architecture,
+      reference: normalized.applicationImage,
+      revision: normalized.sourceRevision,
+      role: 'application',
+      version: release.version,
+    },
+  );
+  const operator = normalizeImageInspection(
+    inspectImage(normalized.operatorImage),
+    {
+      architecture: normalized.architecture,
+      reference: normalized.operatorImage,
+      revision: normalized.sourceRevision,
+      role: 'operator',
+      version: release.version,
+    },
+  );
+  if (application.id === operator.id) fail('trial kit images must be distinct');
+  const evidence = {
+    schemaVersion: 1,
+    schema: VERIFICATION_SCHEMA,
+    subject: {
+      version: release.version,
+      sourceRevision: normalized.sourceRevision,
+      architecture: normalized.architecture,
+      applicationImageId: application.id,
+      operatorImageId: operator.id,
+    },
+    workflow: {
+      repository: normalized.repository,
+      workflowRef: normalized.workflowRef,
+      workflowSha: normalized.workflowSha,
+      event: normalized.eventName,
+      job: normalized.job,
+      runId: normalized.runId,
+      runAttempt: normalized.runAttempt,
+    },
+    gates: { ...VERIFICATION },
+  };
+  validateVerificationEvidence(evidence, evidence.subject);
+  writeExclusive(normalized.output, `${JSON.stringify(evidence, null, 2)}\n`);
+  return evidence;
+}
+
 function archiveName(architecture) {
   return `qinglong3-local-trial-kit-${architecture}.docker.tar`;
 }
@@ -288,6 +437,11 @@ function validateCreateOptions(options) {
       MAX_JSON_BYTES,
       'operator SBOM',
     ),
+    verificationEvidence: assertCanonicalFile(
+      options.verificationEvidence,
+      MAX_JSON_BYTES,
+      'trial kit verification evidence',
+    ),
     readme: assertCanonicalFile(
       options.readme,
       MAX_README_BYTES,
@@ -308,6 +462,10 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
   const operatorSbom = readBoundedJson(
     normalized.operatorSbom,
     'operator SBOM',
+  );
+  const verificationEvidence = readBoundedJson(
+    normalized.verificationEvidence,
+    'trial kit verification evidence',
   );
   validateSbom(applicationSbom, {
     root: normalized.root,
@@ -340,6 +498,13 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
     },
   );
   if (application.id === operator.id) fail('trial kit images must be distinct');
+  validateVerificationEvidence(verificationEvidence, {
+    version: release.version,
+    sourceRevision: normalized.sourceRevision,
+    architecture: normalized.architecture,
+    applicationImageId: application.id,
+    operatorImageId: operator.id,
+  });
 
   let created = false;
   try {
@@ -369,11 +534,15 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       path.join(normalized.outputRoot, FILES.operatorSbom),
     );
     copyExclusive(
+      normalized.verificationEvidence,
+      path.join(normalized.outputRoot, FILES.verificationEvidence),
+    );
+    copyExclusive(
       normalized.readme,
       path.join(normalized.outputRoot, FILES.readme),
     );
     const manifest = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',
@@ -387,7 +556,10 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
         operator: fileRecord(normalized.outputRoot, FILES.operatorSbom),
       },
       readme: fileRecord(normalized.outputRoot, FILES.readme),
-      verification: { ...VERIFICATION },
+      verification: fileRecord(
+        normalized.outputRoot,
+        FILES.verificationEvidence,
+      ),
     };
     writeExclusive(
       path.join(normalized.outputRoot, FILES.manifest),
@@ -397,6 +569,7 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       archive,
       FILES.applicationSbom,
       FILES.operatorSbom,
+      FILES.verificationEvidence,
       FILES.readme,
       FILES.manifest,
     ];
@@ -467,7 +640,7 @@ function auditLocalAlphaTrialKit(options) {
       'readme',
       'verification',
     ]) ||
-    manifest.schemaVersion !== 2 ||
+    manifest.schemaVersion !== 3 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
@@ -475,9 +648,7 @@ function auditLocalAlphaTrialKit(options) {
     !REVISION_PATTERN.test(manifest.sourceRevision || '') ||
     !ARCHITECTURES.includes(manifest.architecture) ||
     !exactKeys(manifest.images, ['application', 'operator']) ||
-    !exactKeys(manifest.sboms, ['application', 'operator']) ||
-    !exactKeys(manifest.verification, Object.keys(VERIFICATION)) ||
-    JSON.stringify(manifest.verification) !== JSON.stringify(VERIFICATION)
+    !exactKeys(manifest.sboms, ['application', 'operator'])
   ) {
     fail('trial kit manifest identity or shape is incompatible');
   }
@@ -497,6 +668,11 @@ function auditLocalAlphaTrialKit(options) {
     bundleRoot,
   );
   validateFileRecord(manifest.sboms.operator, FILES.operatorSbom, bundleRoot);
+  validateFileRecord(
+    manifest.verification,
+    FILES.verificationEvidence,
+    bundleRoot,
+  );
   validateFileRecord(manifest.readme, FILES.readme, bundleRoot);
   validateOfflineSbom(
     readBoundedJson(
@@ -511,12 +687,26 @@ function auditLocalAlphaTrialKit(options) {
     'local-operator',
     manifest.version,
   );
+  const verificationEvidence = validateVerificationEvidence(
+    readBoundedJson(
+      path.join(bundleRoot, FILES.verificationEvidence),
+      'trial kit verification evidence',
+    ),
+    {
+      version: manifest.version,
+      sourceRevision: manifest.sourceRevision,
+      architecture: manifest.architecture,
+      applicationImageId: manifest.images.application.id,
+      operatorImageId: manifest.images.operator.id,
+    },
+  );
   const expectedFiles = [
     FILES.checksums,
     FILES.manifest,
     FILES.readme,
     FILES.applicationSbom,
     FILES.operatorSbom,
+    FILES.verificationEvidence,
     expectedArchive,
   ].sort();
   const actualFiles = fs
@@ -535,6 +725,7 @@ function auditLocalAlphaTrialKit(options) {
     expectedArchive,
     FILES.applicationSbom,
     FILES.operatorSbom,
+    FILES.verificationEvidence,
     FILES.readme,
     FILES.manifest,
   ];
@@ -555,6 +746,9 @@ function auditLocalAlphaTrialKit(options) {
     archiveSha256: manifest.archive.sha256,
     applicationImageId: manifest.images.application.id,
     operatorImageId: manifest.images.operator.id,
+    verificationSha256: manifest.verification.sha256,
+    workflowRunId: verificationEvidence.workflow.runId,
+    workflowRunAttempt: verificationEvidence.workflow.runAttempt,
     compatible: true,
   });
 }
@@ -576,6 +770,43 @@ function parseArguments(argv) {
     }
     return { mode: 'audit', bundleRoot: path.resolve(values.bundle) };
   }
+  if (values.mode === 'record-verification') {
+    const expected = [
+      'application-image',
+      'architecture',
+      'event',
+      'job',
+      'mode',
+      'operator-image',
+      'output',
+      'repository',
+      'run-attempt',
+      'run-id',
+      'source-revision',
+      'workflow-ref',
+      'workflow-sha',
+    ];
+    if (
+      JSON.stringify(Object.keys(values).sort()) !== JSON.stringify(expected)
+    ) {
+      fail('record-verification arguments are invalid');
+    }
+    return {
+      mode: 'record-verification',
+      output: path.resolve(values.output),
+      architecture: values.architecture,
+      sourceRevision: values['source-revision'],
+      applicationImage: values['application-image'],
+      operatorImage: values['operator-image'],
+      repository: values.repository,
+      workflowRef: values['workflow-ref'],
+      workflowSha: values['workflow-sha'],
+      eventName: values.event,
+      job: values.job,
+      runId: values['run-id'],
+      runAttempt: values['run-attempt'],
+    };
+  }
   if (values.mode === 'create') {
     const expected = [
       'application-image',
@@ -587,6 +818,7 @@ function parseArguments(argv) {
       'output',
       'readme',
       'source-revision',
+      'verification-evidence',
     ];
     if (
       JSON.stringify(Object.keys(values).sort()) !== JSON.stringify(expected)
@@ -602,6 +834,7 @@ function parseArguments(argv) {
       operatorImage: values['operator-image'],
       applicationSbom: path.resolve(values['application-sbom']),
       operatorSbom: path.resolve(values['operator-sbom']),
+      verificationEvidence: path.resolve(values['verification-evidence']),
       readme: path.resolve(values.readme),
     };
   }
@@ -610,10 +843,14 @@ function parseArguments(argv) {
 
 function runCli(argv) {
   const options = parseArguments(argv);
-  const report =
-    options.mode === 'create'
-      ? createLocalAlphaTrialKit(options)
-      : auditLocalAlphaTrialKit(options);
+  let report;
+  if (options.mode === 'record-verification') {
+    report = createLocalAlphaTrialKitVerificationEvidence(options);
+  } else if (options.mode === 'create') {
+    report = createLocalAlphaTrialKit(options);
+  } else {
+    report = auditLocalAlphaTrialKit(options);
+  }
   process.stdout.write(`${JSON.stringify(report)}\n`);
   return report;
 }
@@ -633,9 +870,11 @@ module.exports = Object.freeze({
   FILES,
   SCHEMA,
   VERIFICATION,
+  VERIFICATION_SCHEMA,
   archiveName,
   auditLocalAlphaTrialKit,
   createLocalAlphaTrialKit,
+  createLocalAlphaTrialKitVerificationEvidence,
   parseArguments,
   runCli,
   sha256File,

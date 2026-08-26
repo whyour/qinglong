@@ -509,6 +509,7 @@
 | [ADR-0503](./ADR-0503-downloadable-local-alpha-trial-kit.md)                                        | 可下载的 Local Alpha 试运行套件                                                                                                                                                                                     | Proposed（原生 Linux 双架构已通过；实际可下载归档待维护者授权） |
 | [ADR-0504](./ADR-0504-canonical-local-alpha-trial-kit-materialization.md)                            | Local Alpha Trial Kit 单一物化与离线审计                                                                                                                                                                            | Accepted |
 | [ADR-0505](./ADR-0505-pinned-alpine-openssl-runtime-security-patch.md)                              | 固定 Alpine OpenSSL 运行时安全补丁                                                                                                                                                                                    | Accepted |
+| [ADR-0506](./ADR-0506-source-bound-local-alpha-verification-evidence.md)                            | 源码绑定的 Local Alpha 验证证据                                                                                                                                                                                        | Accepted |
 
 ## 规则
 

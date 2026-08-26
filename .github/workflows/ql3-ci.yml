@@ -592,6 +592,20 @@ jobs:
           set -euo pipefail
           umask 077
           node scripts/ql3-local-alpha-trial-kit-bundle.cjs \
+            --mode=record-verification \
+            --application-image="${IMAGE}" \
+            --operator-image="${OPERATOR_IMAGE}" \
+            --architecture=${{ matrix.image_arch }} \
+            --source-revision=${{ github.sha }} \
+            --repository=${{ github.repository }} \
+            --workflow-ref="${{ github.workflow_ref }}" \
+            --workflow-sha=${{ github.workflow_sha }} \
+            --event=${{ github.event_name }} \
+            --job=${{ github.job }} \
+            --run-id=${{ github.run_id }} \
+            --run-attempt=${{ github.run_attempt }} \
+            --output="${RUNNER_TEMP}/ql3-local-alpha-verification-${{ matrix.image_arch }}.json"
+          node scripts/ql3-local-alpha-trial-kit-bundle.cjs \
             --mode=create \
             --application-image="${IMAGE}" \
             --operator-image="${OPERATOR_IMAGE}" \
@@ -599,6 +613,7 @@ jobs:
             --source-revision=${{ github.sha }} \
             --application-sbom="${RUNNER_TEMP}/ql3-local-application.cdx.json" \
             --operator-sbom="${RUNNER_TEMP}/ql3-local-operator.cdx.json" \
+            --verification-evidence="${RUNNER_TEMP}/ql3-local-alpha-verification-${{ matrix.image_arch }}.json" \
             --readme=docs/operations/ql3-local-alpha-trial-kit.md \
             --output="${RUNNER_TEMP}/ql3-alpha-local-${{ matrix.image_arch }}"
           node scripts/ql3-local-alpha-trial-kit-bundle.cjs \
