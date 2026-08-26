@@ -521,6 +521,10 @@ function assertDockerfile(readFile, root, findings) {
     'node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d';
   const pinnedRuntimeNodeBase =
     'node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436';
+  const pinnedRuntimeOsPatch =
+    'RUN apk add --no-cache --upgrade \\\n' +
+    '    libcrypto3=3.5.8-r0 \\\n' +
+    '    libssl3=3.5.8-r0';
   const dockerfile = readFile(
     path.join(root, 'deploy/containers/ql3-cluster-control/Dockerfile'),
     'utf8',
@@ -532,6 +536,7 @@ function assertDockerfile(readFile, root, findings) {
     'ql3-cluster-control/runtime-dependencies/package.json',
     'ql3-cluster-control/runtime-dependencies/package-lock.json',
     'FROM runtime-dependency-manifest AS external-dependencies',
+    pinnedRuntimeOsPatch,
     '/opt/qinglong/node_modules/.bin/tsc',
     '-p packages/ql3-runtime-core/tsconfig.json',
     '-p packages/ql3-cluster-postgres/tsconfig.json',
@@ -572,6 +577,14 @@ function assertDockerfile(readFile, root, findings) {
       finding(
         'QL3_CLUSTER_DEFAULT_IMAGE_TARGET_DRIFT',
         'The AI-free runtime target must remain the final/default Docker stage',
+      ),
+    );
+  }
+  if ((dockerfile.match(/\bapk\b/gu) || []).length !== 1) {
+    findings.push(
+      finding(
+        'QL3_CLUSTER_DOCKERFILE_OS_PATCH_DRIFT',
+        'Cluster control runtime must contain one exact pinned OS patch command',
       ),
     );
   }
@@ -638,6 +651,7 @@ function assertDockerfile(readFile, root, findings) {
     'node:24.18.0-bookworm-slim',
     'npm ci --ignore-scripts --no-audit --no-fund',
     'npm ci --omit=dev --ignore-scripts --no-audit --no-fund',
+    pinnedRuntimeOsPatch,
     'ql3-cluster-admin/runtime-dependencies/package.json',
     'ql3-cluster-admin/runtime-dependencies/package-lock.json',
     '-p packages/ql3-runtime-core/tsconfig.json',
@@ -669,6 +683,14 @@ function assertDockerfile(readFile, root, findings) {
       finding(
         'QL3_CLUSTER_ADMIN_DOCKERFILE_BASE_IMAGE_NOT_PINNED',
         'Cluster admin build and runtime stages must use their exact immutable Node base digests',
+      ),
+    );
+  }
+  if ((adminDockerfile.match(/\bapk\b/gu) || []).length !== 1) {
+    findings.push(
+      finding(
+        'QL3_CLUSTER_ADMIN_DOCKERFILE_OS_PATCH_DRIFT',
+        'Cluster admin runtime must contain one exact pinned OS patch command',
       ),
     );
   }

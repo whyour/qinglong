@@ -91,6 +91,10 @@ COPY --from=workspace-ai /workspace/packages/ql3-cluster-control/dist \
 
 FROM node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436 AS runtime-base
 
+RUN apk add --no-cache --upgrade \
+    libcrypto3=3.5.8-r0 \
+    libssl3=3.5.8-r0
+
 ARG SOURCE_REVISION=uncommitted
 
 LABEL org.opencontainers.image.title="QingLong 3.0 Cluster Control" \

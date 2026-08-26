@@ -76,6 +76,10 @@ const dockerfile = fs.readFileSync(
   path.join(root, 'deploy/containers/ql3-worker/Dockerfile'),
   'utf8',
 );
+const runtimeOsPatch =
+  'RUN apk add --no-cache --upgrade \\\n' +
+  '    libcrypto3=3.5.8-r0 \\\n' +
+  '    libssl3=3.5.8-r0';
 for (const required of [
   'node:24.18.0-bookworm-slim@sha256:',
   'node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436',
@@ -90,6 +94,8 @@ for (const required of [
 ]) {
   assert.match(dockerfile, new RegExp(required.replaceAll('/', '\\/')));
 }
+assert.ok(dockerfile.includes(runtimeOsPatch));
+assert.equal((dockerfile.match(/\bapk\b/g) || []).length, 1);
 assert.doesNotMatch(
   dockerfile,
   /packages\/ql3-(?:cluster|local-application|local-sqlite|ai)/,

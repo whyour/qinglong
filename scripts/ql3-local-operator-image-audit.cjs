@@ -11,6 +11,10 @@ const BUILD_NODE_IMAGE =
   'node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d';
 const RUNTIME_NODE_IMAGE =
   'node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436';
+const RUNTIME_OS_PATCH =
+  'RUN apk add --no-cache --upgrade \\\n' +
+  '    libcrypto3=3.5.8-r0 \\\n' +
+  '    libssl3=3.5.8-r0';
 const BUILD_DEPENDENCIES = Object.freeze({
   'drizzle-orm': '1.0.0-rc.4',
   semver: '7.7.4',
@@ -153,6 +157,7 @@ function auditDockerfile(contents, release, findings) {
   const required = [
     `FROM ${BUILD_NODE_IMAGE} AS dependency-manifest`,
     `FROM ${RUNTIME_NODE_IMAGE} AS runtime`,
+    RUNTIME_OS_PATCH,
     'RUN npm ci --ignore-scripts --no-audit --no-fund',
     'RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund',
     `org.opencontainers.image.version="${release.version}"`,
@@ -172,7 +177,8 @@ function auditDockerfile(contents, release, findings) {
   if (
     /(?:^|\n)\s*ARG\s+NODE_IMAGE\b/u.test(contents) ||
     /\b(?:apt-get|apt|curl|wget)\b|ADD\s+https?:/iu.test(contents) ||
-    /^(?:EXPOSE|HEALTHCHECK)\b/gmu.test(contents)
+    /^(?:EXPOSE|HEALTHCHECK)\b/gmu.test(contents) ||
+    (contents.match(/\bapk\b/gu) || []).length !== 1
   ) {
     finding(findings, 'UNREVIEWED_RUNTIME_OR_BUILD_SURFACE');
   }

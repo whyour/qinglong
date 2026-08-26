@@ -10,6 +10,10 @@ const BUILD_NODE_IMAGE =
   'node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d';
 const RUNTIME_NODE_IMAGE =
   'node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436';
+const RUNTIME_OS_PATCH =
+  'RUN apk add --no-cache --upgrade \\\n' +
+  '    libcrypto3=3.5.8-r0 \\\n' +
+  '    libssl3=3.5.8-r0';
 const BUILD_DEPENDENCIES = Object.freeze({
   croner: '7.0.8',
   'drizzle-orm': '1.0.0-rc.4',
@@ -203,6 +207,12 @@ function auditDockerfile(contents, findings) {
     )
   ) {
     addFinding(findings, 'NPM_CI_CONTRACT_DRIFT');
+  }
+  if (
+    !contents.includes(RUNTIME_OS_PATCH) ||
+    (contents.match(/\bapk\b/gu) || []).length !== 1
+  ) {
+    addFinding(findings, 'RUNTIME_OS_PATCH_DRIFT');
   }
   if (/\b(?:apt-get|apt|curl|wget)\b|ADD\s+https?:/i.test(contents)) {
     addFinding(findings, 'UNREVIEWED_BUILD_NETWORK_OR_OS_PACKAGE');
