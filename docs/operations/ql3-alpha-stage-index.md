@@ -6,7 +6,7 @@
 
 | 设备或环境 | 选择 | 稳态组件 | 需要下载 |
 | --- | --- | --- | --- |
-| 低配路由器、NAS、单机 | `deploymentSelections.local` | 仅 Local Application；Operator 只在 setup/upgrade/recovery 短暂运行 | 目标架构的一个 Local Trial Kit |
+| 低配路由器、NAS、单机 | `deploymentSelections.local`；默认选择 `headless`，需要浏览器操作面时显式选择 `console` | 仅 Local Application；Operator 只在 setup/upgrade/recovery 短暂运行 | 目标架构、目标 variant 的一个 Local Trial Kit |
 | 临时 K3s/Kubernetes 集群 | `deploymentSelections.cluster` | control、admin、worker；AI 按需增加 control-ai | 目标架构的三个 required artifact；需要 AI 时再下载 optional artifact |
 
 不得把四个 Cluster 角色部署到低配路由器，也不需要为一台 amd64 主机下载 arm64 归档。索引固定列出十个可选择 artifact，但每个部署者只下载目标 Profile、架构和角色所需的子集。
@@ -15,7 +15,8 @@
 
 1. 在本目录运行 `sha256sum --check SHA256SUMS`。
 2. 检查 `manifest.json`：
-   - schema 为 `qinglong/alpha-stage-index@v1`；
+   - schema 为 `qinglong/alpha-stage-index@v2`；
+   - `deploymentSelections.local.variant` 与 Local milestone、artifact 名和 Profile 一致；
    - maturity 为 `alpha_stage_delivery_not_public_release`；
    - source revision、run ID/attempt 是准备验证的显式 workflow run；
    - `milestones.local` 与 `milestones.cluster` 分别指向同一提交的 milestone artifact。

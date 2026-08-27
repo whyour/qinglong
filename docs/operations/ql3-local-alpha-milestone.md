@@ -9,7 +9,7 @@
 - 不提供公开 GHCR tag、Cosign 签名、GitHub attestation、catalog、生产升级或长期支持承诺；
 - Cluster/Kubernetes 仍按独立 Integration Candidate 与 Public Release Set 门验收。
 
-单个架构 artifact 提前上传并不代表 milestone 成功。没有 `ql3-alpha-<sourceRevision>-local-milestone` 索引、索引 workflow 不是成功终态、run/attempt 不一致或索引审计失败时，已有的大归档只能作为失败运行的中间文件，不得交付用户。
+单个架构 artifact 提前上传并不代表 milestone 成功。没有 `ql3-alpha-<sourceRevision>-local-<variant>-milestone` 索引、索引 workflow 不是成功终态、run/attempt/variant 不一致或索引审计失败时，已有的大归档只能作为失败运行的中间文件，不得交付用户。
 
 ## 选择并验证下载物
 
@@ -20,7 +20,8 @@
    ```
 
 2. 打开 `manifest.json`，确认：
-   - `schema` 为 `qinglong/alpha-local-milestone@v1`；
+   - `schema` 为 `qinglong/alpha-local-milestone@v2`；
+   - `variant` 为 `headless` 或 `console`，且两个架构记录都使用同一变体；
    - `sourceRevision` 是准备试用的完整 40 位提交；
    - `workflow.event` 为 `workflow_dispatch`，`workflow.job` 为 `local-alpha-milestone`；
    - GitHub Actions 中对应 `runId/runAttempt` 的整条 `QingLong 3.0 CI` 为成功终态；

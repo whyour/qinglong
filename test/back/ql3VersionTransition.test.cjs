@@ -109,6 +109,25 @@ test('audits one source-derived QingLong 3 release identity', () => {
   });
 });
 
+test('requires version identity on both headless and Console runtime targets', (t) => {
+  const fixture = createFixture(t);
+  const dockerfilePath = path.join(
+    fixture,
+    'deploy/containers/ql3-local-application/Dockerfile',
+  );
+  const dockerfile = fs.readFileSync(dockerfilePath, 'utf8');
+  const label = `org.opencontainers.image.version="${SOURCE_VERSION}"`;
+  assert.equal(dockerfile.split(label).length - 1, 2);
+  fs.writeFileSync(
+    dockerfilePath,
+    dockerfile.replace(label, 'org.opencontainers.image.version="drifted"'),
+  );
+  assert.throws(
+    () => auditReleaseVersionContract(fixture),
+    /container Dockerfile release identity drifted/,
+  );
+});
+
 test('plans the exact governed version surface without touching legacy 2.x', () => {
   const plan = createVersionTransitionPlan({
     root,
@@ -116,7 +135,7 @@ test('plans the exact governed version surface without touching legacy 2.x', () 
     targetVersion: TARGET_VERSION,
   });
   assert.equal(plan.fileCount, 66);
-  assert.equal(plan.replacementCount, 86);
+  assert.equal(plan.replacementCount, 87);
   assert.equal(plan.legacyRootPackageVersion, LEGACY_VERSION);
   assert.equal(plan.legacyRootExcluded, true);
   assert.equal(

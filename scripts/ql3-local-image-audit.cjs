@@ -30,6 +30,18 @@ const RUNTIME_DEPENDENCIES = Object.freeze({
 const BUILD_PACKAGES = Object.freeze([
   'ql3-ai',
   'ql3-local-admin',
+  'ql3-local-api',
+  'ql3-local-application',
+  'ql3-local-command-file',
+  'ql3-local-execution',
+  'ql3-local-owner-console',
+  'ql3-local-process',
+  'ql3-local-secret',
+  'ql3-local-sqlite',
+  'ql3-runtime-core',
+]);
+const RUNTIME_PACKAGES = Object.freeze([
+  'ql3-local-admin',
   'ql3-local-application',
   'ql3-local-command-file',
   'ql3-local-execution',
@@ -38,8 +50,8 @@ const BUILD_PACKAGES = Object.freeze([
   'ql3-local-sqlite',
   'ql3-runtime-core',
 ]);
-const RUNTIME_PACKAGES = Object.freeze(
-  BUILD_PACKAGES.filter((name) => name !== 'ql3-ai'),
+const CONSOLE_RUNTIME_PACKAGES = Object.freeze(
+  [...RUNTIME_PACKAGES, 'ql3-local-api', 'ql3-local-owner-console'].sort(),
 );
 
 function readJson(filePath) {
@@ -174,6 +186,15 @@ function counts(values) {
   return result;
 }
 
+function dockerStage(contents, name) {
+  const marker = new RegExp(`^FROM [^\\n]+ AS ${name}$`, 'm');
+  const match = marker.exec(contents);
+  if (!match) return '';
+  const remaining = contents.slice(match.index + match[0].length);
+  const next = /^FROM [^\n]+ AS [a-z0-9-]+$/m.exec(remaining);
+  return next ? remaining.slice(0, next.index) : remaining;
+}
+
 function auditDockerfile(contents, findings) {
   const escapedBuildNodeImage = BUILD_NODE_IMAGE.replace(
     /[.*+?^${}()|[\]\\]/g,
@@ -188,7 +209,7 @@ function auditDockerfile(contents, findings) {
     'gm',
   );
   const exactRuntimeBasePattern = new RegExp(
-    `^FROM ${escapedRuntimeNodeImage} AS runtime$`,
+    `^FROM ${escapedRuntimeNodeImage} AS runtime-platform$`,
     'gm',
   );
   if (
@@ -221,8 +242,13 @@ function auditDockerfile(contents, findings) {
     addFinding(findings, 'UNREVIEWED_RUNTIME_SURFACE');
   }
 
+  const workspaceStage = dockerStage(contents, 'workspace');
+  const assembledStage = dockerStage(contents, 'assembled');
+  const consoleAssembledStage = dockerStage(contents, 'console-assembled');
+  const runtimeStage = dockerStage(contents, 'runtime');
+  const consoleRuntimeStage = dockerStage(contents, 'runtime-console');
   const buildCopies = captures(
-    contents,
+    workspaceStage,
     /^COPY packages\/(ql3-[a-z-]+) packages\/\1$/gm,
   ).sort();
   if (!sameJson(buildCopies, [...BUILD_PACKAGES].sort())) {
@@ -230,7 +256,7 @@ function auditDockerfile(contents, findings) {
   }
   const runtimeCopyCounts = counts(
     captures(
-      contents,
+      assembledStage,
       /^COPY --from=workspace \/workspace\/packages\/(ql3-[a-z-]+)\/(?:package\.json|dist) /gm,
     ),
   );
@@ -243,6 +269,28 @@ function auditDockerfile(contents, findings) {
     )
   ) {
     addFinding(findings, 'RUNTIME_INTERNAL_PACKAGE_CLOSURE_DRIFT');
+  }
+  const consoleRuntimeCopyCounts = counts(
+    captures(
+      consoleAssembledStage,
+      /^COPY --from=workspace \/workspace\/packages\/(ql3-[a-z-]+)\/(?:package\.json|dist) /gm,
+    ),
+  );
+  if (
+    !sameJson(
+      sortedObject(consoleRuntimeCopyCounts),
+      sortedObject(
+        Object.fromEntries(
+          CONSOLE_RUNTIME_PACKAGES.map((name) => [name, 2]),
+        ),
+      ),
+    ) ||
+    !consoleAssembledStage.includes(
+      'COPY --from=workspace /workspace/packages/ql3-local-api/assets \\\n' +
+        '  node_modules/@qinglong/local-api/assets',
+    )
+  ) {
+    addFinding(findings, 'CONSOLE_RUNTIME_INTERNAL_PACKAGE_CLOSURE_DRIFT');
   }
   if (contents.includes('COPY --from=workspace /workspace/packages/ql3-ai/')) {
     addFinding(findings, 'AI_PRESENT_IN_RUNTIME_STAGE');
@@ -264,19 +312,50 @@ function auditDockerfile(contents, findings) {
     addFinding(findings, 'RUNTIME_NONESSENTIAL_FILES_NOT_REMOVED');
   }
   if (
-    !contents.includes('USER 65532:65532') ||
-    !contents.includes(
+    !consoleAssembledStage.includes(
+      'RUN rm -rf node_modules/.bin \\\n' +
+        '  && node /tmp/ql3-prune-runtime-artifact.cjs node_modules/@qinglong \\\n' +
+        '    @qinglong/local-api/config \\\n' +
+        '    @qinglong/local-api/process \\\n' +
+        '    --exclude=@qinglong/ai \\\n' +
+        '    --retain-js=local-api/assets/console/console.js \\\n' +
+        '  && rm /tmp/ql3-prune-runtime-artifact.cjs',
+    )
+  ) {
+    addFinding(findings, 'CONSOLE_RUNTIME_NONESSENTIAL_FILES_NOT_REMOVED');
+  }
+  if (
+    !runtimeStage.includes('USER 65532:65532') ||
+    !runtimeStage.includes(
       'ENTRYPOINT ["node", "/opt/qinglong/node_modules/@qinglong/local-application/dist/cli.js"]',
     ) ||
-    !contents.includes('io.qinglong.ai="excluded"') ||
-    !contents.includes('io.qinglong.profile="edge,standalone"') ||
-    !contents.includes('io.qinglong.local.application-config="2,3,4"') ||
-    !contents.includes('io.qinglong.local.sqlite-contract-min="51"') ||
-    !contents.includes('io.qinglong.local.sqlite-contract-max="52"') ||
-    !contents.includes('io.qinglong.local.sqlite-write-contract="52"') ||
-    !contents.includes('io.qinglong.local.compose-selection="1"')
+    !runtimeStage.includes('io.qinglong.ai="excluded"') ||
+    !runtimeStage.includes('io.qinglong.profile="edge,standalone"') ||
+    !runtimeStage.includes('io.qinglong.local.application-config="2,3,4"') ||
+    !runtimeStage.includes('io.qinglong.local.sqlite-contract-min="51"') ||
+    !runtimeStage.includes('io.qinglong.local.sqlite-contract-max="52"') ||
+    !runtimeStage.includes('io.qinglong.local.sqlite-write-contract="52"') ||
+    !runtimeStage.includes('io.qinglong.local.compose-selection="1"')
   ) {
     addFinding(findings, 'RUNTIME_IDENTITY_OR_LABEL_DRIFT');
+  }
+  if (
+    !consoleRuntimeStage.includes('USER 65532:65532') ||
+    !consoleRuntimeStage.includes(
+      'ENTRYPOINT ["node", "/opt/qinglong/node_modules/@qinglong/local-api/dist/cli.js"]',
+    ) ||
+    !consoleRuntimeStage.includes(
+      'org.opencontainers.image.title="QingLong 3.0 Local Console Application"',
+    ) ||
+    !consoleRuntimeStage.includes(
+      'io.qinglong.profile="edge-application-api,standalone-application-api"',
+    ) ||
+    !consoleRuntimeStage.includes(
+      'io.qinglong.local.console="offline-loopback"',
+    ) ||
+    !consoleRuntimeStage.includes('io.qinglong.ai="excluded"')
+  ) {
+    addFinding(findings, 'CONSOLE_RUNTIME_IDENTITY_OR_LABEL_DRIFT');
   }
 }
 
@@ -295,6 +374,9 @@ function auditWorkflow(contents, findings) {
     'pnpm audit:local-image:ql3',
     'docker build',
     '--file deploy/containers/ql3-local-application/Dockerfile',
+    '--target runtime',
+    '--target runtime-console',
+    'qinglong3-local-console:ci-${{ matrix.image_arch }}',
     'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 51 52 52 1',
     'actual="$(docker image inspect --format \'{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.local.application-config"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-min"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-max"}} {{index .Config.Labels "io.qinglong.local.sqlite-write-contract"}} {{index .Config.Labels "io.qinglong.local.compose-selection"}}\' "${IMAGE}")"',
     'io.qinglong.local.application-config',
@@ -309,10 +391,18 @@ function auditWorkflow(contents, findings) {
     '--memory=128m',
     '--pids-limit=64',
     'scripts/ql3-local-image-inventory.cjs',
+    'scripts/ql3-local-console-image-inventory.cjs',
     '--inventory-root=/opt/qinglong/node_modules',
     'node ../../scripts/ql3-build-package-closure.cjs',
     'node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=edge',
     'node scripts/ql3-local-image-live-contract.cjs --image="${IMAGE}" --profile=standalone',
+    'node scripts/ql3-local-alpha-trial-kit-live-contract.cjs',
+    '--variant=headless',
+    '--variant=console',
+    '--image=local-console',
+    'io.qinglong.local.console',
+    '--variant="${TRIAL_VARIANT}"',
+    'inputs.local_alpha_variant',
   ];
   for (const value of required) {
     if (!job.includes(value)) {
@@ -353,6 +443,14 @@ function auditLocalImageContract(root) {
     runtimePackages: Object.freeze(
       [
         ...RUNTIME_PACKAGES.map((name) => `@qinglong/${name.slice(4)}`),
+        ...Object.keys(RUNTIME_DEPENDENCIES),
+      ].sort(),
+    ),
+    consoleRuntimePackages: Object.freeze(
+      [
+        ...CONSOLE_RUNTIME_PACKAGES.map(
+          (name) => `@qinglong/${name.slice(4)}`,
+        ),
         ...Object.keys(RUNTIME_DEPENDENCIES),
       ].sort(),
     ),

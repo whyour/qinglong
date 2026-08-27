@@ -63,6 +63,50 @@ test('accepts the exact AI-excluded local application image contract', () => {
     'croner',
     'semver',
   ]);
+  assert.deepEqual(report.consoleRuntimePackages, [
+    '@qinglong/local-admin',
+    '@qinglong/local-api',
+    '@qinglong/local-application',
+    '@qinglong/local-command-file',
+    '@qinglong/local-execution',
+    '@qinglong/local-owner-console',
+    '@qinglong/local-process',
+    '@qinglong/local-secret',
+    '@qinglong/local-sqlite',
+    '@qinglong/runtime-core',
+    'croner',
+    'semver',
+  ]);
+});
+
+test('rejects Console assets, loopback identity or retained JavaScript drift', () => {
+  const current = fixture();
+  try {
+    const dockerfilePath = path.join(current.target, 'Dockerfile');
+    const dockerfile = fs
+      .readFileSync(dockerfilePath, 'utf8')
+      .replace(
+        '--retain-js=local-api/assets/console/console.js',
+        '--retain-js=local-api/assets/console/unreviewed.js',
+      )
+      .replace('io.qinglong.local.console="offline-loopback"', 'io.qinglong.local.console="public"');
+    fs.writeFileSync(dockerfilePath, dockerfile);
+    const report = auditLocalImageContract(current.root);
+    assert.equal(report.compatible, false);
+    assert.ok(
+      report.findings.some(
+        ({ code }) =>
+          code === 'CONSOLE_RUNTIME_NONESSENTIAL_FILES_NOT_REMOVED',
+      ),
+    );
+    assert.ok(
+      report.findings.some(
+        ({ code }) => code === 'CONSOLE_RUNTIME_IDENTITY_OR_LABEL_DRIFT',
+      ),
+    );
+  } finally {
+    current.close();
+  }
 });
 
 test('rejects a mutable runtime base image', () => {

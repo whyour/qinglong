@@ -66,7 +66,7 @@ D-416 的 Local Trial Kit 和基础 `edge|standalone` Application 仍保持 head
 - `application-api` Edge/Standalone 制品当前为 3,953,346 / 3,953,490 bytes、467 files、12 packages，远低于 6 MiB/640-file budget；加载闭包为 90 modules，实测 import RSS delta 约 14.0 MiB；
 - 基础 headless Edge/Standalone、D-416 Trial Kit、Cluster Profile 和 AI/MCP Profile 不因本切片新增 Console 进程或端口；
 - Console 视觉和交互已在 1440×960 与 390×844 视口验证，工作态覆盖 Task detail、运行确认、Run evidence/Event sequence 和取消入口；
-- 当前仍缺少面向部署用户的 Console Docker image/Trial Kit 选择、真实低性能物理 Edge 容量数据，以及受保护 public release。
+- 本 ADR 当时缺少的 Console Docker image/Trial Kit 选择已由 ADR-0513 闭合；真实低性能物理 Edge 容量数据和受保护 public release 仍未完成。
 
 ## 验证
 

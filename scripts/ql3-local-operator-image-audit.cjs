@@ -199,10 +199,10 @@ function auditWorkflow(contents, findings) {
     '--mode=record-verification',
     '--mode=create',
     '--mode=audit',
-    '/quickstart.sh" \\\n            edge "${QUICKSTART_ROOT}" "${QUICKSTART_CONTAINER}"',
+    'sh "${BUNDLE_ROOT}/quickstart.sh" \\\n            edge "${QUICKSTART_ROOT}" "${QUICKSTART_CONTAINER}"',
     'docker stop --time 30 "${QUICKSTART_CONTAINER}"',
     'test -s "${QUICKSTART_ROOT}/qinglong3.sqlite"',
-    '--application-sbom="${RUNNER_TEMP}/ql3-local-application.cdx.json"',
+    '--application-sbom="${APPLICATION_SBOM}"',
     '--operator-sbom="${RUNNER_TEMP}/ql3-local-operator.cdx.json"',
     '--verification-evidence="${RUNNER_TEMP}/ql3-local-alpha-verification-${{ matrix.image_arch }}.json"',
     '--readme=docs/operations/ql3-local-alpha-trial-kit.md',
@@ -213,6 +213,8 @@ function auditWorkflow(contents, findings) {
     '--job=${{ github.job }}',
     '--run-id=${{ github.run_id }}',
     '--run-attempt=${{ github.run_attempt }}',
+    '--variant="${TRIAL_VARIANT}"',
+    'inputs.local_alpha_variant',
   ];
   for (const value of required) {
     if (!contents.includes(value))

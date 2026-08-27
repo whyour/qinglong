@@ -760,17 +760,22 @@ if (require.main === module) {
   try {
     if (process.argv.length < 4) {
       fail(
-        'usage: ql3-prune-runtime-artifact.cjs node_modules/@qinglong @qinglong/profile-entry [...]',
+        'usage: ql3-prune-runtime-artifact.cjs node_modules/@qinglong @qinglong/profile-entry [...] [--exclude=@qinglong/package] [--retain-js=package/path.js]',
       );
     }
     const arguments = process.argv.slice(3);
     const report = pruneRuntimeArtifact(process.argv[2], {
       entrySpecifiers: arguments.filter(
-        (argument) => !argument.startsWith('--exclude='),
+        (argument) =>
+          !argument.startsWith('--exclude=') &&
+          !argument.startsWith('--retain-js='),
       ),
       excludedInternalPackages: arguments
         .filter((argument) => argument.startsWith('--exclude='))
         .map((argument) => argument.slice('--exclude='.length)),
+      retainedJavaScriptFiles: arguments
+        .filter((argument) => argument.startsWith('--retain-js='))
+        .map((argument) => argument.slice('--retain-js='.length)),
     });
     process.stdout.write(
       `${JSON.stringify({ schemaVersion: 1, ...report })}\n`,

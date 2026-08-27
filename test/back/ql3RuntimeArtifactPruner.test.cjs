@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -570,6 +571,37 @@ test('rejects invalid or missing explicit JavaScript assets before mutation', ()
       );
       assert.equal(fs.existsSync(map), true);
     }
+  } finally {
+    current.close();
+  }
+});
+
+test('CLI retains one reviewed JavaScript asset outside dist', () => {
+  const current = fixture();
+  try {
+    const application = writePackage(
+      current.root,
+      'local-api',
+      '@qinglong/local-api',
+    );
+    fs.writeFileSync(path.join(application.dist, 'index.js'), "'use strict';\n");
+    const assets = path.join(application.packageRoot, 'assets/console');
+    fs.mkdirSync(assets, { recursive: true });
+    const retained = path.join(assets, 'console.js');
+    fs.writeFileSync(retained, "'use strict';\n");
+    const run = spawnSync(
+      process.execPath,
+      [
+        path.resolve(__dirname, '../../scripts/ql3-prune-runtime-artifact.cjs'),
+        current.root,
+        '@qinglong/local-api',
+        '--retain-js=local-api/assets/console/console.js',
+      ],
+      { encoding: 'utf8' },
+    );
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(fs.existsSync(retained), true);
+    assert.equal(JSON.parse(run.stdout).schemaVersion, 1);
   } finally {
     current.close();
   }

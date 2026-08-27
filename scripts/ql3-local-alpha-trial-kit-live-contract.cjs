@@ -20,27 +20,30 @@ function fail(message) {
 function argumentsFrom(argv) {
   const values = {};
   for (const argument of argv) {
-    const match = /^--(application-image|operator-image|profile)=(.+)$/u.exec(
-      argument,
-    );
+    const match =
+      /^--(application-image|operator-image|profile|variant)=(.+)$/u.exec(
+        argument,
+      );
     if (!match || Object.hasOwn(values, match[1]))
       fail('arguments are invalid');
     values[match[1]] = match[2];
   }
   if (
-    Object.keys(values).length !== 3 ||
+    Object.keys(values).length !== 4 ||
     !IMAGE_PATTERN.test(values['application-image'] ?? '') ||
     !IMAGE_PATTERN.test(values['operator-image'] ?? '') ||
-    !['edge', 'standalone'].includes(values.profile)
+    !['edge', 'standalone'].includes(values.profile) ||
+    !['headless', 'console'].includes(values.variant)
   ) {
     fail(
-      'usage: --application-image=... --operator-image=... --profile=edge|standalone',
+      'usage: --application-image=... --operator-image=... --profile=edge|standalone --variant=headless|console',
     );
   }
   return Object.freeze({
     applicationImage: values['application-image'],
     operatorImage: values['operator-image'],
     profile: values.profile,
+    variant: values.variant,
   });
 }
 
@@ -61,41 +64,54 @@ function docker(args, options = {}) {
   return result.stdout.trim();
 }
 
-function inspectImages(applicationImage, operatorImage) {
-  const application = docker([
-    'image',
-    'inspect',
-    '--format',
-    '{{.Id}} {{.Architecture}} {{.Config.User}} {{index .Config.Labels "org.opencontainers.image.revision"}} {{index .Config.Labels "org.opencontainers.image.version"}}',
-    applicationImage,
-  ]).split(' ');
-  const operator = docker([
-    'image',
-    'inspect',
-    '--format',
-    '{{.Id}} {{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.lifecycle"}} {{index .Config.Labels "io.qinglong.authority"}} {{index .Config.Labels "org.opencontainers.image.revision"}} {{index .Config.Labels "org.opencontainers.image.version"}}',
-    operatorImage,
-  ]).split(' ');
+function inspectImages(applicationImage, operatorImage, variant) {
+  const application = JSON.parse(
+    docker(['image', 'inspect', applicationImage]),
+  )[0];
+  const operator = JSON.parse(docker(['image', 'inspect', operatorImage]))[0];
+  const applicationLabels = application?.Config?.Labels;
+  const operatorLabels = operator?.Config?.Labels;
+  const expectedTitle =
+    variant === 'console'
+      ? 'QingLong 3.0 Local Console Application'
+      : 'QingLong 3.0 Local Application';
+  const expectedProfile =
+    variant === 'console'
+      ? 'edge-application-api,standalone-application-api'
+      : 'edge,standalone';
   if (
-    !/^sha256:[0-9a-f]{64}$/u.test(application[0] ?? '') ||
-    !/^sha256:[0-9a-f]{64}$/u.test(operator[0] ?? '') ||
-    application[1] !== operator[1] ||
-    !['amd64', 'arm64'].includes(application[1]) ||
-    application[2] !== '65532:65532' ||
-    operator[2] !== '65532:65532' ||
-    operator[3] !== 'short-lived' ||
-    operator[4] !== 'local-owner-management' ||
-    !/^[0-9a-f]{40}$/u.test(application[3] ?? '') ||
-    application[3] !== operator[5] ||
-    application[4] !== operator[6] ||
-    !/^3\.0\.0-alpha\.[0-9]+$/u.test(application[4] ?? '')
+    !/^sha256:[0-9a-f]{64}$/u.test(application?.Id ?? '') ||
+    !/^sha256:[0-9a-f]{64}$/u.test(operator?.Id ?? '') ||
+    application?.Architecture !== operator?.Architecture ||
+    !['amd64', 'arm64'].includes(application?.Architecture) ||
+    application?.Config?.User !== '65532:65532' ||
+    operator?.Config?.User !== '65532:65532' ||
+    applicationLabels?.['org.opencontainers.image.title'] !== expectedTitle ||
+    applicationLabels?.['io.qinglong.profile'] !== expectedProfile ||
+    applicationLabels?.['io.qinglong.ai'] !== 'excluded' ||
+    (variant === 'console'
+      ? applicationLabels?.['io.qinglong.local.console'] !==
+        'offline-loopback'
+      : applicationLabels?.['io.qinglong.local.console'] !== undefined) ||
+    operatorLabels?.['io.qinglong.lifecycle'] !== 'short-lived' ||
+    operatorLabels?.['io.qinglong.authority'] !== 'local-owner-management' ||
+    !/^[0-9a-f]{40}$/u.test(
+      applicationLabels?.['org.opencontainers.image.revision'] ?? '',
+    ) ||
+    applicationLabels?.['org.opencontainers.image.revision'] !==
+      operatorLabels?.['org.opencontainers.image.revision'] ||
+    applicationLabels?.['org.opencontainers.image.version'] !==
+      operatorLabels?.['org.opencontainers.image.version'] ||
+    !/^3\.0\.0-alpha\.[0-9]+$/u.test(
+      applicationLabels?.['org.opencontainers.image.version'] ?? '',
+    )
   ) {
     fail('image identity, architecture or authority labels drifted');
   }
   return Object.freeze({
-    architecture: application[1],
-    applicationId: application[0],
-    operatorId: operator[0],
+    architecture: application.Architecture,
+    applicationId: application.Id,
+    operatorId: operator.Id,
   });
 }
 
@@ -326,6 +342,55 @@ function writeApplicationConfig(state) {
     },
     ai: { deployment: 'excluded' },
   });
+  if (state.variant === 'console') {
+    writePrivateJson(path.join(state.root, 'local-api.json'), {
+      schema: 'qinglong/local-api-process@v1',
+      deploymentRoot: '/var/lib/qinglong3',
+      applicationConfigFilePath:
+        '/var/lib/qinglong3/local-application.json',
+      ownerPepperKeyringDirectory: '/var/lib/qinglong3/owner-peppers',
+      listener: { host: '127.0.0.1', port: 5700 },
+    });
+  }
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function consoleSurfaceContract() {
+  let lastError;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      const root = await fetch('http://127.0.0.1:5700/', {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(2_000),
+      });
+      const api = await fetch(
+        'http://127.0.0.1:5700/api/v3/projects/default/tasks',
+        {
+          redirect: 'manual',
+          signal: AbortSignal.timeout(2_000),
+        },
+      );
+      await root.body?.cancel();
+      await api.body?.cancel();
+      if (root.status !== 200 || api.status !== 401) {
+        fail(
+          `Console HTTP contract drifted: root=${root.status}, unauthenticatedApi=${api.status}`,
+        );
+      }
+      return Object.freeze({
+        listener: '127.0.0.1:5700',
+        rootStatus: 200,
+        unauthenticatedApiStatus: 401,
+      });
+    } catch (error) {
+      lastError = error;
+      await delay(250);
+    }
+  }
+  throw lastError || new Error('Console listener did not become ready');
 }
 
 async function runApplication(state) {
@@ -344,7 +409,7 @@ async function runApplication(state) {
       '--user',
       `${state.uid}:${state.gid}`,
       '--network',
-      'none',
+      state.variant === 'console' ? 'host' : 'none',
       '--cap-drop',
       'ALL',
       '--security-opt',
@@ -363,13 +428,18 @@ async function runApplication(state) {
       `${state.root}:/var/lib/qinglong3`,
       state.applicationImage,
       '--config',
-      '/var/lib/qinglong3/local-application.json',
+      state.variant === 'console'
+        ? '/var/lib/qinglong3/local-api.json'
+        : '/var/lib/qinglong3/local-application.json',
     ],
     { stdio: ['ignore', 'pipe', 'pipe'] },
   );
   let stdout = '';
   let stderr = '';
   let active = false;
+  let surfaceError;
+  let surface = Object.freeze({ status: 'not_applicable' });
+  let surfacePromise = Promise.resolve();
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
   child.stdout.on('data', (chunk) => {
@@ -385,7 +455,17 @@ async function runApplication(state) {
       })
     ) {
       active = true;
-      docker(['stop', '--time', '30', name]);
+      surfacePromise = (async () => {
+        try {
+          if (state.variant === 'console') {
+            surface = await consoleSurfaceContract();
+          }
+        } catch (error) {
+          surfaceError = error;
+        } finally {
+          docker(['stop', '--time', '30', name]);
+        }
+      })();
     }
   });
   child.stderr.on('data', (chunk) => {
@@ -403,6 +483,8 @@ async function runApplication(state) {
         resolve({ code, signal });
       });
     });
+    await surfacePromise;
+    if (surfaceError) throw surfaceError;
     const events = stdout
       .trim()
       .split('\n')
@@ -426,7 +508,7 @@ async function runApplication(state) {
         })}`,
       );
     }
-    return Object.freeze({ active: true, gracefulStop: true });
+    return Object.freeze({ active: true, gracefulStop: true, surface });
   } finally {
     spawnSync('docker', ['rm', '--force', name], { stdio: 'ignore' });
   }
@@ -441,7 +523,11 @@ async function main() {
     fail('a POSIX identity is required');
   }
   const options = argumentsFrom(process.argv.slice(2));
-  const images = inspectImages(options.applicationImage, options.operatorImage);
+  const images = inspectImages(
+    options.applicationImage,
+    options.operatorImage,
+    options.variant,
+  );
   const root = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-alpha-trial-')),
   );
@@ -479,8 +565,9 @@ async function main() {
       fail('durable SQLite result is invalid');
     process.stdout.write(
       `${JSON.stringify({
-        schemaVersion: 1,
-        schema: 'qinglong/local-alpha-trial-kit-live@v1',
+        schemaVersion: 2,
+        schema: 'qinglong/local-alpha-trial-kit-live@v2',
+        variant: options.variant,
         profile: options.profile,
         architecture: images.architecture,
         images: {

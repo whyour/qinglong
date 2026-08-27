@@ -23,6 +23,14 @@ on:
           - local
           - cluster
           - all
+      local_alpha_variant:
+        description: Select the Local Alpha deployment surface without changing the default headless image
+        required: true
+        default: headless
+        type: choice
+        options:
+          - headless
+          - console
 
 permissions:
   contents: read
@@ -384,8 +392,19 @@ jobs:
         run: >-
           docker build
           --file deploy/containers/ql3-local-application/Dockerfile
+          --target runtime
           --build-arg SOURCE_REVISION=${{ github.sha }}
           --tag "${IMAGE}"
+          .
+      - name: Build the opt-in Local Console image
+        env:
+          CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
+        run: >-
+          docker build
+          --file deploy/containers/ql3-local-application/Dockerfile
+          --target runtime-console
+          --build-arg SOURCE_REVISION=${{ github.sha }}
+          --tag "${CONSOLE_IMAGE}"
           .
       - name: Build the native short-lived Local operator image
         env:
@@ -404,6 +423,9 @@ jobs:
           node scripts/ql3-image-os-vulnerability-policy.cjs \
             --image=local-operator \
             --output=${{ runner.temp }}/ql3-local-operator-${{ matrix.image_arch }}.trivyignore.yaml
+          node scripts/ql3-image-os-vulnerability-policy.cjs \
+            --image=local-console \
+            --output=${{ runner.temp }}/ql3-local-console-${{ matrix.image_arch }}.trivyignore.yaml
       - name: Reject unexcepted high or critical local OS vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -434,6 +456,21 @@ jobs:
           timeout: '10m0s'
           cache: 'false'
           trivyignores: ${{ runner.temp }}/ql3-local-operator-${{ matrix.image_arch }}.trivyignore.yaml
+      - name: Reject unexcepted high or critical Local Console OS vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          image-ref: qinglong3-local-console:ci-${{ matrix.image_arch }}
+          scanners: 'vuln'
+          vuln-type: 'os'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: 'false'
+          exit-code: '1'
+          format: 'table'
+          hide-progress: 'true'
+          timeout: '10m0s'
+          cache: 'false'
+          trivyignores: ${{ runner.temp }}/ql3-local-console-${{ matrix.image_arch }}.trivyignore.yaml
       - name: Verify non-root identity and architecture
         env:
           IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
@@ -454,6 +491,17 @@ jobs:
           actual="$(docker image inspect --format '{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.lifecycle"}} {{index .Config.Labels "io.qinglong.authority"}} {{index .Config.Labels "io.qinglong.network"}}' "${OPERATOR_IMAGE}")"
           if [[ "${actual}" != "${EXPECTED}" ]]; then
             echo "unexpected Local operator image contract: ${actual}" >&2
+            exit 1
+          fi
+      - name: Verify the opt-in Local Console identity
+        env:
+          CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
+          EXPECTED: ${{ matrix.image_arch }} 65532:65532 edge-application-api,standalone-application-api offline-loopback
+        run: |
+          set -euo pipefail
+          actual="$(docker image inspect --format '{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.profile"}} {{index .Config.Labels "io.qinglong.local.console"}}' "${CONSOLE_IMAGE}")"
+          if [[ "${actual}" != "${EXPECTED}" ]]; then
+            echo "unexpected Local Console image contract: ${actual}" >&2
             exit 1
           fi
       - name: Reconcile the exact production package inventory
@@ -483,6 +531,20 @@ jobs:
           --entrypoint node
           "${OPERATOR_IMAGE}"
           scripts/ql3-local-operator-image-inventory.cjs
+          --inventory-root=/opt/qinglong/node_modules
+      - name: Reconcile the opt-in Local Console package inventory
+        env:
+          CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
+        run: >-
+          docker run --rm --read-only
+          --network none
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --volume "${{ github.workspace }}:/audit:ro"
+          --workdir /audit
+          --entrypoint node
+          "${CONSOLE_IMAGE}"
+          scripts/ql3-local-console-image-inventory.cjs
           --inventory-root=/opt/qinglong/node_modules
       - name: Generate and reconcile the reviewed CycloneDX SBOM
         env:
@@ -520,6 +582,24 @@ jobs:
             scripts/ql3-cluster-image-sbom.cjs \
             --image=local-operator \
             --inventory-root=/opt/qinglong/node_modules
+      - name: Generate and reconcile the Local Console CycloneDX SBOM
+        env:
+          CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
+        run: |
+          node scripts/ql3-cluster-image-sbom.cjs \
+            --image=local-console \
+            --output="${{ runner.temp }}/ql3-local-console.cdx.json"
+          docker run --rm --read-only \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --volume "${{ github.workspace }}:/audit:ro" \
+            --workdir /audit \
+            --entrypoint node \
+            "${CONSOLE_IMAGE}" \
+            scripts/ql3-cluster-image-sbom.cjs \
+            --image=local-console \
+            --inventory-root=/opt/qinglong/node_modules
       - name: Exercise the entrypoint under the router stress envelope
         env:
           IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
@@ -534,6 +614,21 @@ jobs:
           --pids-limit=64
           --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m
           "${IMAGE}"
+          --help
+      - name: Exercise the opt-in Console entrypoint under the router stress envelope
+        env:
+          CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
+        run: >-
+          docker run --rm --read-only
+          --network none
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --memory=128m
+          --memory-swap=128m
+          --cpus=0.5
+          --pids-limit=64
+          --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m
+          "${CONSOLE_IMAGE}"
           --help
       - name: Exercise the short-lived Local operator entrypoint
         env:
@@ -576,11 +671,23 @@ jobs:
           node scripts/ql3-local-alpha-trial-kit-live-contract.cjs \
             --application-image="${IMAGE}" \
             --operator-image="${OPERATOR_IMAGE}" \
-            --profile=edge
+            --profile=edge \
+            --variant=headless
           node scripts/ql3-local-alpha-trial-kit-live-contract.cjs \
             --application-image="${IMAGE}" \
             --operator-image="${OPERATOR_IMAGE}" \
-            --profile=standalone
+            --profile=standalone \
+            --variant=headless
+      - name: Run the Local Console loopback journey
+        env:
+          IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
+          OPERATOR_IMAGE: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+        run: |
+          node scripts/ql3-local-alpha-trial-kit-live-contract.cjs \
+            --application-image="${IMAGE}" \
+            --operator-image="${OPERATOR_IMAGE}" \
+            --profile=edge \
+            --variant=console
       - name: Run authenticated Local API cancellation through real Linux processes
         env:
           QL3_LOCAL_API_CANCELLATION_LIVE: '1'
@@ -599,16 +706,27 @@ jobs:
       - name: Materialize and offline-audit the native Local Alpha trial kit
         if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'local' || inputs.alpha_artifact_scope == 'all')
         env:
-          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+          HEADLESS_IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+          CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
           OPERATOR_IMAGE: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+          TRIAL_VARIANT: ${{ inputs.local_alpha_variant }}
         run: |
           set -euo pipefail
           umask 077
+          if [[ "${TRIAL_VARIANT}" == 'console' ]]; then
+            IMAGE="${CONSOLE_IMAGE}"
+            APPLICATION_SBOM="${RUNNER_TEMP}/ql3-local-console.cdx.json"
+          else
+            IMAGE="${HEADLESS_IMAGE}"
+            APPLICATION_SBOM="${RUNNER_TEMP}/ql3-local-application.cdx.json"
+          fi
+          BUNDLE_ROOT="${RUNNER_TEMP}/ql3-alpha-local-${TRIAL_VARIANT}-${{ matrix.image_arch }}"
           node scripts/ql3-local-alpha-trial-kit-bundle.cjs \
             --mode=record-verification \
             --application-image="${IMAGE}" \
             --operator-image="${OPERATOR_IMAGE}" \
             --architecture=${{ matrix.image_arch }} \
+            --variant="${TRIAL_VARIANT}" \
             --source-revision=${{ github.sha }} \
             --repository=${{ github.repository }} \
             --workflow-ref="${{ github.workflow_ref }}" \
@@ -623,19 +741,24 @@ jobs:
             --application-image="${IMAGE}" \
             --operator-image="${OPERATOR_IMAGE}" \
             --architecture=${{ matrix.image_arch }} \
+            --variant="${TRIAL_VARIANT}" \
             --source-revision=${{ github.sha }} \
-            --application-sbom="${RUNNER_TEMP}/ql3-local-application.cdx.json" \
+            --application-sbom="${APPLICATION_SBOM}" \
             --operator-sbom="${RUNNER_TEMP}/ql3-local-operator.cdx.json" \
             --verification-evidence="${RUNNER_TEMP}/ql3-local-alpha-verification-${{ matrix.image_arch }}.json" \
             --readme=docs/operations/ql3-local-alpha-trial-kit.md \
-            --output="${RUNNER_TEMP}/ql3-alpha-local-${{ matrix.image_arch }}"
+            --output="${BUNDLE_ROOT}"
           node scripts/ql3-local-alpha-trial-kit-bundle.cjs \
-            --mode=audit --bundle="${RUNNER_TEMP}/ql3-alpha-local-${{ matrix.image_arch }}"
-          QUICKSTART_CONTAINER="ql3-alpha-quickstart-${{ matrix.image_arch }}"
-          QUICKSTART_ROOT="${RUNNER_TEMP}/ql3-alpha-quickstart-${{ matrix.image_arch }}"
+            --mode=audit --bundle="${BUNDLE_ROOT}"
+          QUICKSTART_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-quickstart-${{ matrix.image_arch }}"
+          QUICKSTART_ROOT="${RUNNER_TEMP}/ql3-alpha-${TRIAL_VARIANT}-quickstart-${{ matrix.image_arch }}"
           trap 'docker rm --force "${QUICKSTART_CONTAINER}" >/dev/null 2>&1 || true' EXIT
-          sh "${RUNNER_TEMP}/ql3-alpha-local-${{ matrix.image_arch }}/quickstart.sh" \
+          sh "${BUNDLE_ROOT}/quickstart.sh" \
             edge "${QUICKSTART_ROOT}" "${QUICKSTART_CONTAINER}"
+          if [[ "${TRIAL_VARIANT}" == 'console' ]]; then
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:5700/)" = '200'
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:5700/api/v3/projects/default/tasks)" = '401'
+          fi
           docker stop --time 30 "${QUICKSTART_CONTAINER}"
           docker rm "${QUICKSTART_CONTAINER}"
           test -s "${QUICKSTART_ROOT}/qinglong3.sqlite"
@@ -645,8 +768,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'local' || inputs.alpha_artifact_scope == 'all')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ql3-alpha-${{ github.sha }}-local-${{ matrix.image_arch }}
-          path: ${{ runner.temp }}/ql3-alpha-local-${{ matrix.image_arch }}
+          name: ql3-alpha-${{ github.sha }}-local-${{ inputs.local_alpha_variant }}-${{ matrix.image_arch }}
+          path: ${{ runner.temp }}/ql3-alpha-local-${{ inputs.local_alpha_variant }}-${{ matrix.image_arch }}
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
@@ -1777,12 +1900,12 @@ jobs:
       - name: Download the exact amd64 Local Alpha trial kit
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ql3-alpha-${{ github.sha }}-local-amd64
+          name: ql3-alpha-${{ github.sha }}-local-${{ inputs.local_alpha_variant }}-amd64
           path: ${{ runner.temp }}/ql3-alpha-local-milestone-input/amd64
       - name: Download the exact arm64 Local Alpha trial kit
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ql3-alpha-${{ github.sha }}-local-arm64
+          name: ql3-alpha-${{ github.sha }}-local-${{ inputs.local_alpha_variant }}-arm64
           path: ${{ runner.temp }}/ql3-alpha-local-milestone-input/arm64
       - name: Close both native trial kits into one milestone index
         run: |
@@ -1792,6 +1915,7 @@ jobs:
             --mode=finalize \
             --amd64-bundle="${RUNNER_TEMP}/ql3-alpha-local-milestone-input/amd64" \
             --arm64-bundle="${RUNNER_TEMP}/ql3-alpha-local-milestone-input/arm64" \
+            --variant=${{ inputs.local_alpha_variant }} \
             --source-revision=${{ github.sha }} \
             --repository=${{ github.repository }} \
             --workflow-ref="${{ github.workflow_ref }}" \
@@ -1807,7 +1931,7 @@ jobs:
       - name: Upload the closed Local Alpha milestone index
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ql3-alpha-${{ github.sha }}-local-milestone
+          name: ql3-alpha-${{ github.sha }}-local-${{ inputs.local_alpha_variant }}-milestone
           path: ${{ runner.temp }}/ql3-alpha-local-milestone
           if-no-files-found: error
           retention-days: 30
@@ -1830,7 +1954,7 @@ jobs:
       - name: Download the closed Local Alpha milestone
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ql3-alpha-${{ github.sha }}-local-milestone
+          name: ql3-alpha-${{ github.sha }}-local-${{ inputs.local_alpha_variant }}-milestone
           path: ${{ runner.temp }}/ql3-alpha-stage-input/local
       - name: Download the closed Cluster Alpha milestone
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

@@ -128,6 +128,40 @@ test('generates the AI-excluded local application image closure', () => {
   );
 });
 
+test('generates the bounded AI-excluded local Console image closure', () => {
+  const document = createClusterImageSbom({ root, image: 'local-console' });
+  const report = auditClusterImageSbom(document, {
+    root,
+    image: 'local-console',
+  });
+
+  assert.deepEqual(report, {
+    image: 'local-console',
+    root: `pkg:npm/%40qinglong/local-application-image@${version}`,
+    components: 12,
+    externalComponents: 2,
+    internalComponents: 10,
+    dependencyNodes: 13,
+    inventoryVerified: false,
+  });
+  assert.equal(
+    document.components.some(
+      (component) => component.name === '@qinglong/local-api',
+    ),
+    true,
+  );
+  assert.equal(
+    document.components.some(
+      (component) => component.name === '@qinglong/local-owner-console',
+    ),
+    true,
+  );
+  assert.equal(
+    document.components.some((component) => component.name === '@qinglong/ai'),
+    false,
+  );
+});
+
 test('generates the headless Worker image runtime closure', () => {
   const document = createClusterImageSbom({ root, image: 'worker' });
   const report = auditClusterImageSbom(document, {

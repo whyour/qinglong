@@ -25,6 +25,12 @@ const CONTAINER_ROOTS = Object.freeze([
   'deploy/containers/ql3-local-application',
   'deploy/containers/ql3-worker',
 ]);
+const CONTAINER_DOCKER_VERSION_LABEL_COUNTS = Object.freeze({
+  'deploy/containers/ql3-cluster-control': 1,
+  'deploy/containers/ql3-cluster-admin': 1,
+  'deploy/containers/ql3-local-application': 2,
+  'deploy/containers/ql3-worker': 1,
+});
 const DEPLOYMENT_ROOTS = Object.freeze([
   'deploy/kubernetes/ql3-cluster',
   'deploy/kubernetes/ql3-worker',
@@ -257,7 +263,7 @@ function auditReleaseVersionContract(rootInput = DEFAULT_ROOT) {
       versionOccurrences(
         dockerfile,
         `org.opencontainers.image.version=\"${identity.version}\"`,
-      ) !== 1
+      ) !== CONTAINER_DOCKER_VERSION_LABEL_COUNTS[containerRoot]
     ) {
       fail(`container Dockerfile release identity drifted: ${containerRoot}`);
     }

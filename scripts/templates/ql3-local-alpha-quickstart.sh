@@ -9,6 +9,7 @@ OPERATOR_ID='@@OPERATOR_ID@@'
 ARCHITECTURE='@@ARCHITECTURE@@'
 SOURCE_REVISION='@@SOURCE_REVISION@@'
 ARCHIVE='@@ARCHIVE@@'
+VARIANT='@@VARIANT@@'
 
 fail() {
   printf '%s\n' "QingLong Local Alpha quickstart failed: $*" >&2
@@ -36,6 +37,18 @@ case "$profile" in
     pids=256
     ;;
   *) usage ;;
+esac
+case "$VARIANT" in
+  headless)
+    network_mode=none
+    application_config=local-application.json
+    ;;
+  console)
+    [ "$(uname -s)" = Linux ] || fail 'Console variant requires a Linux Docker host'
+    network_mode=host
+    application_config=local-api.json
+    ;;
+  *) fail 'embedded Trial Kit variant is invalid' ;;
 esac
 
 case "$data_root" in
@@ -92,6 +105,11 @@ EOF
 cat >"$data_root/local-application.json" <<EOF
 {"schema":"qinglong/local-application-process@v2","instanceId":"alpha-trial-local","profile":"$profile","storage":{"mode":"fresh","databasePath":"/var/lib/qinglong3/qinglong3.sqlite","busyTimeoutMs":100},"runtime":{"receiptRoot":"/var/lib/qinglong3/receipts","artifactRoot":"/var/lib/qinglong3/artifacts","secretKeyringPath":"/var/lib/qinglong3/local-secret-keyring.json"},"pluginPackages":{"stagingRoot":"/var/lib/qinglong3/plugin-staging","activationRoot":"/var/lib/qinglong3/plugin-activation","recoverySource":{"mode":"disabled"},"pageSize":4,"maxPages":4,"taskPublicationPageSize":4,"taskPublicationMaxPages":4},"ai":{"deployment":"excluded"}}
 EOF
+if [ "$VARIANT" = console ]; then
+  cat >"$data_root/local-api.json" <<EOF
+{"schema":"qinglong/local-api-process@v1","deploymentRoot":"/var/lib/qinglong3","applicationConfigFilePath":"/var/lib/qinglong3/local-application.json","ownerPepperKeyringDirectory":"/var/lib/qinglong3/owner-peppers","listener":{"host":"127.0.0.1","port":5700}}
+EOF
+fi
 chmod 0600 "$data_root"/*.json
 
 uid=$(id -u)
@@ -129,12 +147,12 @@ trap cleanup EXIT
 trap 'exit 130' HUP INT TERM
 
 container_id=$(docker run --detach --name "$container_name" \
-  --restart unless-stopped --read-only --user "$uid:$gid" --network none \
+  --restart unless-stopped --read-only --user "$uid:$gid" --network "$network_mode" \
   --cap-drop ALL --security-opt no-new-privileges \
   --memory "$memory" --memory-swap "$memory" --cpus 0.5 --pids-limit "$pids" \
   --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
   --mount "type=bind,src=$data_root,dst=/var/lib/qinglong3" \
-  "$APPLICATION_IMAGE" --config /var/lib/qinglong3/local-application.json)
+  "$APPLICATION_IMAGE" --config "/var/lib/qinglong3/$application_config")
 printf '%s\n' "$container_id" >"$data_root/container.id"
 chmod 0600 "$data_root/container.id"
 
@@ -153,10 +171,15 @@ done
 umask "$old_umask"
 
 printf '%s\n' \
-  "QingLong 3.0 Local Alpha is active ($profile, $ARCHITECTURE)." \
+  "QingLong 3.0 Local Alpha is active ($VARIANT, $profile, $ARCHITECTURE)." \
   "Data root: $data_root" \
   "Owner deliveries: $data_root/owner-delivery" \
   "Logs: docker logs $container_name" \
   "Stop: docker stop --time 30 $container_name" \
   "Remove container: docker rm $container_name" \
   'The fresh data root is retained until you remove it explicitly.'
+if [ "$VARIANT" = console ]; then
+  printf '%s\n' \
+    'Console: http://127.0.0.1:5700/' \
+    'Remote access: create an SSH tunnel to 127.0.0.1:5700; do not expose the port on LAN or the public Internet.'
+fi

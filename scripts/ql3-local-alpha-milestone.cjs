@@ -7,11 +7,12 @@ const path = require('node:path');
 const {
   auditLocalAlphaTrialKit,
   sha256File,
+  VARIANTS,
 } = require('./ql3-local-alpha-trial-kit-bundle.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-milestone@v1';
+const SCHEMA = 'qinglong/alpha-local-milestone@v2';
 const ARCHITECTURES = Object.freeze(['amd64', 'arm64']);
 const FILES = Object.freeze({
   readme: 'README.md',
@@ -126,8 +127,8 @@ function checksumContents(root, names) {
     .join('\n')}\n`;
 }
 
-function artifactName(sourceRevision, architecture) {
-  return `ql3-alpha-${sourceRevision}-local-${architecture}`;
+function artifactName(sourceRevision, architecture, variant = 'headless') {
+  return `ql3-alpha-${sourceRevision}-local-${variant}-${architecture}`;
 }
 
 function validateIdentity(options) {
@@ -150,6 +151,7 @@ function validateFinalizeOptions(options) {
   const outputRoot = path.resolve(options.outputRoot || '');
   const parent = path.dirname(outputRoot);
   if (
+    !VARIANTS.includes(options.variant) ||
     !path.isAbsolute(outputRoot) ||
     fs.existsSync(outputRoot) ||
     fs.realpathSync(parent) !== parent
@@ -179,6 +181,7 @@ function validateFinalizeOptions(options) {
       'milestone README',
     ),
     sourceRevision: options.sourceRevision,
+    variant: options.variant,
     repository: options.repository,
     workflowRef: options.workflowRef,
     workflowSha: options.workflowSha,
@@ -196,12 +199,17 @@ function bundleRecord(options, architecture) {
     report.architecture !== architecture ||
     report.sourceRevision !== options.sourceRevision ||
     report.workflowRunId !== options.runId ||
-    report.workflowRunAttempt !== options.runAttempt
+    report.workflowRunAttempt !== options.runAttempt ||
+    report.variant !== options.variant
   ) {
     fail(`${architecture} trial kit is detached from the milestone run`);
   }
   return Object.freeze({
-    artifactName: artifactName(options.sourceRevision, architecture),
+    artifactName: artifactName(
+      options.sourceRevision,
+      architecture,
+      options.variant,
+    ),
     architecture,
     bundleManifest: fileRecord(
       path.join(bundleRoot, 'manifest.json'),
@@ -226,7 +234,7 @@ function validateArtifactRecord(record, architecture, manifest) {
       'verificationSha256',
     ]) ||
     record.artifactName !==
-      artifactName(manifest.sourceRevision, architecture) ||
+      artifactName(manifest.sourceRevision, architecture, manifest.variant) ||
     record.architecture !== architecture ||
     !exactKeys(record.bundleManifest, ['file', 'sha256', 'bytes']) ||
     record.bundleManifest.file !== 'manifest.json' ||
@@ -298,16 +306,18 @@ function auditLocalAlphaMilestone(options) {
       'schema',
       'maturity',
       'product',
+      'variant',
       'version',
       'sourceRevision',
       'workflow',
       'artifacts',
       'readme',
     ]) ||
-    manifest.schemaVersion !== 1 ||
+    manifest.schemaVersion !== 2 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
+    !VARIANTS.includes(manifest.variant) ||
     typeof manifest.version !== 'string' ||
     manifest.version.length < 3 ||
     manifest.version.length > 64 ||
@@ -373,9 +383,10 @@ function auditLocalAlphaMilestone(options) {
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-milestone-audit@v1',
+    schema: 'qinglong/alpha-local-milestone-audit@v2',
     sourceRevision: manifest.sourceRevision,
     version: manifest.version,
+    variant: manifest.variant,
     workflowRunId: manifest.workflow.runId,
     workflowRunAttempt: manifest.workflow.runAttempt,
     architectures: [...ARCHITECTURES],
@@ -422,10 +433,11 @@ function finalizeLocalAlphaMilestone(options) {
       path.join(normalized.outputRoot, FILES.readme),
     );
     const manifest = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',
+      variant: normalized.variant,
       version: [...versions][0],
       sourceRevision: normalized.sourceRevision,
       workflow: {
@@ -492,6 +504,10 @@ function auditLocalAlphaMilestoneWorkflow(root = DEFAULT_ROOT) {
     '- local',
     '- cluster',
     '- all',
+    'local_alpha_variant:',
+    'default: headless',
+    '- headless',
+    '- console',
     "github.run_id || 'validation'",
     "cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts) }}",
   ];
@@ -512,12 +528,13 @@ function auditLocalAlphaMilestoneWorkflow(root = DEFAULT_ROOT) {
     '    name: Finalize the Local Alpha milestone',
     '    needs:',
     'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
-    `name: ql3-alpha-${'${{ github.sha }}'}-local-amd64`,
-    `name: ql3-alpha-${'${{ github.sha }}'}-local-arm64`,
+    `name: ql3-alpha-${'${{ github.sha }}'}-local-${'${{ inputs.local_alpha_variant }}'}-amd64`,
+    `name: ql3-alpha-${'${{ github.sha }}'}-local-${'${{ inputs.local_alpha_variant }}'}-arm64`,
     'scripts/ql3-local-alpha-milestone.cjs',
     '--mode=finalize',
+    '--variant=${{ inputs.local_alpha_variant }}',
     '--mode=audit',
-    `name: ql3-alpha-${'${{ github.sha }}'}-local-milestone`,
+    `name: ql3-alpha-${'${{ github.sha }}'}-local-${'${{ inputs.local_alpha_variant }}'}-milestone`,
     'retention-days: 30',
     'overwrite: false',
   ];
@@ -587,6 +604,7 @@ function parseArguments(argv) {
     'run-attempt',
     'run-id',
     'source-revision',
+    'variant',
     'workflow-ref',
     'workflow-sha',
   ];
@@ -605,6 +623,7 @@ function parseArguments(argv) {
     },
     readme: path.resolve(values.readme),
     sourceRevision: values['source-revision'],
+    variant: values.variant,
     repository: values.repository,
     workflowRef: values['workflow-ref'],
     workflowSha: values['workflow-sha'],

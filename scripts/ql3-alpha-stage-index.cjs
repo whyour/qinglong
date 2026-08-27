@@ -12,7 +12,7 @@ const { sha256File } = require('./ql3-local-alpha-trial-kit-bundle.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-stage-index@v1';
+const SCHEMA = 'qinglong/alpha-stage-index@v2';
 const FILES = Object.freeze({
   readme: 'README.md',
   manifest: 'manifest.json',
@@ -118,8 +118,10 @@ function stageArtifactName(sourceRevision) {
   return `ql3-alpha-${sourceRevision}-stage-index`;
 }
 
-function milestoneArtifactName(sourceRevision, product) {
-  return `ql3-alpha-${sourceRevision}-${product}-milestone`;
+function milestoneArtifactName(sourceRevision, product, variant) {
+  return product === 'local'
+    ? `ql3-alpha-${sourceRevision}-local-${variant}-milestone`
+    : `ql3-alpha-${sourceRevision}-cluster-milestone`;
 }
 
 function validateWorkflow(document, sourceRevision) {
@@ -189,8 +191,15 @@ function readMilestones(localMilestoneRoot, clusterMilestoneRoot) {
 function expectedSelections(local, cluster) {
   return {
     local: {
-      profiles: ['edge', 'standalone'],
-      intent: 'fresh_non_production_trial',
+      variant: local.variant,
+      profiles:
+        local.variant === 'console'
+          ? ['edge-application-api', 'standalone-application-api']
+          : ['edge', 'standalone'],
+      intent:
+        local.variant === 'console'
+          ? 'fresh_loopback_console_non_production_trial'
+          : 'fresh_non_production_trial',
       architectures: Object.fromEntries(
         ARCHITECTURES.map((architecture) => [
           architecture,
@@ -224,18 +233,19 @@ function expectedSelections(local, cluster) {
   };
 }
 
-function validateMilestoneRecord(record, product, sourceRevision) {
+function validateMilestoneRecord(record, product, sourceRevision, variant) {
   const expectedMaturity =
     product === 'local'
       ? 'alpha_candidate_not_public_release'
       : 'cluster_integration_candidate_not_public_release';
   const expectedSchema =
     product === 'local'
-      ? 'qinglong/alpha-local-milestone@v1'
+      ? 'qinglong/alpha-local-milestone@v2'
       : 'qinglong/alpha-cluster-milestone@v1';
   if (
     !exactKeys(record, ['artifactName', 'schema', 'maturity', 'manifest']) ||
-    record.artifactName !== milestoneArtifactName(sourceRevision, product) ||
+    record.artifactName !==
+      milestoneArtifactName(sourceRevision, product, variant) ||
     record.schema !== expectedSchema ||
     record.maturity !== expectedMaturity ||
     !exactKeys(record.manifest, ['file', 'sha256', 'bytes']) ||
@@ -293,7 +303,7 @@ function auditAlphaStageIndex(options) {
       'deploymentSelections',
       'readme',
     ]) ||
-    manifest.schemaVersion !== 1 ||
+    manifest.schemaVersion !== 2 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_stage_delivery_not_public_release' ||
     manifest.product !== 'qinglong3' ||
@@ -321,11 +331,13 @@ function auditAlphaStageIndex(options) {
     manifest.milestones.local,
     'local',
     manifest.sourceRevision,
+    milestones.local.variant,
   );
   validateMilestoneRecord(
     manifest.milestones.cluster,
     'cluster',
     manifest.sourceRevision,
+    undefined,
   );
   const milestoneManifests = {
     local: fileRecord(
@@ -365,12 +377,15 @@ function auditAlphaStageIndex(options) {
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-stage-index-audit@v1',
+    schema: 'qinglong/alpha-stage-index-audit@v2',
     version: manifest.version,
     sourceRevision: manifest.sourceRevision,
     workflowRunId: manifest.workflow.runId,
     workflowRunAttempt: manifest.workflow.runAttempt,
-    profiles: ['edge', 'standalone', 'cluster'],
+    profiles: [
+      ...manifest.deploymentSelections.local.profiles,
+      'cluster',
+    ],
     artifactCount: 10,
     compatible: true,
   });
@@ -441,7 +456,7 @@ function finalizeAlphaStageIndex(options) {
       path.join(normalized.outputRoot, FILES.readme),
     );
     const manifest = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       schema: SCHEMA,
       maturity: 'alpha_stage_delivery_not_public_release',
       product: 'qinglong3',
@@ -461,6 +476,7 @@ function finalizeAlphaStageIndex(options) {
           artifactName: milestoneArtifactName(
             normalized.sourceRevision,
             'local',
+            normalized.local.variant,
           ),
           schema: normalized.local.schema,
           maturity: normalized.local.maturity,
@@ -473,6 +489,7 @@ function finalizeAlphaStageIndex(options) {
           artifactName: milestoneArtifactName(
             normalized.sourceRevision,
             'cluster',
+            undefined,
           ),
           schema: normalized.cluster.schema,
           maturity: normalized.cluster.maturity,
@@ -542,7 +559,7 @@ function auditAlphaStageIndexWorkflow(root = DEFAULT_ROOT) {
     `if: ${condition}`,
     '      - local-alpha-milestone\n',
     '      - cluster-alpha-milestone\n',
-    `name: ql3-alpha-${'${{ github.sha }}'}-local-milestone`,
+    `name: ql3-alpha-${'${{ github.sha }}'}-local-${'${{ inputs.local_alpha_variant }}'}-milestone`,
     `name: ql3-alpha-${'${{ github.sha }}'}-cluster-milestone`,
     'scripts/ql3-alpha-stage-index.cjs',
     '--mode=finalize',

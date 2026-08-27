@@ -29,7 +29,7 @@ const revision = 'a'.repeat(40);
 const runId = '33047425710';
 const runAttempt = '2';
 
-function imageInspection(role, architecture, idCharacter) {
+function imageInspection(role, architecture, idCharacter, variant = 'headless') {
   return {
     Id: `sha256:${idCharacter.repeat(64)}`,
     Os: 'linux',
@@ -39,15 +39,23 @@ function imageInspection(role, architecture, idCharacter) {
       Labels: {
         'org.opencontainers.image.title':
           role === 'application'
-            ? 'QingLong 3.0 Local Application'
+            ? variant === 'console'
+              ? 'QingLong 3.0 Local Console Application'
+              : 'QingLong 3.0 Local Application'
             : 'QingLong 3.0 Local Operator',
         'org.opencontainers.image.source': 'https://github.com/whyour/qinglong',
         'org.opencontainers.image.revision': revision,
         'org.opencontainers.image.version': version,
         ...(role === 'application'
           ? {
-              'io.qinglong.profile': 'edge,standalone',
+              'io.qinglong.profile':
+                variant === 'console'
+                  ? 'edge-application-api,standalone-application-api'
+                  : 'edge,standalone',
               'io.qinglong.ai': 'excluded',
+              ...(variant === 'console'
+                ? { 'io.qinglong.local.console': 'offline-loopback' }
+                : {}),
             }
           : {
               'io.qinglong.lifecycle': 'short-lived',
@@ -60,6 +68,7 @@ function imageInspection(role, architecture, idCharacter) {
 }
 
 function createBundle(fixtureRoot, architecture, options = {}) {
+  const variant = options.variant || 'headless';
   const bundleFixture = path.join(fixtureRoot, architecture);
   fs.mkdirSync(bundleFixture);
   const applicationSbom = path.join(bundleFixture, 'application.json');
@@ -69,7 +78,12 @@ function createBundle(fixtureRoot, architecture, options = {}) {
   const outputRoot = path.join(bundleFixture, 'bundle');
   fs.writeFileSync(
     applicationSbom,
-    `${JSON.stringify(createClusterImageSbom({ root, image: 'local' }))}\n`,
+    `${JSON.stringify(
+      createClusterImageSbom({
+        root,
+        image: variant === 'console' ? 'local-console' : 'local',
+      }),
+    )}\n`,
   );
   fs.writeFileSync(
     operatorSbom,
@@ -88,7 +102,7 @@ function createBundle(fixtureRoot, architecture, options = {}) {
   const adapters = {
     inspectImage(image) {
       const role = image.includes('operator') ? 'operator' : 'application';
-      return imageInspection(role, architecture, characters[role]);
+      return imageInspection(role, architecture, characters[role], variant);
     },
     saveImages(images, archivePath) {
       assert.deepEqual(images, [applicationImage, operatorImage]);
@@ -104,6 +118,7 @@ function createBundle(fixtureRoot, architecture, options = {}) {
       root,
       output: verificationEvidence,
       architecture,
+      variant,
       sourceRevision: revision,
       applicationImage,
       operatorImage,
@@ -123,6 +138,7 @@ function createBundle(fixtureRoot, architecture, options = {}) {
       root,
       outputRoot,
       architecture,
+      variant,
       sourceRevision: revision,
       applicationImage,
       operatorImage,
@@ -152,9 +168,16 @@ function fixture(t, options = {}) {
     readme,
     outputRoot: path.join(fixtureRoot, 'milestone'),
     bundles: {
-      amd64: createBundle(fixtureRoot, 'amd64', options.amd64),
-      arm64: createBundle(fixtureRoot, 'arm64', options.arm64),
+      amd64: createBundle(fixtureRoot, 'amd64', {
+        ...options.amd64,
+        variant: options.variant || 'headless',
+      }),
+      arm64: createBundle(fixtureRoot, 'arm64', {
+        ...options.arm64,
+        variant: options.variant || 'headless',
+      }),
     },
+    variant: options.variant || 'headless',
   };
 }
 
@@ -165,6 +188,7 @@ function finalizeOptions(paths) {
     bundles: paths.bundles,
     readme: paths.readme,
     sourceRevision: revision,
+    variant: paths.variant,
     repository: 'whyour/qinglong',
     workflowRef: 'whyour/qinglong/.github/workflows/ql3-ci.yml@refs/heads/next',
     workflowSha: revision,
@@ -177,16 +201,17 @@ function finalizeOptions(paths) {
 test('finalizes two exact native trial kits into one closed milestone index', (t) => {
   const paths = fixture(t);
   const manifest = finalizeLocalAlphaMilestone(finalizeOptions(paths));
-  assert.equal(manifest.schema, 'qinglong/alpha-local-milestone@v1');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-milestone@v2');
+  assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.deepEqual(Object.keys(manifest.artifacts), ['amd64', 'arm64']);
   assert.equal(
     manifest.artifacts.amd64.artifactName,
-    `ql3-alpha-${revision}-local-amd64`,
+    `ql3-alpha-${revision}-local-headless-amd64`,
   );
   assert.equal(
     manifest.artifacts.arm64.artifactName,
-    `ql3-alpha-${revision}-local-arm64`,
+    `ql3-alpha-${revision}-local-headless-arm64`,
   );
   assert.notEqual(
     manifest.artifacts.amd64.archiveSha256,
@@ -204,6 +229,25 @@ test('finalizes two exact native trial kits into one closed milestone index', (t
   assert.deepEqual(report.architectures, ['amd64', 'arm64']);
   assert.equal(report.workflowRunId, runId);
   assert.equal(report.workflowRunAttempt, runAttempt);
+  assert.equal(report.variant, 'headless');
+});
+
+test('finalizes Console trial kits as a separately named milestone', (t) => {
+  const paths = fixture(t, { variant: 'console' });
+  const manifest = finalizeLocalAlphaMilestone(finalizeOptions(paths));
+  assert.equal(manifest.variant, 'console');
+  assert.equal(
+    manifest.artifacts.amd64.artifactName,
+    `ql3-alpha-${revision}-local-console-amd64`,
+  );
+  assert.equal(
+    manifest.artifacts.arm64.artifactName,
+    `ql3-alpha-${revision}-local-console-arm64`,
+  );
+  assert.equal(
+    auditLocalAlphaMilestone({ milestoneRoot: paths.outputRoot }).variant,
+    'console',
+  );
 });
 
 test('rejects a trial kit from another run attempt before publishing', (t) => {

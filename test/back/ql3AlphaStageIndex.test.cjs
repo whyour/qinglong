@@ -78,18 +78,19 @@ function writeMilestone(directory, manifest) {
   fs.writeFileSync(path.join(directory, 'SHA256SUMS'), checksums(directory));
 }
 
-function localManifest(attempt = runAttempt) {
+function localManifest(attempt = runAttempt, variant = 'headless') {
   return {
-    schemaVersion: 1,
-    schema: 'qinglong/alpha-local-milestone@v1',
+    schemaVersion: 2,
+    schema: 'qinglong/alpha-local-milestone@v2',
     maturity: 'alpha_candidate_not_public_release',
     product: 'local',
+    variant,
     version,
     sourceRevision: revision,
     workflow: workflow('local-alpha-milestone', attempt),
     artifacts: {
       amd64: {
-        artifactName: `ql3-alpha-${revision}-local-amd64`,
+        artifactName: `ql3-alpha-${revision}-local-${variant}-amd64`,
         architecture: 'amd64',
         bundleManifest: {
           file: 'manifest.json',
@@ -102,7 +103,7 @@ function localManifest(attempt = runAttempt) {
         verificationSha256: digest('5'),
       },
       arm64: {
-        artifactName: `ql3-alpha-${revision}-local-arm64`,
+        artifactName: `ql3-alpha-${revision}-local-${variant}-arm64`,
         architecture: 'arm64',
         bundleManifest: {
           file: 'manifest.json',
@@ -163,7 +164,10 @@ function fixture(t, options = {}) {
   t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
   const localMilestoneRoot = path.join(fixtureRoot, 'local');
   const clusterMilestoneRoot = path.join(fixtureRoot, 'cluster');
-  writeMilestone(localMilestoneRoot, localManifest(options.localAttempt));
+  writeMilestone(
+    localMilestoneRoot,
+    localManifest(options.localAttempt, options.variant || 'headless'),
+  );
   writeMilestone(clusterMilestoneRoot, clusterManifest(options.clusterAttempt));
   const readme = path.join(fixtureRoot, 'README-source.md');
   fs.writeFileSync(readme, '# QingLong 3.0 Alpha stage index\n');
@@ -196,11 +200,11 @@ function finalizeOptions(paths) {
 test('closes Local and Cluster milestones into one deployment-facing stage index', (t) => {
   const paths = fixture(t);
   const manifest = finalizeAlphaStageIndex(finalizeOptions(paths));
-  assert.equal(manifest.schema, 'qinglong/alpha-stage-index@v1');
+  assert.equal(manifest.schema, 'qinglong/alpha-stage-index@v2');
   assert.deepEqual(Object.keys(manifest.milestones), ['local', 'cluster']);
   assert.deepEqual(
     manifest.deploymentSelections.local.architectures.amd64.requiredArtifacts,
-    [`ql3-alpha-${revision}-local-amd64`],
+    [`ql3-alpha-${revision}-local-headless-amd64`],
   );
   assert.deepEqual(
     manifest.deploymentSelections.cluster.architectures.arm64.requiredArtifacts,
@@ -222,6 +226,34 @@ test('closes Local and Cluster milestones into one deployment-facing stage index
   assert.equal(report.compatible, true);
   assert.equal(report.artifactCount, 10);
   assert.deepEqual(report.profiles, ['edge', 'standalone', 'cluster']);
+});
+
+test('indexes the Console milestone as a distinct loopback deployment selection', (t) => {
+  const paths = fixture(t, { variant: 'console' });
+  const manifest = finalizeAlphaStageIndex(finalizeOptions(paths));
+  assert.equal(
+    manifest.milestones.local.artifactName,
+    `ql3-alpha-${revision}-local-console-milestone`,
+  );
+  assert.equal(manifest.deploymentSelections.local.variant, 'console');
+  assert.deepEqual(manifest.deploymentSelections.local.profiles, [
+    'edge-application-api',
+    'standalone-application-api',
+  ]);
+  assert.equal(
+    manifest.deploymentSelections.local.intent,
+    'fresh_loopback_console_non_production_trial',
+  );
+  const report = auditAlphaStageIndex({
+    stageRoot: paths.outputRoot,
+    localMilestoneRoot: paths.localMilestoneRoot,
+    clusterMilestoneRoot: paths.clusterMilestoneRoot,
+  });
+  assert.deepEqual(report.profiles, [
+    'edge-application-api',
+    'standalone-application-api',
+    'cluster',
+  ]);
 });
 
 test('rejects Local and Cluster milestones from different workflow attempts', (t) => {

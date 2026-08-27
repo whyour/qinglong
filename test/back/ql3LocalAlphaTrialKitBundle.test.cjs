@@ -27,6 +27,7 @@ const revision = 'a'.repeat(40);
 function imageInspection(
   role,
   idCharacter = role === 'application' ? '1' : '2',
+  variant = 'headless',
 ) {
   return {
     Id: `sha256:${idCharacter.repeat(64)}`,
@@ -37,15 +38,23 @@ function imageInspection(
       Labels: {
         'org.opencontainers.image.title':
           role === 'application'
-            ? 'QingLong 3.0 Local Application'
+            ? variant === 'console'
+              ? 'QingLong 3.0 Local Console Application'
+              : 'QingLong 3.0 Local Application'
             : 'QingLong 3.0 Local Operator',
         'org.opencontainers.image.source': 'https://github.com/whyour/qinglong',
         'org.opencontainers.image.revision': revision,
         'org.opencontainers.image.version': version,
         ...(role === 'application'
           ? {
-              'io.qinglong.profile': 'edge,standalone',
+              'io.qinglong.profile':
+                variant === 'console'
+                  ? 'edge-application-api,standalone-application-api'
+                  : 'edge,standalone',
               'io.qinglong.ai': 'excluded',
+              ...(variant === 'console'
+                ? { 'io.qinglong.local.console': 'offline-loopback' }
+                : {}),
             }
           : {
               'io.qinglong.lifecycle': 'short-lived',
@@ -57,7 +66,7 @@ function imageInspection(
   };
 }
 
-function fixture(t) {
+function fixture(t, variant = 'headless') {
   const fixtureRoot = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-local-alpha-bundle-')),
   );
@@ -71,7 +80,12 @@ function fixture(t) {
   const readme = path.join(fixtureRoot, 'README-source.md');
   fs.writeFileSync(
     applicationSbom,
-    `${JSON.stringify(createClusterImageSbom({ root, image: 'local' }))}\n`,
+    `${JSON.stringify(
+      createClusterImageSbom({
+        root,
+        image: variant === 'console' ? 'local-console' : 'local',
+      }),
+    )}\n`,
   );
   fs.writeFileSync(
     operatorSbom,
@@ -89,8 +103,8 @@ function fixture(t) {
     outputRoot: path.join(fixtureRoot, 'bundle'),
   };
   createLocalAlphaTrialKitVerificationEvidence(
-    verificationOptions(paths),
-    adapters(),
+    verificationOptions(paths, { variant }),
+    adapters({}, variant),
   );
   return paths;
 }
@@ -100,6 +114,7 @@ function verificationOptions(paths, overrides = {}) {
     root,
     output: paths.verificationEvidence,
     architecture: 'arm64',
+    variant: 'headless',
     sourceRevision: revision,
     applicationImage: 'qinglong3-local-application:test-arm64',
     operatorImage: 'qinglong3-local-operator:test-arm64',
@@ -114,11 +129,12 @@ function verificationOptions(paths, overrides = {}) {
   };
 }
 
-function createOptions(paths) {
+function createOptions(paths, variant = 'headless') {
   return {
     root,
     outputRoot: paths.outputRoot,
     architecture: 'arm64',
+    variant,
     sourceRevision: revision,
     applicationImage: 'qinglong3-local-application:test-arm64',
     operatorImage: 'qinglong3-local-operator:test-arm64',
@@ -129,12 +145,12 @@ function createOptions(paths) {
   };
 }
 
-function adapters(overrides = {}) {
+function adapters(overrides = {}, variant = 'headless') {
   return {
     inspectImage(image) {
       return image.includes('operator')
-        ? imageInspection('operator')
-        : imageInspection('application');
+        ? imageInspection('operator', '2', variant)
+        : imageInspection('application', '1', variant);
     },
     saveImages(images, archivePath) {
       assert.deepEqual(images, [
@@ -150,7 +166,8 @@ function adapters(overrides = {}) {
 test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const paths = fixture(t);
   const manifest = createLocalAlphaTrialKit(createOptions(paths), adapters());
-  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v3');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v4');
+  assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.equal(manifest.architecture, 'arm64');
   assert.equal(manifest.images.application.architecture, 'arm64');
@@ -164,13 +181,14 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const quickstartContents = fs.readFileSync(quickstart, 'utf8');
   assert.match(
     quickstartContents,
-    /QingLong 3\.0 Local Alpha is active \(\$profile, \$ARCHITECTURE\)/,
+    /QingLong 3\.0 Local Alpha is active \(\$VARIANT, \$profile, \$ARCHITECTURE\)/,
   );
   assert.match(quickstartContents, /qinglong3-local-application:test-arm64/);
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);
   assert.equal(report.workflowRunId, '32990652047');
+  assert.equal(report.variant, 'headless');
   assert.deepEqual(fs.readdirSync(paths.outputRoot).sort(), [
     'README.md',
     'SHA256SUMS',
@@ -178,6 +196,57 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     'qinglong3-local-application.cdx.json',
     'qinglong3-local-operator.cdx.json',
     'qinglong3-local-trial-kit-arm64.docker.tar',
+    'quickstart.sh',
+    'verification-evidence.json',
+  ]);
+});
+
+test('materializes a distinct loopback Console trial kit without widening the headless archive', (t) => {
+  const paths = fixture(t, 'console');
+  const manifest = createLocalAlphaTrialKit(
+    createOptions(paths, 'console'),
+    adapters({}, 'console'),
+  );
+  assert.equal(manifest.variant, 'console');
+  const applicationSbom = JSON.parse(
+    fs.readFileSync(
+      path.join(paths.outputRoot, 'qinglong3-local-application.cdx.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(
+    applicationSbom.metadata.properties.find(
+      (property) => property.name === 'qinglong:image-profile',
+    ).value,
+    'local-console',
+  );
+  const verification = JSON.parse(
+    fs.readFileSync(
+      path.join(paths.outputRoot, 'verification-evidence.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(verification.gates.consoleLiveJourney, 'passed');
+  const quickstartContents = fs.readFileSync(
+    path.join(paths.outputRoot, 'quickstart.sh'),
+    'utf8',
+  );
+  assert.match(quickstartContents, /VARIANT='console'/);
+  assert.match(quickstartContents, /network_mode=host/);
+  assert.match(quickstartContents, /application_config=local-api\.json/);
+  assert.match(quickstartContents, /"host":"127\.0\.0\.1","port":5700/);
+  assert.match(quickstartContents, /Console: http:\/\/127\.0\.0\.1:5700\//);
+  assert.match(quickstartContents, /do not expose the port on LAN/);
+  const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
+  assert.equal(report.compatible, true);
+  assert.equal(report.variant, 'console');
+  assert.deepEqual(fs.readdirSync(paths.outputRoot).sort(), [
+    'README.md',
+    'SHA256SUMS',
+    'manifest.json',
+    'qinglong3-local-application.cdx.json',
+    'qinglong3-local-console-trial-kit-arm64.docker.tar',
+    'qinglong3-local-operator.cdx.json',
     'quickstart.sh',
     'verification-evidence.json',
   ]);
@@ -352,7 +421,7 @@ exit 1
   );
   assert.match(
     run.stdout,
-    /QingLong 3\.0 Local Alpha is active \(edge, arm64\)/,
+    /QingLong 3\.0 Local Alpha is active \(headless, edge, arm64\)/,
   );
   assert.equal(
     fs.readFileSync(path.join(dataRoot, 'container.id'), 'utf8'),
@@ -439,6 +508,7 @@ test('CLI grammar is exact and separates create from offline audit', () => {
     '--application-image=qinglong3-local-application:test-arm64',
     '--operator-image=qinglong3-local-operator:test-arm64',
     '--architecture=arm64',
+    '--variant=headless',
     `--source-revision=${revision}`,
     '--repository=whyour/qinglong',
     '--workflow-ref=whyour/qinglong/.github/workflows/ql3-ci.yml@refs/heads/next',
