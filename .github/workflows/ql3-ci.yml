@@ -631,6 +631,16 @@ jobs:
             --output="${RUNNER_TEMP}/ql3-alpha-local-${{ matrix.image_arch }}"
           node scripts/ql3-local-alpha-trial-kit-bundle.cjs \
             --mode=audit --bundle="${RUNNER_TEMP}/ql3-alpha-local-${{ matrix.image_arch }}"
+          QUICKSTART_CONTAINER="ql3-alpha-quickstart-${{ matrix.image_arch }}"
+          QUICKSTART_ROOT="${RUNNER_TEMP}/ql3-alpha-quickstart-${{ matrix.image_arch }}"
+          trap 'docker rm --force "${QUICKSTART_CONTAINER}" >/dev/null 2>&1 || true' EXIT
+          sh "${RUNNER_TEMP}/ql3-alpha-local-${{ matrix.image_arch }}/quickstart.sh" \
+            edge "${QUICKSTART_ROOT}" "${QUICKSTART_CONTAINER}"
+          docker stop --time 30 "${QUICKSTART_CONTAINER}"
+          docker rm "${QUICKSTART_CONTAINER}"
+          test -s "${QUICKSTART_ROOT}/qinglong3.sqlite"
+          test -s "${QUICKSTART_ROOT}/owner-delivery/credential-019f8680-143d-4000-8000-000000000021.ready.json"
+          trap - EXIT
       - name: Upload the tested native Local Alpha trial kit
         if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'local' || inputs.alpha_artifact_scope == 'all')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -514,6 +514,7 @@
 | [ADR-0508](./ADR-0508-cross-architecture-local-alpha-milestone-closure.md)                          | 跨架构 Local Alpha 里程碑闭合                                                                                                                                                                                            | Accepted（首份实际 milestone artifact 待维护者授权） |
 | [ADR-0509](./ADR-0509-cluster-alpha-bundle-and-milestone-closure.md)                                | Cluster Alpha Bundle 与跨架构里程碑闭合                                                                                                                                                                                   | Accepted（首份实际 Cluster milestone artifact 待维护者授权） |
 | [ADR-0510](./ADR-0510-cross-profile-alpha-stage-delivery-index.md)                                  | 跨 Profile Alpha 阶段交付索引                                                                                                                                                                                              | Accepted（首份实际 stage index 待维护者授权） |
+| [ADR-0511](./ADR-0511-runnable-local-alpha-quickstart.md)                                           | 可直接试运行的 Local Alpha Quickstart                                                                                                                                                                                       | Accepted（首份实际 v3 Trial Kit 待维护者授权） |
 
 ## 规则
 

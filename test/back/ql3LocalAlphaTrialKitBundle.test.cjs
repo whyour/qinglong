@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -10,6 +11,7 @@ const {
   createLocalAlphaTrialKit,
   createLocalAlphaTrialKitVerificationEvidence,
   parseArguments,
+  sha256File,
 } = require('../../scripts/ql3-local-alpha-trial-kit-bundle.cjs');
 const {
   createClusterImageSbom,
@@ -148,13 +150,23 @@ function adapters(overrides = {}) {
 test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const paths = fixture(t);
   const manifest = createLocalAlphaTrialKit(createOptions(paths), adapters());
-  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v2');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v3');
   assert.equal(manifest.sourceRevision, revision);
   assert.equal(manifest.architecture, 'arm64');
   assert.equal(manifest.images.application.architecture, 'arm64');
   assert.equal(manifest.images.operator.architecture, 'arm64');
   assert.notEqual(manifest.images.application.id, manifest.images.operator.id);
   assert.equal(manifest.verification.file, 'verification-evidence.json');
+  assert.equal(manifest.quickstart.file, 'quickstart.sh');
+  const quickstart = path.join(paths.outputRoot, 'quickstart.sh');
+  const syntax = spawnSync('sh', ['-n', quickstart], { encoding: 'utf8' });
+  assert.equal(syntax.status, 0, syntax.stderr);
+  const quickstartContents = fs.readFileSync(quickstart, 'utf8');
+  assert.match(
+    quickstartContents,
+    /QingLong 3\.0 Local Alpha is active \(\$profile, \$ARCHITECTURE\)/,
+  );
+  assert.match(quickstartContents, /qinglong3-local-application:test-arm64/);
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);
@@ -166,6 +178,7 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     'qinglong3-local-application.cdx.json',
     'qinglong3-local-operator.cdx.json',
     'qinglong3-local-trial-kit-arm64.docker.tar',
+    'quickstart.sh',
     'verification-evidence.json',
   ]);
 });
@@ -194,7 +207,13 @@ test('fails closed and removes a partial output on incompatible image identity',
 });
 
 test('offline audit rejects archive, file-set, SBOM and verification mutation', (t) => {
-  for (const mutation of ['archive', 'extra', 'sbom', 'verification']) {
+  for (const mutation of [
+    'archive',
+    'extra',
+    'quickstart',
+    'sbom',
+    'verification',
+  ]) {
     const paths = fixture(t);
     paths.outputRoot = path.join(paths.fixtureRoot, `bundle-${mutation}`);
     createLocalAlphaTrialKit(createOptions(paths), adapters());
@@ -208,6 +227,11 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
       );
     } else if (mutation === 'extra') {
       fs.writeFileSync(path.join(paths.outputRoot, 'credential.txt'), 'secret');
+    } else if (mutation === 'quickstart') {
+      fs.appendFileSync(
+        path.join(paths.outputRoot, 'quickstart.sh'),
+        '# drift\n',
+      );
     } else if (mutation === 'sbom') {
       fs.copyFileSync(
         path.join(paths.outputRoot, 'qinglong3-local-application.cdx.json'),
@@ -225,6 +249,143 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
       mutation,
     );
   }
+});
+
+test('offline audit rejects a rehashed non-canonical quickstart', (t) => {
+  const paths = fixture(t);
+  createLocalAlphaTrialKit(createOptions(paths), adapters());
+  const quickstart = path.join(paths.outputRoot, 'quickstart.sh');
+  fs.appendFileSync(quickstart, '# locally rewritten\n');
+  const manifestPath = path.join(paths.outputRoot, 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.quickstart = {
+    file: 'quickstart.sh',
+    sha256: sha256File(quickstart),
+    bytes: fs.statSync(quickstart).size,
+  };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  const checkedFiles = [
+    'qinglong3-local-trial-kit-arm64.docker.tar',
+    'qinglong3-local-application.cdx.json',
+    'qinglong3-local-operator.cdx.json',
+    'verification-evidence.json',
+    'quickstart.sh',
+    'README.md',
+    'manifest.json',
+  ];
+  fs.writeFileSync(
+    path.join(paths.outputRoot, 'SHA256SUMS'),
+    `${checkedFiles
+      .map(
+        (name) =>
+          `${sha256File(path.join(paths.outputRoot, name)).slice(7)}  ${name}`,
+      )
+      .join('\n')}\n`,
+  );
+  assert.throws(
+    () => auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot }),
+    /quickstart differs from the canonical deployment journey/,
+  );
+});
+
+test('generated quickstart drives the closed fresh Edge journey', (t) => {
+  const paths = fixture(t);
+  createLocalAlphaTrialKit(createOptions(paths), adapters());
+  const fakeBin = path.join(paths.fixtureRoot, 'fake-bin');
+  fs.mkdirSync(fakeBin);
+  const dockerLog = path.join(paths.fixtureRoot, 'docker.log');
+  const fakeDocker = path.join(fakeBin, 'docker');
+  fs.writeFileSync(
+    fakeDocker,
+    `#!/bin/sh
+printf '%s\\n' "$*" >>"$FAKE_DOCKER_LOG"
+case "$1:$2" in
+  info:|load:*) exit 0 ;;
+  image:inspect)
+    case "$*" in
+      *local-application*) printf '%s\\n' 'sha256:${'1'.repeat(
+        64,
+      )}|arm64|65532:65532|${revision}' ;;
+      *local-operator*) printf '%s\\n' 'sha256:${'2'.repeat(
+        64,
+      )}|arm64|65532:65532|${revision}|short-lived|none-by-default' ;;
+      *) exit 1 ;;
+    esac
+    exit 0
+    ;;
+  logs:*) printf '%s\\n' '{"event":"active"}'; exit 0 ;;
+  inspect:*) printf '%s\\n' 'true'; exit 0 ;;
+esac
+case " $* " in
+  *' --detach '*) printf '%s\\n' 'fake-container-id'; exit 0 ;;
+  *'/setup.json'*) printf '%s\\n' '{"status":"prepared"}'; exit 0 ;;
+  *'/owner-provision.json'*) printf '%s\\n' '{"status":"inserted"}'; exit 0 ;;
+  *'/owner-challenge.json'*) printf '%s\\n' '{"status":"inserted"}'; exit 0 ;;
+  *'/owner-claim.json'*) printf '%s\\n' '{"status":"inserted","role":"owner"}'; exit 0 ;;
+esac
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  const dataRoot = path.join(paths.fixtureRoot, 'quickstart-data');
+  const run = spawnSync(
+    'sh',
+    [
+      path.join(paths.outputRoot, 'quickstart.sh'),
+      'edge',
+      dataRoot,
+      'ql3-alpha-test',
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        FAKE_DOCKER_LOG: dockerLog,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+      },
+    },
+  );
+  assert.equal(
+    run.status,
+    0,
+    `${run.stderr}\n${run.stdout}\n${fs.readFileSync(dockerLog, 'utf8')}`,
+  );
+  assert.match(
+    run.stdout,
+    /QingLong 3\.0 Local Alpha is active \(edge, arm64\)/,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(dataRoot, 'container.id'), 'utf8'),
+    'fake-container-id\n',
+  );
+  assert.equal(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(dataRoot, 'results', 'owner-claim.json.result.json'),
+        'utf8',
+      ),
+    ).role,
+    'owner',
+  );
+  const calls = fs.readFileSync(dockerLog, 'utf8');
+  assert.match(
+    calls,
+    /load --input .*qinglong3-local-trial-kit-arm64\.docker\.tar/,
+  );
+  assert.match(calls, /--memory 128m --memory-swap 128m/);
+  assert.match(calls, /--pids-limit 64/);
+  assert.doesNotMatch(calls, /--network (?!none)/);
+});
+
+test('create rejects an image reference that could alter the shell journey', (t) => {
+  const paths = fixture(t);
+  const options = createOptions(paths);
+  options.applicationImage = 'qinglong3-local-application:test;unexpected';
+  assert.throws(
+    () => createLocalAlphaTrialKit(options, adapters()),
+    /application image reference is invalid/,
+  );
+  assert.equal(fs.existsSync(paths.outputRoot), false);
 });
 
 test('create rejects verification detached from the reviewed workflow', (t) => {

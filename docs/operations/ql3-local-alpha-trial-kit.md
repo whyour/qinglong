@@ -23,7 +23,7 @@ sha256sum --check SHA256SUMS
 
 `manifest.json` 必须满足：
 
-- `schema` 为 `qinglong/alpha-local-trial-kit@v2`；
+- `schema` 为 `qinglong/alpha-local-trial-kit@v3`；
 - `sourceRevision` 是你准备试用的完整 40 位 commit；
 - `architecture` 与主机相同；
 - `maturity` 为 `alpha_candidate_not_public_release`。
@@ -40,7 +40,37 @@ node scripts/ql3-local-alpha-trial-kit-bundle.cjs \
 
 任一校验失败都不要加载或运行 archive。
 
-## 加载与最小 smoke
+## 一条命令完成 Fresh 试运行
+
+v3 bundle 内的 `quickstart.sh` 不依赖宿主 Node.js、jq 或 Compose，只需要 POSIX
+shell、`sha256sum` 和已启动的 Docker。必须选择一个尚不存在、与 2.x/生产数据完全
+隔离的绝对路径：
+
+```sh
+sh quickstart.sh edge /opt/qinglong3-alpha-data
+```
+
+资源较充足的单节点可以把 `edge` 改为 `standalone`。第三个可选参数用于指定容器名：
+
+```sh
+sh quickstart.sh standalone /srv/qinglong3-alpha-data ql3-alpha-standalone
+```
+
+脚本会自动执行全包 checksum、加载 archive、核对 exact image ID/source/architecture、
+以当前 UID:GID 和无网络的短生命周期 operator 完成 fresh setup 与首 Owner 建立，随后按
+Profile 资源上限启动 Application。只有容器日志出现结构化 `active` 事件才返回成功。
+Owner delivery 保留在新数据目录的 `owner-delivery/`，operator command 结果保留在
+`results/`；两者都位于 `0700` 私有根内，不会打印 Secret 到终端。
+
+成功输出会给出当前容器的 logs、graceful stop 和 remove 命令。停止/删除容器不会自动
+删除数据目录；确认不再需要诊断后由操作者显式删除该 fresh 测试目录。脚本拒绝既有目录，
+不能用于升级、迁移或接管 2.x。
+
+当前 Application 是无外部 listener、AI-excluded 的 headless Alpha runtime。该试运行可
+验证 3.0 SQLite、Owner authority、调度/插件基础与生命周期，但还不是 2.x Web UI 的
+可替代版本。
+
+## 手工加载与最小 smoke
 
 从 `manifest.json.archive.file` 找到 archive 后加载：
 
@@ -66,7 +96,7 @@ docker run --rm --read-only --network none --cap-drop ALL \
 
 ## Fresh 试运行边界
 
-完整 fresh setup、首 Owner ceremony、Application active、SIGTERM drain、SQLite integrity 和原生 cancellation 必须在 `verification-evidence.json` 指向的同架构 milestone job 中验证。实际部署时仍必须使用独立目录，并让 operator 以最终数据文件 POSIX owner 的 UID/GID 运行；operator 默认无网络且每次只执行一个命令后退出，不应作为 sidecar 或 daemon 常驻。
+完整 fresh setup、首 Owner ceremony、Application active、SIGTERM drain、SQLite integrity 和原生 cancellation 必须在 `verification-evidence.json` 指向的同架构 milestone job 中验证。v3 artifact job 还必须从将要上传的目录实际执行 `quickstart.sh` 并完成 graceful stop。实际部署时仍必须使用独立目录，并让 operator 以最终数据文件 POSIX owner 的 UID/GID 运行；operator 默认无网络且每次只执行一个命令后退出，不应作为 sidecar 或 daemon 常驻。
 
 Edge 的验证上限为 Application 128 MiB、0.5 CPU、64 PID；Standalone 为 256 MiB、0.5 CPU、256 PID；operator 为 128 MiB、0.5 CPU、32 PID。这里的数值是试运行门，不是所有 workload 的容量承诺。
 

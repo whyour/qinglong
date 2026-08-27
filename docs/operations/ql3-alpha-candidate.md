@@ -7,7 +7,7 @@
 | 等级 | 面向对象 | 必须通过 | 当前用途 |
 | --- | --- | --- | --- |
 | Runtime Engineering Candidate | QingLong 开发者、设备兼容测试者 | 单个常驻镜像的 OS 漏洞策略、SBOM/库存、资源门和生命周期 | 验证 runtime 可加载、可启动；缺少管理制品时不能称用户 Alpha |
-| Local Alpha Trial Kit | amd64/arm64 路由器、NAS、单机试用者 | 同源 Application + 短生命周期 operator、fresh setup/Owner/active/stop 完整旅程、SBOM/库存与资源门 | 一个去重 Docker archive 完成隔离 fresh 试运行；不承诺生产升级 |
+| Local Alpha Trial Kit | amd64/arm64 路由器、NAS、单机试用者 | 同源 Application + 短生命周期 operator、exact quickstart、fresh setup/Owner/active/stop 完整旅程、SBOM/库存与资源门 | POSIX shell 一条命令从去重 Docker archive 完成隔离 fresh 试运行；不承诺生产升级 |
 | Cluster Integration Candidate | amd64/arm64 集群测试节点 | OS 漏洞策略、SBOM 与镜像库存复核、non-root identity；Admin 额外通过产品 facade smoke | 导入隔离 registry/测试节点，进行多组件集成；不作为 production HA release |
 | Public Release Set | 生产用户 | 受保护 tag、六镜像 multi-arch digest（Local Application/operator + Cluster 四角色）、签名/attestation、私有发布证据、catalog、Local/Cluster 部署与回退闭环 | 尚未实际发布；只能由受保护 release workflow 生成 |
 
@@ -26,7 +26,7 @@
 
 该本地 archive 不是新的 v2 Local Alpha Trial Kit。它在 ADR-0506 前生成，manifest v1 会无条件写入 `passed`，且 macOS Docker Desktop 因 bind-mount UID 映射无法对 exact 本地 archive 完成 Owner pepper 旅程；原生 CI 证明同源码实现，不自动证明另一个 archive 的 exact image bytes。它因此保留为工程候选，不冒充已获 workflow evidence 的用户 Alpha。
 
-ADR-0506 现要求 `qinglong/alpha-local-trial-kit@v2` 额外包含 `verification-evidence.json`，绑定显式 `workflow_dispatch` 的 source、workflow SHA/ref、run/attempt、架构和两个 image ID。旧 `e3c05862` runtime-only archive、`2620be05` v1 Trial Kit 与 `4239464a` v1 archive 均为历史工程证据，不能通过 v2 auditor。下一项外部里程碑仍是维护者授权 `produce_alpha_artifacts=true`，由同一次原生 milestone job 生成 exact-image evidence 和双架构可下载 archive。
+ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加了 source-bound `verification-evidence.json`；ADR-0511 进一步把当前格式升级为 `@v3`，新增不依赖宿主 Node.js 的 canonical `quickstart.sh`，把可验证镜像闭合为可执行的 fresh 用户旅程。旧 `e3c05862` runtime-only archive、`2620be05` v1 Trial Kit、`4239464a` v1 archive 与未携带 quickstart 的 v2 均为历史工程证据，不能通过 v3 auditor。下一项外部里程碑仍是维护者授权 `produce_alpha_artifacts=true`，由同一次原生 milestone job 生成并实际执行 exact-image 双架构可下载 archive。
 
 ## 生成
 
@@ -43,7 +43,8 @@ ADR-0506 现要求 `qinglong/alpha-local-trial-kit@v2` 额外包含 `verificatio
 Local artifact 含：
 
 - 一个包含 Application 与短生命周期 operator 的 `qinglong3-local-trial-kit-<arch>.docker.tar`；共享 Node 基础层在 archive 中去重；
-- schema 为 `qinglong/alpha-local-trial-kit@v2` 的 `manifest.json`，通过 `archive/images/sboms/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
+- schema 为 `qinglong/alpha-local-trial-kit@v3` 的 `manifest.json`，通过 `archive/images/sboms/quickstart/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
+- canonical `quickstart.sh`，在目标 Linux 设备上只依赖 POSIX shell、`sha256sum` 和 Docker，完成 checksum、load、identity、fresh Owner 与 Profile-bound Application active；
 - `verification-evidence.json` 绑定 `workflow_dispatch` 的 workflow ref/SHA、run ID/attempt、同架构两个 exact image ID 和完整 gate 集；下载者仍须到 GitHub 交叉检查 run，它不替代正式签名；
 - 与实际只读镜像 inventory 对账过的 CycloneDX SBOM；
 - 面向 Local 用户的 README 与覆盖全部内容文件的 `SHA256SUMS`。
@@ -54,7 +55,21 @@ Stage index 是 `qinglong/alpha-stage-index@v1` 三文件闭包。它重新审�
 
 任何 required job 失败时不上传对应产物。artifact 名和 archive 内的 `ci-*` tag 都表示 commit-bound candidate，不能改名后冒充 `v3.x` release。
 
-## 下载后验证与最小 smoke
+## 下载后直接试运行
+
+在同架构原生 Linux Docker 主机上进入解压后的 Local artifact 目录，使用一个尚不存在的
+隔离目录：
+
+```sh
+sh quickstart.sh edge /opt/qinglong3-alpha-data
+```
+
+也可以选择 `standalone` 和自定义容器名。quickstart 会先执行 `SHA256SUMS`，再核对 exact
+镜像身份并完成 fresh setup、首 Owner 与 Application active；成功后输出 logs、stop 和
+remove 命令。当前是无外部 listener、AI-excluded 的 headless runtime 阶段成果，不是
+2.x Web UI 的替代品。
+
+## 手工验证与最小 smoke
 
 在同架构 Linux Docker 主机上进入解压后的 artifact 目录：
 

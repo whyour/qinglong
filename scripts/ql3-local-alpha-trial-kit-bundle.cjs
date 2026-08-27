@@ -10,18 +10,24 @@ const { auditClusterImageSbom } = require('./ql3-cluster-image-sbom.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-trial-kit@v2';
+const SCHEMA = 'qinglong/alpha-local-trial-kit@v3';
 const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v1';
+const QUICKSTART_TEMPLATE = path.join(
+  DEFAULT_ROOT,
+  'scripts/templates/ql3-local-alpha-quickstart.sh',
+);
 const ARCHITECTURES = Object.freeze(['amd64', 'arm64']);
 const ARCHIVE_MIN_BYTES = 1024;
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const MAX_README_BYTES = 512 * 1024;
+const MAX_QUICKSTART_BYTES = 256 * 1024;
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const REVISION_PATTERN = /^[0-9a-f]{40}$/u;
 const FILES = Object.freeze({
   applicationSbom: 'qinglong3-local-application.cdx.json',
   operatorSbom: 'qinglong3-local-operator.cdx.json',
   verificationEvidence: 'verification-evidence.json',
+  quickstart: 'quickstart.sh',
   readme: 'README.md',
   manifest: 'manifest.json',
   checksums: 'SHA256SUMS',
@@ -148,9 +154,7 @@ function saveDockerImages(images, archivePath) {
 function validateImageReference(value, label) {
   if (
     typeof value !== 'string' ||
-    value.length < 3 ||
-    value.length > 256 ||
-    /[\s\0]/u.test(value)
+    !/^[A-Za-z0-9][A-Za-z0-9._:/@-]{2,255}$/u.test(value)
   ) {
     fail(`${label} image reference is invalid`);
   }
@@ -383,6 +387,34 @@ function archiveName(architecture) {
   return `qinglong3-local-trial-kit-${architecture}.docker.tar`;
 }
 
+function renderQuickstart(identity) {
+  const template = fs.readFileSync(
+    assertCanonicalFile(
+      QUICKSTART_TEMPLATE,
+      MAX_QUICKSTART_BYTES,
+      'quickstart template',
+    ),
+    'utf8',
+  );
+  const replacements = Object.freeze({
+    '@@APPLICATION_IMAGE@@': identity.images.application.reference,
+    '@@APPLICATION_ID@@': identity.images.application.id,
+    '@@OPERATOR_IMAGE@@': identity.images.operator.reference,
+    '@@OPERATOR_ID@@': identity.images.operator.id,
+    '@@ARCHITECTURE@@': identity.architecture,
+    '@@SOURCE_REVISION@@': identity.sourceRevision,
+    '@@ARCHIVE@@': identity.archive.file,
+  });
+  let rendered = template;
+  for (const [token, value] of Object.entries(replacements)) {
+    rendered = rendered.replaceAll(token, value);
+  }
+  if (/@@[A-Z_]+@@/u.test(rendered)) {
+    fail('quickstart template contains an unresolved token');
+  }
+  return rendered;
+}
+
 function fileRecord(bundleRoot, name) {
   const filePath = path.join(bundleRoot, name);
   const stat = fs.lstatSync(filePath);
@@ -541,8 +573,19 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       normalized.readme,
       path.join(normalized.outputRoot, FILES.readme),
     );
+    const manifestIdentity = {
+      sourceRevision: normalized.sourceRevision,
+      architecture: normalized.architecture,
+      archive: { file: archive },
+      images: { application, operator },
+    };
+    writeExclusive(
+      path.join(normalized.outputRoot, FILES.quickstart),
+      renderQuickstart(manifestIdentity),
+      0o700,
+    );
     const manifest = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',
@@ -555,6 +598,7 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
         application: fileRecord(normalized.outputRoot, FILES.applicationSbom),
         operator: fileRecord(normalized.outputRoot, FILES.operatorSbom),
       },
+      quickstart: fileRecord(normalized.outputRoot, FILES.quickstart),
       readme: fileRecord(normalized.outputRoot, FILES.readme),
       verification: fileRecord(
         normalized.outputRoot,
@@ -570,6 +614,7 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       FILES.applicationSbom,
       FILES.operatorSbom,
       FILES.verificationEvidence,
+      FILES.quickstart,
       FILES.readme,
       FILES.manifest,
     ];
@@ -637,10 +682,11 @@ function auditLocalAlphaTrialKit(options) {
       'archive',
       'images',
       'sboms',
+      'quickstart',
       'readme',
       'verification',
     ]) ||
-    manifest.schemaVersion !== 3 ||
+    manifest.schemaVersion !== 4 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
@@ -673,6 +719,19 @@ function auditLocalAlphaTrialKit(options) {
     FILES.verificationEvidence,
     bundleRoot,
   );
+  validateFileRecord(manifest.quickstart, FILES.quickstart, bundleRoot);
+  const expectedQuickstart = renderQuickstart(manifest);
+  const actualQuickstart = fs.readFileSync(
+    assertCanonicalFile(
+      path.join(bundleRoot, FILES.quickstart),
+      MAX_QUICKSTART_BYTES,
+      'quickstart',
+    ),
+    'utf8',
+  );
+  if (actualQuickstart !== expectedQuickstart) {
+    fail('quickstart differs from the canonical deployment journey');
+  }
   validateFileRecord(manifest.readme, FILES.readme, bundleRoot);
   validateOfflineSbom(
     readBoundedJson(
@@ -707,6 +766,7 @@ function auditLocalAlphaTrialKit(options) {
     FILES.applicationSbom,
     FILES.operatorSbom,
     FILES.verificationEvidence,
+    FILES.quickstart,
     expectedArchive,
   ].sort();
   const actualFiles = fs
@@ -726,6 +786,7 @@ function auditLocalAlphaTrialKit(options) {
     FILES.applicationSbom,
     FILES.operatorSbom,
     FILES.verificationEvidence,
+    FILES.quickstart,
     FILES.readme,
     FILES.manifest,
   ];
@@ -746,6 +807,7 @@ function auditLocalAlphaTrialKit(options) {
     archiveSha256: manifest.archive.sha256,
     applicationImageId: manifest.images.application.id,
     operatorImageId: manifest.images.operator.id,
+    quickstartSha256: manifest.quickstart.sha256,
     verificationSha256: manifest.verification.sha256,
     workflowRunId: verificationEvidence.workflow.runId,
     workflowRunAttempt: verificationEvidence.workflow.runAttempt,

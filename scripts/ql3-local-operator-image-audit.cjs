@@ -199,6 +199,9 @@ function auditWorkflow(contents, findings) {
     '--mode=record-verification',
     '--mode=create',
     '--mode=audit',
+    '/quickstart.sh" \\\n            edge "${QUICKSTART_ROOT}" "${QUICKSTART_CONTAINER}"',
+    'docker stop --time 30 "${QUICKSTART_CONTAINER}"',
+    'test -s "${QUICKSTART_ROOT}/qinglong3.sqlite"',
     '--application-sbom="${RUNNER_TEMP}/ql3-local-application.cdx.json"',
     '--operator-sbom="${RUNNER_TEMP}/ql3-local-operator.cdx.json"',
     '--verification-evidence="${RUNNER_TEMP}/ql3-local-alpha-verification-${{ matrix.image_arch }}.json"',
@@ -222,6 +225,7 @@ function auditWorkflow(contents, findings) {
     '--mode=record-verification',
     '--mode=create',
     '--mode=audit',
+    '/quickstart.sh"',
     'name: Upload the tested native Local Alpha trial kit',
   ]) {
     const index = contents.indexOf(value, cursor + 1);
