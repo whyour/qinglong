@@ -2,6 +2,8 @@
 
 本目录是绑定一个 QingLong 3.0 源码提交、一个 Linux 架构和一次显式 GitHub milestone run 的阶段试运行套件，不是公开 release 或生产升级承诺。它同时包含常驻 Application 镜像和短生命周期 operator 镜像；两者共享的 OCI layer 只在同一个 Docker archive 中保存一次。
 
+一套 Trial Kit 只有被同一 run 的 `ql3-alpha-<sourceRevision>-local-milestone` 跨架构索引收录后才是可交付阶段产物。单个矩阵 job 提前上传、另一架构或完整 CI 随后失败时留下的 artifact 只是中间文件。先按 milestone `manifest.json` 选择本机架构并核对本 bundle manifest digest，再执行下述离线验收。
+
 ## 适用范围
 
 - `amd64` 或 `arm64` Linux Docker 主机；
