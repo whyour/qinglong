@@ -386,11 +386,14 @@ jobs:
           --build-arg SOURCE_REVISION=${{ github.sha }}
           --tag "${OPERATOR_IMAGE}"
           .
-      - name: Materialize the reviewed local OS vulnerability exceptions
-        run: >-
-          node scripts/ql3-image-os-vulnerability-policy.cjs
-          --image=local
-          --output=${{ runner.temp }}/ql3-local-${{ matrix.image_arch }}.trivyignore.yaml
+      - name: Materialize the reviewed Local OS vulnerability exceptions
+        run: |
+          node scripts/ql3-image-os-vulnerability-policy.cjs \
+            --image=local \
+            --output=${{ runner.temp }}/ql3-local-${{ matrix.image_arch }}.trivyignore.yaml
+          node scripts/ql3-image-os-vulnerability-policy.cjs \
+            --image=local-operator \
+            --output=${{ runner.temp }}/ql3-local-operator-${{ matrix.image_arch }}.trivyignore.yaml
       - name: Reject unexcepted high or critical local OS vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -420,7 +423,7 @@ jobs:
           hide-progress: 'true'
           timeout: '10m0s'
           cache: 'false'
-          trivyignores: ${{ runner.temp }}/ql3-local-${{ matrix.image_arch }}.trivyignore.yaml
+          trivyignores: ${{ runner.temp }}/ql3-local-operator-${{ matrix.image_arch }}.trivyignore.yaml
       - name: Verify non-root identity and architecture
         env:
           IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
@@ -959,6 +962,9 @@ jobs:
             target: runtime
           - image: local
             dockerfile: deploy/containers/ql3-local-application/Dockerfile
+            target: runtime
+          - image: local-operator
+            dockerfile: deploy/containers/ql3-local-operator/Dockerfile
             target: runtime
           - image: worker
             dockerfile: deploy/containers/ql3-worker/Dockerfile

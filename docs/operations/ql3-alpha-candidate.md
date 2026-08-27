@@ -9,7 +9,7 @@
 | Runtime Engineering Candidate | QingLong 开发者、设备兼容测试者 | 单个常驻镜像的 OS 漏洞策略、SBOM/库存、资源门和生命周期 | 验证 runtime 可加载、可启动；缺少管理制品时不能称用户 Alpha |
 | Local Alpha Trial Kit | amd64/arm64 路由器、NAS、单机试用者 | 同源 Application + 短生命周期 operator、fresh setup/Owner/active/stop 完整旅程、SBOM/库存与资源门 | 一个去重 Docker archive 完成隔离 fresh 试运行；不承诺生产升级 |
 | Cluster Integration Candidate | amd64/arm64 集群测试节点 | OS 漏洞策略、SBOM 与镜像库存复核、non-root identity；Admin 额外通过产品 facade smoke | 导入隔离 registry/测试节点，进行多组件集成；不作为 production HA release |
-| Public Release Set | 生产用户 | 受保护 tag、五镜像 multi-arch digest、签名/attestation、私有发布证据、catalog、Local/Cluster 部署与回退闭环 | 尚未实际发布；只能由受保护 release workflow 生成 |
+| Public Release Set | 生产用户 | 受保护 tag、六镜像 multi-arch digest（Local Application/operator + Cluster 四角色）、签名/attestation、私有发布证据、catalog、Local/Cluster 部署与回退闭环 | 尚未实际发布；只能由受保护 release workflow 生成 |
 
 只有 `Local Alpha Trial Kit` 可以称为本阶段“用户可试运行产物”。单个 headless runtime 和 Cluster archive 都只是工程候选；后者还不满足正式 Kubernetes deployment-lock 的 GHCR immutable digest 与 catalog provenance。
 

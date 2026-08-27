@@ -71,6 +71,12 @@ function releaseSet(scope) {
       ...identity,
       releaseScope: scope,
       image: entry.image,
+      localRoleVerification:
+        entry.image === 'local'
+          ? 'application_rollout_verified'
+          : entry.image === 'local-operator'
+          ? 'operator_entrypoint_verified'
+          : 'not_applicable',
       digest: `sha256:${String(index + 1).repeat(64)}`,
     }),
   );

@@ -510,6 +510,7 @@
 | [ADR-0504](./ADR-0504-canonical-local-alpha-trial-kit-materialization.md)                            | Local Alpha Trial Kit 单一物化与离线审计                                                                                                                                                                            | Accepted |
 | [ADR-0505](./ADR-0505-pinned-alpine-openssl-runtime-security-patch.md)                              | 固定 Alpine OpenSSL 运行时安全补丁                                                                                                                                                                                    | Accepted |
 | [ADR-0506](./ADR-0506-source-bound-local-alpha-verification-evidence.md)                            | 源码绑定的 Local Alpha 验证证据                                                                                                                                                                                        | Accepted |
+| [ADR-0507](./ADR-0507-public-local-application-and-operator-release-pair.md)                        | Public Local Application 与 Operator 发布对                                                                                                                                                                            | Accepted（首份真实公开发布待受保护 tag） |
 
 ## 规则
 

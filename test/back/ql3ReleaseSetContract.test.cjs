@@ -51,6 +51,12 @@ function recordsFor(releaseCandidate) {
       ...identity,
       releaseScope: releaseCandidate.release.scope,
       image: entry.image,
+      localRoleVerification:
+        entry.image === 'local'
+          ? 'application_rollout_verified'
+          : entry.image === 'local-operator'
+          ? 'operator_entrypoint_verified'
+          : 'not_applicable',
       digest: `sha256:${String(index + 1).repeat(64)}`,
     }),
   );
@@ -72,7 +78,7 @@ function writeCanonical(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value)}\n`, { mode: 0o600 });
 }
 
-test('aggregates the independent Local image into one immutable release set', () => {
+test('aggregates both independent Local images into one immutable release set', () => {
   const releaseCandidate = candidate('local');
   const records = recordsFor(releaseCandidate);
   const { validationClockMs: _unused, ...localIdentity } = identity;
@@ -86,7 +92,7 @@ test('aggregates the independent Local image into one immutable release set', ()
   });
   assert.deepEqual(
     releaseSet.images.map((entry) => entry.name),
-    ['local'],
+    ['local', 'local-operator'],
   );
   assert.equal(releaseSet.deploymentFamilies.local.selected, true);
   assert.equal(releaseSet.deploymentFamilies.cluster.selected, false);
@@ -140,8 +146,11 @@ test('closes cluster and all scopes over the exact candidate image order', () =>
     ...identity,
     releaseScope: 'all',
   });
-  assert.equal(allSet.images.length, 5);
-  assert.deepEqual(allSet.deploymentFamilies.local.images, ['local']);
+  assert.equal(allSet.images.length, 6);
+  assert.deepEqual(allSet.deploymentFamilies.local.images, [
+    'local',
+    'local-operator',
+  ]);
 });
 
 test('requires exact private evidence receipts only for Cluster-capable scopes', () => {
@@ -303,6 +312,7 @@ test('rejects mutable identity, malformed owner and post-aggregate drift', () =>
         repositoryOwner: 'UPPERCASE',
         releaseScope: 'local',
         image: 'local',
+        localRoleVerification: 'application_rollout_verified',
         digest: `sha256:${'1'.repeat(64)}`,
       }),
     /lowercase GitHub owner/,
@@ -315,6 +325,7 @@ test('rejects mutable identity, malformed owner and post-aggregate drift', () =>
         ...identity,
         releaseScope: 'local',
         image: 'local',
+        localRoleVerification: 'application_rollout_verified',
         digest: 'latest',
       }),
     /exact SHA-256 digest/,
@@ -436,6 +447,7 @@ test('CLI records, aggregates and audits exact no-replace files', (t) => {
       '--mode=record-image',
       ...common,
       '--image=local',
+      '--local-role-verification=application_rollout_verified',
       `--digest=sha256:${'1'.repeat(64)}`,
       `--output=${recordPath}`,
     ],
@@ -443,6 +455,20 @@ test('CLI records, aggregates and audits exact no-replace files', (t) => {
     output,
   );
   assert.equal(fs.statSync(recordPath).mode & 0o777, 0o600);
+  const operatorRecordPath = path.join(recordsDirectory, 'local-operator.json');
+  runCli(
+    [
+      '--mode=record-image',
+      ...common,
+      '--image=local-operator',
+      '--local-role-verification=operator_entrypoint_verified',
+      `--digest=sha256:${'2'.repeat(64)}`,
+      `--output=${operatorRecordPath}`,
+    ],
+    root,
+    output,
+  );
+  assert.equal(fs.statSync(operatorRecordPath).mode & 0o777, 0o600);
   const setPath = path.join(directory, 'release-set.json');
   runCli(
     [

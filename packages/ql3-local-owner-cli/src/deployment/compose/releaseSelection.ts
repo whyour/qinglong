@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const MAX_SELECTION_BYTES = 64 * 1024;
-const LOCAL_SELECTION_SCHEMA = 'qinglong/local-compose-release-image@v2';
+const LOCAL_SELECTION_SCHEMA = 'qinglong/local-compose-release-image@v3';
 const CATALOG_SCHEMA = 'qinglong/release-catalog-consumption-ceremony@v1';
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const VERSION_PATTERN = /^3\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/;
@@ -11,6 +11,8 @@ const SOURCE_REVISION_PATTERN = /^[a-f0-9]{40}$/;
 const SOURCE_REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const IMAGE_PATTERN =
   /^ghcr\.io\/([a-z0-9](?:[a-z0-9-]{0,38}))\/qinglong3-local-application@(sha256:[a-f0-9]{64})$/;
+const OPERATOR_IMAGE_PATTERN =
+  /^ghcr\.io\/([a-z0-9](?:[a-z0-9-]{0,38}))\/qinglong3-local-operator@(sha256:[a-f0-9]{64})$/;
 
 export interface LocalComposeReleaseSelectionInput {
   readonly path: string;
@@ -19,6 +21,7 @@ export interface LocalComposeReleaseSelectionInput {
 
 export interface LocalComposeReleaseAuthority {
   readonly image: string;
+  readonly operatorImage: string;
   readonly allowRootService: boolean;
   readonly selectionDigest: string;
   readonly releaseSetDigest: string;
@@ -171,6 +174,7 @@ export function resolveLocalComposeReleaseSelection(
       'schemaVersion',
       'selectionDigest',
       'service',
+      'operator',
       'verification',
     ],
     'release selection',
@@ -195,6 +199,7 @@ export function resolveLocalComposeReleaseSelection(
     'catalog',
   );
   exactKeys(value.service, ['allowRootService', 'image', 'kind'], 'service');
+  exactKeys(value.operator, ['image', 'kind', 'network'], 'operator');
   exactKeys(
     value.verification,
     [
@@ -210,9 +215,13 @@ export function resolveLocalComposeReleaseSelection(
   const release = value.release;
   const catalog = value.catalog;
   const service = value.service;
+  const operator = value.operator;
   const verification = value.verification;
   const image = typeof service.image === 'string' ? service.image : '';
   const imageMatch = IMAGE_PATTERN.exec(image);
+  const operatorImage =
+    typeof operator.image === 'string' ? operator.image : '';
+  const operatorImageMatch = OPERATOR_IMAGE_PATTERN.exec(operatorImage);
   const { selectionDigest, ...unsigned } = value;
   const calculatedDigest = digest(JSON.stringify(unsigned));
   if (
@@ -239,10 +248,14 @@ export function resolveLocalComposeReleaseSelection(
     catalog.releaseSetDigest !== value.releaseSetDigest ||
     catalog.discoveryTagAuthority !== 'none' ||
     !imageMatch ||
+    !operatorImageMatch ||
+    operatorImageMatch[1] !== imageMatch[1] ||
     catalog.immutableReference !==
       `ghcr.io/${imageMatch[1]}/qinglong3-release-catalog@${catalog.manifestDigest}` ||
     service.kind !== 'compose' ||
     service.allowRootService !== allowRootService ||
+    operator.kind !== 'short-lived' ||
+    operator.network !== 'none-by-default' ||
     verification.releaseSet !==
       'standalone_structure_identity_and_self_digest' ||
     verification.sourceRecordsReplayed !== false ||
@@ -262,6 +275,7 @@ export function resolveLocalComposeReleaseSelection(
     expectedSelectionDigest: input.expectedSelectionDigest,
     authority: Object.freeze({
       image,
+      operatorImage,
       allowRootService,
       selectionDigest,
       releaseSetDigest: value.releaseSetDigest,

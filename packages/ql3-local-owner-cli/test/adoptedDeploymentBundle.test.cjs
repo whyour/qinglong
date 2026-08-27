@@ -56,12 +56,16 @@ function releaseSelection(managementRoot, marker = 'a') {
   const image = `ghcr.io/example/qinglong3-local-application@sha256:${marker.repeat(
     64,
   )}`;
+  const operatorImage = image.replace(
+    'qinglong3-local-application',
+    'qinglong3-local-operator',
+  );
   const releaseSetDigest = prefixedDigest(`release-set:${image}`);
   const manifestDigest = prefixedDigest(`catalog-manifest:${image}`);
   const consumptionReportDigest = prefixedDigest(`catalog-report:${image}`);
   const unsigned = {
     schemaVersion: 1,
-    schema: 'qinglong/local-compose-release-image@v2',
+    schema: 'qinglong/local-compose-release-image@v3',
     release: {
       version: '3.0.0-alpha.0',
       sourceRevision: '3'.repeat(40),
@@ -85,6 +89,11 @@ function releaseSelection(managementRoot, marker = 'a') {
       kind: 'compose',
       image,
       allowRootService: rootAcknowledgement(),
+    },
+    operator: {
+      kind: 'short-lived',
+      image: operatorImage,
+      network: 'none-by-default',
     },
     verification: {
       releaseSet: 'standalone_structure_identity_and_self_digest',

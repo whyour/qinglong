@@ -19,8 +19,8 @@ const {
 const { VERSION_PATTERN } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const IMAGE_RECORD_SCHEMA = 'qinglong/release-set-image-record@v1';
-const RELEASE_SET_SCHEMA = 'qinglong/release-set@v3';
+const IMAGE_RECORD_SCHEMA = 'qinglong/release-set-image-record@v2';
+const RELEASE_SET_SCHEMA = 'qinglong/release-set@v4';
 const MAX_JSON_BYTES = 1024 * 1024;
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const OWNER_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/u;
@@ -135,6 +135,14 @@ function selectedImage(candidate, imageName) {
   return matches[0];
 }
 
+function expectedLocalRoleVerification(imageName) {
+  return imageName === 'local'
+    ? 'application_rollout_verified'
+    : imageName === 'local-operator'
+    ? 'operator_entrypoint_verified'
+    : 'not_applicable';
+}
+
 function deriveVerifiedImageRecord(
   candidate,
   repositoryOwner,
@@ -166,7 +174,7 @@ function deriveVerifiedImageRecord(
       remoteDigestVerified: true,
       keylessSignatureVerified: true,
       githubAttestations: [...REQUIRED_IMAGE_ATTESTATIONS],
-      localProfileRolloutVerified: selected.image === 'local',
+      localRoleVerification: expectedLocalRoleVerification(selected.image),
       tagPromotion: 'deferred_to_complete_release_set',
     },
   };
@@ -179,6 +187,12 @@ function deriveVerifiedImageRecord(
 function createVerifiedImageRecord(options) {
   const candidate = verifyCandidate(options.candidate, options);
   const owner = normalizeRepositoryOwner(options.repositoryOwner);
+  if (
+    options.localRoleVerification !==
+    expectedLocalRoleVerification(options.image)
+  ) {
+    fail('local role verification differs from the selected image role');
+  }
   return deriveVerifiedImageRecord(
     candidate,
     owner,
@@ -214,7 +228,7 @@ function validateImageRecord(record, candidate, repositoryOwner) {
       'remoteDigestVerified',
       'keylessSignatureVerified',
       'githubAttestations',
-      'localProfileRolloutVerified',
+      'localRoleVerification',
       'tagPromotion',
     ])
   ) {
@@ -306,10 +320,14 @@ function createReleaseSet(options) {
     return record;
   });
   const localImages = orderedRecords
-    .filter((record) => record.image.name === 'local')
+    .filter((record) =>
+      LOCAL_IMAGES.some((entry) => entry.image === record.image.name),
+    )
     .map((record) => record.image.name);
   const clusterImages = orderedRecords
-    .filter((record) => record.image.name !== 'local')
+    .filter((record) =>
+      CLUSTER_IMAGES.some((entry) => entry.image === record.image.name),
+    )
     .map((record) => record.image.name);
   const images = orderedRecords.map((record) => ({
     ...record.image,
@@ -497,12 +515,16 @@ function inspectReleaseSet(actual, options) {
     local: {
       selected: ['local', 'all'].includes(options.releaseScope),
       profiles: ['edge', 'standalone'],
-      images: expectedNames.filter((name) => name === 'local'),
+      images: expectedNames.filter((name) =>
+        LOCAL_IMAGES.some((entry) => entry.image === name),
+      ),
     },
     cluster: {
       selected: ['cluster', 'all'].includes(options.releaseScope),
       profiles: ['cluster', 'worker-edge', 'worker-node'],
-      images: expectedNames.filter((name) => name !== 'local'),
+      images: expectedNames.filter((name) =>
+        CLUSTER_IMAGES.some((entry) => entry.image === name),
+      ),
     },
   };
   if (
@@ -619,7 +641,7 @@ function parseArguments(argv) {
   const common = ['candidate', ...identity];
   const expected =
     values.mode === 'record-image'
-      ? [...common, 'digest', 'image', 'output']
+      ? [...common, 'digest', 'image', 'local-role-verification', 'output']
       : values.mode === 'aggregate'
       ? [...common, 'evidence-receipts', 'output', 'records']
       : values.mode === 'audit'
@@ -643,6 +665,9 @@ function parseArguments(argv) {
     releaseScope: values['release-scope'],
     repositoryOwner: values['repository-owner'],
     ...(values.image ? { image: values.image } : {}),
+    ...(values['local-role-verification']
+      ? { localRoleVerification: values['local-role-verification'] }
+      : {}),
     ...(values.digest ? { digest: values.digest } : {}),
     ...(values.records ? { records: values.records } : {}),
     ...(values['evidence-receipts']

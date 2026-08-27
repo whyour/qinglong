@@ -14,7 +14,7 @@ const {
 const { inspectReleaseSet } = require('./ql3-release-set-contract.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const LOCAL_SELECTION_SCHEMA = 'qinglong/local-compose-release-image@v2';
+const LOCAL_SELECTION_SCHEMA = 'qinglong/local-compose-release-image@v3';
 const KUBERNETES_LOCK_SCHEMA = 'qinglong/kubernetes-deployment-lock@v2';
 const MAX_RELEASE_SET_BYTES = 1024 * 1024;
 const MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
@@ -193,6 +193,7 @@ function createLocalSelection(releaseSet, options) {
     fail('allow-root-service must be an explicit boolean');
   }
   const local = imageByName(releaseSet, 'local');
+  const operator = imageByName(releaseSet, 'local-operator');
   const unsigned = {
     schemaVersion: 1,
     schema: LOCAL_SELECTION_SCHEMA,
@@ -204,6 +205,11 @@ function createLocalSelection(releaseSet, options) {
       kind: 'compose',
       image: local.reference,
       allowRootService: options.allowRootService,
+    },
+    operator: {
+      kind: 'short-lived',
+      image: operator.reference,
+      network: 'none-by-default',
     },
     verification: {
       releaseSet: inspection.verification,
@@ -233,6 +239,7 @@ function auditLocalSelection(actual, releaseSet, options) {
     catalogManifestDigest: actual.catalog.manifestDigest,
     immutableReference: actual.catalog.immutableReference,
     image: actual.service.image,
+    operatorImage: actual.operator.image,
     networkAccess: false,
     deploymentMutation: false,
   });

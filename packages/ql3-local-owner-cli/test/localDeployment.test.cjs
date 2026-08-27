@@ -31,12 +31,16 @@ function sha256(value) {
 }
 
 function releaseSelectionForImage(managementRoot, image, allowRootService) {
+  const operatorImage = image.replace(
+    'qinglong3-local-application',
+    'qinglong3-local-operator',
+  );
   const releaseSetDigest = sha256(`release-set:${image}`);
   const manifestDigest = sha256(`catalog-manifest:${image}`);
   const consumptionReportDigest = sha256(`catalog-report:${image}`);
   const unsigned = {
     schemaVersion: 1,
-    schema: 'qinglong/local-compose-release-image@v2',
+    schema: 'qinglong/local-compose-release-image@v3',
     release: {
       version: '3.0.0-alpha.0',
       sourceRevision: '3'.repeat(40),
@@ -60,6 +64,11 @@ function releaseSelectionForImage(managementRoot, image, allowRootService) {
       kind: 'compose',
       image,
       allowRootService,
+    },
+    operator: {
+      kind: 'short-lived',
+      image: operatorImage,
+      network: 'none-by-default',
     },
     verification: {
       releaseSet: 'standalone_structure_identity_and_self_digest',
@@ -393,7 +402,7 @@ function composeSelection({
   const selected = JSON.parse(fs.readFileSync(releaseSelection.path, 'utf8'));
   return [
     'x-qinglong-image-selection:',
-    '  schema: qinglong/local-compose-image-selection@v2',
+    '  schema: qinglong/local-compose-image-selection@v3',
     `  generation: ${generation}`,
     `  previous_generation: ${previousGeneration}`,
     `  rollback_target_generation: ${rollbackTargetGeneration}`,
@@ -412,6 +421,7 @@ function composeSelection({
     `  catalog_manifest_digest: ${selected.catalog.manifestDigest}`,
     `  catalog_consumption_report_digest: ${selected.catalog.consumptionReportDigest}`,
     `  catalog_discovery_tag_authority: ${selected.catalog.discoveryTagAuthority}`,
+    `  operator_image: ${selected.operator.image}`,
     `  allow_root_service: ${selected.service.allowRootService}`,
     'services:',
     '  qinglong3:',
@@ -1056,7 +1066,7 @@ test('renders bounded OpenRC and immutable rootless Compose descriptors', async 
   );
   assert.match(
     fs.readFileSync(selectionPath, 'utf8'),
-    /^  schema: qinglong\/local-compose-image-selection@v2$/m,
+    /^  schema: qinglong\/local-compose-image-selection@v3$/m,
   );
   assert.match(
     fs.readFileSync(selectionPath, 'utf8'),
@@ -2200,6 +2210,16 @@ test('upgrades and rolls back Compose image selections with generation CAS', asy
     fs.readFileSync(selectionPath, 'utf8'),
     new RegExp(`^    image: ${upgradedImage}$`, 'm'),
   );
+  assert.match(
+    fs.readFileSync(selectionPath, 'utf8'),
+    new RegExp(
+      `^  operator_image: ${upgradedImage.replace(
+        '/qinglong3-local-application@',
+        '/qinglong3-local-operator@',
+      )}$`,
+      'm',
+    ),
+  );
   assert.equal(mode(path.join(revisions, '2.yaml')), 0o600);
   assert.equal(fs.readFileSync(composePath, 'utf8'), stableDescriptor);
 
@@ -2224,6 +2244,16 @@ test('upgrades and rolls back Compose image selections with generation CAS', asy
   assert.match(active, /^  generation: 3$/m);
   assert.match(active, /^  rollback_target_generation: 1$/m);
   assert.match(active, new RegExp(`^    image: ${state.composeImage}$`, 'm'));
+  assert.match(
+    active,
+    new RegExp(
+      `^  operator_image: ${state.composeImage.replace(
+        '/qinglong3-local-application@',
+        '/qinglong3-local-operator@',
+      )}$`,
+      'm',
+    ),
+  );
   assert.equal(
     fs
       .readFileSync(path.join(revisions, '2.yaml'), 'utf8')

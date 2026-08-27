@@ -46,7 +46,10 @@ function selectedImages(scope) {
     ['admin', 'qinglong3-cluster-admin'],
     ['worker', 'qinglong3-worker'],
   ];
-  const local = [['local', 'qinglong3-local-application']];
+  const local = [
+    ['local', 'qinglong3-local-application'],
+    ['local-operator', 'qinglong3-local-operator'],
+  ];
   return scope === 'local'
     ? local
     : scope === 'cluster'
@@ -79,7 +82,7 @@ function releaseSet(scope) {
   const names = images.map((entry) => entry.name);
   const unsigned = {
     schemaVersion: 1,
-    schema: 'qinglong/release-set@v3',
+    schema: 'qinglong/release-set@v4',
     release,
     candidate: {
       schema: 'qinglong/release-candidate-contract@v1',
@@ -91,12 +94,16 @@ function releaseSet(scope) {
       local: {
         selected: ['local', 'all'].includes(scope),
         profiles: ['edge', 'standalone'],
-        images: names.filter((name) => name === 'local'),
+        images: names.filter((name) =>
+          ['local', 'local-operator'].includes(name),
+        ),
       },
       cluster: {
         selected: ['cluster', 'all'].includes(scope),
         profiles: ['cluster', 'worker-edge', 'worker-node'],
-        images: names.filter((name) => name !== 'local'),
+        images: names.filter((name) =>
+          ['control', 'control-ai', 'admin', 'worker'].includes(name),
+        ),
       },
     },
     evidenceReceipts: privateReleaseEvidenceReceipts(release),
@@ -392,8 +399,9 @@ test('supports the complete all-scope image family without runtime coupling', (t
     'admin',
     'worker',
     'local',
+    'local-operator',
   ]);
-  assert.equal(report.releaseSet.imageCount, 5);
+  assert.equal(report.releaseSet.imageCount, 6);
   assert.equal(report.claims.deploymentMutation, false);
 });
 

@@ -241,6 +241,39 @@ function expectedImageConfig(architecture, revision, image) {
       },
     };
   }
+  if (image === 'local-operator') {
+    return {
+      architecture,
+      os: 'linux',
+      config: {
+        User: '65532:65532',
+        Env: [
+          'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+          'NODE_VERSION=24.18.0',
+          'YARN_VERSION=1.22.22',
+          'NODE_ENV=production',
+        ],
+        Entrypoint: [
+          'node',
+          '/opt/qinglong/node_modules/@qinglong/local-owner-cli/dist/product-cli/cli.js',
+        ],
+        WorkingDir: '/opt/qinglong',
+        Labels: {
+          'io.qinglong.authority': 'local-owner-management',
+          'io.qinglong.lifecycle': 'short-lived',
+          'io.qinglong.network': 'none-by-default',
+          'org.opencontainers.image.description':
+            'QingLong 3.0 short-lived Local management authority',
+          'org.opencontainers.image.licenses': 'Apache-2.0',
+          'org.opencontainers.image.revision': revision,
+          'org.opencontainers.image.source':
+            'https://github.com/whyour/qinglong',
+          'org.opencontainers.image.title': 'QingLong 3.0 Local Operator',
+          'org.opencontainers.image.version': QL3_VERSION,
+        },
+      },
+    };
+  }
   const isControl = image === 'control' || image === 'control-ai';
   const isControlAi = image === 'control-ai';
   return {
@@ -529,7 +562,9 @@ function auditClusterOciLayout(options = {}) {
   const image = resolveImageProfile(options.image).id;
   const expectedPlatforms = options.expectedPlatforms || EXPECTED_PLATFORMS;
   const maximumPlatformBytes =
-    image === 'local' ? 128 * 1024 * 1024 : 512 * 1024 * 1024;
+    image === 'local' || image === 'local-operator'
+      ? 128 * 1024 * 1024
+      : 512 * 1024 * 1024;
   if (
     !path.isAbsolute(layoutRoot) ||
     typeof expectedRevision !== 'string' ||

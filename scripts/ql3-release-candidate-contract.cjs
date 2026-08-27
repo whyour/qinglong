@@ -38,6 +38,13 @@ const LOCAL_IMAGES = Object.freeze([
     runtime_root:
       'deploy/containers/ql3-local-application/runtime-dependencies',
   }),
+  Object.freeze({
+    image: 'local-operator',
+    repository: 'qinglong3-local-operator',
+    dockerfile: 'deploy/containers/ql3-local-operator/Dockerfile',
+    target: 'runtime',
+    runtime_root: 'deploy/containers/ql3-local-operator/runtime-dependencies',
+  }),
 ]);
 const CLUSTER_IMAGES = Object.freeze([
   Object.freeze({
@@ -208,7 +215,15 @@ function createReleaseCandidateContract(options) {
       version: manifest.version,
     });
   });
-  const publishMatrix = images.map(({ dockerfile, target, ...image }) => image);
+  const publishMatrix = images.map(({ dockerfile, target, ...image }) => ({
+    ...image,
+    local_role_verification:
+      image.image === 'local'
+        ? 'application_rollout_verified'
+        : image.image === 'local-operator'
+        ? 'operator_entrypoint_verified'
+        : 'not_applicable',
+  }));
   const osMatrix = images.flatMap((image) =>
     nativeArchitectures.map((architecture) => ({
       image: image.image,
@@ -285,7 +300,7 @@ function createReleaseCandidateContract(options) {
       'durable-oci-release-catalog',
       'offline-deployment-lock-materialization',
       ...(options.releaseScope !== 'cluster'
-        ? ['edge-and-standalone-rollout']
+        ? ['edge-and-standalone-rollout', 'local-operator-entrypoint']
         : []),
       ...(options.releaseScope !== 'local'
         ? [

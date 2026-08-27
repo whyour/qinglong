@@ -564,6 +564,27 @@ jobs:
             --docker-socket="${docker_socket}" \
             --profile=standalone
 
+      - name: Verify the short-lived Local operator entrypoint
+        if: matrix.image == 'local-operator'
+        env:
+          IMAGE: ${{ steps.identity.outputs.image }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull "${IMAGE}@${DIGEST}"
+          for arguments in "--version" "setup --help"; do
+            read -r -a argv <<< "${arguments}"
+            docker run --rm \
+              --read-only \
+              --network none \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
+              --memory 128m \
+              --cpus 0.5 \
+              --pids-limit 32 \
+              "${IMAGE}@${DIGEST}" "${argv[@]}"
+          done
+
       - name: Verify the keyless signature identity
         env:
           IMAGE: ${{ steps.identity.outputs.image }}
@@ -658,6 +679,7 @@ jobs:
             --repository-owner="${owner}" \
             --candidate="${RUNNER_TEMP}/${{ matrix.repository }}-release-candidate-contract.json" \
             --image="${{ matrix.image }}" \
+            --local-role-verification="${{ matrix.local_role_verification }}" \
             --digest="${DIGEST}" \
             --output="${RUNNER_TEMP}/release-record/${{ matrix.image }}.json"
 
@@ -1107,13 +1129,16 @@ jobs:
           const fs = require('node:fs');
           const selection = JSON.parse(fs.readFileSync(process.env.SELECTION, 'utf8'));
           if (!/^sha256:[a-f0-9]{64}$/.test(selection.selectionDigest || '') ||
-              !/^ghcr\.io\/[a-z0-9._-]+\/qinglong3-local-application@sha256:[a-f0-9]{64}$/.test(selection.service?.image || '')) process.exit(1);
-          process.stdout.write(`selection=${process.env.SELECTION}\nselection-digest=${selection.selectionDigest}\nimage=${selection.service.image}\n`);
+              !/^ghcr\.io\/[a-z0-9._-]+\/qinglong3-local-application@sha256:[a-f0-9]{64}$/.test(selection.service?.image || '') ||
+              !/^ghcr\.io\/[a-z0-9._-]+\/qinglong3-local-operator@sha256:[a-f0-9]{64}$/.test(selection.operator?.image || '') ||
+              selection.operator?.kind !== 'short-lived' || selection.operator?.network !== 'none-by-default') process.exit(1);
+          process.stdout.write(`selection=${process.env.SELECTION}\nselection-digest=${selection.selectionDigest}\nimage=${selection.service.image}\noperator-image=${selection.operator.image}\n`);
           NODE
 
       - name: Prove catalog-bound Edge and Standalone rollout
         env:
           IMAGE: ${{ steps.local-selection.outputs.image }}
+          OPERATOR_IMAGE: ${{ steps.local-selection.outputs.operator-image }}
           RELEASE_SELECTION: ${{ steps.local-selection.outputs.selection }}
           SELECTION_DIGEST: ${{ steps.local-selection.outputs.selection-digest }}
           EVIDENCE_ROOT: ${{ runner.temp }}/ql3-release-catalog-local-deployment
@@ -1124,6 +1149,27 @@ jobs:
           umask 077
           install -d -m 0700 "${EVIDENCE_ROOT}"
           docker pull "${IMAGE}"
+          docker pull "${OPERATOR_IMAGE}"
+          docker run --rm --read-only \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --memory=128m \
+            --memory-swap=128m \
+            --cpus=0.5 \
+            --pids-limit=32 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
+            "${OPERATOR_IMAGE}" --version
+          docker run --rm --read-only \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --memory=128m \
+            --memory-swap=128m \
+            --cpus=0.5 \
+            --pids-limit=32 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
+            "${OPERATOR_IMAGE}" setup --help
           docker_executable="$(realpath "$(command -v docker)")"
           docker_socket="$(realpath /var/run/docker.sock)"
           for profile in edge standalone; do

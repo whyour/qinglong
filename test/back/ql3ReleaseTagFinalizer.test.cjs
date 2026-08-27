@@ -32,7 +32,10 @@ function publicationPlan() {
   const version = '3.0.0-alpha.0';
   const sourceRevision = 'a'.repeat(40);
   const repository = 'ghcr.io/qinglong-release/qinglong3-local-application';
+  const operatorRepository =
+    'ghcr.io/qinglong-release/qinglong3-local-operator';
   const imageDigest = `sha256:${'1'.repeat(64)}`;
+  const operatorDigest = `sha256:${'9'.repeat(64)}`;
   const manifestDigest = `sha256:${'2'.repeat(64)}`;
   const unsigned = {
     schemaVersion: 1,
@@ -87,6 +90,22 @@ function publicationPlan() {
           {
             kind: 'source',
             reference: `${repository}:sha-${sourceRevision}`,
+          },
+        ],
+      },
+      {
+        name: 'local-operator',
+        registryRepository: operatorRepository,
+        immutableReference: `${operatorRepository}@${operatorDigest}`,
+        digest: operatorDigest,
+        tags: [
+          {
+            kind: 'version',
+            reference: `${operatorRepository}:${version}`,
+          },
+          {
+            kind: 'source',
+            reference: `${operatorRepository}:sha-${sourceRevision}`,
           },
         ],
       },
@@ -174,10 +193,14 @@ test('finalizes every exact tag and audits the live terminal state', () => {
   const plan = publicationPlan();
   const registry = new FakeRegistry(plan);
   const observation = finalizeReleaseTags(plan, registry);
-  assert.equal(registry.copyCalls().length, 2);
-  assert.equal(observation.tags.length, 2);
+  assert.equal(registry.copyCalls().length, 4);
+  assert.equal(observation.tags.length, 4);
   assert.equal(
-    observation.tags.every((tag) => tag.digest === plan.images[0].digest),
+    observation.tags.every(
+      (tag) =>
+        tag.digest ===
+        plan.images.find((image) => image.name === tag.image)?.digest,
+    ),
     true,
   );
   const copiesBeforeAudit = registry.copyCalls().length;
@@ -185,7 +208,7 @@ test('finalizes every exact tag and audits the live terminal state', () => {
     schemaVersion: 1,
     planDigest: plan.planDigest,
     observationDigest: observation.observationDigest,
-    tagCount: 2,
+    tagCount: 4,
     allTagsExactDigest: true,
     registryMutation: false,
     compatible: true,
@@ -228,8 +251,8 @@ test('recovers copy response loss by reusing exact tags and only filling absence
   );
   assert.equal(registry.copyCalls().length, 1);
   const observation = finalizeReleaseTags(plan, registry);
-  assert.equal(registry.copyCalls().length, 2);
-  assert.equal(observation.tags.length, 2);
+  assert.equal(registry.copyCalls().length, 4);
+  assert.equal(observation.tags.length, 4);
   assert.equal(
     registry.resolveDigest(plan.images[0].tags[0].reference),
     plan.images[0].digest,

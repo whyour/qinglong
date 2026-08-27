@@ -16,7 +16,7 @@ const CATALOG_PUBLICATION_DECISION_SCHEMA =
 const CATALOG_RECEIPT_SCHEMA = 'qinglong/release-catalog-receipt@v2';
 const CATALOG_TAG_INVENTORY_DECISION_SCHEMA =
   'qinglong/release-catalog-tag-inventory-decision@v1';
-const ARTIFACT_TYPE = 'application/vnd.qinglong.release-set.v3+json';
+const ARTIFACT_TYPE = 'application/vnd.qinglong.release-set.v4+json';
 const FILE_MEDIA_TYPE = ARTIFACT_TYPE;
 const OCI_MANIFEST_MEDIA_TYPE = 'application/vnd.oci.image.manifest.v1+json';
 const OCI_EMPTY_CONFIG_MEDIA_TYPE = 'application/vnd.oci.empty.v1+json';

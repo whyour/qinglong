@@ -93,6 +93,12 @@ function releaseSet(scope) {
       ...identity,
       releaseScope: scope,
       image: entry.image,
+      localRoleVerification:
+        entry.image === 'local'
+          ? 'application_rollout_verified'
+          : entry.image === 'local-operator'
+          ? 'operator_entrypoint_verified'
+          : 'not_applicable',
       digest: `sha256:${String(index + 1).repeat(64)}`,
     }),
   );
@@ -429,7 +435,7 @@ test('selects catalog-backed live artifacts only for one complete environment', 
   assert.equal(artifacts.report.requiredImages.length, 4);
 });
 
-test('selects one immutable Local Compose image without adding device work', () => {
+test('selects immutable Local runtime and short-lived operator images without adding steady-state device work', () => {
   for (const scope of ['local', 'all']) {
     const set = releaseSet(scope);
     const selection = createLocalSelection(
@@ -437,7 +443,7 @@ test('selects one immutable Local Compose image without adding device work', () 
       options(set, { allowRootService: false }),
     );
     assert.equal(selection.deploymentFamily, 'local');
-    assert.equal(selection.schema, 'qinglong/local-compose-release-image@v2');
+    assert.equal(selection.schema, 'qinglong/local-compose-release-image@v3');
     assert.equal(selection.releaseSetDigest, set.releaseSetDigest);
     assert.equal(
       selection.catalog.releaseSetDigest,
@@ -451,6 +457,9 @@ test('selects one immutable Local Compose image without adding device work', () 
     assert.equal(selection.service.kind, 'compose');
     assert.equal(selection.service.image, references(set).local);
     assert.equal(selection.service.allowRootService, false);
+    assert.equal(selection.operator.kind, 'short-lived');
+    assert.equal(selection.operator.image, references(set)['local-operator']);
+    assert.equal(selection.operator.network, 'none-by-default');
     assert.equal(selection.verification.networkAccess, false);
     assert.equal(selection.verification.deploymentMutation, false);
     assert.equal(
@@ -495,6 +504,18 @@ test('Local selection rejects cluster scope, implicit root policy and drift', ()
     () =>
       auditLocalSelection(
         drifted,
+        localSet,
+        options(localSet, { allowRootService: true }),
+      ),
+    /differs from the verified release set/,
+  );
+  const operatorDrifted = JSON.parse(JSON.stringify(selection));
+  operatorDrifted.operator.image =
+    'ghcr.io/example/qinglong3-local-operator:latest';
+  assert.throws(
+    () =>
+      auditLocalSelection(
+        operatorDrifted,
         localSet,
         options(localSet, { allowRootService: true }),
       ),
@@ -947,7 +968,7 @@ test('deployment-lock CLI cannot regress to a loose release-set input', () => {
   assert.match(source, /'consumption-bundle'/u);
   assert.match(source, /'source-repository'/u);
   assert.doesNotMatch(source, /['"]release-set['"]/u);
-  assert.match(source, /qinglong\/local-compose-release-image@v2/u);
+  assert.match(source, /qinglong\/local-compose-release-image@v3/u);
   assert.match(source, /qinglong\/kubernetes-deployment-lock@v2/u);
 });
 

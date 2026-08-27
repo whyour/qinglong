@@ -22,11 +22,13 @@ import {
 } from '../foundation/files';
 import { deploymentPaths } from '../foundation/render';
 
-const SELECTION_SCHEMA = 'qinglong/local-compose-image-selection@v2';
+const SELECTION_SCHEMA = 'qinglong/local-compose-image-selection@v3';
 const CATALOG_SCHEMA = 'qinglong/release-catalog-consumption-ceremony@v1';
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const IMAGE_PATTERN =
   /^ghcr\.io\/([a-z0-9](?:[a-z0-9-]{0,38}))\/qinglong3-local-application@sha256:[0-9a-f]{64}$/;
+const OPERATOR_IMAGE_PATTERN =
+  /^ghcr\.io\/([a-z0-9](?:[a-z0-9-]{0,38}))\/qinglong3-local-operator@sha256:[0-9a-f]{64}$/;
 const VERSION_PATTERN = /^3\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/;
 const SOURCE_REVISION_PATTERN = /^[a-f0-9]{40}$/;
 const SOURCE_REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -63,6 +65,7 @@ function selectionContents(selection: Readonly<ComposeImageSelection>): string {
     `  catalog_manifest_digest: ${selection.catalogManifestDigest}`,
     `  catalog_consumption_report_digest: ${selection.catalogConsumptionReportDigest}`,
     `  catalog_discovery_tag_authority: ${selection.catalogDiscoveryTagAuthority}`,
+    `  operator_image: ${selection.operatorImage}`,
     `  allow_root_service: ${selection.allowRootService}`,
     'services:',
     '  qinglong3:',
@@ -94,7 +97,7 @@ function parseSelection(
   label: string,
 ): Readonly<ComposeImageSelection> {
   const match =
-    /^x-qinglong-image-selection:\n  schema: qinglong\/local-compose-image-selection@v2\n  generation: (0|[1-9][0-9]{0,5})\n  previous_generation: (0|[1-9][0-9]{0,5})\n  rollback_target_generation: (0|[1-9][0-9]{0,5})\n  mutation_id: ([0-9a-f-]+)\n  changed_at_ms: ([0-9]+)\n  release_selection_digest: (sha256:[a-f0-9]{64})\n  release_set_digest: (sha256:[a-f0-9]{64})\n  release_version: ([^\n]+)\n  release_source_revision: ([a-f0-9]{40})\n  release_source_ref: ([^\n]+)\n  release_scope: (local|all)\n  catalog_schema: qinglong\/release-catalog-consumption-ceremony@v1\n  catalog_source_repository: ([^\n]+)\n  catalog_workflow_identity: ([^\n]+)\n  catalog_immutable_reference: ([^\n]+)\n  catalog_manifest_digest: (sha256:[a-f0-9]{64})\n  catalog_consumption_report_digest: (sha256:[a-f0-9]{64})\n  catalog_discovery_tag_authority: none\n  allow_root_service: (true|false)\nservices:\n  qinglong3:\n    image: ([^\n]+)\n    labels:\n      io\.qinglong\.deployment\.generation: "([0-9]+)"\n      io\.qinglong\.deployment\.mutation: "([0-9a-f-]+)"\n      io\.qinglong\.release\.selection: "(sha256:[a-f0-9]{64})"\n      io\.qinglong\.release\.set: "(sha256:[a-f0-9]{64})"\n      io\.qinglong\.release\.catalog-manifest: "(sha256:[a-f0-9]{64})"\n      io\.qinglong\.release\.catalog-report: "(sha256:[a-f0-9]{64})"\n$/.exec(
+    /^x-qinglong-image-selection:\n  schema: qinglong\/local-compose-image-selection@v3\n  generation: (0|[1-9][0-9]{0,5})\n  previous_generation: (0|[1-9][0-9]{0,5})\n  rollback_target_generation: (0|[1-9][0-9]{0,5})\n  mutation_id: ([0-9a-f-]+)\n  changed_at_ms: ([0-9]+)\n  release_selection_digest: (sha256:[a-f0-9]{64})\n  release_set_digest: (sha256:[a-f0-9]{64})\n  release_version: ([^\n]+)\n  release_source_revision: ([a-f0-9]{40})\n  release_source_ref: ([^\n]+)\n  release_scope: (local|all)\n  catalog_schema: qinglong\/release-catalog-consumption-ceremony@v1\n  catalog_source_repository: ([^\n]+)\n  catalog_workflow_identity: ([^\n]+)\n  catalog_immutable_reference: ([^\n]+)\n  catalog_manifest_digest: (sha256:[a-f0-9]{64})\n  catalog_consumption_report_digest: (sha256:[a-f0-9]{64})\n  catalog_discovery_tag_authority: none\n  operator_image: ([^\n]+)\n  allow_root_service: (true|false)\nservices:\n  qinglong3:\n    image: ([^\n]+)\n    labels:\n      io\.qinglong\.deployment\.generation: "([0-9]+)"\n      io\.qinglong\.deployment\.mutation: "([0-9a-f-]+)"\n      io\.qinglong\.release\.selection: "(sha256:[a-f0-9]{64})"\n      io\.qinglong\.release\.set: "(sha256:[a-f0-9]{64})"\n      io\.qinglong\.release\.catalog-manifest: "(sha256:[a-f0-9]{64})"\n      io\.qinglong\.release\.catalog-report: "(sha256:[a-f0-9]{64})"\n$/.exec(
       contents,
     );
   if (!match) {
@@ -122,15 +125,17 @@ function parseSelection(
   const catalogImmutableReference = match[14]!;
   const catalogManifestDigest = match[15]!;
   const catalogConsumptionReportDigest = match[16]!;
-  const allowRootService = match[17] === 'true';
-  const image = match[18]!;
-  const labelGeneration = Number(match[19]);
-  const labelMutationId = match[20];
-  const labelSelectionDigest = match[21];
-  const labelReleaseSetDigest = match[22];
-  const labelCatalogManifestDigest = match[23];
-  const labelCatalogReportDigest = match[24];
+  const operatorImage = match[17]!;
+  const allowRootService = match[18] === 'true';
+  const image = match[19]!;
+  const labelGeneration = Number(match[20]);
+  const labelMutationId = match[21];
+  const labelSelectionDigest = match[22];
+  const labelReleaseSetDigest = match[23];
+  const labelCatalogManifestDigest = match[24];
+  const labelCatalogReportDigest = match[25];
   const imageMatch = IMAGE_PATTERN.exec(image);
+  const operatorImageMatch = OPERATOR_IMAGE_PATTERN.exec(operatorImage);
   if (
     generation < 1 ||
     previousGeneration !== generation - 1 ||
@@ -150,6 +155,8 @@ function parseSelection(
     !DIGEST_PATTERN.test(catalogManifestDigest) ||
     !DIGEST_PATTERN.test(catalogConsumptionReportDigest) ||
     !imageMatch ||
+    !operatorImageMatch ||
+    operatorImageMatch[1] !== imageMatch[1] ||
     catalogImmutableReference !==
       `ghcr.io/${imageMatch?.[1]}/qinglong3-release-catalog@${catalogManifestDigest}` ||
     labelGeneration !== generation ||
@@ -168,6 +175,7 @@ function parseSelection(
     mutationId,
     changedAtMs,
     image,
+    operatorImage,
     allowRootService,
     selectionDigest,
     releaseSetDigest,
@@ -235,6 +243,7 @@ function releaseAuthorityFromSelection(
 ): Readonly<LocalComposeReleaseAuthority> {
   return Object.freeze({
     image: selection.image,
+    operatorImage: selection.operatorImage,
     allowRootService: selection.allowRootService,
     selectionDigest: selection.selectionDigest,
     releaseSetDigest: selection.releaseSetDigest,

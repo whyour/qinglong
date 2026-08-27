@@ -169,6 +169,11 @@ function auditClusterImageCiWorkflow(
       target: 'runtime',
     },
     {
+      image: 'local-operator',
+      dockerfile: 'deploy/containers/ql3-local-operator/Dockerfile',
+      target: 'runtime',
+    },
+    {
       image: 'worker',
       dockerfile: 'deploy/containers/ql3-worker/Dockerfile',
       target: 'runtime',
@@ -185,7 +190,7 @@ function auditClusterImageCiWorkflow(
       JSON.stringify(expectedOciMatrix)
   ) {
     throw new Error(
-      'image CI matrices must contain only exact control/control-ai/admin/local/worker amd64/arm64 evidence targets',
+      'image CI matrices must contain only exact control/control-ai/admin/local/local-operator/worker amd64/arm64 evidence targets',
     );
   }
   const expectedTrivyInputs = {
@@ -205,7 +210,13 @@ function auditClusterImageCiWorkflow(
       localImageJob,
       'qinglong3-local-application:ci-${{ matrix.image_arch }}',
       '${{ runner.temp }}/ql3-local-${{ matrix.image_arch }}.trivyignore.yaml',
-      'local',
+      'Local application',
+    ],
+    [
+      localImageJob,
+      'qinglong3-local-operator:ci-${{ matrix.image_arch }}',
+      '${{ runner.temp }}/ql3-local-operator-${{ matrix.image_arch }}.trivyignore.yaml',
+      'Local operator',
     ],
     [
       clusterImageJob,
@@ -217,7 +228,8 @@ function auditClusterImageCiWorkflow(
     const step = job?.steps?.find(
       (entry) =>
         entry.uses ===
-        'aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25',
+          'aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25' &&
+        entry.with?.['image-ref'] === imageRef,
     );
     if (
       !step ||
@@ -246,13 +258,18 @@ function auditClusterImageCiWorkflow(
   requireOccurrences(
     source,
     /node scripts\/ql3-image-os-vulnerability-policy\.cjs/g,
-    2,
+    3,
     'native image CI must materialize reviewed image-scoped Trivy exceptions',
   );
   requirePattern(
     source,
-    /--image=local\s+--output=\$\{\{ runner\.temp \}\}\/ql3-local-\$\{\{ matrix\.image_arch \}\}\.trivyignore\.yaml/,
+    /--image=local \\\s+--output=\$\{\{ runner\.temp \}\}\/ql3-local-\$\{\{ matrix\.image_arch \}\}\.trivyignore\.yaml/,
     'local native image CI must materialize the local exception view',
+  );
+  requirePattern(
+    source,
+    /--image=local-operator \\\s+--output=\$\{\{ runner\.temp \}\}\/ql3-local-operator-\$\{\{ matrix\.image_arch \}\}\.trivyignore\.yaml/,
+    'Local operator native image CI must materialize its own exception view',
   );
   requirePattern(
     source,
@@ -489,8 +506,8 @@ function auditClusterImageCiWorkflow(
   );
   requirePattern(
     source,
-    /- image: control\s+dockerfile: deploy\/containers\/ql3-cluster-control\/Dockerfile\s+target: runtime\s+- image: control-ai\s+dockerfile: deploy\/containers\/ql3-cluster-control\/Dockerfile\s+target: runtime-ai\s+- image: admin\s+dockerfile: deploy\/containers\/ql3-cluster-admin\/Dockerfile\s+target: runtime\s+- image: local\s+dockerfile: deploy\/containers\/ql3-local-application\/Dockerfile\s+target: runtime\s+- image: worker\s+dockerfile: deploy\/containers\/ql3-worker\/Dockerfile\s+target: runtime/,
-    'OCI evidence CI must build independent control, control-ai, admin, local and worker images',
+    /- image: control\s+dockerfile: deploy\/containers\/ql3-cluster-control\/Dockerfile\s+target: runtime\s+- image: control-ai\s+dockerfile: deploy\/containers\/ql3-cluster-control\/Dockerfile\s+target: runtime-ai\s+- image: admin\s+dockerfile: deploy\/containers\/ql3-cluster-admin\/Dockerfile\s+target: runtime\s+- image: local\s+dockerfile: deploy\/containers\/ql3-local-application\/Dockerfile\s+target: runtime\s+- image: local-operator\s+dockerfile: deploy\/containers\/ql3-local-operator\/Dockerfile\s+target: runtime\s+- image: worker\s+dockerfile: deploy\/containers\/ql3-worker\/Dockerfile\s+target: runtime/,
+    'OCI evidence CI must build independent control, control-ai, admin, local, local-operator and worker images',
   );
   requirePattern(
     source,
@@ -519,7 +536,14 @@ function auditClusterImageCiWorkflow(
     'local image CI must generate and inventory-check the exact local SBOM profile',
   );
   return {
-    images: ['control', 'control-ai', 'admin', 'local', 'worker'],
+    images: [
+      'control',
+      'control-ai',
+      'admin',
+      'local',
+      'local-operator',
+      'worker',
+    ],
     nativeArchitectures: ['amd64', 'arm64'],
     runtimeInventory: true,
     clusterAdminProductFacade: true,
@@ -844,7 +868,7 @@ function auditReleaseWorkflow(source) {
     );
   }
   if (
-    !/ql3-release-set-contract\.cjs[\s\S]*--mode=record-image[\s\S]*--version="\$\{RELEASE_VERSION\}"[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--release-scope="\$\{RELEASE_SCOPE\}"[\s\S]*--repository-owner="\$\{owner\}"[\s\S]*--candidate="\$\{RUNNER_TEMP\}\/\$\{\{ matrix\.repository \}\}-release-candidate-contract\.json"[\s\S]*--image="\$\{\{ matrix\.image \}\}"[\s\S]*--digest="\$\{DIGEST\}"/.test(
+    !/ql3-release-set-contract\.cjs[\s\S]*--mode=record-image[\s\S]*--version="\$\{RELEASE_VERSION\}"[\s\S]*--source-revision="\$\{GITHUB_SHA\}"[\s\S]*--source-ref="\$\{GITHUB_REF\}"[\s\S]*--release-scope="\$\{RELEASE_SCOPE\}"[\s\S]*--repository-owner="\$\{owner\}"[\s\S]*--candidate="\$\{RUNNER_TEMP\}\/\$\{\{ matrix\.repository \}\}-release-candidate-contract\.json"[\s\S]*--image="\$\{\{ matrix\.image \}\}"[\s\S]*--local-role-verification="\$\{\{ matrix\.local_role_verification \}\}"[\s\S]*--digest="\$\{DIGEST\}"/.test(
       publishSteps[recordIndex]?.run ?? '',
     ) ||
     JSON.stringify(publishSteps[recordUploadIndex]?.with) !==
@@ -991,10 +1015,10 @@ function auditReleaseWorkflow(source) {
       localCatalogDeploymentSteps[5]?.run ?? '',
     ) ||
     localCatalogDeploymentSteps[6]?.id !== 'local-selection' ||
-    !/ql3-deployment-lock-contract\.cjs[\s\S]*--mode=local-create[\s\S]*--consumption-bundle="\$\{CONSUMPTION_BUNDLE\}"[\s\S]*--allow-root-service=false[\s\S]*--output="\$\{selection\}"[\s\S]*ql3-deployment-lock-contract\.cjs[\s\S]*--mode=local-audit[\s\S]*--selection="\$\{selection\}"[\s\S]*selection-digest=\$\{selection\.selectionDigest\}[\s\S]*image=\$\{selection\.service\.image\}/u.test(
+    !/ql3-deployment-lock-contract\.cjs[\s\S]*--mode=local-create[\s\S]*--consumption-bundle="\$\{CONSUMPTION_BUNDLE\}"[\s\S]*--allow-root-service=false[\s\S]*--output="\$\{selection\}"[\s\S]*ql3-deployment-lock-contract\.cjs[\s\S]*--mode=local-audit[\s\S]*--selection="\$\{selection\}"[\s\S]*selection-digest=\$\{selection\.selectionDigest\}[\s\S]*image=\$\{selection\.service\.image\}[\s\S]*operator-image=\$\{selection\.operator\.image\}/u.test(
       localCatalogDeploymentSteps[6]?.run ?? '',
     ) ||
-    !/docker pull "\$\{IMAGE\}"[\s\S]*for profile in edge standalone[\s\S]*ql3-local-compose-rollout-live-contract\.cjs[\s\S]*--image="\$\{IMAGE\}"[\s\S]*--profile="\$\{profile\}"[\s\S]*--release-selection="\$\{RELEASE_SELECTION\}"[\s\S]*--expected-selection-digest="\$\{SELECTION_DIGEST\}"[\s\S]*verified_release_catalog[\s\S]*catalogConsumptionDigest/u.test(
+    !/docker pull "\$\{IMAGE\}"[\s\S]*docker pull "\$\{OPERATOR_IMAGE\}"[\s\S]*"\$\{OPERATOR_IMAGE\}" --version[\s\S]*"\$\{OPERATOR_IMAGE\}" setup --help[\s\S]*for profile in edge standalone[\s\S]*ql3-local-compose-rollout-live-contract\.cjs[\s\S]*--image="\$\{IMAGE\}"[\s\S]*--profile="\$\{profile\}"[\s\S]*--release-selection="\$\{RELEASE_SELECTION\}"[\s\S]*--expected-selection-digest="\$\{SELECTION_DIGEST\}"[\s\S]*verified_release_catalog[\s\S]*catalogConsumptionDigest/u.test(
       localCatalogDeploymentSteps[7]?.run ?? '',
     ) ||
     localCatalogDeploymentSteps[8]?.if !== 'always()' ||
@@ -1540,7 +1564,14 @@ function auditReleaseWorkflow(source) {
       immutableArtifactRetentionDays: 1,
       attestedToPublishedDigest: true,
     },
-    images: ['control', 'control-ai', 'admin', 'worker', 'local'],
+    images: [
+      'control',
+      'control-ai',
+      'admin',
+      'worker',
+      'local',
+      'local-operator',
+    ],
     platforms: ['linux/amd64', 'linux/arm64'],
     keylessSignature: true,
     buildkitAttestations: ['sbom', 'provenance'],
@@ -1578,7 +1609,7 @@ function auditReleaseWorkflow(source) {
     },
     durableCatalog: {
       repository: 'qinglong3-release-catalog',
-      artifactType: 'application/vnd.qinglong.release-set.v3+json',
+      artifactType: 'application/vnd.qinglong.release-set.v4+json',
       planSchema: 'qinglong/release-catalog-plan@v2',
       receiptSchema: 'qinglong/release-catalog-receipt@v2',
       tagInventoryDecisionSchema:

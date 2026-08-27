@@ -120,6 +120,14 @@ function resolveReleaseSelection(input, temporaryRoot, uid) {
   const unsigned = { ...selection };
   delete unsigned.selectionDigest;
   const computedDigest = sha256(JSON.stringify(unsigned));
+  const applicationImageMatch =
+    /^ghcr\.io\/([a-z0-9](?:[a-z0-9-]{0,38}))\/qinglong3-local-application@sha256:[a-f0-9]{64}$/u.exec(
+      selection.service?.image ?? '',
+    );
+  const operatorImageMatch =
+    /^ghcr\.io\/([a-z0-9](?:[a-z0-9-]{0,38}))\/qinglong3-local-operator@sha256:[a-f0-9]{64}$/u.exec(
+      selection.operator?.image ?? '',
+    );
   if (
     !stat.isFile() ||
     stat.isSymbolicLink() ||
@@ -135,7 +143,7 @@ function resolveReleaseSelection(input, temporaryRoot, uid) {
     computedDigest !== input.releaseSelection.expectedSelectionDigest ||
     selection.selectionDigest !== computedDigest ||
     selection.schemaVersion !== 1 ||
-    selection.schema !== 'qinglong/local-compose-release-image@v2' ||
+    selection.schema !== 'qinglong/local-compose-release-image@v3' ||
     !/^3\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/u.test(
       selection.release?.version ?? '',
     ) ||
@@ -148,6 +156,11 @@ function resolveReleaseSelection(input, temporaryRoot, uid) {
     selection.service?.kind !== 'compose' ||
     selection.service?.image !== input.image ||
     selection.service?.allowRootService !== (uid === 0) ||
+    !applicationImageMatch ||
+    !operatorImageMatch ||
+    applicationImageMatch[1] !== operatorImageMatch[1] ||
+    selection.operator?.kind !== 'short-lived' ||
+    selection.operator?.network !== 'none-by-default' ||
     selection.catalog?.schema !==
       'qinglong/release-catalog-consumption-ceremony@v1' ||
     !DIGEST_PATTERN.test(selection.catalog?.manifestDigest ?? '') ||

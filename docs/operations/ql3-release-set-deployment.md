@@ -15,7 +15,7 @@ ghcr.io/<owner>/qinglong3-release-catalog:v<version>-<scope>
 
 ## 私有发布证据收据链
 
-当前长期 authority 是 `qinglong/release-set@v3`。`local` scope 的 `evidenceReceipts` 必须为空；`cluster|all` 必须按顺序恰好包含
+当前长期 authority 是 `qinglong/release-set@v4`。`local` scope 的 `evidenceReceipts` 必须为空；`cluster|all` 必须按顺序恰好包含
 `worker-management` 与 `cloudnativepg-disaster-recovery` 两份 `qinglong/private-release-evidence-receipt@v2`。每份收据绑定同一
 version/source tag/revision/scope、24 小时 freshness、私有报告 digest 和自身 digest；DR 收据还绑定 CloudNativePG backup、Barman Cloud 与
 cert-manager 三项静态审计摘要。v2 收据不持久化私有 runner 的 wall-clock：创建时仍必须以当前时钟完成 freshness gate，但 durable JSON 只绑定
@@ -23,7 +23,7 @@ cert-manager 三项静态审计摘要。v2 收据不持久化私有 runner 的 w
 
 这些收据不包含原始生产报告、路径、credential、token、Kubernetes object 或 transcript。公开 consumer 可以重算收据和 release-set digest，
 但必须保持 `publicConsumerReplay=not_possible_without_private_reports`；它不能声称重放了私有现场结果。原始报告不上传，只有收据以 1 天 artifact
-从私有 job 交给 release-set job，随后完整嵌入 release-set v3 并由 durable catalog 长期保护。公开收据同时声明
+从私有 job 交给 release-set job，随后完整嵌入 release-set v4 并由 durable catalog 长期保护。公开收据同时声明
 `freshnessValidatedAtCreation=true` 与 `durableValidationClockPublished=false`，避免把未发布的临时时钟伪装成可离线重放的现场证据。
 
 创建时通过不等于可以无限期等待再闭合发布。`cluster|all` 的 release-set aggregate 与紧随其后的 independent audit 会各自从 runner 内部取得当前
@@ -42,8 +42,9 @@ attested 后写入。catalog 先存在而部署门失败时，不会产生正式
 deployment-ready 版本公告。
 
 `local|all` scope 在 durable catalog 发布后启动独立 `release-catalog-local-deployment-live`。它与 publisher 权限隔离，从公开 catalog
-重新完成发现、Cosign/GitHub provenance 验证和 three-file bundle audit，随后物化唯一 Local v2 selection。该 selection 不是只做 JSON
-检查：同一个 immutable Local image 与 selection 会依次进入 Edge、Standalone 的正式 Compose rollout、SQLite backup/restore、evidence
+重新完成发现、Cosign/GitHub provenance 验证和 three-file bundle audit，随后物化唯一 Local v3 selection。该 selection 同时绑定常驻
+Application 与短生命周期 operator，但不会把 operator 写成 Compose service。operator 先在无网络、只读、drop-all 和 128 MiB/0.5 CPU
+边界内完成入口验证；随后同一个 immutable Application 与 selection 依次进入 Edge、Standalone 的正式 Compose rollout、SQLite backup/restore、evidence
 collection 和 graceful stop。两个 content-free report 必须绑定同一 release-set、catalog manifest、consumption report 与 selection digest；
 任一 Profile 失败都会阻断 Local release。
 
@@ -100,9 +101,9 @@ attestation 仍必须通过受保护 release tag 或受控 release repository �
 
 | 部署类型 | release scope | 必须出现的镜像 |
 | --- | --- | --- |
-| 低配路由器、Edge、Standalone | `local` | `local` |
+| 低配路由器、Edge、Standalone | `local` | `local`、`local-operator` |
 | Kubernetes/Cluster | `cluster` | `control`、`control-ai`、`worker`、`admin` |
-| 同时发布两族 | `all` | 上述五个镜像 |
+| 同时发布两族 | `all` | 上述六个镜像 |
 
 Local 用户不需要下载 Cluster 镜像，也不依赖 CloudNativePG 或 Worker 私有发布证据。Cluster 运维者不能拿 Local
 image 的证明替代任一角色镜像；尤其 Worker 与短生命周期 Admin 必须有各自 digest。
@@ -451,12 +452,12 @@ SHA-256，`receipt.expectedDigest` 是 receipt 内的 `receiptDigest`。审计�
 1. 只接受已验证 Cosign exact workflow identity 与 GitHub source tag/revision provenance 的 catalog immutable
    reference；discovery tag 无 authority。
 2. materializer 只能接受完整 `qinglong/release-catalog-consumption-ceremony@v1` bundle，不能接受旧的松散 `--release-set`；其中
-   `qinglong/release-set@v3` 的 `release.version`、`release.sourceRef`、`release.sourceRevision`、`release.scope` 必须与变更单一致。
+   `qinglong/release-set@v4` 的 `release.version`、`release.sourceRef`、`release.sourceRevision`、`release.scope` 必须与变更单一致。
 3. 镜像集合必须与上表精确相等；每个 `reference` 必须是 digest reference，且 owner/repository 与部署目标一致。
 4. Local scope 必须为零私有收据；Cluster/All 必须精确包含两份同 source、同 scope、自摘要有效且 freshness 闭合的 content-free 收据。
    static lock compatible 不等于现场证据已公开重放，任何 consumer 都必须保留该限制。
 5. Kubernetes 必须先渲染 overlay，再用离线 post-render materializer 生成和复验 v2 locked manifest；嵌套 overlay 的
-   `newName`/digest 不是最终 authority。Local 必须生成并审计 v2 service selection。两族输出都必须绑定同一 catalog manifest、
+   `newName`/digest 不是最终 authority。Local 必须生成并审计 v3 Application/operator selection。两族输出都必须绑定同一 catalog manifest、
    consumption report 与 release-set digest，并且只能消费 release set 中的 `@sha256:` reference。
 6. rollout 前再次确认 catalog receipt/immutable reference 与已检查文件一致。Kubernetes 必须把 locked manifest/report、pinned
    kubectl/kubeconfig 和目标 cluster UID 绑定进 preflight/apply receipt；version/source/catalog tag 都只能用于发现，部署始终以
@@ -466,7 +467,9 @@ SHA-256，`receipt.expectedDigest` 是 receipt 内的 `receiptDigest`。审计�
 
 路由器或其他低配 Edge 设备不需要安装 Node、regctl、Cosign、GitHub CLI、Kustomize 或 materializer。维护者在可信工作站
 完成上述 ceremony 和 Local v2 selection 审计，再向设备传输已检查的 catalog-bound canonical JSON，并只把 `local` family 的
-immutable image reference 写入 compose/rollout。
+immutable Application image reference 写入 compose/rollout。operator 镜像只在 setup、upgrade、recovery 等显式管理动作期间按 digest 拉取并短暂运行；
+它没有 listener、timer 或常驻 service，因此设备稳态仍只有 Application。设备不执行管理动作时可以不保留 operator layer，但每次管理动作必须先验证
+selection 中的 exact operator digest，不能用 Application 入口或宿主 Node 代替。
 设备不下载 Cluster 四镜像，也不加载 Kubernetes、CloudNativePG、PostgreSQL driver 或 Worker 私有发布证据。
 
 如果设备本身不运行容器 registry client，可由工作站按 digest 拉取并通过既有离线交付渠道传送镜像；离线包的哈希与

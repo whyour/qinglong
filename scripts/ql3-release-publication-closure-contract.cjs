@@ -311,10 +311,10 @@ function validatePublicationPlan(plan) {
     !Array.isArray(plan.images) ||
     plan.images.length !==
       (plan.release.scope === 'local'
-        ? 1
+        ? 2
         : plan.release.scope === 'cluster'
         ? 4
-        : 5)
+        : 6)
   ) {
     fail('publication plan shape is invalid');
   }

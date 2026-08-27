@@ -23,7 +23,14 @@ const releaseSource = fs.readFileSync(
 test('accepts the reviewed native CI and digest release contracts', () => {
   assert.deepEqual(auditClusterImageRelease(root), {
     ci: {
-      images: ['control', 'control-ai', 'admin', 'local', 'worker'],
+      images: [
+        'control',
+        'control-ai',
+        'admin',
+        'local',
+        'local-operator',
+        'worker',
+      ],
       nativeArchitectures: ['amd64', 'arm64'],
       runtimeInventory: true,
       clusterAdminProductFacade: true,
@@ -85,7 +92,14 @@ test('accepts the reviewed native CI and digest release contracts', () => {
         immutableArtifactRetentionDays: 1,
         attestedToPublishedDigest: true,
       },
-      images: ['control', 'control-ai', 'admin', 'worker', 'local'],
+      images: [
+        'control',
+        'control-ai',
+        'admin',
+        'worker',
+        'local',
+        'local-operator',
+      ],
       platforms: ['linux/amd64', 'linux/arm64'],
       keylessSignature: true,
       buildkitAttestations: ['sbom', 'provenance'],
@@ -123,7 +137,7 @@ test('accepts the reviewed native CI and digest release contracts', () => {
       },
       durableCatalog: {
         repository: 'qinglong3-release-catalog',
-        artifactType: 'application/vnd.qinglong.release-set.v3+json',
+        artifactType: 'application/vnd.qinglong.release-set.v4+json',
         planSchema: 'qinglong/release-catalog-plan@v2',
         receiptSchema: 'qinglong/release-catalog-receipt@v2',
         tagInventoryDecisionSchema:

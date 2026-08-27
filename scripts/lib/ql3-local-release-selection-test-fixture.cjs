@@ -12,9 +12,15 @@ function writeSyntheticLocalReleaseSelection(options) {
   const releaseSetDigest = sha256(`release-set:${options.image}`);
   const manifestDigest = sha256(`catalog-manifest:${options.image}`);
   const consumptionReportDigest = sha256(`catalog-report:${options.image}`);
+  const operatorImage =
+    options.operatorImage ||
+    options.image.replace(
+      '/qinglong3-local-application@',
+      '/qinglong3-local-operator@',
+    );
   const unsigned = {
     schemaVersion: 1,
-    schema: 'qinglong/local-compose-release-image@v2',
+    schema: 'qinglong/local-compose-release-image@v3',
     release: {
       version: '3.0.0-alpha.0',
       sourceRevision: options.sourceRevision ?? '3'.repeat(40),
@@ -38,6 +44,11 @@ function writeSyntheticLocalReleaseSelection(options) {
       kind: 'compose',
       image: options.image,
       allowRootService: options.allowRootService,
+    },
+    operator: {
+      kind: 'short-lived',
+      image: operatorImage,
+      network: 'none-by-default',
     },
     verification: {
       releaseSet: 'standalone_structure_identity_and_self_digest',

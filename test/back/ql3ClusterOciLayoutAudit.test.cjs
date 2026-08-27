@@ -29,6 +29,7 @@ function createFixture(t, options = {}) {
   const isControl = image === 'control' || image === 'control-ai';
   const isControlAi = image === 'control-ai';
   const isLocal = image === 'local';
+  const isLocalOperator = image === 'local-operator';
   const isWorker = image === 'worker';
   const layoutRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-oci-layout-'));
   t.after(() => fs.rmSync(layoutRoot, { recursive: true, force: true }));
@@ -103,7 +104,7 @@ function createFixture(t, options = {}) {
               ? '0:0'
               : isWorker
               ? '65532:65532'
-              : isLocal
+              : isLocal || isLocalOperator
               ? '65532:65532'
               : '10001:10001',
           ...(isControl ? { ExposedPorts: { '5800/tcp': {} } } : {}),
@@ -119,6 +120,8 @@ function createFixture(t, options = {}) {
               ? '/opt/qinglong/node_modules/@qinglong/worker-runtime/dist/process/workerProcessCli.js'
               : isLocal
               ? '/opt/qinglong/node_modules/@qinglong/local-application/dist/cli.js'
+              : isLocalOperator
+              ? '/opt/qinglong/node_modules/@qinglong/local-owner-cli/dist/product-cli/cli.js'
               : isControl
               ? isControlAi
                 ? '/opt/qinglong/node_modules/@qinglong/cluster-control/dist/aiCli.js'
@@ -144,8 +147,17 @@ function createFixture(t, options = {}) {
                   'io.qinglong.profile': 'edge,standalone',
                 }
               : {}),
+            ...(isLocalOperator
+              ? {
+                  'io.qinglong.authority': 'local-owner-management',
+                  'io.qinglong.lifecycle': 'short-lived',
+                  'io.qinglong.network': 'none-by-default',
+                }
+              : {}),
             'org.opencontainers.image.description': isLocal
               ? 'QingLong 3.0 AI-excluded Edge and Standalone runtime'
+              : isLocalOperator
+              ? 'QingLong 3.0 short-lived Local management authority'
               : isWorker
               ? 'QingLong 3.0 headless Remote Worker runtime'
               : isControl
@@ -159,6 +171,8 @@ function createFixture(t, options = {}) {
               'https://github.com/whyour/qinglong',
             'org.opencontainers.image.title': isLocal
               ? 'QingLong 3.0 Local Application'
+              : isLocalOperator
+              ? 'QingLong 3.0 Local Operator'
               : isWorker
               ? 'QingLong 3.0 Worker'
               : isControl
@@ -166,7 +180,11 @@ function createFixture(t, options = {}) {
                 ? 'QingLong 3.0 Cluster Control AI'
                 : 'QingLong 3.0 Cluster Control'
               : 'QingLong 3.0 Cluster Admin',
-            ...(isLocal || isWorker || isControl || image === 'admin'
+            ...(isLocal ||
+            isLocalOperator ||
+            isWorker ||
+            isControl ||
+            image === 'admin'
               ? {
                   'org.opencontainers.image.version': version,
                 }
@@ -376,6 +394,21 @@ test('accepts the AI-excluded local image and attestation closure', (t) => {
   assert.deepEqual(
     report.platforms.map((entry) => entry.spdxApplicationPackages),
     [10, 10],
+  );
+});
+
+test('accepts the short-lived Local operator image and attestation closure', (t) => {
+  const report = auditClusterOciLayout({
+    root,
+    layoutRoot: createFixture(t, { image: 'local-operator' }),
+    expectedRevision: revision,
+    image: 'local-operator',
+  });
+  assert.equal(report.image, 'local-operator');
+  assert.equal(report.maximumPlatformBytes, 128 * 1024 * 1024);
+  assert.deepEqual(
+    report.platforms.map((entry) => entry.spdxApplicationPackages),
+    [9, 9],
   );
 });
 

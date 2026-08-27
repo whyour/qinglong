@@ -31,7 +31,7 @@ test('freezes an independent low-resource local release family', () => {
   });
   assert.deepEqual(
     contract.images.map((entry) => entry.image),
-    ['local'],
+    ['local', 'local-operator'],
   );
   assert.equal(contract.releasePlan.clusterEvidenceRequired, false);
   assert.deepEqual(contract.deploymentFamilies.local.profiles, [
@@ -78,7 +78,7 @@ test('freezes an independent low-resource local release family', () => {
       contractDigest: contract.contractDigest,
       releaseScope: 'local',
       workspacePackageCount: 18,
-      images: ['local'],
+      images: ['local', 'local-operator'],
       clusterEvidenceRequired: false,
     },
   );
@@ -141,10 +141,14 @@ test('combines local and cluster families without weakening either gate', () => 
   });
   assert.deepEqual(
     contract.images.map((entry) => entry.image),
-    ['control', 'control-ai', 'admin', 'worker', 'local'],
+    ['control', 'control-ai', 'admin', 'worker', 'local', 'local-operator'],
   );
   assert.equal(
     contract.requiredGates.includes('edge-and-standalone-rollout'),
+    true,
+  );
+  assert.equal(
+    contract.requiredGates.includes('local-operator-entrypoint'),
     true,
   );
   assert.equal(
