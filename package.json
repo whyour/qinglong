@@ -43,6 +43,7 @@
     "finalize:local-alpha-milestone:ql3": "node scripts/ql3-local-alpha-milestone.cjs",
     "bundle:cluster-alpha:ql3": "node scripts/ql3-cluster-alpha-bundle.cjs",
     "finalize:cluster-alpha-milestone:ql3": "node scripts/ql3-cluster-alpha-milestone.cjs",
+    "finalize:alpha-stage-index:ql3": "node scripts/ql3-alpha-stage-index.cjs",
     "audit:local-api-cancellation-live:ql3": "node scripts/ql3-local-api-cancellation-live-audit.cjs",
     "test:provider-credential-test-kubernetes-live:ql3": "pnpm --filter @qinglong/cluster-admin build && node scripts/ql3-provider-credential-test-kubernetes-live-contract.cjs",
     "audit:provider-credential-test-kubernetes-live:ql3": "node scripts/ql3-provider-credential-test-kubernetes-live-audit.cjs",

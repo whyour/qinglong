@@ -6,10 +6,12 @@
 - 目标版本：QingLong 3.x
 - 作者：QingLong Maintainers
 - 创建日期：2026-07-17
-- 最后更新：2026-08-27
+- 最后更新：2026-08-28
 - 讨论范围：架构与演进路线，不包含最终 UI 视觉方案
 
-最新增量证据（2026-08-27）：
+最新增量证据（2026-08-28）：
+
+- D-415/ADR-0510（已实现，首份真实 stage index 待授权）：二十天开发形成的 Local 与 Cluster 候选现在有统一、面向部署者的最外层阶段交付入口。新增 `qinglong/alpha-stage-index@v1` finalizer/auditor，仅在显式 `produce_alpha_artifacts=true + alpha_artifact_scope=all` 且 Local/Cluster milestone 都成功后运行；它重新离线审计两个索引，要求 version/source/workflow SHA/ref/run/attempt 完全一致，记录两个 milestone manifest digest，并为 amd64/arm64 写出机器可读选择：低配 Edge/Standalone 只下载一个 Local Trial Kit、稳态只运行 Application 且 Operator 短时启动；Cluster 下载 control/admin/worker，按需增加 control-ai。跨索引审计必须同时持有 stage 与两个 milestone，拒绝跨运行混用、内容/选择漂移和额外文件。该索引不重复十个大 archive，不改变 Local-only/Cluster-only 授权路径，也不冒充受保护 tag、GHCR immutable digest、签名、正式 OCI catalog、生产 deployment lock 或 HA；普通 push/PR 不生成实际阶段 artifact。实现不新增 workspace package、runtime dependency、镜像 layer、端口、daemon、timer、连接池或 Edge/Standalone 稳态 RSS。
 
 - D-414/ADR-0509（已实现，首份真实 Cluster milestone artifact 待授权）：开发约二十天后，Cluster 阶段产物不再是八个由 workflow 内联 shell 自报 `passed` 的松散 archive。新增统一 `qinglong/alpha-cluster-image@v1` materializer/auditor，固定 control/control-ai/admin/worker 的 repository、OCI title、non-root user 和 amd64/arm64 identity；每个六文件 bundle 含单镜像 Docker archive、精确 SBOM、绑定 source/workflow SHA/ref/run/attempt/role/architecture/image ID 的 verification evidence、README、manifest 与 `SHA256SUMS`，下载后可无 Docker/网络离线复核闭合文件集和内容 digest。新增完整 CI 后置 `cluster-alpha-milestone` finalizer，重新下载八个 artifact，要求同一 version/source/run/attempt 且八个 image ID/archive digest/verification digest 互异，再上传 `qinglong/alpha-cluster-milestone@v1` 三文件索引；没有该索引的部分 archive 只是失败运行中间件。maturity 明确为 `cluster_integration_candidate_not_public_release`，适用于隔离 registry/K3s/Kubernetes 集成，不冒充受保护 tag、GHCR digest、签名、catalog 或生产 HA。实现不新增 workspace package、runtime dependency、镜像 layer、端口、daemon、timer、连接池或 Edge/Standalone 稳态 RSS；首份实际产物仍需维护者明确触发 `produce_alpha_artifacts=true + alpha_artifact_scope=cluster`。
 

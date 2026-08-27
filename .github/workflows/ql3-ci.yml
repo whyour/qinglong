@@ -1804,3 +1804,58 @@ jobs:
           compression-level: 0
           overwrite: false
           include-hidden-files: false
+
+  alpha-stage-index:
+    name: Finalize the cross-profile Alpha stage index
+    if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && inputs.alpha_artifact_scope == 'all'
+    needs:
+      - local-alpha-milestone
+      - cluster-alpha-milestone
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+      - name: Download the closed Local Alpha milestone
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-local-milestone
+          path: ${{ runner.temp }}/ql3-alpha-stage-input/local
+      - name: Download the closed Cluster Alpha milestone
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-cluster-milestone
+          path: ${{ runner.temp }}/ql3-alpha-stage-input/cluster
+      - name: Close both deployment classes into one stage index
+        run: |
+          set -euo pipefail
+          umask 077
+          node scripts/ql3-alpha-stage-index.cjs \
+            --mode=finalize \
+            --local-milestone="${RUNNER_TEMP}/ql3-alpha-stage-input/local" \
+            --cluster-milestone="${RUNNER_TEMP}/ql3-alpha-stage-input/cluster" \
+            --source-revision=${{ github.sha }} \
+            --repository=${{ github.repository }} \
+            --workflow-ref="${{ github.workflow_ref }}" \
+            --workflow-sha=${{ github.workflow_sha }} \
+            --event=${{ github.event_name }} \
+            --run-id=${{ github.run_id }} \
+            --run-attempt=${{ github.run_attempt }} \
+            --readme=docs/operations/ql3-alpha-stage-index.md \
+            --output="${RUNNER_TEMP}/ql3-alpha-stage-index"
+          node scripts/ql3-alpha-stage-index.cjs \
+            --mode=audit \
+            --stage="${RUNNER_TEMP}/ql3-alpha-stage-index" \
+            --local-milestone="${RUNNER_TEMP}/ql3-alpha-stage-input/local" \
+            --cluster-milestone="${RUNNER_TEMP}/ql3-alpha-stage-input/cluster"
+      - name: Upload the closed cross-profile Alpha stage index
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-stage-index
+          path: ${{ runner.temp }}/ql3-alpha-stage-index
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false

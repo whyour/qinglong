@@ -513,6 +513,7 @@
 | [ADR-0507](./ADR-0507-public-local-application-and-operator-release-pair.md)                        | Public Local Application 与 Operator 发布对                                                                                                                                                                            | Accepted（首份真实公开发布待受保护 tag） |
 | [ADR-0508](./ADR-0508-cross-architecture-local-alpha-milestone-closure.md)                          | 跨架构 Local Alpha 里程碑闭合                                                                                                                                                                                            | Accepted（首份实际 milestone artifact 待维护者授权） |
 | [ADR-0509](./ADR-0509-cluster-alpha-bundle-and-milestone-closure.md)                                | Cluster Alpha Bundle 与跨架构里程碑闭合                                                                                                                                                                                   | Accepted（首份实际 Cluster milestone artifact 待维护者授权） |
+| [ADR-0510](./ADR-0510-cross-profile-alpha-stage-delivery-index.md)                                  | 跨 Profile Alpha 阶段交付索引                                                                                                                                                                                              | Accepted（首份实际 stage index 待维护者授权） |
 
 ## 规则
 

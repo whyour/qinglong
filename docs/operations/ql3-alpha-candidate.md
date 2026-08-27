@@ -13,6 +13,8 @@
 
 `Local Alpha Trial Kit + Local milestone index` 是本阶段的用户可试运行产物；`Cluster Integration Candidate + Cluster milestone index` 是集群部署者可下载、可离线验真的集成产物。单个 headless runtime、单个 Cluster archive 或没有 milestone index 的部分矩阵产物都只是工程中间件。Cluster milestone 仍不满足正式 Kubernetes deployment-lock 的 GHCR immutable digest 与 catalog provenance。
 
+当维护者显式选择 `alpha_artifact_scope=all` 时，还会生成 `Alpha stage index`。它把同一次 run 的 Local/Cluster milestone 交叉绑定，并为 Edge、Standalone、Cluster 给出目标架构的最小 artifact 选择；这是阶段交付导航，不是正式 release catalog。只生成 Local 或 Cluster 时，各自 milestone 仍可独立成立，不制造一个不完整的总索引。
+
 ## 当前阶段实物（2026-08-27）
 
 提交 `4239464af6937d56528a0a2c573d12329bc7ca55` 已形成最新 owner-private arm64 工程候选：
@@ -36,6 +38,7 @@ ADR-0506 现要求 `qinglong/alpha-local-trial-kit@v2` 额外包含 `verificatio
 - `ql3-alpha-<commit>-local-milestone`；
 - `ql3-alpha-<commit>-control-<arch>`、`control-ai-<arch>`、`admin-<arch>`、`worker-<arch>`。
 - `ql3-alpha-<commit>-cluster-milestone`。
+- 仅 `alpha_artifact_scope=all`：`ql3-alpha-<commit>-stage-index`。
 
 Local artifact 含：
 
@@ -46,6 +49,8 @@ Local artifact 含：
 - 面向 Local 用户的 README 与覆盖全部内容文件的 `SHA256SUMS`。
 
 Cluster artifact 是每角色/架构一个六文件闭包：native Docker archive、精确 CycloneDX SBOM、workflow-bound verification evidence、README、`qinglong/alpha-cluster-image@v1` manifest 和覆盖全部内容文件的 `SHA256SUMS`。完整 CI 成功后，八个 bundle 由 `qinglong/alpha-cluster-milestone@v1` 小型索引闭合；索引本身不重复存放大 archive。
+
+Stage index 是 `qinglong/alpha-stage-index@v1` 三文件闭包。它重新审计两个 milestone，要求 version/source/workflow SHA/ref/run/attempt 一致，并把路由/NAS 的单 Local Trial Kit 与 Cluster 的 control/admin/worker 最小集、可选 control-ai 写为机器可读选择；它不重复存放任何镜像 archive。
 
 任何 required job 失败时不上传对应产物。artifact 名和 archive 内的 `ci-*` tag 都表示 commit-bound candidate，不能改名后冒充 `v3.x` release。
 
