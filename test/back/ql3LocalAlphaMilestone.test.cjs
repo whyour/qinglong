@@ -256,13 +256,19 @@ test('workflow audit rejects a partial milestone finalizer', (t) => {
   fs.mkdirSync(path.join(fixtureRoot, '.github/workflows'), {
     recursive: true,
   });
-  const workflow = fs
-    .readFileSync(path.join(root, '.github/workflows/ql3-ci.yml'), 'utf8')
+  const source = fs.readFileSync(
+    path.join(root, '.github/workflows/ql3-ci.yml'),
+    'utf8',
+  );
+  const marker = '\n  local-alpha-milestone:\n';
+  const markerIndex = source.indexOf(marker);
+  const workflow = `${source.slice(0, markerIndex)}${source
+    .slice(markerIndex)
     .replace('      - cluster-postgres-ha\n', '')
     .replace(
       'scripts/ql3-local-alpha-milestone.cjs',
       'scripts/unreviewed-finalizer.cjs',
-    );
+    )}`;
   fs.writeFileSync(
     path.join(fixtureRoot, '.github/workflows/ql3-ci.yml'),
     workflow,

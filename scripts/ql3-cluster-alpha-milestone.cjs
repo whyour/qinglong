@@ -5,14 +5,20 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  auditLocalAlphaTrialKit,
+  ARCHITECTURES,
+  ROLES,
+  auditClusterAlphaBundle,
   sha256File,
-} = require('./ql3-local-alpha-trial-kit-bundle.cjs');
+} = require('./ql3-cluster-alpha-bundle.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-milestone@v1';
-const ARCHITECTURES = Object.freeze(['amd64', 'arm64']);
+const SCHEMA = 'qinglong/alpha-cluster-milestone@v1';
+const SUBJECTS = Object.freeze(
+  Object.keys(ROLES).flatMap((role) =>
+    ARCHITECTURES.map((architecture) => `${role}-${architecture}`),
+  ),
+);
 const FILES = Object.freeze({
   readme: 'README.md',
   manifest: 'manifest.json',
@@ -22,7 +28,7 @@ const WORKFLOW_IDENTITY = Object.freeze({
   repository: 'whyour/qinglong',
   workflowRef: 'whyour/qinglong/.github/workflows/ql3-ci.yml@refs/heads/next',
   event: 'workflow_dispatch',
-  job: 'local-alpha-milestone',
+  job: 'cluster-alpha-milestone',
 });
 const REQUIRED_WORKFLOW_NEEDS = Object.freeze([
   'backend',
@@ -120,14 +126,25 @@ function fileRecord(filePath, name) {
   });
 }
 
-function checksumContents(root, names) {
-  return `${names
+function checksumContents(root, checkedNames) {
+  return `${checkedNames
     .map((name) => `${sha256File(path.join(root, name)).slice(7)}  ${name}`)
     .join('\n')}\n`;
 }
 
-function artifactName(sourceRevision, architecture) {
-  return `ql3-alpha-${sourceRevision}-local-${architecture}`;
+function artifactName(sourceRevision, role, architecture) {
+  return `ql3-alpha-${sourceRevision}-${role}-${architecture}`;
+}
+
+function splitSubject(subject) {
+  const architecture = ARCHITECTURES.find((value) =>
+    subject.endsWith(`-${value}`),
+  );
+  if (!architecture) fail(`milestone subject is invalid: ${subject}`);
+  return Object.freeze({
+    role: subject.slice(0, -(architecture.length + 1)),
+    architecture,
+  });
 }
 
 function validateIdentity(options) {
@@ -140,7 +157,7 @@ function validateIdentity(options) {
     !DECIMAL_ID_PATTERN.test(options.runId || '') ||
     !ATTEMPT_PATTERN.test(options.runAttempt || '')
   ) {
-    fail('milestone workflow identity is invalid');
+    fail('Cluster milestone workflow identity is invalid');
   }
 }
 
@@ -154,20 +171,20 @@ function validateFinalizeOptions(options) {
     fs.existsSync(outputRoot) ||
     fs.realpathSync(parent) !== parent
   ) {
-    fail('milestone output is invalid');
+    fail('Cluster milestone output is invalid');
   }
   const bundles = {};
-  for (const architecture of ARCHITECTURES) {
+  for (const subject of SUBJECTS) {
     const bundleRoot = fs.realpathSync(
-      path.resolve(options.bundles?.[architecture] || ''),
+      path.resolve(options.bundles?.[subject] || ''),
     );
     if (!fs.lstatSync(bundleRoot).isDirectory()) {
-      fail(`${architecture} bundle root is invalid`);
+      fail(`${subject} bundle root is invalid`);
     }
-    bundles[architecture] = bundleRoot;
+    bundles[subject] = bundleRoot;
   }
-  if (bundles.amd64 === bundles.arm64) {
-    fail('milestone architectures must use distinct bundles');
+  if (new Set(Object.values(bundles)).size !== SUBJECTS.length) {
+    fail('Cluster milestone subjects must use distinct bundles');
   }
   return Object.freeze({
     root,
@@ -176,7 +193,7 @@ function validateFinalizeOptions(options) {
     readme: assertCanonicalFile(
       options.readme,
       MAX_README_BYTES,
-      'milestone README',
+      'Cluster milestone README',
     ),
     sourceRevision: options.sourceRevision,
     repository: options.repository,
@@ -188,45 +205,49 @@ function validateFinalizeOptions(options) {
   });
 }
 
-function bundleRecord(options, architecture) {
-  const bundleRoot = options.bundles[architecture];
-  const report = auditLocalAlphaTrialKit({ bundleRoot });
+function bundleRecord(options, subject) {
+  const { role, architecture } = splitSubject(subject);
+  const bundleRoot = options.bundles[subject];
+  const report = auditClusterAlphaBundle({ bundleRoot });
   if (
     report.compatible !== true ||
+    report.role !== role ||
     report.architecture !== architecture ||
     report.sourceRevision !== options.sourceRevision ||
     report.workflowRunId !== options.runId ||
     report.workflowRunAttempt !== options.runAttempt
   ) {
-    fail(`${architecture} trial kit is detached from the milestone run`);
+    fail(`${subject} bundle is detached from the Cluster milestone run`);
   }
   return Object.freeze({
-    artifactName: artifactName(options.sourceRevision, architecture),
+    artifactName: artifactName(options.sourceRevision, role, architecture),
+    role,
     architecture,
     bundleManifest: fileRecord(
       path.join(bundleRoot, 'manifest.json'),
       'manifest.json',
     ),
     archiveSha256: report.archiveSha256,
-    applicationImageId: report.applicationImageId,
-    operatorImageId: report.operatorImageId,
+    imageId: report.imageId,
     verificationSha256: report.verificationSha256,
   });
 }
 
-function validateArtifactRecord(record, architecture, manifest) {
+function validateArtifactRecord(record, subject, manifest) {
+  const { role, architecture } = splitSubject(subject);
   if (
     !exactKeys(record, [
       'artifactName',
+      'role',
       'architecture',
       'bundleManifest',
       'archiveSha256',
-      'applicationImageId',
-      'operatorImageId',
+      'imageId',
       'verificationSha256',
     ]) ||
     record.artifactName !==
-      artifactName(manifest.sourceRevision, architecture) ||
+      artifactName(manifest.sourceRevision, role, architecture) ||
+    record.role !== role ||
     record.architecture !== architecture ||
     !exactKeys(record.bundleManifest, ['file', 'sha256', 'bytes']) ||
     record.bundleManifest.file !== 'manifest.json' ||
@@ -234,16 +255,14 @@ function validateArtifactRecord(record, architecture, manifest) {
     !Number.isSafeInteger(record.bundleManifest.bytes) ||
     record.bundleManifest.bytes < 2 ||
     !SHA256_PATTERN.test(record.archiveSha256 || '') ||
-    !SHA256_PATTERN.test(record.applicationImageId || '') ||
-    !SHA256_PATTERN.test(record.operatorImageId || '') ||
-    !SHA256_PATTERN.test(record.verificationSha256 || '') ||
-    record.applicationImageId === record.operatorImageId
+    !SHA256_PATTERN.test(record.imageId || '') ||
+    !SHA256_PATTERN.test(record.verificationSha256 || '')
   ) {
-    fail(`${architecture} milestone artifact record is incompatible`);
+    fail(`${subject} milestone artifact record is incompatible`);
   }
 }
 
-function validateWorkflow(document, sourceRevision, runId, runAttempt) {
+function validateWorkflow(document, sourceRevision) {
   if (
     !exactKeys(document, [
       'repository',
@@ -259,38 +278,36 @@ function validateWorkflow(document, sourceRevision, runId, runAttempt) {
     document.workflowSha !== sourceRevision ||
     document.event !== WORKFLOW_IDENTITY.event ||
     document.job !== WORKFLOW_IDENTITY.job ||
-    document.runId !== runId ||
-    document.runAttempt !== runAttempt ||
     !DECIMAL_ID_PATTERN.test(document.runId || '') ||
     !ATTEMPT_PATTERN.test(document.runAttempt || '')
   ) {
-    fail('milestone manifest workflow identity is incompatible');
+    fail('Cluster milestone manifest workflow identity is incompatible');
   }
 }
 
-function auditLocalAlphaMilestone(options) {
+function auditClusterAlphaMilestone(options) {
   const milestoneRoot = fs.realpathSync(
     path.resolve(options.milestoneRoot || ''),
   );
   if (!fs.lstatSync(milestoneRoot).isDirectory()) {
-    fail('milestone root must be a canonical directory');
+    fail('Cluster milestone root must be a canonical directory');
   }
   const expectedFiles = Object.values(FILES).sort();
   const actualFiles = fs
     .readdirSync(milestoneRoot, { withFileTypes: true })
     .map((entry) => {
       if (!entry.isFile() || entry.isSymbolicLink()) {
-        fail(`milestone contains a non-regular entry: ${entry.name}`);
+        fail(`Cluster milestone contains a non-regular entry: ${entry.name}`);
       }
       return entry.name;
     })
     .sort();
   if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles)) {
-    fail('milestone file set is not closed');
+    fail('Cluster milestone file set is not closed');
   }
   const manifest = readBoundedJson(
     path.join(milestoneRoot, FILES.manifest),
-    'milestone manifest',
+    'Cluster milestone manifest',
   );
   if (
     !exactKeys(manifest, [
@@ -306,49 +323,32 @@ function auditLocalAlphaMilestone(options) {
     ]) ||
     manifest.schemaVersion !== 1 ||
     manifest.schema !== SCHEMA ||
-    manifest.maturity !== 'alpha_candidate_not_public_release' ||
-    manifest.product !== 'local' ||
+    manifest.maturity !== 'cluster_integration_candidate_not_public_release' ||
+    manifest.product !== 'cluster' ||
     typeof manifest.version !== 'string' ||
     manifest.version.length < 3 ||
     manifest.version.length > 64 ||
     !REVISION_PATTERN.test(manifest.sourceRevision || '') ||
-    !exactKeys(manifest.artifacts, ARCHITECTURES) ||
+    !exactKeys(manifest.artifacts, SUBJECTS) ||
     !exactKeys(manifest.readme, ['file', 'sha256', 'bytes']) ||
     manifest.readme.file !== FILES.readme ||
     !SHA256_PATTERN.test(manifest.readme.sha256 || '') ||
     !Number.isSafeInteger(manifest.readme.bytes) ||
     manifest.readme.bytes < 2
   ) {
-    fail('milestone manifest identity or shape is incompatible');
+    fail('Cluster milestone manifest identity or shape is incompatible');
   }
-  validateWorkflow(
-    manifest.workflow,
-    manifest.sourceRevision,
-    manifest.workflow?.runId,
-    manifest.workflow?.runAttempt,
-  );
-  for (const architecture of ARCHITECTURES) {
-    validateArtifactRecord(
-      manifest.artifacts[architecture],
-      architecture,
-      manifest,
-    );
+  validateWorkflow(manifest.workflow, manifest.sourceRevision);
+  for (const subject of SUBJECTS) {
+    validateArtifactRecord(manifest.artifacts[subject], subject, manifest);
   }
-  const records = ARCHITECTURES.map(
-    (architecture) => manifest.artifacts[architecture],
-  );
-  const imageIds = records.flatMap((record) => [
-    record.applicationImageId,
-    record.operatorImageId,
-  ]);
-  if (
-    new Set(imageIds).size !== imageIds.length ||
-    new Set(records.map((record) => record.archiveSha256)).size !==
-      ARCHITECTURES.length ||
-    new Set(records.map((record) => record.verificationSha256)).size !==
-      ARCHITECTURES.length
-  ) {
-    fail('milestone architecture subjects are not distinct');
+  const records = SUBJECTS.map((subject) => manifest.artifacts[subject]);
+  for (const field of ['imageId', 'archiveSha256', 'verificationSha256']) {
+    if (
+      new Set(records.map((record) => record[field])).size !== SUBJECTS.length
+    ) {
+      fail(`Cluster milestone ${field} subjects are not distinct`);
+    }
   }
   const actualReadme = fileRecord(
     path.join(milestoneRoot, FILES.readme),
@@ -358,60 +358,55 @@ function auditLocalAlphaMilestone(options) {
     actualReadme.sha256 !== manifest.readme.sha256 ||
     actualReadme.bytes !== manifest.readme.bytes
   ) {
-    fail('milestone README differs from manifest');
+    fail('Cluster milestone README differs from manifest');
   }
   const expectedChecksums = checksumContents(milestoneRoot, [
     FILES.readme,
     FILES.manifest,
   ]);
-  const actualChecksums = fs.readFileSync(
-    path.join(milestoneRoot, FILES.checksums),
-    'utf8',
-  );
-  if (actualChecksums !== expectedChecksums) {
-    fail('milestone SHA256SUMS differs from the closed file set');
+  if (
+    fs.readFileSync(path.join(milestoneRoot, FILES.checksums), 'utf8') !==
+    expectedChecksums
+  ) {
+    fail('Cluster milestone SHA256SUMS differs from the closed file set');
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-milestone-audit@v1',
+    schema: 'qinglong/alpha-cluster-milestone-audit@v1',
     sourceRevision: manifest.sourceRevision,
     version: manifest.version,
     workflowRunId: manifest.workflow.runId,
     workflowRunAttempt: manifest.workflow.runAttempt,
-    architectures: [...ARCHITECTURES],
+    subjects: [...SUBJECTS],
     compatible: true,
   });
 }
 
-function finalizeLocalAlphaMilestone(options) {
+function finalizeClusterAlphaMilestone(options) {
   const normalized = validateFinalizeOptions(options);
-  const artifacts = {
-    amd64: bundleRecord(normalized, 'amd64'),
-    arm64: bundleRecord(normalized, 'arm64'),
-  };
+  const artifacts = Object.fromEntries(
+    SUBJECTS.map((subject) => [subject, bundleRecord(normalized, subject)]),
+  );
   const versions = new Set(
-    ARCHITECTURES.map((architecture) => {
-      const manifest = readBoundedJson(
-        path.join(normalized.bundles[architecture], 'manifest.json'),
-        `${architecture} trial kit manifest`,
-      );
-      return manifest.version;
-    }),
+    SUBJECTS.map(
+      (subject) =>
+        readBoundedJson(
+          path.join(normalized.bundles[subject], 'manifest.json'),
+          `${subject} bundle manifest`,
+        ).version,
+    ),
   );
   const release = readReleaseIdentity(normalized.root);
   if (versions.size !== 1 || !versions.has(release.version)) {
-    fail('milestone trial kits must have one release version');
+    fail('Cluster milestone bundles must have one release version');
   }
-  const allImageIds = ARCHITECTURES.flatMap((architecture) => [
-    artifacts[architecture].applicationImageId,
-    artifacts[architecture].operatorImageId,
-  ]);
-  if (
-    new Set(allImageIds).size !== allImageIds.length ||
-    artifacts.amd64.archiveSha256 === artifacts.arm64.archiveSha256 ||
-    artifacts.amd64.verificationSha256 === artifacts.arm64.verificationSha256
-  ) {
-    fail('milestone architecture subjects must be distinct');
+  for (const field of ['imageId', 'archiveSha256', 'verificationSha256']) {
+    if (
+      new Set(SUBJECTS.map((subject) => artifacts[subject][field])).size !==
+      SUBJECTS.length
+    ) {
+      fail(`Cluster milestone ${field} subjects must be distinct`);
+    }
   }
   let created = false;
   try {
@@ -424,8 +419,8 @@ function finalizeLocalAlphaMilestone(options) {
     const manifest = {
       schemaVersion: 1,
       schema: SCHEMA,
-      maturity: 'alpha_candidate_not_public_release',
-      product: 'local',
+      maturity: 'cluster_integration_candidate_not_public_release',
+      product: 'cluster',
       version: [...versions][0],
       sourceRevision: normalized.sourceRevision,
       workflow: {
@@ -451,12 +446,11 @@ function finalizeLocalAlphaMilestone(options) {
       path.join(normalized.outputRoot, FILES.checksums),
       checksumContents(normalized.outputRoot, [FILES.readme, FILES.manifest]),
     );
-    auditLocalAlphaMilestone({ milestoneRoot: normalized.outputRoot });
+    auditClusterAlphaMilestone({ milestoneRoot: normalized.outputRoot });
     return Object.freeze(manifest);
   } catch (error) {
-    if (created) {
+    if (created)
       fs.rmSync(normalized.outputRoot, { recursive: true, force: true });
-    }
     throw error;
   }
 }
@@ -477,73 +471,67 @@ function jobBlock(workflow, jobName) {
   return workflow.slice(start, end);
 }
 
-function auditLocalAlphaMilestoneWorkflow(root = DEFAULT_ROOT) {
-  const workflowPath = path.join(
-    fs.realpathSync(path.resolve(root)),
-    '.github/workflows/ql3-ci.yml',
+function auditClusterAlphaMilestoneWorkflow(root = DEFAULT_ROOT) {
+  const workflow = fs.readFileSync(
+    path.join(
+      fs.realpathSync(path.resolve(root)),
+      '.github/workflows/ql3-ci.yml',
+    ),
+    'utf8',
   );
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
   const findings = [];
-  const milestoneStart = workflow.indexOf('\n  local-alpha-milestone:\n');
-  const milestone = jobBlock(workflow, 'local-alpha-milestone');
-  const requiredWorkflowTokens = [
-    'alpha_artifact_scope:',
-    'default: local',
-    '- local',
-    '- cluster',
-    '- all',
-    "github.run_id || 'validation'",
-    "cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts) }}",
-  ];
-  if (requiredWorkflowTokens.some((token) => !workflow.includes(token))) {
-    findings.push('MILESTONE_DISPATCH_OR_CONCURRENCY_DRIFT');
-  }
-  const localScopeCondition =
-    "github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'local' || inputs.alpha_artifact_scope == 'all')";
-  const clusterScopeCondition =
+  const clusterCondition =
     "github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'cluster' || inputs.alpha_artifact_scope == 'all')";
   if (
-    countOccurrences(workflow, localScopeCondition) !== 3 ||
-    countOccurrences(workflow, clusterScopeCondition) !== 3
+    countOccurrences(workflow, clusterCondition) !== 3 ||
+    !workflow.includes("github.run_id || 'validation'") ||
+    !workflow.includes(
+      "cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts) }}",
+    )
   ) {
-    findings.push('MILESTONE_SCOPE_CONTRACT_DRIFT');
+    findings.push('CLUSTER_MILESTONE_SCOPE_OR_CONCURRENCY_DRIFT');
   }
-  const milestoneTokens = [
-    '    name: Finalize the Local Alpha milestone',
-    '    needs:',
+  const milestone = jobBlock(workflow, 'cluster-alpha-milestone');
+  const tokens = [
+    'name: Finalize the Cluster Alpha integration milestone',
     'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
-    `name: ql3-alpha-${'${{ github.sha }}'}-local-amd64`,
-    `name: ql3-alpha-${'${{ github.sha }}'}-local-arm64`,
-    'scripts/ql3-local-alpha-milestone.cjs',
+    'scripts/ql3-cluster-alpha-milestone.cjs',
     '--mode=finalize',
     '--mode=audit',
-    `name: ql3-alpha-${'${{ github.sha }}'}-local-milestone`,
+    `name: ql3-alpha-${'${{ github.sha }}'}-cluster-milestone`,
     'retention-days: 30',
     'overwrite: false',
   ];
   if (
-    milestoneStart < 0 ||
-    milestoneTokens.some((token) => !milestone.includes(token)) ||
+    !milestone ||
+    tokens.some((token) => !milestone.includes(token)) ||
+    SUBJECTS.some(
+      (subject) =>
+        !milestone.includes(
+          `name: ql3-alpha-${'${{ github.sha }}'}-${subject}`,
+        ),
+    ) ||
     REQUIRED_WORKFLOW_NEEDS.some(
       (job) => !milestone.includes(`      - ${job}\n`),
     )
   ) {
-    findings.push('MILESTONE_FINALIZER_CONTRACT_DRIFT');
+    findings.push('CLUSTER_MILESTONE_FINALIZER_CONTRACT_DRIFT');
   }
   const finalizerIndex = milestone.indexOf('--mode=finalize');
   const auditIndex = milestone.indexOf('--mode=audit');
-  const uploadIndex = milestone.lastIndexOf('actions/upload-artifact@');
+  const uploadIndex = milestone.indexOf('actions/upload-artifact@');
   if (
     finalizerIndex < 0 ||
     auditIndex <= finalizerIndex ||
     uploadIndex <= auditIndex
   ) {
-    findings.push('MILESTONE_FINALIZER_GATE_ORDER_DRIFT');
+    findings.push('CLUSTER_MILESTONE_GATE_ORDER_DRIFT');
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-milestone-workflow-audit@v1',
+    schema: 'qinglong/alpha-cluster-milestone-workflow-audit@v1',
     requiredNeeds: [...REQUIRED_WORKFLOW_NEEDS],
+    subjects: [...SUBJECTS],
     findings: Object.freeze(findings),
     compatible: findings.length === 0,
   });
@@ -553,9 +541,8 @@ function parseArguments(argv) {
   const values = {};
   for (const argument of argv) {
     const match = /^--([a-z0-9-]+)=(.+)$/u.exec(argument);
-    if (!match || Object.hasOwn(values, match[1])) {
+    if (!match || Object.hasOwn(values, match[1]))
       fail('arguments are invalid');
-    }
     values[match[1]] = match[2];
   }
   if (values.mode === 'audit') {
@@ -565,7 +552,7 @@ function parseArguments(argv) {
     ) {
       fail('audit arguments are invalid');
     }
-    return { mode: 'audit', milestoneRoot: path.resolve(values.milestone) };
+    return { mode: values.mode, milestoneRoot: path.resolve(values.milestone) };
   }
   if (values.mode === 'audit-workflow') {
     if (
@@ -574,11 +561,11 @@ function parseArguments(argv) {
     ) {
       fail('workflow audit arguments are invalid');
     }
-    return { mode: 'audit-workflow', root: path.resolve(values.root) };
+    return { mode: values.mode, root: path.resolve(values.root) };
   }
+  const bundleArguments = SUBJECTS.map((subject) => `${subject}-bundle`);
   const expected = [
-    'amd64-bundle',
-    'arm64-bundle',
+    ...bundleArguments,
     'event',
     'mode',
     'output',
@@ -589,7 +576,7 @@ function parseArguments(argv) {
     'source-revision',
     'workflow-ref',
     'workflow-sha',
-  ];
+  ].sort();
   if (
     values.mode !== 'finalize' ||
     JSON.stringify(Object.keys(values).sort()) !== JSON.stringify(expected)
@@ -597,12 +584,14 @@ function parseArguments(argv) {
     fail('finalize arguments are invalid');
   }
   return {
-    mode: 'finalize',
+    mode: values.mode,
     outputRoot: path.resolve(values.output),
-    bundles: {
-      amd64: path.resolve(values['amd64-bundle']),
-      arm64: path.resolve(values['arm64-bundle']),
-    },
+    bundles: Object.fromEntries(
+      SUBJECTS.map((subject) => [
+        subject,
+        path.resolve(values[`${subject}-bundle`]),
+      ]),
+    ),
     readme: path.resolve(values.readme),
     sourceRevision: values['source-revision'],
     repository: values.repository,
@@ -618,12 +607,12 @@ function runCli(argv) {
   const options = parseArguments(argv);
   let report;
   if (options.mode === 'finalize') {
-    report = finalizeLocalAlphaMilestone(options);
+    report = finalizeClusterAlphaMilestone(options);
   } else if (options.mode === 'audit-workflow') {
-    report = auditLocalAlphaMilestoneWorkflow(options.root);
+    report = auditClusterAlphaMilestoneWorkflow(options.root);
     if (!report.compatible) fail(JSON.stringify(report));
   } else {
-    report = auditLocalAlphaMilestone(options);
+    report = auditClusterAlphaMilestone(options);
   }
   process.stdout.write(`${JSON.stringify(report)}\n`);
   return report;
@@ -635,7 +624,9 @@ if (require.main === module) {
   } catch (error) {
     process.stderr.write(
       `${
-        error instanceof Error ? error.message : 'Local Alpha milestone failed'
+        error instanceof Error
+          ? error.message
+          : 'Cluster Alpha milestone failed'
       }\n`,
     );
     process.exitCode = 1;
@@ -643,14 +634,14 @@ if (require.main === module) {
 }
 
 module.exports = Object.freeze({
-  ARCHITECTURES,
   FILES,
   REQUIRED_WORKFLOW_NEEDS,
   SCHEMA,
+  SUBJECTS,
   artifactName,
-  auditLocalAlphaMilestone,
-  auditLocalAlphaMilestoneWorkflow,
-  finalizeLocalAlphaMilestone,
+  auditClusterAlphaMilestone,
+  auditClusterAlphaMilestoneWorkflow,
+  finalizeClusterAlphaMilestone,
   parseArguments,
   runCli,
 });

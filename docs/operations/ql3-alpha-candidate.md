@@ -11,7 +11,7 @@
 | Cluster Integration Candidate | amd64/arm64 集群测试节点 | OS 漏洞策略、SBOM 与镜像库存复核、non-root identity；Admin 额外通过产品 facade smoke | 导入隔离 registry/测试节点，进行多组件集成；不作为 production HA release |
 | Public Release Set | 生产用户 | 受保护 tag、六镜像 multi-arch digest（Local Application/operator + Cluster 四角色）、签名/attestation、私有发布证据、catalog、Local/Cluster 部署与回退闭环 | 尚未实际发布；只能由受保护 release workflow 生成 |
 
-只有 `Local Alpha Trial Kit` 可以称为本阶段“用户可试运行产物”。单个 headless runtime 和 Cluster archive 都只是工程候选；后者还不满足正式 Kubernetes deployment-lock 的 GHCR immutable digest 与 catalog provenance。
+`Local Alpha Trial Kit + Local milestone index` 是本阶段的用户可试运行产物；`Cluster Integration Candidate + Cluster milestone index` 是集群部署者可下载、可离线验真的集成产物。单个 headless runtime、单个 Cluster archive 或没有 milestone index 的部分矩阵产物都只是工程中间件。Cluster milestone 仍不满足正式 Kubernetes deployment-lock 的 GHCR immutable digest 与 catalog provenance。
 
 ## 当前阶段实物（2026-08-27）
 
@@ -28,12 +28,14 @@ ADR-0506 现要求 `qinglong/alpha-local-trial-kit@v2` 额外包含 `verificatio
 
 ## 生成
 
-在 GitHub Actions 手动运行 `QingLong 3.0 CI`，选择目标 `next` 提交并设置 `produce_alpha_artifacts=true`。普通 push/PR 不上传大镜像，避免每次开发提交都制造伪里程碑和额外存储成本。
+在 GitHub Actions 手动运行 `QingLong 3.0 CI`，选择目标 `next` 提交，设置 `produce_alpha_artifacts=true`，并明确选择 `alpha_artifact_scope=local|cluster|all`。普通 push/PR 不上传大镜像，避免每次开发提交都制造伪里程碑和额外存储成本。
 
 成功后同一次 run 生成、保留 30 天：
 
 - `ql3-alpha-<commit>-local-amd64` 与 `ql3-alpha-<commit>-local-arm64`；
+- `ql3-alpha-<commit>-local-milestone`；
 - `ql3-alpha-<commit>-control-<arch>`、`control-ai-<arch>`、`admin-<arch>`、`worker-<arch>`。
+- `ql3-alpha-<commit>-cluster-milestone`。
 
 Local artifact 含：
 
@@ -43,7 +45,7 @@ Local artifact 含：
 - 与实际只读镜像 inventory 对账过的 CycloneDX SBOM；
 - 面向 Local 用户的 README 与覆盖全部内容文件的 `SHA256SUMS`。
 
-Cluster artifact 仍是每个角色一个 native Docker archive 和各自 manifest。
+Cluster artifact 是每角色/架构一个六文件闭包：native Docker archive、精确 CycloneDX SBOM、workflow-bound verification evidence、README、`qinglong/alpha-cluster-image@v1` manifest 和覆盖全部内容文件的 `SHA256SUMS`。完整 CI 成功后，八个 bundle 由 `qinglong/alpha-cluster-milestone@v1` 小型索引闭合；索引本身不重复存放大 archive。
 
 任何 required job 失败时不上传对应产物。artifact 名和 archive 内的 `ci-*` tag 都表示 commit-bound candidate，不能改名后冒充 `v3.x` release。
 
@@ -82,4 +84,4 @@ Cluster candidate 必须先导入隔离 registry 并重新绑定该 registry 的
 
 ## 里程碑判定
 
-一次用户阶段里程碑只有同时记录以下事实才成立：源码 commit、版本、两种 Tier-1 架构的 Application/operator、完整 CI run、artifact 名与 digest、fresh setup→首 Owner→active→stop 的目标 Profile smoke、已知限制和回退路径。仅有源码、`dist/`、单元测试数字、Dockerfile、单个 headless runtime 或“理论上可构建”都不算用户可用产物。
+一次 Local 用户阶段里程碑只有同时记录以下事实才成立：源码 commit、版本、两种 Tier-1 架构的 Application/operator、完整 CI run、artifact 名与 digest、fresh setup→首 Owner→active→stop 的目标 Profile smoke、已知限制和回退路径。一次 Cluster 集成里程碑还必须精确闭合四角色乘两架构、同一 run/attempt 和八个独立主体。仅有源码、`dist/`、单元测试数字、Dockerfile、单个 headless runtime 或“理论上可构建”都不算阶段可用产物。

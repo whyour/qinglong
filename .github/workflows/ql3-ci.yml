@@ -838,51 +838,37 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'cluster' || inputs.alpha_artifact_scope == 'all')
         env:
           IMAGE: ${{ matrix.repository }}:ci-${{ matrix.image_arch }}
-          IMAGE_ARCH: ${{ matrix.image_arch }}
-          IMAGE_ROLE: ${{ matrix.image }}
-          IMAGE_REPOSITORY: ${{ matrix.repository }}
           BUNDLE_ROOT: ${{ runner.temp }}/ql3-alpha-${{ matrix.image }}-${{ matrix.image_arch }}
         run: |
           set -euo pipefail
           umask 077
-          mkdir "${BUNDLE_ROOT}"
-          archive="${BUNDLE_ROOT}/${IMAGE_REPOSITORY}-${IMAGE_ARCH}.docker.tar"
-          docker image save --output "${archive}" "${IMAGE}"
-          cp "${RUNNER_TEMP}/ql3-cluster-${IMAGE_ROLE}.cdx.json" \
-            "${BUNDLE_ROOT}/${IMAGE_REPOSITORY}.cdx.json"
-          cp docs/operations/ql3-alpha-candidate.md "${BUNDLE_ROOT}/README.md"
-          archive_sha256="sha256:$(sha256sum "${archive}" | cut -d ' ' -f 1)"
-          ARCHIVE="${archive}" ARCHIVE_SHA256="${archive_sha256}" \
-            MANIFEST="${BUNDLE_ROOT}/manifest.json" \
-            node <<'NODE'
-          const fs = require('node:fs');
-          const childProcess = require('node:child_process');
-          const release = require('./ql3-release.json');
-          const imageId = childProcess
-            .execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', process.env.IMAGE], { encoding: 'utf8' })
-            .trim();
-          const manifest = {
-            schemaVersion: 1,
-            schema: 'qinglong/alpha-native-image@v1',
-            maturity: 'alpha_candidate_not_public_release',
-            product: 'cluster',
-            role: process.env.IMAGE_ROLE,
-            version: release.version,
-            sourceRevision: process.env.GITHUB_SHA,
-            architecture: process.env.IMAGE_ARCH,
-            image: process.env.IMAGE,
-            imageId,
-            archive: process.env.ARCHIVE.split('/').pop(),
-            archiveSha256: process.env.ARCHIVE_SHA256,
-            verification: {
-              osVulnerabilityPolicy: 'passed',
-              sbomInventoryReconciliation: 'passed',
-              nonRootRuntimeIdentity: 'passed',
-              clusterAdminProductFacade: process.env.IMAGE_ROLE === 'admin' ? 'passed' : 'not_applicable',
-            },
-          };
-          fs.writeFileSync(process.env.MANIFEST, `${JSON.stringify(manifest)}\n`, { mode: 0o600, flag: 'wx' });
-          NODE
+          node scripts/ql3-cluster-alpha-bundle.cjs \
+            --mode=record-verification \
+            --role=${{ matrix.image }} \
+            --architecture=${{ matrix.image_arch }} \
+            --image="${IMAGE}" \
+            --source-revision=${{ github.sha }} \
+            --repository=${{ github.repository }} \
+            --workflow-ref="${{ github.workflow_ref }}" \
+            --workflow-sha=${{ github.workflow_sha }} \
+            --event=${{ github.event_name }} \
+            --job=cluster-image \
+            --run-id=${{ github.run_id }} \
+            --run-attempt=${{ github.run_attempt }} \
+            --output="${RUNNER_TEMP}/ql3-cluster-${{ matrix.image }}-${{ matrix.image_arch }}-verification.json"
+          node scripts/ql3-cluster-alpha-bundle.cjs \
+            --mode=create \
+            --role=${{ matrix.image }} \
+            --architecture=${{ matrix.image_arch }} \
+            --image="${IMAGE}" \
+            --source-revision=${{ github.sha }} \
+            --sbom="${RUNNER_TEMP}/ql3-cluster-${{ matrix.image }}.cdx.json" \
+            --verification-evidence="${RUNNER_TEMP}/ql3-cluster-${{ matrix.image }}-${{ matrix.image_arch }}-verification.json" \
+            --readme=docs/operations/ql3-alpha-candidate.md \
+            --output="${BUNDLE_ROOT}"
+          node scripts/ql3-cluster-alpha-bundle.cjs \
+            --mode=offline-audit \
+            --bundle="${BUNDLE_ROOT}"
       - name: Upload the tested native Cluster Alpha image
         if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'cluster' || inputs.alpha_artifact_scope == 'all')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1642,6 +1628,112 @@ jobs:
           path: ${{ runner.temp }}/ql3-plugin-package-recovery-e2e/report.json
           if-no-files-found: warn
           retention-days: 14
+
+  cluster-alpha-milestone:
+    name: Finalize the Cluster Alpha integration milestone
+    if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'cluster' || inputs.alpha_artifact_scope == 'all')
+    needs:
+      - backend
+      - service-manager-bridge
+      - linux-resource-envelopes
+      - linux-resource-release-evidence
+      - supply-chain
+      - local-image
+      - cluster-image
+      - cluster-console-capacity-release-evidence
+      - image-oci
+      - worker-runtime
+      - local-profiles
+      - cluster-postgres
+      - cluster-postgres-ha
+      - cluster-cloudnativepg-live
+      - cluster-provider-credential-test-kubernetes-live
+      - cluster-secret-binding-mounted-provider-kubernetes-live
+      - cluster-vault-kv-worker-secret-live
+      - cluster-plugin-package-kubernetes-live
+      - cluster-plugin-package-recovery-e2e
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+      - name: Download the exact control amd64 Cluster Alpha bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-control-amd64
+          path: ${{ runner.temp }}/ql3-alpha-cluster-milestone-input/control-amd64
+      - name: Download the exact control arm64 Cluster Alpha bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-control-arm64
+          path: ${{ runner.temp }}/ql3-alpha-cluster-milestone-input/control-arm64
+      - name: Download the exact control-ai amd64 Cluster Alpha bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-control-ai-amd64
+          path: ${{ runner.temp }}/ql3-alpha-cluster-milestone-input/control-ai-amd64
+      - name: Download the exact control-ai arm64 Cluster Alpha bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-control-ai-arm64
+          path: ${{ runner.temp }}/ql3-alpha-cluster-milestone-input/control-ai-arm64
+      - name: Download the exact admin amd64 Cluster Alpha bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-admin-amd64
+          path: ${{ runner.temp }}/ql3-alpha-cluster-milestone-input/admin-amd64
+      - name: Download the exact admin arm64 Cluster Alpha bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-admin-arm64
+          path: ${{ runner.temp }}/ql3-alpha-cluster-milestone-input/admin-arm64
+      - name: Download the exact worker amd64 Cluster Alpha bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-worker-amd64
+          path: ${{ runner.temp }}/ql3-alpha-cluster-milestone-input/worker-amd64
+      - name: Download the exact worker arm64 Cluster Alpha bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-worker-arm64
+          path: ${{ runner.temp }}/ql3-alpha-cluster-milestone-input/worker-arm64
+      - name: Close all native Cluster bundles into one milestone index
+        run: |
+          set -euo pipefail
+          umask 077
+          node scripts/ql3-cluster-alpha-milestone.cjs \
+            --mode=finalize \
+            --control-amd64-bundle="${RUNNER_TEMP}/ql3-alpha-cluster-milestone-input/control-amd64" \
+            --control-arm64-bundle="${RUNNER_TEMP}/ql3-alpha-cluster-milestone-input/control-arm64" \
+            --control-ai-amd64-bundle="${RUNNER_TEMP}/ql3-alpha-cluster-milestone-input/control-ai-amd64" \
+            --control-ai-arm64-bundle="${RUNNER_TEMP}/ql3-alpha-cluster-milestone-input/control-ai-arm64" \
+            --admin-amd64-bundle="${RUNNER_TEMP}/ql3-alpha-cluster-milestone-input/admin-amd64" \
+            --admin-arm64-bundle="${RUNNER_TEMP}/ql3-alpha-cluster-milestone-input/admin-arm64" \
+            --worker-amd64-bundle="${RUNNER_TEMP}/ql3-alpha-cluster-milestone-input/worker-amd64" \
+            --worker-arm64-bundle="${RUNNER_TEMP}/ql3-alpha-cluster-milestone-input/worker-arm64" \
+            --source-revision=${{ github.sha }} \
+            --repository=${{ github.repository }} \
+            --workflow-ref="${{ github.workflow_ref }}" \
+            --workflow-sha=${{ github.workflow_sha }} \
+            --event=${{ github.event_name }} \
+            --run-id=${{ github.run_id }} \
+            --run-attempt=${{ github.run_attempt }} \
+            --readme=docs/operations/ql3-cluster-alpha-milestone.md \
+            --output="${RUNNER_TEMP}/ql3-alpha-cluster-milestone"
+          node scripts/ql3-cluster-alpha-milestone.cjs \
+            --mode=audit \
+            --milestone="${RUNNER_TEMP}/ql3-alpha-cluster-milestone"
+      - name: Upload the closed Cluster Alpha milestone index
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-alpha-${{ github.sha }}-cluster-milestone
+          path: ${{ runner.temp }}/ql3-alpha-cluster-milestone
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
 
   local-alpha-milestone:
     name: Finalize the Local Alpha milestone
