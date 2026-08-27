@@ -89,7 +89,10 @@ function projectRuntimeExports(value, requiredKeys = null) {
   return Object.fromEntries(
     Object.entries(value)
       .filter(([key]) => {
-        if (key !== '.' && !/^\.\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/.test(key)) {
+        if (
+          key !== '.' &&
+          !/^\.\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/.test(key)
+        ) {
           fail(`runtime package export key ${key} is invalid`);
         }
         return requiredKeys === null || requiredKeys.has(key);
@@ -127,7 +130,9 @@ function normalizeEntrySpecifiers(options) {
     Array.isArray(options) ||
     Reflect.ownKeys(options).some(
       (key) =>
-        key !== 'entrySpecifiers' && key !== 'excludedInternalPackages',
+        key !== 'entrySpecifiers' &&
+        key !== 'excludedInternalPackages' &&
+        key !== 'retainedJavaScriptFiles',
     ) ||
     !Array.isArray(options.entrySpecifiers) ||
     options.entrySpecifiers.length > 64
@@ -145,6 +150,41 @@ function normalizeEntrySpecifiers(options) {
     entries.push(value);
   }
   return Object.freeze(entries);
+}
+
+function normalizeRetainedJavaScriptFiles(options, inventory) {
+  if (options === undefined || options.retainedJavaScriptFiles === undefined) {
+    return Object.freeze([]);
+  }
+  if (
+    !Array.isArray(options.retainedJavaScriptFiles) ||
+    options.retainedJavaScriptFiles.length > 64
+  ) {
+    fail('retained JavaScript file options are invalid');
+  }
+  const inventoryPaths = new Set(inventory.files.map(({ path: file }) => file));
+  const retained = [];
+  const seen = new Set();
+  for (const value of options.retainedJavaScriptFiles) {
+    if (
+      typeof value !== 'string' ||
+      Buffer.byteLength(value, 'utf8') > 256 ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[A-Za-z0-9._-]+)+\.js$/u.test(value) ||
+      seen.has(value)
+    ) {
+      fail('retained JavaScript file is invalid');
+    }
+    seen.add(value);
+    const resolved = path.resolve(inventory.resolved, ...value.split('/'));
+    if (
+      !resolved.startsWith(`${inventory.resolved}${path.sep}`) ||
+      !inventoryPaths.has(resolved)
+    ) {
+      fail('retained JavaScript file is not installed');
+    }
+    retained.push(resolved);
+  }
+  return Object.freeze(retained);
 }
 
 function normalizeExcludedInternalPackages(options) {
@@ -195,14 +235,18 @@ function collectStaticModuleSpecifiers(files) {
     for (const match of contents.matchAll(STATIC_MODULE_SPECIFIER_PATTERN)) {
       const specifier = match[2];
       const start = match.index + match[0].indexOf(specifier);
-      literalRanges.push(Object.freeze({ start, end: start + specifier.length }));
+      literalRanges.push(
+        Object.freeze({ start, end: start + specifier.length }),
+      );
       literalCalls.add(match.index);
       specifiers.push(specifier);
     }
     MODULE_LOAD_START_PATTERN.lastIndex = 0;
     for (const match of contents.matchAll(MODULE_LOAD_START_PATTERN)) {
       if (!literalCalls.has(match.index)) {
-        fail(`runtime JavaScript contains a non-literal module load at ${file.path}`);
+        fail(
+          `runtime JavaScript contains a non-literal module load at ${file.path}`,
+        );
       }
     }
     let occurrence = contents.indexOf('@qinglong/');
@@ -212,7 +256,9 @@ function collectStaticModuleSpecifiers(files) {
           ({ start, end }) => occurrence >= start && occurrence < end,
         )
       ) {
-        fail(`runtime JavaScript contains an unproved internal specifier at ${file.path}`);
+        fail(
+          `runtime JavaScript contains an unproved internal specifier at ${file.path}`,
+        );
       }
       occurrence = contents.indexOf('@qinglong/', occurrence + 1);
     }
@@ -269,8 +315,8 @@ function manifestBinTargets(record) {
     typeof bin === 'string'
       ? [bin]
       : bin && typeof bin === 'object' && !Array.isArray(bin)
-        ? Object.values(bin)
-        : null;
+      ? Object.values(bin)
+      : null;
   if (!values || values.some((value) => typeof value !== 'string')) {
     fail(`runtime package bin is invalid for ${record.manifest.name}`);
   }
@@ -297,10 +343,11 @@ function canonicalRelativeSpecifier(specifier) {
   else while (remainder.startsWith('../')) remainder = remainder.slice(3);
   return (
     remainder.length > 0 &&
-    remainder.split('/').every(
-      (segment) =>
-        segment.length > 0 && segment !== '.' && segment !== '..',
-    )
+    remainder
+      .split('/')
+      .every(
+        (segment) => segment.length > 0 && segment !== '.' && segment !== '..',
+      )
   );
 }
 
@@ -373,6 +420,10 @@ function pruneRuntimeArtifact(directory, options) {
     normalizeExcludedInternalPackages(options),
   );
   const inventory = inventoryRuntimeArtifact(directory);
+  const retainedJavaScriptFiles = normalizeRetainedJavaScriptFiles(
+    options,
+    inventory,
+  );
   const manifests = inventory.files.filter(
     (file) =>
       path.basename(file.path) === 'package.json' &&
@@ -523,6 +574,9 @@ function pruneRuntimeArtifact(directory, options) {
       }
     }
   }
+  for (const file of retainedJavaScriptFiles) {
+    enqueueJavascript(file, 'explicit runtime asset');
+  }
   for (const specifier of entrySpecifiers) requireExport(specifier);
 
   while (pendingJavascript.length > 0) {
@@ -536,11 +590,7 @@ function pruneRuntimeArtifact(directory, options) {
         requireExport(specifier, filePath);
       } else if (specifier.startsWith('.')) {
         enqueueJavascript(
-          resolveRelativeRuntimeTarget(
-            filePath,
-            specifier,
-            owner.packageRoot,
-          ),
+          resolveRelativeRuntimeTarget(filePath, specifier, owner.packageRoot),
           `relative import from ${filePath}`,
         );
       }
@@ -567,13 +617,8 @@ function pruneRuntimeArtifact(directory, options) {
   for (const record of packageRecords) {
     const { file, before, manifest, packageRoot } = record;
     const required = requiredExports.get(manifest.name);
-    const retainMain =
-      !manifest.exports || required.has('.');
-    const projected = projectRuntimeManifest(
-      manifest,
-      required,
-      retainMain,
-    );
+    const retainMain = !manifest.exports || required.has('.');
+    const projected = projectRuntimeManifest(manifest, required, retainMain);
     if (projected.exports) {
       for (const target of Object.values(projected.exports)) {
         validateRuntimeExportTarget(packageRoot, target);

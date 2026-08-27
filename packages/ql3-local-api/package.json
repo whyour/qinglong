@@ -27,6 +27,7 @@
     }
   },
   "files": [
+    "assets/console/*",
     "dist/**/*.js",
     "dist/**/*.d.ts"
   ],

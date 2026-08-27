@@ -79,7 +79,10 @@ test('prunes only deployment waste while preserving runtime package semantics', 
       `${JSON.stringify(application.manifest, null, 2)}\n`,
     );
     const executable = path.join(application.dist, 'cli.js');
-    fs.writeFileSync(path.join(application.dist, 'index.js'), "'use strict';\n");
+    fs.writeFileSync(
+      path.join(application.dist, 'index.js'),
+      "'use strict';\n",
+    );
     fs.writeFileSync(
       executable,
       "#!/usr/bin/env node\n'use strict';\n//# sourceMappingURL=cli.js.map\n",
@@ -163,7 +166,10 @@ test('projects runtime exports from static imports and explicit Profile entries'
       `${JSON.stringify(runtime.manifest, null, 2)}\n`,
     );
     for (const name of ['index', 'used', 'lazy', 'unused']) {
-      fs.writeFileSync(path.join(runtime.dist, `${name}.js`), "'use strict';\n");
+      fs.writeFileSync(
+        path.join(runtime.dist, `${name}.js`),
+        "'use strict';\n",
+      );
     }
 
     const application = writePackage(
@@ -277,10 +283,7 @@ test('allows only explicitly excluded and declared optional feature imports', ()
       entrySpecifiers: ['@qinglong/local-application'],
       excludedInternalPackages: ['@qinglong/ai'],
     });
-    assert.equal(
-      report.packageManifests.runtimeExports.excludedSpecifiers,
-      1,
-    );
+    assert.equal(report.packageManifests.runtimeExports.excludedSpecifiers, 1);
   } finally {
     current.close();
   }
@@ -370,7 +373,10 @@ test('retains relative, dynamic, cyclic, bin, migration and asset closure', () =
       `${JSON.stringify(runtime.manifest, null, 2)}\n`,
     );
     for (const name of ['index', 'used', 'unused']) {
-      fs.writeFileSync(path.join(runtime.dist, `${name}.js`), "'use strict';\n");
+      fs.writeFileSync(
+        path.join(runtime.dist, `${name}.js`),
+        "'use strict';\n",
+      );
     }
 
     const application = writePackage(
@@ -422,9 +428,16 @@ test('retains relative, dynamic, cyclic, bin, migration and asset closure', () =
     const assetDirectory = path.join(application.dist, 'assets');
     fs.mkdirSync(assetDirectory);
     fs.writeFileSync(path.join(assetDirectory, 'schema.json'), '{}\n');
+    const consoleDirectory = path.join(application.packageRoot, 'assets');
+    fs.mkdirSync(consoleDirectory);
+    fs.writeFileSync(
+      path.join(consoleDirectory, 'console.js'),
+      "'use strict';\ndocument.title = 'QingLong';\n",
+    );
 
     const report = pruneRuntimeArtifact(current.root, {
       entrySpecifiers: ['@qinglong/local-application'],
+      retainedJavaScriptFiles: ['local-application/assets/console.js'],
     });
 
     for (const relative of [
@@ -435,10 +448,14 @@ test('retains relative, dynamic, cyclic, bin, migration and asset closure', () =
       'bin-support.js',
       'migration/ledger.js',
       'assets/schema.json',
+      '../assets/console.js',
     ]) {
       assert.equal(fs.existsSync(path.join(application.dist, relative)), true);
     }
-    assert.equal(fs.existsSync(path.join(application.dist, 'unused.js')), false);
+    assert.equal(
+      fs.existsSync(path.join(application.dist, 'unused.js')),
+      false,
+    );
     assert.equal(fs.existsSync(path.join(runtime.dist, 'used.js')), true);
     assert.equal(fs.existsSync(path.join(runtime.dist, 'index.js')), false);
     assert.equal(fs.existsSync(path.join(runtime.dist, 'unused.js')), false);
@@ -520,6 +537,39 @@ test('rejects escaping and missing relative targets before mutation', () => {
       /target is missing/,
     );
     assert.equal(fs.existsSync(map), true);
+  } finally {
+    current.close();
+  }
+});
+
+test('rejects invalid or missing explicit JavaScript assets before mutation', () => {
+  const current = fixture();
+  try {
+    const application = writePackage(
+      current.root,
+      'local-application',
+      '@qinglong/local-application',
+    );
+    const entry = path.join(application.dist, 'index.js');
+    const map = path.join(application.dist, 'index.js.map');
+    fs.writeFileSync(entry, "'use strict';\n");
+    fs.writeFileSync(map, '{}\n');
+
+    for (const retainedJavaScriptFiles of [
+      ['../outside.js'],
+      ['local-application/assets/missing.js'],
+      ['local-application/dist/index.js', 'local-application/dist/index.js'],
+    ]) {
+      assert.throws(
+        () =>
+          pruneRuntimeArtifact(current.root, {
+            entrySpecifiers: ['@qinglong/local-application'],
+            retainedJavaScriptFiles,
+          }),
+        /retained JavaScript file/u,
+      );
+      assert.equal(fs.existsSync(map), true);
+    }
   } finally {
     current.close();
   }

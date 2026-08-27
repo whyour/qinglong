@@ -15,6 +15,10 @@ test('ships runtime JavaScript and declarations without development maps', () =>
   for (const [packagePath, files] of [
     ['packages/ql3-runtime-core', ['dist/**/*.js', 'dist/**/*.d.ts']],
     [
+      'packages/ql3-local-api',
+      ['assets/console/*', 'dist/**/*.js', 'dist/**/*.d.ts'],
+    ],
+    [
       'packages/ql3-cluster-admin',
       ['dist/**/*.js', 'dist/**/*.d.ts', 'assets/copilot-console/*'],
     ],

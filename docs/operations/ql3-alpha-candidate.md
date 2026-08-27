@@ -17,6 +17,15 @@
 
 ## 当前阶段实物（2026-08-27）
 
+在下面保留的历史 exact-image 证据之外，2026-08-28 的源码阶段已经形成两条可独立验收的产品线：
+
+| 阶段产物 | 当前可用能力 | 仍缺少 |
+| --- | --- | --- |
+| D-416 Local Alpha Trial Kit v3 | POSIX shell + Docker 一条命令完成 checksum、load、fresh setup、首 Owner、headless Application active/stop | 首份远端双架构实际 artifact 仍需维护者授权 `produce_alpha_artifacts=true` |
+| D-417 opt-in Local Web Console | `application-api` 制品可在同进程/同 SQLite/loopback listener 上查看 Task/Run/Event 并显式运行或取消；Edge/Standalone 制品审计通过 | 尚未进入 Trial Kit Docker image/quickstart，不能冒充当前路由/NAS 下载物 |
+
+这两个边界共同防止把“20 天代码和测试”冒充“用户已经能下载并完整操作”：D-416 已关闭 fresh headless 用户旅程，D-417 已关闭 source/application-api 操作界面，但两者尚未合并成实际可下载的 Console Trial Kit。操作说明见 [Local Web Console](./ql3-local-web-console.md)。
+
 提交 `4239464af6937d56528a0a2c573d12329bc7ca55` 已形成最新 owner-private arm64 工程候选：
 
 - Application image ID `sha256:0d1d4b80ee46e9bb671d846f93d9a6d832c9856a91eed03f299055904da88a50`，operator image ID `sha256:b9122f481b1ba60d7eee9a3ed5ca57c9c141cbc389e7c7dbe19c6f6b1c98b49e`；

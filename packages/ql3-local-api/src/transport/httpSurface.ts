@@ -13,6 +13,10 @@ import type { BoundedRunListInput } from '@qinglong/runtime-core/bounded-run-lis
 import type { BoundedRunEventListInput } from '@qinglong/runtime-core/bounded-run-event-list-projection';
 import type { BoundedRunStepListInput } from '@qinglong/runtime-core/bounded-run-step-list-projection';
 import type { BoundedTaskListInput } from '@qinglong/runtime-core/bounded-task-list-projection';
+import {
+  loadLocalConsoleAssets,
+  type LocalConsoleAsset,
+} from '../console/localConsoleAssets';
 import type { LocalApiResponse } from './contract';
 
 const MAX_HEADER_BYTES = 8 * 1_024;
@@ -38,6 +42,8 @@ const TASK_START_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs$/;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const LOCAL_CONSOLE_CONTENT_SECURITY_POLICY =
+  "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 type LocalApiRouteResolution =
   | LocalApiAdmissionOperation
@@ -559,6 +565,45 @@ function send(
   response.end(body);
 }
 
+function sendConsoleAsset(
+  response: ServerResponse,
+  requestId: string,
+  asset: Readonly<LocalConsoleAsset>,
+): void {
+  if (response.destroyed || response.headersSent) return;
+  response.statusCode = 200;
+  response.setHeader('content-type', asset.contentType);
+  response.setHeader('cache-control', 'no-store');
+  response.setHeader(
+    'content-security-policy',
+    LOCAL_CONSOLE_CONTENT_SECURITY_POLICY,
+  );
+  response.setHeader('cross-origin-opener-policy', 'same-origin');
+  response.setHeader('cross-origin-resource-policy', 'same-origin');
+  response.setHeader(
+    'permissions-policy',
+    'camera=(), geolocation=(), microphone=()',
+  );
+  response.setHeader('referrer-policy', 'no-referrer');
+  response.setHeader('x-content-type-options', 'nosniff');
+  response.setHeader('x-frame-options', 'DENY');
+  response.setHeader('x-request-id', requestId);
+  response.setHeader('etag', asset.etag);
+  response.setHeader('content-length', asset.body.byteLength);
+  response.end(asset.body);
+}
+
+function sendConsoleFavicon(response: ServerResponse, requestId: string): void {
+  if (response.destroyed || response.headersSent) return;
+  response.statusCode = 204;
+  response.setHeader('cache-control', 'no-store');
+  response.setHeader('cross-origin-resource-policy', 'same-origin');
+  response.setHeader('referrer-policy', 'no-referrer');
+  response.setHeader('x-content-type-options', 'nosniff');
+  response.setHeader('x-request-id', requestId);
+  response.end();
+}
+
 function errorResponse(statusCode: number, code: string): LocalApiResponse {
   return Object.freeze({
     statusCode,
@@ -588,6 +633,7 @@ export async function startLocalApiHttpSurface(
   options: LocalApiHttpSurfaceOptions,
 ): Promise<Readonly<ActiveLocalApiHttpSurface>> {
   validateOptions(options);
+  const consoleAssets = loadLocalConsoleAssets();
   const uuid = options.randomUuid ?? randomUUID;
   const maxConcurrentRequests = options.profile === 'edge' ? 4 : 32;
   const drainTimeoutMs = options.profile === 'edge' ? 5_000 : 10_000;
@@ -609,6 +655,28 @@ export async function startLocalApiHttpSurface(
       }
       if (inFlight.size >= maxConcurrentRequests) {
         send(response, requestId, errorResponse(503, 'server_overloaded'));
+        return;
+      }
+      const consoleAsset =
+        request.method === 'GET' && typeof request.url === 'string'
+          ? consoleAssets.get(request.url)
+          : undefined;
+      if (consoleAsset) {
+        if (hasRequestBody(request)) {
+          send(response, requestId, errorResponse(400, 'invalid_request_body'));
+          request.resume();
+          return;
+        }
+        sendConsoleAsset(response, requestId, consoleAsset);
+        return;
+      }
+      if (request.method === 'GET' && request.url === '/favicon.ico') {
+        if (hasRequestBody(request)) {
+          send(response, requestId, errorResponse(400, 'invalid_request_body'));
+          request.resume();
+          return;
+        }
+        sendConsoleFavicon(response, requestId);
         return;
       }
       const resolvedRoute = route(request, options.profile);

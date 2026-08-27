@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#19353d" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <title>QingLong 3.0 · 自动化值班台</title>
+    <link rel="stylesheet" href="/console.css" />
+    <script src="/console.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">跳到操作区</a>
+    <div class="shell">
+      <aside class="gate" aria-label="连接与导航">
+        <header class="brand">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="brand-name">QingLong</span>
+          <span class="brand-version">3.0</span>
+        </header>
+
+        <section class="gate-copy">
+          <p class="eyebrow">Local operations</p>
+          <h1>自动化<br />值班台</h1>
+          <p>在一块屏幕上看清任务、运行与事件，然后只执行你明确确认的动作。</p>
+        </section>
+
+        <div class="connection-state" id="connection-state" data-state="idle">
+          <span class="signal" aria-hidden="true"></span>
+          <span id="connection-label">等待凭据</span>
+        </div>
+
+        <form id="credential-form" class="credential-form" autocomplete="off">
+          <label for="project-input">项目</label>
+          <input
+            id="project-input"
+            name="project"
+            value="default"
+            inputmode="text"
+            maxlength="128"
+            spellcheck="false"
+            required
+          />
+          <label for="token-input">API Credential</label>
+          <input
+            id="token-input"
+            name="token"
+            type="password"
+            placeholder="ql3c_…"
+            maxlength="128"
+            spellcheck="false"
+            autocomplete="off"
+            required
+          />
+          <button class="primary-button" type="submit">连接本机</button>
+          <button class="quiet-button" id="disconnect-button" type="button" hidden>
+            断开并清除凭据
+          </button>
+          <p class="privacy-note">凭据只保存在当前页面内存；不写入 URL、Cookie 或浏览器存储。</p>
+        </form>
+
+        <nav class="section-nav" aria-label="工作区" hidden>
+          <button type="button" data-view="tasks" aria-current="page">
+            <span>任务</span><kbd>T</kbd>
+          </button>
+          <button type="button" data-view="runs">
+            <span>运行</span><kbd>R</kbd>
+          </button>
+        </nav>
+
+        <footer class="gate-footer">
+          <span>Loopback only</span>
+          <span>Alpha · API v3</span>
+        </footer>
+      </aside>
+
+      <main id="workspace" class="workspace" tabindex="-1">
+        <header class="masthead">
+          <div>
+            <p class="eyebrow" id="section-kicker">Connection gate</p>
+            <h2 id="section-title">先建立一条本机连接</h2>
+            <p id="section-description">
+              输入 quickstart 交付的 Owner API Credential。连接成功后才能读取或执行操作。
+            </p>
+          </div>
+          <button class="refresh-button" id="refresh-button" type="button" hidden>
+            <span aria-hidden="true">↻</span> 刷新
+          </button>
+        </header>
+
+        <div class="workspace-grid">
+          <section class="ledger" id="ledger" aria-live="polite" aria-busy="false">
+            <div class="welcome-state">
+              <span class="welcome-index">QL / 03</span>
+              <p>任务是计划，运行是事实，事件是证据。</p>
+              <div class="welcome-rule" aria-hidden="true"><i></i><i></i><i></i></div>
+            </div>
+          </section>
+
+          <aside class="detail" id="detail" aria-label="详情">
+            <div class="detail-empty">
+              <span class="detail-glyph" aria-hidden="true">⌁</span>
+              <p>选择一项，查看它的执行围栏与事件轨迹。</p>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <dialog id="confirmation-dialog" class="confirmation-dialog">
+      <form method="dialog">
+        <p class="eyebrow">Explicit action</p>
+        <h2 id="confirmation-title">确认操作</h2>
+        <p id="confirmation-copy"></p>
+        <div class="dialog-actions">
+          <button class="quiet-button" value="cancel">返回</button>
+          <button class="danger-button" id="confirmation-accept" value="accept">
+            确认
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

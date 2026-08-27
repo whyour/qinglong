@@ -68,7 +68,9 @@ Owner delivery 保留在新数据目录的 `owner-delivery/`，operator command 
 
 当前 Application 是无外部 listener、AI-excluded 的 headless Alpha runtime。该试运行可
 验证 3.0 SQLite、Owner authority、调度/插件基础与生命周期，但还不是 2.x Web UI 的
-可替代版本。
+可替代版本。D-417 已在 opt-in `application-api` Profile 提供首个 Local Web Console，
+但本 v3 Trial Kit 尚未携带该 Profile；不要期待 quickstart 启动后出现 Web 端口。Console
+当前使用方式与边界见 [Local Web Console](./ql3-local-web-console.md)。
 
 ## 手工加载与最小 smoke
 

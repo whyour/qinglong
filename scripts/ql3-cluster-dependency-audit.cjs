@@ -3323,6 +3323,9 @@ function auditPackageScripts(packagePath, manifest, findings) {
 
 function auditPackageFiles(packagePath, manifest, findings) {
   const expected = ['dist/**/*.js', 'dist/**/*.d.ts'];
+  if (packagePath === 'packages/ql3-local-api') {
+    expected.unshift('assets/console/*');
+  }
   if (packagePath === 'packages/ql3-cluster-admin') {
     expected.push('assets/copilot-console/*');
   }

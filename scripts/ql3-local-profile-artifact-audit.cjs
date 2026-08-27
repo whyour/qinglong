@@ -352,6 +352,44 @@ function auditLocalApiExecutable(artifactDirectory) {
   ) {
     fail('local API executable help output is invalid');
   }
+  const consoleDirectory = path.join(packageDirectory, 'assets', 'console');
+  const expectedAssets = ['console.css', 'console.js', 'index.html'];
+  const actualAssets = fs.readdirSync(consoleDirectory).sort();
+  if (JSON.stringify(actualAssets) !== JSON.stringify(expectedAssets)) {
+    fail(
+      `local Console asset closure is invalid: ${JSON.stringify(actualAssets)}`,
+    );
+  }
+  let totalBytes = 0;
+  const contents = {};
+  for (const name of expectedAssets) {
+    const assetPath = path.join(consoleDirectory, name);
+    const stat = fs.lstatSync(assetPath);
+    if (
+      !stat.isFile() ||
+      stat.isSymbolicLink() ||
+      stat.size < 100 ||
+      stat.size > 96 * 1024
+    ) {
+      fail(`local Console asset is invalid: ${name}`);
+    }
+    totalBytes += stat.size;
+    contents[name] = fs.readFileSync(assetPath, 'utf8');
+  }
+  if (
+    totalBytes > 192 * 1024 ||
+    !contents['index.html'].includes('href="/console.css"') ||
+    !contents['index.html'].includes('src="/console.js"') ||
+    /<(?:script|style)(?:\s|>)[^>]*>\s*[^<\s]/u.test(contents['index.html']) ||
+    /\b(?:localStorage|sessionStorage|innerHTML|eval)\b/u.test(
+      contents['console.js'],
+    ) ||
+    /https?:\/\//u.test(contents['index.html']) ||
+    /https?:\/\//u.test(contents['console.css']) ||
+    /https?:\/\//u.test(contents['console.js'])
+  ) {
+    fail('local Console offline or credential-custody contract is invalid');
+  }
 }
 
 function packageRootFromEntry(entryPath, packageName) {
@@ -672,6 +710,9 @@ function main() {
         entrySpecifiers,
         excludedInternalPackages:
           options.application && !options.ai ? ['@qinglong/ai'] : [],
+        retainedJavaScriptFiles: options.api
+          ? ['local-api/assets/console/console.js']
+          : [],
       },
     );
     const prunedMcpExternalDevelopment = options.mcp
