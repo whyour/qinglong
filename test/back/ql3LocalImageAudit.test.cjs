@@ -89,19 +89,47 @@ test('rejects Console assets, loopback identity or retained JavaScript drift', (
         '--retain-js=local-api/assets/console/console.js',
         '--retain-js=local-api/assets/console/unreviewed.js',
       )
-      .replace('io.qinglong.local.console="offline-loopback"', 'io.qinglong.local.console="public"');
+      .replace(
+        'io.qinglong.local.console="offline-loopback"',
+        'io.qinglong.local.console="public"',
+      );
+    fs.writeFileSync(dockerfilePath, dockerfile);
+    const report = auditLocalImageContract(current.root);
+    assert.equal(report.compatible, false);
+    assert.ok(
+      report.findings.some(
+        ({ code }) => code === 'CONSOLE_RUNTIME_NONESSENTIAL_FILES_NOT_REMOVED',
+      ),
+    );
+    assert.ok(
+      report.findings.some(
+        ({ code }) => code === 'CONSOLE_RUNTIME_IDENTITY_OR_LABEL_DRIFT',
+      ),
+    );
+  } finally {
+    current.close();
+  }
+});
+
+test('rejects a Local runtime without the verified process launcher asset', () => {
+  const current = fixture();
+  try {
+    const dockerfilePath = path.join(current.target, 'Dockerfile');
+    const dockerfile = fs
+      .readFileSync(dockerfilePath, 'utf8')
+      .replaceAll(
+        'COPY --from=workspace /workspace/packages/ql3-local-process/assets \\\n' +
+          '  node_modules/@qinglong/local-process/assets\n',
+        '',
+      );
     fs.writeFileSync(dockerfilePath, dockerfile);
     const report = auditLocalImageContract(current.root);
     assert.equal(report.compatible, false);
     assert.ok(
       report.findings.some(
         ({ code }) =>
-          code === 'CONSOLE_RUNTIME_NONESSENTIAL_FILES_NOT_REMOVED',
-      ),
-    );
-    assert.ok(
-      report.findings.some(
-        ({ code }) => code === 'CONSOLE_RUNTIME_IDENTITY_OR_LABEL_DRIFT',
+          code === 'RUNTIME_INTERNAL_PACKAGE_CLOSURE_DRIFT' ||
+          code === 'CONSOLE_RUNTIME_INTERNAL_PACKAGE_CLOSURE_DRIFT',
       ),
     );
   } finally {

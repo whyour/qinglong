@@ -266,6 +266,13 @@ function auditDockerfile(contents, findings) {
       sortedObject(
         Object.fromEntries(RUNTIME_PACKAGES.map((name) => [name, 2])),
       ),
+    ) ||
+    !assembledStage.includes(
+      'COPY --from=workspace /workspace/packages/ql3-local-process/assets \\\n' +
+        '  node_modules/@qinglong/local-process/assets',
+    ) ||
+    !assembledStage.includes(
+      'RUN chmod 0555 node_modules/@qinglong/local-process/assets/ql3-launcher.sh',
     )
   ) {
     addFinding(findings, 'RUNTIME_INTERNAL_PACKAGE_CLOSURE_DRIFT');
@@ -280,14 +287,19 @@ function auditDockerfile(contents, findings) {
     !sameJson(
       sortedObject(consoleRuntimeCopyCounts),
       sortedObject(
-        Object.fromEntries(
-          CONSOLE_RUNTIME_PACKAGES.map((name) => [name, 2]),
-        ),
+        Object.fromEntries(CONSOLE_RUNTIME_PACKAGES.map((name) => [name, 2])),
       ),
     ) ||
     !consoleAssembledStage.includes(
       'COPY --from=workspace /workspace/packages/ql3-local-api/assets \\\n' +
         '  node_modules/@qinglong/local-api/assets',
+    ) ||
+    !consoleAssembledStage.includes(
+      'COPY --from=workspace /workspace/packages/ql3-local-process/assets \\\n' +
+        '  node_modules/@qinglong/local-process/assets',
+    ) ||
+    !consoleAssembledStage.includes(
+      'RUN chmod 0555 node_modules/@qinglong/local-process/assets/ql3-launcher.sh',
     )
   ) {
     addFinding(findings, 'CONSOLE_RUNTIME_INTERNAL_PACKAGE_CLOSURE_DRIFT');
@@ -448,9 +460,7 @@ function auditLocalImageContract(root) {
     ),
     consoleRuntimePackages: Object.freeze(
       [
-        ...CONSOLE_RUNTIME_PACKAGES.map(
-          (name) => `@qinglong/${name.slice(4)}`,
-        ),
+        ...CONSOLE_RUNTIME_PACKAGES.map((name) => `@qinglong/${name.slice(4)}`),
         ...Object.keys(RUNTIME_DEPENDENCIES),
       ].sort(),
     ),

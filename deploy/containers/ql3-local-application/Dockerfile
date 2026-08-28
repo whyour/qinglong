@@ -123,6 +123,8 @@ COPY --from=workspace /workspace/packages/ql3-local-process/package.json \
   node_modules/@qinglong/local-process/package.json
 COPY --from=workspace /workspace/packages/ql3-local-process/dist \
   node_modules/@qinglong/local-process/dist
+COPY --from=workspace /workspace/packages/ql3-local-process/assets \
+  node_modules/@qinglong/local-process/assets
 COPY --from=workspace /workspace/packages/ql3-local-secret/package.json \
   node_modules/@qinglong/local-secret/package.json
 COPY --from=workspace /workspace/packages/ql3-local-secret/dist \
@@ -131,6 +133,8 @@ COPY --from=workspace /workspace/packages/ql3-local-sqlite/package.json \
   node_modules/@qinglong/local-sqlite/package.json
 COPY --from=workspace /workspace/packages/ql3-local-sqlite/dist \
   node_modules/@qinglong/local-sqlite/dist
+
+RUN chmod 0555 node_modules/@qinglong/local-process/assets/ql3-launcher.sh
 
 RUN rm -rf node_modules/.bin \
   && node /tmp/ql3-prune-runtime-artifact.cjs node_modules/@qinglong \
@@ -190,6 +194,8 @@ COPY --from=workspace /workspace/packages/ql3-local-process/package.json \
   node_modules/@qinglong/local-process/package.json
 COPY --from=workspace /workspace/packages/ql3-local-process/dist \
   node_modules/@qinglong/local-process/dist
+COPY --from=workspace /workspace/packages/ql3-local-process/assets \
+  node_modules/@qinglong/local-process/assets
 COPY --from=workspace /workspace/packages/ql3-local-secret/package.json \
   node_modules/@qinglong/local-secret/package.json
 COPY --from=workspace /workspace/packages/ql3-local-secret/dist \
@@ -198,6 +204,8 @@ COPY --from=workspace /workspace/packages/ql3-local-sqlite/package.json \
   node_modules/@qinglong/local-sqlite/package.json
 COPY --from=workspace /workspace/packages/ql3-local-sqlite/dist \
   node_modules/@qinglong/local-sqlite/dist
+
+RUN chmod 0555 node_modules/@qinglong/local-process/assets/ql3-launcher.sh
 
 RUN rm -rf node_modules/.bin \
   && node /tmp/ql3-prune-runtime-artifact.cjs node_modules/@qinglong \
