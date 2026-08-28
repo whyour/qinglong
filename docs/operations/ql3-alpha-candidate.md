@@ -25,6 +25,7 @@
 | D-418 Console Trial Kit v4 | 显式 Linux-only 变体；同一 quickstart 关闭 Owner ceremony 后启动 loopback Console，支持 Task/Run/Event、显式运行与取消；CI 验证首页 200、未认证 API 401 | 仍是 Alpha、无 public ingress/TLS/签名；首份实际 archive 同样需维护者授权 |
 | D-419 Local Trial Kit v5 | headless/Console 都原子安装标准 Owner credential presentation；不再要求部署者手工拼接 bootstrap Secret | 首份实际双架构 v5 archive 仍需维护者授权 |
 | D-419 Console 首自动化闭环 | quickstart 创建无网络/SecretRef/Trigger 的示例 Task；原生 CI 使用真实 Owner credential 完成 read、fenced start、`succeeded` 与 bounded log marker | 仍不提供 Web Task 编辑、2.x 升级或生产远程管理 |
+| D-420 Console Run 日志观察面 | 选择 Run 后经既有认证/Policy/Audit 链读取 latest Attempt 首个 32 KiB，展示 range、truncation、pending/retired 等明确状态 | 不自动轮询、不提供整文件下载；Web Task 创建/修订仍待独立强认证事务切片 |
 
 D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完整操作”：源码与普通 CI 已具备生成、审计和实跑两种 Trial Kit 的能力，但只有显式 artifact run 生成且被同 run 的双架构 milestone 收录后，才是可下载阶段产物。操作说明见 [Local Alpha Trial Kit](./ql3-local-alpha-trial-kit.md) 与 [Local Web Console](./ql3-local-web-console.md)。
 

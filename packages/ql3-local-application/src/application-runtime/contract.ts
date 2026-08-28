@@ -50,7 +50,10 @@ export interface LocalApplicationProductSurfaceAuthority {
   readonly profile: LocalApplicationProfile;
   readonly runs: Pick<
     ReadyFreshStorage['runs'],
-    'findRunById' | 'listEvents' | 'listRunsByProject'
+    | 'findRunById'
+    | 'findLatestAttemptByRunId'
+    | 'listEvents'
+    | 'listRunsByProject'
   >;
   readonly stepRuns: Awaited<ReturnType<ReadyFreshStorage['stepRunReader']>>;
   readonly runCancellation: Awaited<

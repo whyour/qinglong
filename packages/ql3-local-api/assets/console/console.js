@@ -4,6 +4,7 @@
   const PROJECT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
   const TOKEN_PATTERN =
     /^ql3c_[A-Za-z0-9][A-Za-z0-9._:-]{0,63}_[A-Za-z0-9_-]{43}$/;
+  const LOG_READ_BYTES = 32 * 1024;
   const TERMINAL = new Set(['succeeded', 'failed', 'cancelled', 'timed_out']);
   const STATUS_LABELS = Object.freeze({
     created: '已创建',
@@ -101,6 +102,27 @@
     return typeof value === 'string' && value.length > 18
       ? `${value.slice(0, 10)}…${value.slice(-6)}`
       : value || '—';
+  }
+
+  function decodeBase64Utf8(value) {
+    if (
+      typeof value !== 'string' ||
+      value.length > 48 * 1024 ||
+      !/^[A-Za-z0-9+/]*={0,2}$/u.test(value)
+    ) {
+      return null;
+    }
+    try {
+      const binary = window.atob(value);
+      if (binary.length > LOG_READ_BYTES) return null;
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+      return new TextDecoder('utf-8').decode(bytes);
+    } catch {
+      return null;
+    }
   }
 
   function statusTone(status) {
@@ -485,13 +507,100 @@
         api(`/api/v3/projects/${state.project}/runs/${runId}/events?limit=64`),
         api(`/api/v3/projects/${state.project}/runs/${runId}/steps?limit=64`),
       ]);
-      renderRunDetail(runValue.run, eventValue, stepValue);
+      const logView = await readRunLog(runValue.run);
+      renderRunDetail(runValue.run, eventValue, stepValue, logView);
     } catch (error) {
       detailEmpty(describeError(error));
     }
   }
 
-  function renderRunDetail(run, eventPage, stepPage) {
+  async function readRunLog(run) {
+    const attempt = run?.latestAttempt;
+    if (!attempt || typeof attempt.id !== 'string') {
+      return Object.freeze({ status: 'not_started' });
+    }
+    try {
+      const value = await api(
+        `/api/v3/projects/${state.project}/runs/${run.id}/attempts/${attempt.id}/log?offset=0&length=${LOG_READ_BYTES}`,
+      );
+      if (value.status === 'pending') {
+        return Object.freeze({ status: 'pending', attempt });
+      }
+      const content =
+        value.status === 'available' && value.encoding === 'base64'
+          ? decodeBase64Utf8(value.content)
+          : null;
+      if (
+        content === null ||
+        !value.range ||
+        !Number.isSafeInteger(value.range.start) ||
+        !Number.isSafeInteger(value.range.endExclusive) ||
+        !Number.isSafeInteger(value.range.totalBytes)
+      ) {
+        return Object.freeze({ status: 'unavailable', attempt });
+      }
+      return Object.freeze({
+        status: 'available',
+        attempt,
+        content,
+        range: value.range,
+        truncation: value.truncation,
+      });
+    } catch (error) {
+      if (error instanceof ConsoleRequestError && error.status === 410) {
+        return Object.freeze({ status: 'retired', attempt });
+      }
+      if (error instanceof ConsoleRequestError && error.status === 404) {
+        return Object.freeze({ status: 'not_found', attempt });
+      }
+      return Object.freeze({ status: 'unavailable', attempt });
+    }
+  }
+
+  function renderRunLog(logView) {
+    const section = element('section', 'run-log');
+    section.dataset.state = logView.status;
+    const header = element('div', 'run-log-header');
+    header.append(element('strong', null, 'Bounded log'));
+    if (logView.attempt) {
+      header.append(
+        element(
+          'span',
+          null,
+          `Attempt ${logView.attempt.attempt} · ${logView.attempt.status}`,
+        ),
+      );
+    }
+    section.append(header);
+    if (logView.status === 'available') {
+      const metadata = [
+        `${logView.range.start}–${logView.range.endExclusive} / ${logView.range.totalBytes} bytes`,
+      ];
+      if (logView.truncation?.truncated === true) metadata.push('执行端已截断');
+      if (logView.truncation?.truncated === 'unknown')
+        metadata.push('截断状态未知');
+      if (logView.range.nextOffset !== undefined)
+        metadata.push('后续内容可经 API 分页读取');
+      section.append(element('p', 'run-log-meta', metadata.join(' · ')));
+      section.append(
+        element('pre', 'run-log-content', logView.content || '（空日志）'),
+      );
+      return section;
+    }
+    const labels = {
+      not_started: '当前 Run 还没有可读取的执行 Attempt。',
+      pending: '日志尚未发布；运行中可使用“刷新”重新读取。',
+      retired: '日志已按保留策略清理，Run 与 Event 事实仍然保留。',
+      not_found: '当前 Project 下没有找到这份 Attempt 日志。',
+      unavailable: '日志暂时不可用；Run 状态与 Event 仍可独立核验。',
+    };
+    section.append(
+      element('p', 'run-log-placeholder', labels[logView.status] || labels.unavailable),
+    );
+    return section;
+  }
+
+  function renderRunDetail(run, eventPage, stepPage, logView) {
     const events = Array.isArray(eventPage.events) ? eventPage.events : [];
     const steps = Array.isArray(stepPage.steps) ? stepPage.steps : [];
     const fragment = document.createDocumentFragment();
@@ -525,6 +634,7 @@
       );
       fragment.append(actions);
     }
+    fragment.append(renderRunLog(logView));
     fragment.append(element('h4', 'timeline-heading', 'Event sequence'));
     if (events.length === 0) {
       fragment.append(element('p', 'privacy-note', '当前窗口没有可见事件。'));

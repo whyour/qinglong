@@ -72,6 +72,10 @@ test('loads one bounded offline Console asset closure', () => {
       );
       assert.match(text, /authorization: `Bearer \$\{state\.token\}`/u);
       assert.match(text, /credentials: 'omit'/u);
+      assert.match(text, /attempts\/\$\{attempt\.id\}\/log/u);
+      assert.match(text, /const LOG_READ_BYTES = 32 \* 1024/u);
+      assert.match(text, /new TextDecoder\('utf-8'\)/u);
+      assert.match(text, /日志已按保留策略清理/u);
     }
   }
   assert.ok(totalBytes <= 192 * 1024);

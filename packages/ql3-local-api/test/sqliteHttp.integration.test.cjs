@@ -448,6 +448,14 @@ test('serves an authenticated Run through one real SQLite authority and durable 
   assert.equal(accepted.statusCode, 200);
   assert.equal(accepted.body.run.id, RUN_ID);
   assert.equal(accepted.body.run.projectId, 'default');
+  assert.deepEqual(accepted.body.run.latestAttempt, {
+    id: ATTEMPT_ID,
+    attempt: 1,
+    status: 'running',
+    logAvailable: true,
+    createdAtMs: NOW - 90,
+    startedAtMs: NOW - 80,
+  });
   assert.equal(JSON.stringify(accepted).includes('secret'), false);
 
   const listed = await request(

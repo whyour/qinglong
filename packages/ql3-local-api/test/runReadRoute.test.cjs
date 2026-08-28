@@ -33,11 +33,31 @@ function run(overrides = {}) {
   };
 }
 
+function attempt(overrides = {}) {
+  return {
+    id: 'attempt_123',
+    runId: 'run_123',
+    attempt: 2,
+    status: 'running',
+    executorType: 'local_process',
+    executorHandle: 'private-executor-handle',
+    logArtifactId: 'private-log-artifact-id',
+    callbackSequence: 0,
+    createdAtMs: 2_100,
+    startedAtMs: 2_200,
+    ...overrides,
+  };
+}
+
 test('returns the shared bounded Run projection without secret-adjacent fields', async () => {
   const route = createLocalApiRunReadRoute({
     async findRunById(runId) {
       assert.equal(runId, 'run_123');
       return run({ version: 0 });
+    },
+    async findLatestAttemptByRunId(runId) {
+      assert.equal(runId, 'run_123');
+      return attempt();
     },
   });
 
@@ -48,6 +68,14 @@ test('returns the shared bounded Run projection without secret-adjacent fields',
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.run.projectId, 'prj_default');
   assert.equal(response.body.run.version, 0);
+  assert.deepEqual(response.body.run.latestAttempt, {
+    id: 'attempt_123',
+    attempt: 2,
+    status: 'running',
+    logAvailable: true,
+    createdAtMs: 2_100,
+    startedAtMs: 2_200,
+  });
   assert.equal(JSON.stringify(response).includes('private'), false);
 });
 
@@ -56,6 +84,9 @@ test('collapses absent and cross-project Runs and fails closed on repository err
     const route = createLocalApiRunReadRoute({
       async findRunById() {
         return value;
+      },
+      async findLatestAttemptByRunId() {
+        throw new Error('must not inspect Attempt for an absent Run');
       },
     });
     assert.deepEqual(
@@ -67,9 +98,45 @@ test('collapses absent and cross-project Runs and fails closed on repository err
     async findRunById() {
       throw new Error('database unavailable');
     },
+    async findLatestAttemptByRunId() {
+      throw new Error('database unavailable');
+    },
   });
   assert.deepEqual(
     await unavailable.handle({ projectId: 'prj_default', runId: 'run_123' }),
+    { statusCode: 503, body: { code: 'run_query_unavailable' } },
+  );
+});
+
+test('returns null without an Attempt and fails closed on invalid Attempt projections', async () => {
+  const withoutAttempt = createLocalApiRunReadRoute({
+    async findRunById() {
+      return run();
+    },
+    async findLatestAttemptByRunId() {
+      return null;
+    },
+  });
+  const response = await withoutAttempt.handle({
+    projectId: 'prj_default',
+    runId: 'run_123',
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.run.latestAttempt, null);
+
+  const invalidAttempt = createLocalApiRunReadRoute({
+    async findRunById() {
+      return run();
+    },
+    async findLatestAttemptByRunId() {
+      return attempt({ runId: 'another_run' });
+    },
+  });
+  assert.deepEqual(
+    await invalidAttempt.handle({
+      projectId: 'prj_default',
+      runId: 'run_123',
+    }),
     { statusCode: 503, body: { code: 'run_query_unavailable' } },
   );
 });
