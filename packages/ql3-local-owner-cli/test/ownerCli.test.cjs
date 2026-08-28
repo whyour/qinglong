@@ -145,6 +145,64 @@ test('completes fresh Owner and credential recovery ceremonies without returning
   assert.equal(claimed.status, 'inserted');
   assert.equal(claimed.role, 'owner');
   assert.equal(JSON.stringify(claimed).includes('secret'), false);
+  const credentialFilePath = path.join(
+    state.options.deploymentRoot,
+    'owner-credential.json',
+  );
+  const installed = await runner.run(
+    commandFile(
+      state,
+      'owner.credential-presentation.install-from-delivery',
+      { credentialMutationId, destinationFilePath: credentialFilePath },
+      '04b-install-presentation',
+    ),
+  );
+  assert.deepEqual(installed, {
+    schemaVersion: 1,
+    operation: 'owner.credential-presentation.install-from-delivery',
+    status: 'installed',
+    credentialMutationId,
+  });
+  const presentation = JSON.parse(fs.readFileSync(credentialFilePath, 'utf8'));
+  assert.equal(
+    presentation.kind,
+    'qinglong3-local-identity-credential-presentation',
+  );
+  assert.match(
+    presentation.token,
+    /^ql3c_own_[A-Za-z0-9_-]{22}_[A-Za-z0-9_-]{43}$/,
+  );
+  assert.equal(fs.statSync(credentialFilePath).mode & 0o777, 0o600);
+  const replayedInstall = await runner.run(
+    commandFile(
+      state,
+      'owner.credential-presentation.install-from-delivery',
+      { credentialMutationId, destinationFilePath: credentialFilePath },
+      '04c-replay-presentation',
+    ),
+  );
+  assert.equal(replayedInstall.status, 'existing');
+  assertNoSecretFields(installed);
+  assertNoSecretFields(replayedInstall);
+  const escapedDestination = path.join(
+    os.tmpdir(),
+    `ql3-owner-credential-escape-${process.pid}.json`,
+  );
+  await assert.rejects(
+    runner.run(
+      commandFile(
+        state,
+        'owner.credential-presentation.install-from-delivery',
+        {
+          credentialMutationId,
+          destinationFilePath: escapedDestination,
+        },
+        '04d-reject-escaped-presentation',
+      ),
+    ),
+    /destinationFilePath must be a descendant of deploymentRoot/,
+  );
+  assert.equal(fs.existsSync(escapedDestination), false);
   for (const [purpose, mutationId, digest, suffix] of [
     [
       'credential-provisioning',

@@ -10,8 +10,8 @@ const { auditClusterImageSbom } = require('./ql3-cluster-image-sbom.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-trial-kit@v4';
-const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v2';
+const SCHEMA = 'qinglong/alpha-local-trial-kit@v5';
+const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v3';
 const QUICKSTART_TEMPLATE = path.join(
   DEFAULT_ROOT,
   'scripts/templates/ql3-local-alpha-quickstart.sh',
@@ -40,6 +40,7 @@ const VERIFICATION = Object.freeze({
   operator128MiBEntrypoint: 'passed',
   operatorPackageInventory: 'passed',
   freshOwnerJourney: 'passed',
+  ownerCredentialPresentation: 'passed',
   edgeFreshLifecycle: 'passed',
   standaloneFreshLifecycle: 'passed',
   localApiCancellation: 'passed',
@@ -49,6 +50,7 @@ function verificationGates(variant) {
   return Object.freeze({
     ...VERIFICATION,
     consoleLiveJourney: variant === 'console' ? 'passed' : 'not_applicable',
+    firstAutomationJourney: variant === 'console' ? 'passed' : 'not_applicable',
   });
 }
 const WORKFLOW_IDENTITY = Object.freeze({
@@ -302,7 +304,10 @@ function validateVerificationEvidence(document, expected) {
     document.workflow.job !== WORKFLOW_IDENTITY.job ||
     !DECIMAL_ID_PATTERN.test(document.workflow.runId || '') ||
     !ATTEMPT_PATTERN.test(document.workflow.runAttempt || '') ||
-    !exactKeys(document.gates, Object.keys(verificationGates(expected.variant))) ||
+    !exactKeys(
+      document.gates,
+      Object.keys(verificationGates(expected.variant)),
+    ) ||
     JSON.stringify(document.gates) !==
       JSON.stringify(verificationGates(expected.variant))
   ) {
@@ -618,7 +623,7 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       0o700,
     );
     const manifest = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',
@@ -721,7 +726,7 @@ function auditLocalAlphaTrialKit(options) {
       'readme',
       'verification',
     ]) ||
-    manifest.schemaVersion !== 5 ||
+    manifest.schemaVersion !== 6 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||

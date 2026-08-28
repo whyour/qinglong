@@ -47,6 +47,12 @@ export {
   type LocalOwnerSecretRecoverySummary,
 } from '../delivery/secretDelivery';
 export {
+  LocalOwnerCredentialPresentationInstallError,
+  installLocalOwnerCredentialPresentation,
+  type InstallLocalOwnerCredentialPresentationOptions,
+  type LocalOwnerCredentialPresentationInstallSummary,
+} from '../delivery/credentialPresentationInstaller';
+export {
   LocalOwnerPepperConfigurationError,
   LocalOwnerPepperConflictError,
   LocalOwnerPepperUnavailableError,

@@ -102,10 +102,16 @@ EOF
 cat >"$data_root/owner-claim.json" <<EOF
 {"schemaVersion":1,"operation":"owner.claim.from-deliveries","options":{"deploymentRoot":"/var/lib/qinglong3","databasePath":"/var/lib/qinglong3/qinglong3.sqlite","pepperPath":"/var/lib/qinglong3/owner-peppers/b3duZXItdjE.pepper","pepperKeyId":"owner-v1","secretDeliveryDirectory":"/var/lib/qinglong3/owner-delivery","profile":"$profile","busyTimeoutMs":100},"request":{"projectId":"default","mutationId":"019f8680-143d-4000-8000-000000000023","requestId":"alpha-trial-owner-claim","credentialMutationId":"019f8680-143d-4000-8000-000000000021","challengeMutationId":"019f8680-143d-4000-8000-000000000022"}}
 EOF
+cat >"$data_root/owner-credential-install.json" <<EOF
+{"schemaVersion":1,"operation":"owner.credential-presentation.install-from-delivery","options":{"deploymentRoot":"/var/lib/qinglong3","databasePath":"/var/lib/qinglong3/qinglong3.sqlite","pepperPath":"/var/lib/qinglong3/owner-peppers/b3duZXItdjE.pepper","pepperKeyId":"owner-v1","secretDeliveryDirectory":"/var/lib/qinglong3/owner-delivery","profile":"$profile","busyTimeoutMs":100},"request":{"credentialMutationId":"019f8680-143d-4000-8000-000000000021","destinationFilePath":"/var/lib/qinglong3/owner-credential.json"}}
+EOF
 cat >"$data_root/local-application.json" <<EOF
 {"schema":"qinglong/local-application-process@v2","instanceId":"alpha-trial-local","profile":"$profile","storage":{"mode":"fresh","databasePath":"/var/lib/qinglong3/qinglong3.sqlite","busyTimeoutMs":100},"runtime":{"receiptRoot":"/var/lib/qinglong3/receipts","artifactRoot":"/var/lib/qinglong3/artifacts","secretKeyringPath":"/var/lib/qinglong3/local-secret-keyring.json"},"pluginPackages":{"stagingRoot":"/var/lib/qinglong3/plugin-staging","activationRoot":"/var/lib/qinglong3/plugin-activation","recoverySource":{"mode":"disabled"},"pageSize":4,"maxPages":4,"taskPublicationPageSize":4,"taskPublicationMaxPages":4},"ai":{"deployment":"excluded"}}
 EOF
 if [ "$VARIANT" = console ]; then
+  cat >"$data_root/alpha-first-task.json" <<EOF
+{"schemaVersion":1,"operation":"task.put","options":{"deploymentRoot":"/var/lib/qinglong3","databasePath":"/var/lib/qinglong3/qinglong3.sqlite","profile":"$profile","ownerPepperKeyringDirectory":"/var/lib/qinglong3/owner-peppers","credentialFilePath":"/var/lib/qinglong3/owner-credential.json","busyTimeoutMs":100},"request":{"projectId":"default","taskId":"alpha-first-automation","expectedRevision":null,"mutationId":"019f8680-143d-4000-8000-000000000031","requestId":"alpha-trial-first-task","failureAuditEventId":"019f8680-143d-4000-8000-000000000032","name":"QingLong 3.0 first automation","description":"A bounded offline task proving the fresh Alpha installation can execute work","kind":"command","spec":{"schema":"qinglong/command@v1","config":{"command":{"kind":"argv","file":"/bin/echo","args":["qinglong3-alpha-first-automation"]}}},"labels":{"qinglong.alpha.example":"true"},"enabled":true,"occurredAtMs":1785254400031}}
+EOF
   cat >"$data_root/local-api.json" <<EOF
 {"schema":"qinglong/local-api-process@v1","deploymentRoot":"/var/lib/qinglong3","applicationConfigFilePath":"/var/lib/qinglong3/local-application.json","ownerPepperKeyringDirectory":"/var/lib/qinglong3/owner-peppers","listener":{"host":"127.0.0.1","port":5700}}
 EOF
@@ -136,6 +142,12 @@ grep -q '"status":"inserted"' "$data_root/results/owner-challenge.json.result.js
 run_operator owner owner-claim.json
 grep -q '"status":"inserted"' "$data_root/results/owner-claim.json.result.json" || fail 'Owner claim did not report inserted'
 grep -q '"role":"owner"' "$data_root/results/owner-claim.json.result.json" || fail 'Owner claim did not establish the owner role'
+run_operator owner owner-credential-install.json
+grep -q '"status":"installed"' "$data_root/results/owner-credential-install.json.result.json" || fail 'Owner credential presentation was not installed'
+if [ "$VARIANT" = console ]; then
+  run_operator task alpha-first-task.json
+  grep -q '"status":"created"' "$data_root/results/alpha-first-task.json.result.json" || fail 'first automation Task was not created'
+fi
 
 ready=0
 cleanup() {
@@ -174,6 +186,7 @@ printf '%s\n' \
   "QingLong 3.0 Local Alpha is active ($VARIANT, $profile, $ARCHITECTURE)." \
   "Data root: $data_root" \
   "Owner deliveries: $data_root/owner-delivery" \
+  "Owner credential presentation: $data_root/owner-credential.json" \
   "Logs: docker logs $container_name" \
   "Stop: docker stop --time 30 $container_name" \
   "Remove container: docker rm $container_name" \
@@ -181,5 +194,6 @@ printf '%s\n' \
 if [ "$VARIANT" = console ]; then
   printf '%s\n' \
     'Console: http://127.0.0.1:5700/' \
+    'Starter Task: alpha-first-automation (review its revision/content fence in Console before running it).' \
     'Remote access: create an SSH tunnel to 127.0.0.1:5700; do not expose the port on LAN or the public Internet.'
 fi

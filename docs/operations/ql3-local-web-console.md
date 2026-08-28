@@ -1,6 +1,6 @@
 # QingLong 3.0 Local Web Console
 
-Local Web Console 是 `@qinglong/local-api` 的 opt-in 操作界面，用来查看 Task、Run 和执行事件，并显式启动或取消一次运行。它不是当前 headless Local Alpha Trial Kit 的组成部分，也不是 2.x Web UI 的完整替代品。
+Local Web Console 是 `@qinglong/local-api` 的 opt-in 操作界面，用来查看 Task、Run 和执行事件，并显式启动或取消一次运行。它由 Console Local Alpha Trial Kit 交付，但不进入默认 headless 变体，也不是 2.x Web UI 的完整替代品。
 
 ## 选择部署档位
 
@@ -11,7 +11,7 @@ Local Web Console 是 `@qinglong/local-api` 的 opt-in 操作界面，用来查�
 | 普通单节点服务器 | 选择 `standalone-application-api` |
 | Kubernetes/Cluster 节点 | 不使用本 Local Console；继续使用 Cluster Control/Console 路径 |
 
-当前仓库能生成 Node.js `application-api` 制品；D-416 的 v3 Docker Trial Kit 仍只包含 headless Application。需要下载即用的 Console image/quickstart 时，应等待后续 Console Trial Kit 切片，不能把本页命令误认为当前公开下载物。
+D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一步安装可直接使用的 Owner credential presentation，并创建默认不自动运行的 `alpha-first-automation`。实际大 archive 仍只由维护者显式 artifact run 生成；普通 push 的源码和 CI 不是公开下载物。
 
 ## 前置条件
 
@@ -54,7 +54,7 @@ ssh -L 5701:127.0.0.1:5701 router.example
 ## 使用
 
 1. 输入 Project ID 和 `ql3c_…` API credential，选择“连接本机”。
-2. 在“任务”中选择 Task，核对 revision/content fence 后才能“运行一次”。
+2. fresh Console Trial Kit 可先选择 `alpha-first-automation`；核对 revision/content fence 后才能“运行一次”。
 3. 在“运行”中选择 durable Run，按 Event sequence 判断实际进度。
 4. “请求取消”只提交 durable cancellation intent；界面出现 `cancelled|failed|succeeded|timed_out` 终态前，不要认为进程已经停止。
 5. 完成后选择“断开并清除凭据”，再关闭页面。

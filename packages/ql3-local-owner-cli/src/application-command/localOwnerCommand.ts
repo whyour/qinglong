@@ -3,6 +3,7 @@ import {
   readPrivateLocalCommandFile,
 } from '@qinglong/local-command-file';
 import {
+  installLocalOwnerCredentialPresentation,
   LocalOwnerSecretDeliveryError,
   openLocalOwnerConsole,
   type ClaimLocalOwnerFromDeliveriesRequest,
@@ -71,6 +72,16 @@ export interface AcknowledgeLocalOwnerDeliveryCommand {
   };
 }
 
+export interface InstallLocalOwnerCredentialPresentationCommand {
+  readonly schemaVersion: 1;
+  readonly operation: 'owner.credential-presentation.install-from-delivery';
+  readonly options: OpenLocalOwnerConsoleOptions;
+  readonly request: {
+    readonly credentialMutationId: string;
+    readonly destinationFilePath: string;
+  };
+}
+
 export interface IssueLocalOwnerCredentialRecoveryCommand {
   readonly schemaVersion: 1;
   readonly operation: 'owner.credential-recovery.issue';
@@ -101,6 +112,7 @@ export type LocalOwnerCommand =
   | ClaimLocalOwnerCommand
   | InspectLocalOwnerDeliveryCommand
   | AcknowledgeLocalOwnerDeliveryCommand
+  | InstallLocalOwnerCredentialPresentationCommand
   | IssueLocalOwnerCredentialRecoveryCommand
   | CompleteLocalOwnerCredentialRecoveryCommand;
 
@@ -153,6 +165,7 @@ function normalizeCommand(value: unknown): Readonly<LocalOwnerCommand> {
     'owner.claim.from-deliveries',
     'owner.delivery.inspect',
     'owner.delivery.acknowledge',
+    'owner.credential-presentation.install-from-delivery',
     'owner.credential-recovery.issue',
     'owner.credential-recovery.complete',
   ];
@@ -218,6 +231,20 @@ function validateAcknowledgementRequest(
   ) {
     throw new LocalOwnerCliConfigurationError(
       'delivery acknowledgement request is invalid',
+    );
+  }
+}
+
+function validatePresentationInstallRequest(
+  value: InstallLocalOwnerCredentialPresentationCommand['request'],
+): void {
+  if (
+    !exactKeys(value, ['credentialMutationId', 'destinationFilePath']) ||
+    !UUID_V4_PATTERN.test(value.credentialMutationId) ||
+    typeof value.destinationFilePath !== 'string'
+  ) {
+    throw new LocalOwnerCliConfigurationError(
+      'credential presentation install request is invalid',
     );
   }
 }
@@ -353,6 +380,22 @@ async function execute(
         mutationId: acknowledgement.mutationId,
         requestId: acknowledgement.requestId,
         ttlMs: acknowledgement.ttlMs,
+      });
+    }
+    case 'owner.credential-presentation.install-from-delivery': {
+      validatePresentationInstallRequest(command.request);
+      const result = installLocalOwnerCredentialPresentation({
+        deploymentRoot: command.options.deploymentRoot,
+        deliveryFilePath: console.credentialDeliveryPath(
+          command.request.credentialMutationId,
+        ),
+        destinationFilePath: command.request.destinationFilePath,
+      });
+      return Object.freeze({
+        schemaVersion: 1 as const,
+        operation: command.operation,
+        status: result.status,
+        credentialMutationId: result.credentialMutationId,
       });
     }
     case 'owner.credential-recovery.issue': {

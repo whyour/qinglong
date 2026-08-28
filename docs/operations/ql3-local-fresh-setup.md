@@ -59,7 +59,33 @@ ql3-local-setup run --command-file /opt/qinglong3/setup.json
 输出 key、digest 或路径。
 
 setup 只准备存储和密钥 authority。随后使用 `ql3-owner` 完成 Identity provision、
-challenge、Owner claim 与 delivery acknowledgement。
+challenge 与 Owner claim。在提交 credential delivery acknowledgement 前，先把 ready record
+安装为后续管理命令和 Console 可直接使用的标准 presentation：
+
+```json
+{
+  "schemaVersion": 1,
+  "operation": "owner.credential-presentation.install-from-delivery",
+  "options": {
+    "deploymentRoot": "/opt/qinglong3",
+    "databasePath": "/opt/qinglong3/qinglong3.sqlite",
+    "pepperPath": "/opt/qinglong3/owner-peppers/b3duZXItdjE.pepper",
+    "pepperKeyId": "owner-v1",
+    "secretDeliveryDirectory": "/opt/qinglong3/owner-delivery",
+    "profile": "edge",
+    "busyTimeoutMs": 100
+  },
+  "request": {
+    "credentialMutationId": "REPLACE_WITH_PROVISION_MUTATION_UUID",
+    "destinationFilePath": "/opt/qinglong3/owner-credential.json"
+  }
+}
+```
+
+该 command file 与 destination 都必须是 `0600`；首次返回 `installed`，原样重放返回
+`existing`。结果不会返回 token 或路径。确认 consumer 已能用
+`owner-credential.json` 完成真实认证后，才执行 credential/challenge delivery
+acknowledgement；不要先清理唯一 ready record。
 
 ## 3. 创建 fresh application 配置
 

@@ -166,7 +166,7 @@ function adapters(overrides = {}, variant = 'headless') {
 test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const paths = fixture(t);
   const manifest = createLocalAlphaTrialKit(createOptions(paths), adapters());
-  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v4');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v5');
   assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.equal(manifest.architecture, 'arm64');
@@ -227,6 +227,8 @@ test('materializes a distinct loopback Console trial kit without widening the he
     ),
   );
   assert.equal(verification.gates.consoleLiveJourney, 'passed');
+  assert.equal(verification.gates.firstAutomationJourney, 'passed');
+  assert.equal(verification.gates.ownerCredentialPresentation, 'passed');
   const quickstartContents = fs.readFileSync(
     path.join(paths.outputRoot, 'quickstart.sh'),
     'utf8',
@@ -236,6 +238,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
   assert.match(quickstartContents, /application_config=local-api\.json/);
   assert.match(quickstartContents, /"host":"127\.0\.0\.1","port":5700/);
   assert.match(quickstartContents, /Console: http:\/\/127\.0\.0\.1:5700\//);
+  assert.match(quickstartContents, /alpha-first-automation/);
   assert.match(quickstartContents, /do not expose the port on LAN/);
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
@@ -391,6 +394,7 @@ case " $* " in
   *'/owner-provision.json'*) printf '%s\\n' '{"status":"inserted"}'; exit 0 ;;
   *'/owner-challenge.json'*) printf '%s\\n' '{"status":"inserted"}'; exit 0 ;;
   *'/owner-claim.json'*) printf '%s\\n' '{"status":"inserted","role":"owner"}'; exit 0 ;;
+  *'/owner-credential-install.json'*) printf '%s\\n' '{"status":"installed"}'; exit 0 ;;
 esac
 exit 1
 `,

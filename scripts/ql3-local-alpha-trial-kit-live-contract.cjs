@@ -90,8 +90,7 @@ function inspectImages(applicationImage, operatorImage, variant) {
     applicationLabels?.['io.qinglong.profile'] !== expectedProfile ||
     applicationLabels?.['io.qinglong.ai'] !== 'excluded' ||
     (variant === 'console'
-      ? applicationLabels?.['io.qinglong.local.console'] !==
-        'offline-loopback'
+      ? applicationLabels?.['io.qinglong.local.console'] !== 'offline-loopback'
       : applicationLabels?.['io.qinglong.local.console'] !== undefined) ||
     operatorLabels?.['io.qinglong.lifecycle'] !== 'short-lived' ||
     operatorLabels?.['io.qinglong.authority'] !== 'local-owner-management' ||
@@ -285,6 +284,34 @@ function establishFirstOwner(state) {
   ) {
     fail('first Owner ceremony did not converge');
   }
+  writePrivateJson(path.join(state.root, 'owner-credential-install.json'), {
+    schemaVersion: 1,
+    operation: 'owner.credential-presentation.install-from-delivery',
+    options: {
+      deploymentRoot: '/var/lib/qinglong3',
+      databasePath: '/var/lib/qinglong3/qinglong3.sqlite',
+      pepperPath: '/var/lib/qinglong3/owner-peppers/b3duZXItdjE.pepper',
+      pepperKeyId: 'owner-v1',
+      secretDeliveryDirectory: '/var/lib/qinglong3/owner-delivery',
+      profile: state.profile,
+      busyTimeoutMs: 100,
+    },
+    request: {
+      credentialMutationId,
+      destinationFilePath: '/var/lib/qinglong3/owner-credential.json',
+    },
+  });
+  const presentation = runOperator(
+    state,
+    'owner',
+    'owner-credential-install.json',
+  );
+  if (
+    presentation.status !== 'installed' ||
+    presentation.credentialMutationId !== credentialMutationId
+  ) {
+    fail('Owner credential presentation did not install');
+  }
   for (const acknowledgement of [
     {
       file: 'owner-credential-ack.json',
@@ -312,7 +339,65 @@ function establishFirstOwner(state) {
     provisioned: true,
     challenged: true,
     claimed: true,
+    credentialPresentationInstalled: true,
     acknowledged: true,
+  });
+}
+
+function createFirstAutomationTask(state) {
+  if (state.variant !== 'console') {
+    return Object.freeze({ status: 'not_applicable' });
+  }
+  writePrivateJson(path.join(state.root, 'alpha-first-task.json'), {
+    schemaVersion: 1,
+    operation: 'task.put',
+    options: {
+      deploymentRoot: '/var/lib/qinglong3',
+      databasePath: '/var/lib/qinglong3/qinglong3.sqlite',
+      profile: state.profile,
+      ownerPepperKeyringDirectory: '/var/lib/qinglong3/owner-peppers',
+      credentialFilePath: '/var/lib/qinglong3/owner-credential.json',
+      busyTimeoutMs: 100,
+    },
+    request: {
+      projectId: 'default',
+      taskId: 'alpha-first-automation',
+      expectedRevision: null,
+      mutationId: '019f8680-143d-4000-8000-000000000031',
+      requestId: 'alpha-trial-first-task',
+      failureAuditEventId: '019f8680-143d-4000-8000-000000000032',
+      name: 'QingLong 3.0 first automation',
+      description:
+        'A bounded offline task proving the fresh Alpha installation can execute work',
+      kind: 'command',
+      spec: {
+        schema: 'qinglong/command@v1',
+        config: {
+          command: {
+            kind: 'argv',
+            file: '/bin/echo',
+            args: ['qinglong3-alpha-first-automation'],
+          },
+        },
+      },
+      labels: { 'qinglong.alpha.example': 'true' },
+      enabled: true,
+      occurredAtMs: 1_785_254_400_031,
+    },
+  });
+  const result = runOperator(state, 'task', 'alpha-first-task.json');
+  if (
+    result.status !== 'created' ||
+    result.task?.taskId !== 'alpha-first-automation' ||
+    result.task?.revision !== 1 ||
+    result.task?.enabled !== true
+  ) {
+    fail('first automation Task did not converge');
+  }
+  return Object.freeze({
+    status: 'created',
+    taskId: result.task.taskId,
+    revision: result.task.revision,
   });
 }
 
@@ -346,8 +431,7 @@ function writeApplicationConfig(state) {
     writePrivateJson(path.join(state.root, 'local-api.json'), {
       schema: 'qinglong/local-api-process@v1',
       deploymentRoot: '/var/lib/qinglong3',
-      applicationConfigFilePath:
-        '/var/lib/qinglong3/local-application.json',
+      applicationConfigFilePath: '/var/lib/qinglong3/local-application.json',
       ownerPepperKeyringDirectory: '/var/lib/qinglong3/owner-peppers',
       listener: { host: '127.0.0.1', port: 5700 },
     });
@@ -358,7 +442,39 @@ function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function consoleSurfaceContract() {
+function credentialToken(state) {
+  const value = JSON.parse(
+    fs.readFileSync(path.join(state.root, 'owner-credential.json'), 'utf8'),
+  );
+  if (
+    value?.schemaVersion !== 1 ||
+    value?.kind !== 'qinglong3-local-identity-credential-presentation' ||
+    typeof value?.token !== 'string' ||
+    !/^ql3c_own_[A-Za-z0-9_-]{22}_[A-Za-z0-9_-]{43}$/u.test(value.token)
+  ) {
+    fail('installed Owner credential presentation is invalid');
+  }
+  return value.token;
+}
+
+async function apiRequest(pathname, token, options = {}) {
+  const response = await fetch(`http://127.0.0.1:5700${pathname}`, {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(2_000),
+    ...options,
+    headers: {
+      authorization: `Bearer ${token}`,
+      ...(options.body === undefined
+        ? {}
+        : { 'content-type': 'application/json' }),
+      ...(options.headers ?? {}),
+    },
+  });
+  const body = await response.json();
+  return Object.freeze({ status: response.status, body });
+}
+
+async function consoleSurfaceContract(state) {
   let lastError;
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
@@ -380,10 +496,81 @@ async function consoleSurfaceContract() {
           `Console HTTP contract drifted: root=${root.status}, unauthenticatedApi=${api.status}`,
         );
       }
+      const token = credentialToken(state);
+      const task = await apiRequest(
+        '/api/v3/projects/default/tasks/alpha-first-automation',
+        token,
+      );
+      if (
+        task.status !== 200 ||
+        task.body?.task?.revision !== 1 ||
+        !/^[0-9a-f]{64}$/u.test(task.body?.task?.contentDigest ?? '')
+      ) {
+        fail(
+          'starter Task is not visible through the authenticated Console API',
+        );
+      }
+      const started = await apiRequest(
+        '/api/v3/projects/default/tasks/alpha-first-automation/runs',
+        token,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            schema: 'qinglong/task-start@v1',
+            mutationId: '019f8680-143d-7000-8000-000000000041',
+            expectedRevision: task.body.task.revision,
+            expectedContentDigest: task.body.task.contentDigest,
+          }),
+        },
+      );
+      if (
+        started.status !== 202 ||
+        started.body?.status !== 'accepted' ||
+        typeof started.body?.runId !== 'string' ||
+        typeof started.body?.attemptId !== 'string'
+      ) {
+        fail('starter Task did not accept one fenced Run');
+      }
+      let terminal;
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        const current = await apiRequest(
+          `/api/v3/projects/default/runs/${started.body.runId}`,
+          token,
+        );
+        if (current.status !== 200) fail('starter Run became unreadable');
+        if (
+          ['succeeded', 'failed', 'cancelled', 'timed_out'].includes(
+            current.body?.run?.status,
+          )
+        ) {
+          terminal = current.body.run.status;
+          break;
+        }
+        await delay(250);
+      }
+      if (terminal !== 'succeeded') {
+        fail(`starter Run did not succeed: ${terminal ?? 'timeout'}`);
+      }
+      const log = await apiRequest(
+        `/api/v3/projects/default/runs/${started.body.runId}/attempts/${started.body.attemptId}/log?offset=0&length=32768`,
+        token,
+      );
+      const logText =
+        log.status === 200 && log.body?.status === 'available'
+          ? Buffer.from(log.body.content, 'base64').toString('utf8')
+          : '';
+      if (!logText.includes('qinglong3-alpha-first-automation')) {
+        fail('starter Run log does not contain the bounded work marker');
+      }
       return Object.freeze({
         listener: '127.0.0.1:5700',
         rootStatus: 200,
         unauthenticatedApiStatus: 401,
+        firstAutomation: Object.freeze({
+          taskId: 'alpha-first-automation',
+          runStatus: terminal,
+          logMarkerObserved: true,
+        }),
       });
     } catch (error) {
       lastError = error;
@@ -458,7 +645,7 @@ async function runApplication(state) {
       surfacePromise = (async () => {
         try {
           if (state.variant === 'console') {
-            surface = await consoleSurfaceContract();
+            surface = await consoleSurfaceContract(state);
           }
         } catch (error) {
           surfaceError = error;
@@ -542,6 +729,7 @@ async function main() {
   try {
     const setup = prepareFreshAuthority(state);
     const owner = establishFirstOwner(state);
+    const firstAutomation = createFirstAutomationTask(state);
     writeApplicationConfig(state);
     const lifecycle = await runApplication(state);
     const database = new DatabaseSync(path.join(root, 'qinglong3.sqlite'), {
@@ -565,8 +753,8 @@ async function main() {
       fail('durable SQLite result is invalid');
     process.stdout.write(
       `${JSON.stringify({
-        schemaVersion: 2,
-        schema: 'qinglong/local-alpha-trial-kit-live@v2',
+        schemaVersion: 3,
+        schema: 'qinglong/local-alpha-trial-kit-live@v3',
         variant: options.variant,
         profile: options.profile,
         architecture: images.architecture,
@@ -576,6 +764,7 @@ async function main() {
         },
         setup,
         owner,
+        firstAutomation,
         lifecycle,
         sqliteIntegrity: integrity,
         activeOwnerBindings: ownerCount,

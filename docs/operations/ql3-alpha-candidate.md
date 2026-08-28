@@ -23,6 +23,8 @@
 | --- | --- | --- |
 | D-418 headless Trial Kit v4 | 默认低配变体；POSIX shell + Docker 一条命令完成 checksum、load、fresh setup、首 Owner、Application active/stop；无 listener | 首份远端双架构实际 artifact 仍需维护者授权 `produce_alpha_artifacts=true` |
 | D-418 Console Trial Kit v4 | 显式 Linux-only 变体；同一 quickstart 关闭 Owner ceremony 后启动 loopback Console，支持 Task/Run/Event、显式运行与取消；CI 验证首页 200、未认证 API 401 | 仍是 Alpha、无 public ingress/TLS/签名；首份实际 archive 同样需维护者授权 |
+| D-419 Local Trial Kit v5 | headless/Console 都原子安装标准 Owner credential presentation；不再要求部署者手工拼接 bootstrap Secret | 首份实际双架构 v5 archive 仍需维护者授权 |
+| D-419 Console 首自动化闭环 | quickstart 创建无网络/SecretRef/Trigger 的示例 Task；原生 CI 使用真实 Owner credential 完成 read、fenced start、`succeeded` 与 bounded log marker | 仍不提供 Web Task 编辑、2.x 升级或生产远程管理 |
 
 D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完整操作”：源码与普通 CI 已具备生成、审计和实跑两种 Trial Kit 的能力，但只有显式 artifact run 生成且被同 run 的双架构 milestone 收录后，才是可下载阶段产物。操作说明见 [Local Alpha Trial Kit](./ql3-local-alpha-trial-kit.md) 与 [Local Web Console](./ql3-local-web-console.md)。
 
@@ -52,7 +54,7 @@ ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verif
 Local artifact 含：
 
 - 一个包含所选 Application 与短生命周期 operator 的 archive；headless 为 `qinglong3-local-trial-kit-<arch>.docker.tar`，Console 为 `qinglong3-local-console-trial-kit-<arch>.docker.tar`，共享 Node 基础层在 archive 中去重；
-- schema 为 `qinglong/alpha-local-trial-kit@v4` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
+- schema 为 `qinglong/alpha-local-trial-kit@v5` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
 - canonical `quickstart.sh`，在目标 Linux 设备上只依赖 POSIX shell、`sha256sum` 和 Docker，完成 checksum、load、identity、fresh Owner 与 Profile-bound Application active；
 - `verification-evidence.json` 绑定 `workflow_dispatch` 的 workflow ref/SHA、run ID/attempt、同架构两个 exact image ID 和完整 gate 集；下载者仍须到 GitHub 交叉检查 run，它不替代正式签名；
 - 与实际只读镜像 inventory 对账过的 CycloneDX SBOM；
