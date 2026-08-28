@@ -36,6 +36,7 @@ import type { PluginPackageTaskPublicationRecoverySource } from '@qinglong/runti
 import type { StepRunRepository } from '@qinglong/runtime-core/step-run';
 import type { RunCancellationRepository } from '@qinglong/runtime-core/run-cancellation';
 import type { TaskStartRepository } from '@qinglong/runtime-core/task-start';
+import type { TaskDefinitionAdministrationRepository } from '@qinglong/runtime-core/task-definition-administration';
 import type { ToolExecutionCompletionRepository } from '@qinglong/runtime-core/tool-execution-completion';
 import type { ToolExecutionFailureCompletionRepository } from '@qinglong/runtime-core/tool-execution-failure-completion';
 import type { ToolExecutionStartBarrierRepository } from '@qinglong/runtime-core/tool-execution-start-barrier';
@@ -50,6 +51,12 @@ import { LocalSqliteApiCredentialRepository } from '../security/apiCredentialRep
 import { LocalSqliteOwnerPepperRepository } from '../local-owner/ownerPepperRepository';
 import { LocalSqliteOperationAuthority } from '../authority/operationAuthority';
 import { LocalSqliteTaskDefinitionRepository } from '../task-definition/taskDefinitionRepository';
+import { LocalSqliteTaskDefinitionAdministrationRepository } from '../task-definition/taskDefinitionAdministration';
+import {
+  confirmLocalSqliteAuthenticatedUserCredentialFence,
+  LocalSqliteAuthenticatedManagementFenceError,
+  type LocalSqliteAuthenticatedUserCredentialFence,
+} from '../administration/packageManagement';
 import {
   TaskSpecSemanticRegistry,
   createBuiltInTaskSpecSemanticRegistry,
@@ -96,6 +103,9 @@ export interface LocalSqliteRuntimeDatabase {
   readonly readiness: LocalSqliteReadinessEvidence;
   readonly runRepository: LocalSqliteRunRepository;
   readonly taskDefinitions: LocalSqliteTaskDefinitionRepository;
+  taskDefinitionAdministrationForCredential(
+    fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+  ): TaskDefinitionAdministrationRepository;
   readonly triggers: LocalSqliteTriggerRepository;
   readonly schedules: LocalSqliteScheduleRepository;
   readonly localDispatch: LocalDispatchStore;
@@ -247,6 +257,27 @@ export async function openLocalSqliteRuntimeDatabase(
       readiness,
       runRepository,
       taskDefinitions,
+      taskDefinitionAdministrationForCredential(
+        fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+      ) {
+        confirmLocalSqliteAuthenticatedUserCredentialFence(authority, fence);
+        return new LocalSqliteTaskDefinitionAdministrationRepository(
+          authority,
+          taskDefinitions,
+          (actor) => {
+            if (
+              actor.type !== fence.subjectType ||
+              actor.id !== fence.subjectId
+            ) {
+              throw new LocalSqliteAuthenticatedManagementFenceError();
+            }
+            confirmLocalSqliteAuthenticatedUserCredentialFence(
+              authority,
+              fence,
+            );
+          },
+        );
+      },
       triggers,
       schedules,
       localDispatch: runRuntimeCapabilities.dispatch,

@@ -2,8 +2,10 @@
   'use strict';
 
   const PROJECT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+  const TASK_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
   const TOKEN_PATTERN =
     /^ql3c_[A-Za-z0-9][A-Za-z0-9._:-]{0,63}_[A-Za-z0-9_-]{43}$/;
+  const PRESENCE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
   const LOG_READ_BYTES = 32 * 1024;
   const TERMINAL = new Set(['succeeded', 'failed', 'cancelled', 'timed_out']);
   const STATUS_LABELS = Object.freeze({
@@ -30,6 +32,16 @@
     run_step_list_unavailable: 'Workflow Step 暂时不可用。',
     task_start_fence_rejected:
       '任务在确认期间发生变化，本次启动已安全拒绝。请刷新后重试。',
+    local_presence_rejected:
+      '本机证明不匹配或已过期。请核对文件；过期后关闭窗口并重新保存。',
+    local_presence_unavailable:
+      '暂时无法生成本机证明。请检查部署数据目录权限。',
+    strong_authentication_required:
+      '当前凭据不能执行管理操作；请使用本机 User API Credential。',
+    task_definition_fence_rejected:
+      'Task 或授权在确认期间发生变化。请刷新后重新创建。',
+    invalid_task_definition: 'Task 定义无效。请检查 ID、命令与参数。',
+    task_definition_unavailable: 'Task 暂时无法保存。请检查数据库状态。',
     run_cancellation_fence_rejected:
       '运行在确认期间发生变化，本次取消已安全拒绝。请刷新后重试。',
     request_unavailable: '本次请求没有完成，请确认服务仍在运行。',
@@ -49,10 +61,29 @@
     title: document.getElementById('section-title'),
     description: document.getElementById('section-description'),
     refresh: document.getElementById('refresh-button'),
+    createTask: document.getElementById('create-task-button'),
     dialog: document.getElementById('confirmation-dialog'),
     dialogTitle: document.getElementById('confirmation-title'),
     dialogCopy: document.getElementById('confirmation-copy'),
     dialogAccept: document.getElementById('confirmation-accept'),
+    taskEditor: document.getElementById('task-editor-dialog'),
+    taskEditorForm: document.getElementById('task-editor-form'),
+    taskEditorClose: document.getElementById('task-editor-close'),
+    taskEditorSave: document.getElementById('task-editor-save'),
+    taskId: document.getElementById('task-id-input'),
+    taskName: document.getElementById('task-name-input'),
+    taskDescription: document.getElementById('task-description-input'),
+    taskCommand: document.getElementById('task-command-input'),
+    taskArgs: document.getElementById('task-args-input'),
+    taskEnabled: document.getElementById('task-enabled-input'),
+    presenceDialog: document.getElementById('presence-dialog'),
+    presenceForm: document.getElementById('presence-form'),
+    presenceFile: document.getElementById('presence-file'),
+    presenceProof: document.getElementById('presence-proof-input'),
+    presenceExpiry: document.getElementById('presence-expiry'),
+    presenceError: document.getElementById('presence-error'),
+    presenceCancel: document.getElementById('presence-cancel'),
+    presenceSubmit: document.getElementById('presence-submit'),
     toast: document.getElementById('toast'),
   });
 
@@ -62,6 +93,7 @@
     view: 'tasks',
     selectedId: null,
     pendingAction: null,
+    pendingTaskMutation: null,
     toastTimer: null,
   };
 
@@ -169,6 +201,9 @@
       body = JSON.stringify(options.body);
       headers['content-type'] = 'application/json';
     }
+    if (options.presence !== undefined) {
+      headers['x-qinglong-local-presence'] = options.presence;
+    }
     let response;
     try {
       response = await fetch(path, {
@@ -193,7 +228,7 @@
         response.headers.get('x-request-id'),
       );
     }
-    if (!response.ok) {
+    if (!response.ok && response.status !== options.acceptStatus) {
       throw new ConsoleRequestError(
         typeof value.code === 'string' ? value.code : 'request_unavailable',
         response.status,
@@ -308,6 +343,148 @@
       : 'primary-button';
     nodes.dialog.returnValue = '';
     nodes.dialog.showModal();
+  }
+
+  function openTaskEditor() {
+    nodes.taskEditorForm.reset();
+    nodes.taskCommand.value = '/bin/echo';
+    nodes.taskEnabled.checked = true;
+    nodes.taskEditor.returnValue = '';
+    nodes.taskEditor.showModal();
+    nodes.taskId.focus();
+  }
+
+  function taskDraft() {
+    const taskId = nodes.taskId.value.trim();
+    const name = nodes.taskName.value.trim();
+    const description = nodes.taskDescription.value.trim();
+    const file = nodes.taskCommand.value.trim();
+    const args = nodes.taskArgs.value
+      .split(/\r?\n/u)
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+    if (!TASK_PATTERN.test(taskId)) {
+      throw new TypeError('Task ID 格式无效。');
+    }
+    if (!name || !file || args.length > 128) {
+      throw new TypeError('名称、命令或参数数量无效。');
+    }
+    return Object.freeze({
+      taskId,
+      body: Object.freeze({
+        expectedRevision: null,
+        mutationId: newMutationId(),
+        name,
+        ...(description ? { description } : {}),
+        kind: 'command',
+        spec: Object.freeze({
+          schema: 'qinglong/command@v1',
+          config: Object.freeze({
+            command: Object.freeze({ kind: 'argv', file, args }),
+          }),
+        }),
+        labels: Object.freeze({ 'qinglong.source': 'local-console' }),
+        enabled: nodes.taskEnabled.checked,
+        occurredAtMs: Date.now(),
+      }),
+    });
+  }
+
+  function showPresenceChallenge(mutation, challenge) {
+    if (
+      challenge?.code !== 'local_presence_required' ||
+      typeof challenge.proofFileName !== 'string' ||
+      !/^[0-9a-f-]{36}\.json$/u.test(challenge.proofFileName) ||
+      !Number.isSafeInteger(challenge.expiresAtMs)
+    ) {
+      throw new ConsoleRequestError('response_unavailable', 503, null);
+    }
+    state.pendingTaskMutation = Object.freeze({ mutation, challenge });
+    nodes.presenceFile.textContent = `console-presence/${challenge.proofFileName}`;
+    nodes.presenceExpiry.textContent = `证明将在 ${formatTime(
+      challenge.expiresAtMs,
+    )} 失效；内容改变后必须重新生成。`;
+    nodes.presenceProof.value = '';
+    nodes.presenceError.textContent = '';
+    nodes.presenceError.hidden = true;
+    nodes.taskEditor.close();
+    nodes.presenceDialog.returnValue = '';
+    nodes.presenceDialog.showModal();
+    nodes.presenceProof.focus();
+  }
+
+  async function saveTaskDraft() {
+    let mutation;
+    try {
+      mutation = taskDraft();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Task 定义无效。',
+        'error',
+      );
+      return;
+    }
+    nodes.taskEditorSave.disabled = true;
+    try {
+      const value = await api(
+        `/api/v3/projects/${state.project}/tasks/${mutation.taskId}`,
+        {
+          method: 'PUT',
+          body: mutation.body,
+          acceptStatus: 428,
+        },
+      );
+      if (value.code === 'local_presence_required') {
+        showPresenceChallenge(mutation, value);
+        return;
+      }
+      throw new ConsoleRequestError('response_unavailable', 503, null);
+    } catch (error) {
+      showToast(describeError(error), 'error');
+    } finally {
+      nodes.taskEditorSave.disabled = false;
+    }
+  }
+
+  async function completeTaskMutation() {
+    const pending = state.pendingTaskMutation;
+    const proof = nodes.presenceProof.value.trim();
+    if (!pending || !PRESENCE_PATTERN.test(proof)) {
+      nodes.presenceError.textContent =
+        'proof 格式无效。请完整复制私有文件中的 proof 字段。';
+      nodes.presenceError.hidden = false;
+      nodes.presenceProof.focus();
+      return;
+    }
+    nodes.presenceSubmit.disabled = true;
+    nodes.presenceError.hidden = true;
+    try {
+      const value = await api(
+        `/api/v3/projects/${state.project}/tasks/${pending.mutation.taskId}`,
+        {
+          method: 'PUT',
+          body: pending.mutation.body,
+          presence: proof,
+        },
+      );
+      state.pendingTaskMutation = null;
+      nodes.presenceProof.value = '';
+      nodes.presenceDialog.close();
+      showToast(
+        value.status === 'existing'
+          ? '已找到同一 Task 请求。'
+          : 'Task 已创建。',
+      );
+      state.selectedId = pending.mutation.taskId;
+      await refresh();
+      await selectTask(pending.mutation.taskId);
+    } catch (error) {
+      nodes.presenceError.textContent = describeError(error);
+      nodes.presenceError.hidden = false;
+      nodes.presenceProof.select();
+    } finally {
+      nodes.presenceSubmit.disabled = false;
+    }
   }
 
   async function renderTasks() {
@@ -595,7 +772,11 @@
       unavailable: '日志暂时不可用；Run 状态与 Event 仍可独立核验。',
     };
     section.append(
-      element('p', 'run-log-placeholder', labels[logView.status] || labels.unavailable),
+      element(
+        'p',
+        'run-log-placeholder',
+        labels[logView.status] || labels.unavailable,
+      ),
     );
     return section;
   }
@@ -702,11 +883,13 @@
       else button.removeAttribute('aria-current');
     }
     if (state.view === 'tasks') {
+      nodes.createTask.hidden = false;
       nodes.kicker.textContent = 'Project task authority';
       nodes.title.textContent = '任务调度台';
       nodes.description.textContent =
-        '查看当前 Task revision 与内容围栏。运行前会再次读取详情并要求显式确认。';
+        '创建命令 Task，查看当前 revision 与内容围栏。管理写入需要部署设备上的一次性本机证明。';
     } else {
+      nodes.createTask.hidden = true;
       nodes.kicker.textContent = 'Durable run evidence';
       nodes.title.textContent = '运行事实账本';
       nodes.description.textContent =
@@ -750,6 +933,9 @@
     state.token = null;
     state.selectedId = null;
     state.pendingAction = null;
+    state.pendingTaskMutation = null;
+    if (nodes.taskEditor.open) nodes.taskEditor.close();
+    if (nodes.presenceDialog.open) nodes.presenceDialog.close();
     nodes.token.value = '';
     nodes.token.disabled = false;
     nodes.project.disabled = false;
@@ -757,6 +943,7 @@
     nodes.disconnect.hidden = true;
     nodes.nav.hidden = true;
     nodes.refresh.hidden = true;
+    nodes.createTask.hidden = true;
     setConnection('idle', '等待凭据');
     nodes.kicker.textContent = 'Connection gate';
     nodes.title.textContent = '先建立一条本机连接';
@@ -793,6 +980,23 @@
 
   nodes.disconnect.addEventListener('click', disconnect);
   nodes.refresh.addEventListener('click', refresh);
+  nodes.createTask.addEventListener('click', openTaskEditor);
+  nodes.taskEditorClose.addEventListener('click', () =>
+    nodes.taskEditor.close(),
+  );
+  nodes.taskEditorForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await saveTaskDraft();
+  });
+  nodes.presenceCancel.addEventListener('click', () => {
+    state.pendingTaskMutation = null;
+    nodes.presenceProof.value = '';
+    nodes.presenceDialog.close();
+  });
+  nodes.presenceForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await completeTaskMutation();
+  });
 
   for (const button of nodes.nav.querySelectorAll('button[data-view]')) {
     button.addEventListener('click', () => {
@@ -820,7 +1024,10 @@
       event.ctrlKey ||
       event.altKey ||
       event.target instanceof HTMLInputElement ||
-      nodes.dialog.open
+      event.target instanceof HTMLTextAreaElement ||
+      nodes.dialog.open ||
+      nodes.taskEditor.open ||
+      nodes.presenceDialog.open
     ) {
       return;
     }

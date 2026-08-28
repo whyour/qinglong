@@ -40,6 +40,7 @@
     "test": "node ../../scripts/ql3-build-package-closure.cjs && node --test test/*.test.cjs"
   },
   "dependencies": {
+    "@qinglong/local-admin": "workspace:*",
     "@qinglong/local-application": "workspace:*",
     "@qinglong/local-command-file": "workspace:*",
     "@qinglong/local-owner-console": "workspace:*",

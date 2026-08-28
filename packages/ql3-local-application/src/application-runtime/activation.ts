@@ -520,6 +520,8 @@ export async function bootstrapLocalApplication(
           taskStart,
           runAttemptLogRead,
           taskDefinitions: storage.taskDefinitions,
+          taskDefinitionAdministrationForCredential:
+            storage.taskDefinitionAdministrationForCredential,
           apiCredentials: storage.apiCredentials,
           ownerPepper: storage.ownerPepper,
           projectPolicy: storage.projectPolicy,

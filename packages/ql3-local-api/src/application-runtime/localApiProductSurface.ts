@@ -9,6 +9,7 @@ import { ProjectPolicyEngine } from '@qinglong/runtime-core/project-policy';
 
 import { createLocalApiAdmission } from '../admission/localApiAdmission';
 import { createLocalApiCredentialAuthenticator } from '../authentication/credentialAuthenticator';
+import { createLocalPresenceProofManager } from '../authentication/localPresenceProof';
 import type { LocalApiProcessConfig } from '../production-process/config';
 import { createLocalApiRunListRoute } from '../run/runListRoute';
 import { createLocalApiRunReadRoute } from '../run/runReadRoute';
@@ -19,6 +20,7 @@ import { createLocalApiRunAttemptLogReadRoute } from '../run/runAttemptLogReadRo
 import { createLocalApiTaskListRoute } from '../task/taskListRoute';
 import { createLocalApiTaskReadRoute } from '../task/taskReadRoute';
 import { createLocalApiTaskStartRoute } from '../task/taskStartRoute';
+import { createLocalApiTaskPutRoute } from '../task/taskPutRoute';
 import { startLocalApiHttpSurface } from '../transport/httpSurface';
 
 export interface LocalApiProductSurfaceEvent {
@@ -98,6 +100,14 @@ export function createLocalApiProductSurface(
         provider,
         options.now === undefined ? {} : { now: options.now },
       );
+      const presenceProof = createLocalPresenceProofManager({
+        deploymentRoot: config.deploymentRoot,
+        profile: authority.profile,
+        ...(options.now === undefined ? {} : { now: options.now }),
+        ...(options.randomUuid === undefined
+          ? {}
+          : { randomUuid: options.randomUuid }),
+      });
       const policy = new ProjectPolicyEngine(authority.projectPolicy);
       const runReadRoute = createLocalApiRunReadRoute(authority.runs);
       const runListRoute = createLocalApiRunListRoute(authority.runs);
@@ -123,6 +133,25 @@ export function createLocalApiProductSurface(
         authority.taskStart,
         options.randomUuid ?? randomUUID,
       );
+      const taskPutRoute = createLocalApiTaskPutRoute({
+        projectPolicy: authority.projectPolicy,
+        taskDefinitions: authority.taskDefinitions,
+        taskDefinitionAdministrationForCredential: (fence) => {
+          if (fence.subjectType !== 'user') {
+            throw new TypeError('Task mutation requires a User credential');
+          }
+          return authority.taskDefinitionAdministrationForCredential({
+            ...fence,
+            subjectType: 'user',
+          });
+        },
+        securityAudit: authority.securityAudit,
+        presenceProof,
+        ...(options.now === undefined ? {} : { now: options.now }),
+        ...(options.randomUuid === undefined
+          ? {}
+          : { randomUuid: options.randomUuid }),
+      });
       const admission = createLocalApiAdmission({
         authenticator,
         policy,
@@ -136,20 +165,27 @@ export function createLocalApiProductSurface(
         taskListRoute,
         taskReadRoute,
         taskStartRoute,
+        taskPutRoute,
         ...(options.now === undefined ? {} : { now: options.now }),
         ...(options.randomUuid === undefined
           ? {}
           : { randomUuid: options.randomUuid }),
       });
-      const active = await startLocalApiHttpSurface({
-        profile: authority.profile,
-        host: config.listener.host,
-        port: config.listener.port,
-        admission,
-        ...(options.randomUuid === undefined
-          ? {}
-          : { randomUuid: options.randomUuid }),
-      });
+      let active;
+      try {
+        active = await startLocalApiHttpSurface({
+          profile: authority.profile,
+          host: config.listener.host,
+          port: config.listener.port,
+          admission,
+          ...(options.randomUuid === undefined
+            ? {}
+            : { randomUuid: options.randomUuid }),
+        });
+      } catch (error) {
+        presenceProof.close();
+        throw error;
+      }
       await bestEffortEmit(
         options.emit,
         surfaceEvent(config, 'listening', { level: 'info' }),
@@ -163,7 +199,12 @@ export function createLocalApiProductSurface(
               options.emit,
               surfaceEvent(config, 'draining', { level: 'info' }),
             );
-            const stopResult = await active.stopAndDrain();
+            let stopResult = await active.stopAndDrain();
+            try {
+              presenceProof.close();
+            } catch {
+              stopResult = 'timed_out';
+            }
             await bestEffortEmit(
               options.emit,
               surfaceEvent(config, 'stopped', {

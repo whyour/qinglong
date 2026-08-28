@@ -17,6 +17,8 @@ type LocalSqliteRunCancellationRepository =
   ReadyLocalStorage['runCancellationRepository'];
 type LocalSqliteTaskStartRepository = ReadyLocalStorage['taskStartRepository'];
 type TaskDefinitionRepository = ReadyLocalStorage['taskDefinitions'];
+type TaskDefinitionAdministrationForCredential =
+  ReadyLocalStorage['taskDefinitionAdministrationForCredential'];
 type LocalScheduleStore = ReadyLocalStorage['schedules'];
 type LocalDispatchStore = ReadyLocalStorage['dispatch'];
 type LocalSecretEnvelopeRepository = ReadyLocalStorage['localSecrets'];
@@ -87,6 +89,7 @@ export type LocalAdoptedProfileBootstrapResult =
       readonly runCancellationRepository: LocalSqliteRunCancellationRepository;
       readonly taskStartRepository: LocalSqliteTaskStartRepository;
       readonly taskDefinitions: TaskDefinitionRepository;
+      readonly taskDefinitionAdministrationForCredential: TaskDefinitionAdministrationForCredential;
       readonly schedules: LocalScheduleStore;
       readonly dispatch: LocalDispatchStore;
       readonly executionControl: ReadyLocalStorage['executionControl'];
@@ -235,6 +238,8 @@ export async function bootstrapLocalAdoptedProfileStorage(
       runCancellationRepository: readyStorage.runCancellationRepository,
       taskStartRepository: readyStorage.taskStartRepository,
       taskDefinitions: readyStorage.taskDefinitions,
+      taskDefinitionAdministrationForCredential:
+        readyStorage.taskDefinitionAdministrationForCredential,
       schedules: readyStorage.schedules,
       dispatch: readyStorage.dispatch,
       executionControl: readyStorage.executionControl,

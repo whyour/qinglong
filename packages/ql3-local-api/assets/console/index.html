@@ -87,9 +87,14 @@
               输入 quickstart 交付的 Owner API Credential。连接成功后才能读取或执行操作。
             </p>
           </div>
-          <button class="refresh-button" id="refresh-button" type="button" hidden>
-            <span aria-hidden="true">↻</span> 刷新
-          </button>
+          <div class="masthead-actions">
+            <button class="action-button" id="create-task-button" type="button" hidden>
+              <span aria-hidden="true">＋</span> 创建任务
+            </button>
+            <button class="refresh-button" id="refresh-button" type="button" hidden>
+              <span aria-hidden="true">↻</span> 刷新
+            </button>
+          </div>
         </header>
 
         <div class="workspace-grid">
@@ -121,6 +126,89 @@
           <button class="danger-button" id="confirmation-accept" value="accept">
             确认
           </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="task-editor-dialog" class="task-editor-dialog">
+      <form id="task-editor-form" autocomplete="off">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Task authoring</p>
+            <h2>创建命令任务</h2>
+          </div>
+          <button class="quiet-button" id="task-editor-close" type="button">关闭</button>
+        </div>
+        <p class="editor-intro">
+          定义会先绑定到一次本机证明，再以同一事务写入 Task revision 与安全审计。
+        </p>
+        <div class="editor-grid">
+          <label>
+            <span>Task ID</span>
+            <input id="task-id-input" maxlength="128" spellcheck="false" required />
+          </label>
+          <label>
+            <span>名称</span>
+            <input id="task-name-input" maxlength="160" required />
+          </label>
+          <label class="editor-wide">
+            <span>说明（可选）</span>
+            <input id="task-description-input" maxlength="1000" />
+          </label>
+          <label class="editor-wide">
+            <span>可执行文件</span>
+            <input
+              id="task-command-input"
+              value="/bin/echo"
+              maxlength="4096"
+              spellcheck="false"
+              required
+            />
+          </label>
+          <label class="editor-wide">
+            <span>参数 · 每行一个</span>
+            <textarea id="task-args-input" rows="5" maxlength="16384" spellcheck="false"></textarea>
+          </label>
+          <label class="editor-check">
+            <input id="task-enabled-input" type="checkbox" checked />
+            <span>创建后允许运行</span>
+          </label>
+        </div>
+        <p class="editor-note">
+          Alpha 当前从 Console 创建 <code>qinglong/command@v1</code>；高级 Task schema 仍使用受信任管理入口。
+        </p>
+        <div class="dialog-actions">
+          <button class="primary-button" id="task-editor-save" type="submit">
+            保存并生成本机证明
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="presence-dialog" class="presence-dialog">
+      <form id="presence-form" autocomplete="off">
+        <p class="eyebrow">Local presence · 02:00</p>
+        <h2>从部署设备取得证明</h2>
+        <p>
+          使用部署 QingLong 的系统用户读取下面的私有文件。证明只绑定这次 Task 内容，且只能使用一次。
+        </p>
+        <code class="proof-ticket" id="presence-file"></code>
+        <label class="presence-input">
+          <span>文件中的 proof</span>
+          <input
+            id="presence-proof-input"
+            type="password"
+            maxlength="128"
+            spellcheck="false"
+            autocomplete="off"
+            required
+          />
+        </label>
+        <p class="presence-expiry" id="presence-expiry"></p>
+        <p class="presence-error" id="presence-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button class="quiet-button" id="presence-cancel" type="button">取消</button>
+          <button class="primary-button" id="presence-submit" type="submit">验证并创建</button>
         </div>
       </form>
     </dialog>

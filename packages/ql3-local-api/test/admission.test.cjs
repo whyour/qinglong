@@ -22,6 +22,7 @@ function request(overrides = {}) {
       runId: 'run_123',
     }),
     authorization: 'Bearer opaque',
+    localPresence: null,
     signal: new AbortController().signal,
     ...overrides,
   });
@@ -35,6 +36,17 @@ function fixture(overrides = {}) {
         events.push('authenticate');
         return Object.freeze({
           principal: PRINCIPAL,
+          credentialFence: Object.freeze({
+            credentialId: 'credential-local',
+            credentialVersion: 1,
+            pepperKeyId: 'owner-v1',
+            materialDigest: 'a'.repeat(64),
+            subjectType: 'user',
+            subjectId: 'usr_local',
+            secretDigest: 'b'.repeat(64),
+            notBeforeAtMs: 1,
+            expiresAtMs: 20_000,
+          }),
           async confirm() {
             events.push('confirm');
           },
@@ -125,6 +137,12 @@ function fixture(overrides = {}) {
       async handle(value) {
         events.push(`task-start:${value.projectId}:${value.taskId}`);
         return { statusCode: 202, body: { status: 'accepted' } };
+      },
+    },
+    taskPutRoute: {
+      async handle(value) {
+        events.push(`task-put:${value.projectId}:${value.taskId}`);
+        return { statusCode: 201, body: { status: 'created' } };
       },
     },
     now: () => 10_000,
@@ -380,6 +398,28 @@ test('authorizes and audits run.start before exposing the Task body handler', as
   ]);
   assert.equal((await prepared.handle({ schema: 'x' })).statusCode, 202);
   assert.equal(events.at(-1), 'task-start:prj_default:task-a');
+});
+
+test('defers Task put Policy, audit and strong confirmation to the request-bound route', async () => {
+  const { admission, events } = fixture();
+  const prepared = await admission.prepare(
+    request({
+      operation: Object.freeze({
+        operationId: 'task.put',
+        projectId: 'prj_default',
+        taskId: 'task-a',
+      }),
+      localPresence: 'ql3p_proof',
+    }),
+  );
+  assert.equal(prepared.bodyMode, 'json');
+  assert.equal(prepared.maximumBodyBytes, 72 * 1024);
+  assert.deepEqual(events, ['authenticate']);
+  assert.deepEqual(await prepared.handle({ name: 'Task' }), {
+    statusCode: 201,
+    body: { status: 'created' },
+  });
+  assert.deepEqual(events, ['authenticate', 'task-put:prj_default:task-a']);
 });
 
 test('audits authentication rejection before returning a challenge', async () => {

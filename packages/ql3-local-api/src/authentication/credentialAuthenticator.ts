@@ -19,6 +19,7 @@ const AUTHORIZATION_PATTERN =
 
 export interface AuthenticatedLocalApiRequest {
   readonly principal: Readonly<SecurityPrincipal>;
+  readonly credentialFence: Readonly<LocalApiCredentialFence>;
   confirm(): Promise<void>;
 }
 
@@ -32,7 +33,7 @@ export interface LocalApiCredentialAuthenticatorOptions {
   readonly now?: () => number;
 }
 
-interface CredentialFence {
+export interface LocalApiCredentialFence {
   readonly credentialId: string;
   readonly credentialVersion: number;
   readonly pepperKeyId: string;
@@ -91,7 +92,7 @@ async function loadFence(
   provider: LocalOwnerPepperKeyringFileProvider,
   credentialId: string,
   credentialVersion: number,
-): Promise<Readonly<CredentialFence>> {
+): Promise<Readonly<LocalApiCredentialFence>> {
   try {
     const candidate = await authority.apiCredentials.resolve(credentialId);
     if (!candidate) throw new Error('credential is unavailable');
@@ -103,11 +104,7 @@ async function loadFence(
       credential.state !== 'active' ||
       credential.subjectStatus !== 'active' ||
       !validKey(key) ||
-      !validMaterial(
-        material,
-        credential.pepperKeyId,
-        key.materialDigest,
-      )
+      !validMaterial(material, credential.pepperKeyId, key.materialDigest)
     ) {
       throw new Error('credential fence is unavailable');
     }
@@ -129,7 +126,10 @@ async function loadFence(
   }
 }
 
-function sameFence(left: CredentialFence, right: CredentialFence): boolean {
+function sameFence(
+  left: LocalApiCredentialFence,
+  right: LocalApiCredentialFence,
+): boolean {
   return (
     left.credentialId === right.credentialId &&
     left.credentialVersion === right.credentialVersion &&
@@ -201,6 +201,7 @@ export function createLocalApiCredentialAuthenticator(
         }
         return Object.freeze({
           principal: authentication.principal,
+          credentialFence: fence,
           async confirm() {
             try {
               const currentAuthentication =
@@ -227,7 +228,8 @@ export function createLocalApiCredentialAuthenticator(
               }
             } catch (error) {
               if (
-                error instanceof LocalApiCredentialAuthenticationUnavailableError
+                error instanceof
+                LocalApiCredentialAuthenticationUnavailableError
               ) {
                 throw error;
               }
@@ -238,9 +240,7 @@ export function createLocalApiCredentialAuthenticator(
           },
         });
       } catch (error) {
-        if (
-          error instanceof LocalApiCredentialAuthenticationUnavailableError
-        ) {
+        if (error instanceof LocalApiCredentialAuthenticationUnavailableError) {
           throw error;
         }
         if (error instanceof LocalIdentityAuthenticationUnavailableError) {

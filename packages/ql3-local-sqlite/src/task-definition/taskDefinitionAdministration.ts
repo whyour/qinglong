@@ -97,7 +97,7 @@ function sameCredentialFence(
   );
 }
 
-class LocalSqliteTaskDefinitionAdministrationRepository
+export class LocalSqliteTaskDefinitionAdministrationRepository
   implements TaskDefinitionAdministrationRepository
 {
   constructor(

@@ -35,7 +35,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -45,6 +46,7 @@ button {
 
 button:focus-visible,
 input:focus-visible,
+textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 3px solid var(--amber);
   outline-offset: 3px;
@@ -319,6 +321,14 @@ input:focus-visible,
   margin: 14px 0 0;
   color: var(--muted);
   line-height: 1.6;
+}
+
+.masthead-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .refresh-button {
@@ -700,6 +710,155 @@ input:focus-visible,
   box-shadow: var(--shadow);
 }
 
+.task-editor-dialog,
+.presence-dialog {
+  padding: 0;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.task-editor-dialog {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.presence-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.task-editor-dialog::backdrop,
+.presence-dialog::backdrop {
+  background: rgba(11, 31, 36, 0.76);
+}
+
+.task-editor-dialog form,
+.presence-dialog form {
+  padding: clamp(22px, 4vw, 34px);
+}
+
+.dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.task-editor-dialog h2,
+.presence-dialog h2 {
+  margin: 0;
+  font-family: 'Avenir Next Condensed', 'Arial Narrow', sans-serif;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.editor-intro,
+.presence-dialog form > p:not(.eyebrow),
+.editor-note,
+.presence-expiry {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.editor-grid {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.editor-grid label,
+.presence-input {
+  display: grid;
+  gap: 7px;
+}
+
+.editor-grid label > span,
+.presence-input > span {
+  color: var(--muted);
+  font: 700 10px/1.2 ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor-grid input:not([type='checkbox']),
+.editor-grid textarea,
+.presence-input input {
+  width: 100%;
+  padding: 11px 12px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--white);
+  font: 500 13px/1.45 ui-monospace, 'SFMono-Regular', Consolas, monospace;
+}
+
+.editor-grid textarea {
+  resize: vertical;
+}
+
+.editor-wide {
+  grid-column: 1 / -1;
+}
+
+.editor-check {
+  grid-column: 1 / -1;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  justify-content: start;
+}
+
+.editor-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--signal);
+}
+
+.editor-note {
+  margin: 18px 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--amber);
+  font-size: 11px;
+}
+
+.proof-ticket {
+  position: relative;
+  margin: 22px 0;
+  padding: 18px 16px 18px 22px;
+  display: block;
+  color: var(--white);
+  border-left: 6px solid var(--signal);
+  background: var(--deep);
+  font: 650 12px/1.5 ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.proof-ticket::after {
+  content: 'HOST FILE';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+.presence-expiry {
+  margin-bottom: 0;
+  font-size: 11px;
+}
+
+.presence-error {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  color: var(--danger);
+  border-left: 3px solid var(--danger);
+  background: rgba(186, 74, 67, 0.08);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .confirmation-dialog::backdrop {
   background: rgba(11, 31, 36, 0.7);
 }
@@ -813,6 +972,11 @@ input:focus-visible,
     flex-direction: column;
   }
 
+  .masthead-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .masthead h2 {
     font-size: 40px;
   }
@@ -835,6 +999,15 @@ input:focus-visible,
 
   .record-side {
     justify-items: start;
+  }
+
+  .editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-wide,
+  .editor-check {
+    grid-column: auto;
   }
 }
 

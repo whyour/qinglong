@@ -26,6 +26,7 @@ import type { LocalApiRunAttemptLogReadRoute } from '../run/runAttemptLogReadRou
 import type { LocalApiTaskListRoute } from '../task/taskListRoute';
 import type { LocalApiTaskReadRoute } from '../task/taskReadRoute';
 import type { LocalApiTaskStartRoute } from '../task/taskStartRoute';
+import type { LocalApiTaskPutRoute } from '../task/taskPutRoute';
 import type { LocalApiResponse } from '../transport/contract';
 
 export type LocalApiAdmissionOperation =
@@ -78,12 +79,18 @@ export type LocalApiAdmissionOperation =
       operationId: 'task.start';
       projectId: string;
       taskId: string;
+    }>
+  | Readonly<{
+      operationId: 'task.put';
+      projectId: string;
+      taskId: string;
     }>;
 
 export interface LocalApiAdmissionRequest {
   readonly requestId: string;
   readonly operation: LocalApiAdmissionOperation;
   readonly authorization: string | null;
+  readonly localPresence: string | null;
   readonly signal: AbortSignal;
 }
 
@@ -112,6 +119,7 @@ export interface LocalApiAdmissionOptions {
   readonly taskListRoute: LocalApiTaskListRoute;
   readonly taskReadRoute: LocalApiTaskReadRoute;
   readonly taskStartRoute: LocalApiTaskStartRoute;
+  readonly taskPutRoute: LocalApiTaskPutRoute;
   readonly now?: () => number;
   readonly randomUuid?: () => string;
 }
@@ -190,6 +198,7 @@ export function createLocalApiAdmission(
     typeof options.taskListRoute?.handle !== 'function' ||
     typeof options.taskReadRoute?.handle !== 'function' ||
     typeof options.taskStartRoute?.handle !== 'function' ||
+    typeof options.taskPutRoute?.handle !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function') ||
     (options.randomUuid !== undefined &&
       typeof options.randomUuid !== 'function')
@@ -238,6 +247,25 @@ export function createLocalApiAdmission(
         return auditFailure ?? response(401, 'authentication_required');
       }
       if (request.signal.aborted) return response(503, 'request_unavailable');
+
+      if (request.operation.operationId === 'task.put') {
+        const taskPutOperation = request.operation;
+        return Object.freeze({
+          bodyMode: 'json' as const,
+          maximumBodyBytes: 72 * 1_024,
+          async handle(body: unknown | null) {
+            return options.taskPutRoute.handle({
+              requestId: request.requestId,
+              projectId: taskPutOperation.projectId,
+              taskId: taskPutOperation.taskId,
+              body,
+              presence: request.localPresence,
+              authenticated,
+              signal: request.signal,
+            });
+          },
+        });
+      }
 
       let decision: Readonly<SecurityPolicyDecision>;
       try {
@@ -386,6 +414,8 @@ export function createLocalApiAdmission(
                 principal: authenticated.principal,
                 policyFence: decision.fence,
               });
+            case 'task.put':
+              return response(503, 'request_unavailable');
           }
         },
       });

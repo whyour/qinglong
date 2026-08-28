@@ -88,6 +88,15 @@ function authorization(request: IncomingMessage): string | null {
   return values.length === 1 ? values[0]! : null;
 }
 
+function localPresence(request: IncomingMessage): string | null {
+  const values = rawHeaderValues(request, 'x-qinglong-local-presence');
+  if (values.length === 0) return null;
+  if (values.length !== 1 || values[0]!.length > 160) {
+    throw new TypeError('invalid_local_presence');
+  }
+  return values[0]!;
+}
+
 function hasRequestBody(request: IncomingMessage): boolean {
   const transferEncoding = rawHeaderValues(request, 'transfer-encoding');
   const contentLength = rawHeaderValues(request, 'content-length');
@@ -453,6 +462,16 @@ function route(
         })
       : null;
   }
+  if (request.method === 'PUT') {
+    const taskPutMatch = TASK_READ_ROUTE_PATTERN.exec(path);
+    return taskPutMatch && rawQuery === undefined
+      ? Object.freeze({
+          operationId: 'task.put',
+          projectId: taskPutMatch[1]!,
+          taskId: taskPutMatch[2]!,
+        })
+      : null;
+  }
   if (request.method !== 'GET') return null;
   const runAttemptLogReadMatch = RUN_ATTEMPT_LOG_READ_ROUTE_PATTERN.exec(path);
   if (runAttemptLogReadMatch) {
@@ -693,10 +712,19 @@ export async function startLocalApiHttpSurface(
       response.once('close', () => {
         if (!response.writableFinished) abort.abort();
       });
+      let presentedLocalPresence: string | null;
+      try {
+        presentedLocalPresence = localPresence(request);
+      } catch {
+        send(response, requestId, errorResponse(400, 'invalid_local_presence'));
+        request.resume();
+        return;
+      }
       const admissionRequest: LocalApiAdmissionRequest = Object.freeze({
         requestId,
         operation: resolvedRoute,
         authorization: authorization(request),
+        localPresence: presentedLocalPresence,
         signal: abort.signal,
       });
       let operation: Promise<void>;

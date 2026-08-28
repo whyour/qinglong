@@ -71,6 +71,7 @@ const EXPECTED_PACKAGE_DEPENDENCIES = Object.freeze({
   }),
   'packages/ql3-local-api': Object.freeze({
     dependencies: Object.freeze({
+      '@qinglong/local-admin': 'workspace:*',
       '@qinglong/local-application': 'workspace:*',
       '@qinglong/local-command-file': 'workspace:*',
       '@qinglong/local-owner-console': 'workspace:*',
@@ -272,6 +273,7 @@ const EXPECTED_PACKAGE_DEPENDENCIES = Object.freeze({
   }),
 });
 const EXPECTED_WORKSPACE_RESOLUTIONS = Object.freeze({
+  'packages/ql3-local-api:@qinglong/local-admin': 'link:../ql3-local-admin',
   'packages/ql3-local-api:@qinglong/local-application':
     'link:../ql3-local-application',
   'packages/ql3-local-api:@qinglong/local-command-file':
@@ -3155,6 +3157,14 @@ function auditSourceImports(root, packagePath, findings) {
         path.relative(packageDirectory, filePath) ===
           'src/plugin-package/pluginPackagePublisherTrustCommand.ts' &&
         specifier === '@qinglong/runtime-core/plugin-package-quarantine'
+      ) {
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-api' &&
+        path.relative(packageDirectory, filePath) ===
+          'src/task/taskPutRoute.ts' &&
+        specifier === '@qinglong/local-admin/task-definition-administration'
       ) {
         continue;
       }

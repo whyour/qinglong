@@ -42,6 +42,7 @@ export type LocalProfileStorageBootstrapResult =
       readonly runCancellationRepository: LocalSqliteRuntimeDatabase['runCancellationRepository'];
       readonly taskStartRepository: LocalSqliteRuntimeDatabase['taskStartRepository'];
       readonly taskDefinitions: LocalSqliteRuntimeDatabase['taskDefinitions'];
+      readonly taskDefinitionAdministrationForCredential: LocalSqliteRuntimeDatabase['taskDefinitionAdministrationForCredential'];
       readonly schedules: LocalSqliteRuntimeDatabase['schedules'];
       readonly dispatch: LocalSqliteRuntimeDatabase['localDispatch'];
       readonly executionControl: LocalSqliteRuntimeDatabase['executionControl'];
@@ -138,6 +139,8 @@ export async function bootstrapLocalProfileStorage(
       runCancellationRepository: database.runCancellationRepository,
       taskStartRepository: database.taskStartRepository,
       taskDefinitions: database.taskDefinitions,
+      taskDefinitionAdministrationForCredential:
+        database.taskDefinitionAdministrationForCredential,
       schedules: database.schedules,
       dispatch: database.localDispatch,
       executionControl: database.executionControl,

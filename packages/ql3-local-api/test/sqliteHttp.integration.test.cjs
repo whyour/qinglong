@@ -41,7 +41,7 @@ const {
   LocalRunAttemptLogRangeReader,
 } = require('../../ql3-local-execution/dist/artifact-read/localRunAttemptLogRangeReader.js');
 
-const NOW = 1_800_000_000_000;
+const NOW = Date.now();
 const PEPPER_KEY_ID = 'local-api-pepper-v1';
 const CREDENTIAL_ID = 'local-api-owner';
 const RUN_ID = 'run_local_api_1';
@@ -437,6 +437,8 @@ test('serves an authenticated Run through one real SQLite authority and durable 
       },
     ),
     taskDefinitions: runtime.taskDefinitions,
+    taskDefinitionAdministrationForCredential:
+      runtime.taskDefinitionAdministrationForCredential,
     apiCredentials: runtime.apiCredentials,
     ownerPepper: runtime.ownerPepper,
     projectPolicy: runtime.projectPolicy,
@@ -525,6 +527,64 @@ test('serves an authenticated Run through one real SQLite authority and durable 
     ),
     { statusCode: 404, body: { code: 'task_not_found' } },
   );
+
+  const taskCreateBody = JSON.stringify({
+    expectedRevision: null,
+    mutationId: '019f7300-0000-4000-8000-000000000701',
+    name: 'Console-created Task',
+    description: 'Created through request-scoped local presence',
+    kind: 'command',
+    spec: {
+      schema: 'qinglong/command@v1',
+      config: {
+        command: {
+          kind: 'argv',
+          file: '/bin/echo',
+          args: ['console-created'],
+        },
+      },
+    },
+    labels: { source: 'local-console' },
+    enabled: true,
+    occurredAtMs: NOW,
+  });
+  const taskCreatePath = '/api/v3/projects/default/tasks/task-console-created';
+  const taskCreateOptions = {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      'content-length': String(Buffer.byteLength(taskCreateBody)),
+    },
+    body: taskCreateBody,
+  };
+  const challenge = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    taskCreatePath,
+    taskCreateOptions,
+  );
+  assert.equal(challenge.statusCode, 428);
+  assert.equal(challenge.body.code, 'local_presence_required');
+  assert.match(challenge.body.requestDigest, /^[0-9a-f]{64}$/);
+  const proofDocument = JSON.parse(
+    fs.readFileSync(
+      path.join(root, 'console-presence', challenge.body.proofFileName),
+      'utf8',
+    ),
+  );
+  const taskCreated = await request(port, `Bearer ${TOKEN}`, taskCreatePath, {
+    ...taskCreateOptions,
+    headers: {
+      ...taskCreateOptions.headers,
+      'x-qinglong-local-presence': proofDocument.proof,
+    },
+  });
+  assert.equal(taskCreated.statusCode, 201);
+  assert.equal(taskCreated.body.status, 'created');
+  assert.equal(taskCreated.body.task.taskId, 'task-console-created');
+  assert.equal(taskCreated.body.task.revision, 1);
+  assert.equal(JSON.stringify(taskCreated).includes('console-created'), true);
+  assert.equal(JSON.stringify(taskCreated).includes('/bin/echo'), false);
 
   const taskStartBody = JSON.stringify({
     schema: 'qinglong/task-start@v1',
@@ -685,7 +745,7 @@ test('serves an authenticated Run through one real SQLite authority and durable 
           `SELECT operation_id, outcome FROM "QingLong3SecurityAuditEvents"
            WHERE operation_id IN (
              'run.get', 'run.list', 'run.events.list', 'run.steps.list',
-             'run.cancel', 'task.get', 'task.list'
+             'run.cancel', 'task.create', 'task.get', 'task.list'
              , 'task.start', 'run.log.read'
            )
            ORDER BY operation_id, outcome`,
@@ -701,6 +761,8 @@ test('serves an authenticated Run through one real SQLite authority and durable 
         'run.list:allowed',
         'run.log.read:allowed',
         'run.steps.list:allowed',
+        'task.create:allowed',
+        'task.create:approval_required',
         'task.get:allowed',
         'task.get:allowed',
         'task.list:allowed',

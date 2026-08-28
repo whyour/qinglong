@@ -52,12 +52,17 @@ function request(port, path, options = {}) {
 function preparedAdmission(handler) {
   return {
     async prepare(value) {
-      const json = ['run.cancel', 'task.start'].includes(
+      const json = ['run.cancel', 'task.start', 'task.put'].includes(
         value.operation.operationId,
       );
       return {
         bodyMode: json ? 'json' : 'none',
-        maximumBodyBytes: json ? 512 : 0,
+        maximumBodyBytes:
+          value.operation.operationId === 'task.put'
+            ? 72 * 1024
+            : json
+            ? 512
+            : 0,
         handle(body) {
           return handler(value, body);
         },
@@ -77,7 +82,8 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
       observed.push(value);
       if (
         value.operation.operationId === 'run.cancel' ||
-        value.operation.operationId === 'task.start'
+        value.operation.operationId === 'task.start' ||
+        value.operation.operationId === 'task.put'
       ) {
         return { statusCode: 202, body: { accepted: body } };
       }
@@ -283,12 +289,36 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     taskId: 'task_1',
   });
 
+  const taskPutBody = JSON.stringify({ name: 'Task one' });
+  const taskPut = await request(
+    port,
+    '/api/v3/projects/prj_default/tasks/task_1',
+    {
+      method: 'PUT',
+      headers: {
+        authorization: 'Bearer opaque',
+        'x-qinglong-local-presence': 'ql3p_request_bound_proof',
+        'content-type': 'application/json',
+        'content-length': String(Buffer.byteLength(taskPutBody)),
+      },
+      body: taskPutBody,
+    },
+  );
+  assert.equal(taskPut.statusCode, 202);
+  assert.deepEqual(taskPut.body.accepted, JSON.parse(taskPutBody));
+  assert.deepEqual(observed[8].operation, {
+    operationId: 'task.put',
+    projectId: 'prj_default',
+    taskId: 'task_1',
+  });
+  assert.equal(observed[8].localPresence, 'ql3p_request_bound_proof');
+
   const log = await request(
     port,
     '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log?offset=4&length=32',
   );
   assert.deepEqual(log.body, { range: { offset: 4, length: 32 } });
-  assert.deepEqual(observed[8].operation, {
+  assert.deepEqual(observed[9].operation, {
     operationId: 'run.log.read',
     projectId: 'prj_default',
     runId: 'run_123',
@@ -374,7 +404,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     assert.equal(invalid.statusCode, 400);
     assert.deepEqual(invalid.body, { code: 'invalid_run_step_list_query' });
   }
-  assert.equal(observed.length, 10);
+  assert.equal(observed.length, 11);
   assert.deepEqual(
     await Promise.all([surface.stopAndDrain(), surface.stopAndDrain()]),
     ['stopped', 'stopped'],

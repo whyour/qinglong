@@ -64,8 +64,11 @@ export interface LocalApplicationProductSurfaceAuthority {
   >;
   readonly taskDefinitions: Pick<
     ReadyFreshStorage['taskDefinitions'],
-    'findCurrentTaskDefinition' | 'listTaskDefinitions'
+    | 'findCurrentTaskDefinition'
+    | 'findTaskDefinitionRevision'
+    | 'listTaskDefinitions'
   >;
+  readonly taskDefinitionAdministrationForCredential: ReadyFreshStorage['taskDefinitionAdministrationForCredential'];
   readonly runAttemptLogRead: Readonly<{
     read(
       request: Readonly<RunAttemptLogReadRequest>,

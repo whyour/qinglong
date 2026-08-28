@@ -15,7 +15,7 @@
 
 当维护者显式选择 `alpha_artifact_scope=all` 时，还会生成 `Alpha stage index`。它把同一次 run 的 Local/Cluster milestone 交叉绑定，并为 Edge、Standalone、Cluster 给出目标架构的最小 artifact 选择；这是阶段交付导航，不是正式 release catalog。只生成 Local 或 Cluster 时，各自 milestone 仍可独立成立，不制造一个不完整的总索引。
 
-## 当前阶段实物（2026-08-28）
+## 当前阶段实物（2026-08-29）
 
 在下面保留的历史 exact-image 证据之外，2026-08-28 的源码阶段已把 headless 用户旅程与 opt-in Console 合并为一条可选择的交付链：
 
@@ -25,6 +25,9 @@
 | Local headless Trial Kit v5 | 默认低配变体；同一源码支持 POSIX shell + Docker 一条命令完成 fresh setup、首 Owner与 Application active/stop；无 listener、示例 Task 或 Console 增量 | 尚未为当前提交单独触发 headless 双架构 milestone；不能把 Console archive 改名复用 |
 | D-419 Console 首自动化闭环 | quickstart 创建无网络/SecretRef/Trigger 的示例 Task；原生 CI 使用真实 Owner credential 完成 read、fenced start、`succeeded` 与 bounded log marker | 仍不提供 Web Task 编辑、2.x 升级或生产远程管理 |
 | D-420 Console Run 日志观察面 | 选择 Run 后经既有认证/Policy/Audit 链读取 latest Attempt 首个 32 KiB，展示 range、truncation、pending/retired 等明确状态 | 不自动轮询、不提供整文件下载；Web Task 创建/修订仍待独立强认证事务切片 |
+| D-421 Console Task 创建切片 | request-scoped credential fence、两分钟一次性本机 proof、同事务 Policy/Audit/Task mutation 已完成；Console 可创建 command Task | 当前源码尚未重新生成双架构 Trial Kit；Web update 等待 authoring read/lease，Cluster 不复用 Local proof |
+
+D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，但不能据此把 run `33173769047` 的旧 archive 改名为新产物。只有 D-421 阶段提交通过远端 CI，并由同源显式 Local Console milestone run 重新生成 amd64/arm64 Trial Kit 与 milestone index 后，下载者才能把该 Web 创建能力视为新的阶段实物；在此之前，旧 Console v5 仍是最新可下载实物，本工作树/提交只是下一候选源码。
 
 D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完整操作”：源码与普通 CI 已具备生成、审计和实跑两种 Trial Kit 的能力，但只有显式 artifact run 生成且被同 run 的双架构 milestone 收录后，才是可下载阶段产物。操作说明见 [Local Alpha Trial Kit](./ql3-local-alpha-trial-kit.md) 与 [Local Web Console](./ql3-local-web-console.md)。
 

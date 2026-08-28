@@ -492,6 +492,9 @@ importers:
 
   packages/ql3-local-api:
     dependencies:
+      '@qinglong/local-admin':
+        specifier: workspace:*
+        version: link:../ql3-local-admin
       '@qinglong/local-application':
         specifier: workspace:*
         version: link:../ql3-local-application

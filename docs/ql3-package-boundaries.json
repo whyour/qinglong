@@ -118,13 +118,18 @@
       },
       "criteria": ["authority", "shared_leaf"],
       "profiles": ["local-owner", "edge-adopted", "standalone-adopted"],
-      "consumers": ["@qinglong/local-application", "@qinglong/local-owner-cli"],
+      "consumers": [
+        "@qinglong/local-api",
+        "@qinglong/local-application",
+        "@qinglong/local-owner-cli"
+      ],
       "authorities": [
         "short-lived SQLite administration",
+        "request-scoped Local Console Task mutation",
         "legacy adoption fence",
         "reviewed adopted Profile activation"
       ],
-      "rationale": "短生命周期写 authority 与 adopted Profile activation 共享完全相同的部署闭包；后者通过 adopted-profile 子路径与惰性 runtime import 隔离，不再用三文件微型 workspace package 表达。"
+      "rationale": "短生命周期写 authority、request-scoped Local Console Task mutation 与 adopted Profile activation 共享完全相同的部署闭包；Local API 仅允许调用 task-definition-administration 精确子路径，adopted Profile 通过 adopted-profile 子路径与惰性 runtime import 隔离，不再用三文件微型 workspace package 表达。"
     },
     {
       "path": "packages/ql3-local-api",
