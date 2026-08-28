@@ -21,13 +21,20 @@
 
 | 阶段产物 | 当前可用能力 | 仍缺少 |
 | --- | --- | --- |
-| D-418 headless Trial Kit v4 | 默认低配变体；POSIX shell + Docker 一条命令完成 checksum、load、fresh setup、首 Owner、Application active/stop；无 listener | 首份远端双架构实际 artifact 仍需维护者授权 `produce_alpha_artifacts=true` |
-| D-418 Console Trial Kit v4 | 显式 Linux-only 变体；同一 quickstart 关闭 Owner ceremony 后启动 loopback Console，支持 Task/Run/Event、显式运行与取消；CI 验证首页 200、未认证 API 401 | 仍是 Alpha、无 public ingress/TLS/签名；首份实际 archive 同样需维护者授权 |
-| D-419 Local Trial Kit v5 | headless/Console 都原子安装标准 Owner credential presentation；不再要求部署者手工拼接 bootstrap Secret | 首份实际双架构 v5 archive 仍需维护者授权 |
+| Local Console Trial Kit v5 | 双架构实物已生成；一条 quickstart 完成 checksum、load、fresh setup、首 Owner、标准 credential presentation、loopback Console 与示例 Task；用户可显式运行并观察 bounded log | 仍是隔离 Alpha、无 public ingress/TLS/签名；Actions artifact 保留 30 天，不是长期 release 渠道 |
+| Local headless Trial Kit v5 | 默认低配变体；同一源码支持 POSIX shell + Docker 一条命令完成 fresh setup、首 Owner与 Application active/stop；无 listener、示例 Task 或 Console 增量 | 尚未为当前提交单独触发 headless 双架构 milestone；不能把 Console archive 改名复用 |
 | D-419 Console 首自动化闭环 | quickstart 创建无网络/SecretRef/Trigger 的示例 Task；原生 CI 使用真实 Owner credential 完成 read、fenced start、`succeeded` 与 bounded log marker | 仍不提供 Web Task 编辑、2.x 升级或生产远程管理 |
 | D-420 Console Run 日志观察面 | 选择 Run 后经既有认证/Policy/Audit 链读取 latest Attempt 首个 32 KiB，展示 range、truncation、pending/retired 等明确状态 | 不自动轮询、不提供整文件下载；Web Task 创建/修订仍待独立强认证事务切片 |
 
 D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完整操作”：源码与普通 CI 已具备生成、审计和实跑两种 Trial Kit 的能力，但只有显式 artifact run 生成且被同 run 的双架构 milestone 收录后，才是可下载阶段产物。操作说明见 [Local Alpha Trial Kit](./ql3-local-alpha-trial-kit.md) 与 [Local Web Console](./ql3-local-web-console.md)。
+
+当前首份可交付 Local Console v5 绑定提交 `37abfa160da7669b2628c0a70dbd52f50f7dcec1` 与 [GitHub Actions run 33173769047](https://github.com/whyour/qinglong/actions/runs/33173769047)，保留至 2026-09-27：
+
+- `ql3-alpha-37abfa160da7669b2628c0a70dbd52f50f7dcec1-local-console-amd64`：187,712,409 bytes，GitHub artifact SHA-256 `baf9861b70ebaccccab45fb49714589dc2d2083da4dc122a4393052285890b2f`，内部 Docker archive SHA-256 `5a7ccda8d50bb902077faa021cf9481631ff9331fc513352fc874a93bffbf5be`；
+- `ql3-alpha-37abfa160da7669b2628c0a70dbd52f50f7dcec1-local-console-arm64`：184,944,025 bytes，GitHub artifact SHA-256 `880574fcabf0214051eec424e1befd5a972dec907d386e5b06d0f8a6dcfe70dc`，内部 Docker archive SHA-256 `812a6ab375f79bcedaab2592acd915b4c715d016c6aa9722a8c3fda21649abab`；
+- `ql3-alpha-37abfa160da7669b2628c0a70dbd52f50f7dcec1-local-console-milestone`：5,623 bytes，GitHub artifact SHA-256 `d3df83539969fbb77ff45c65c2f92bd9f74e30e50ebae5ba0eb688743fad89e8`。
+
+下载后的 milestone `SHA256SUMS` 与离线 auditor 已复核，返回 `compatible: true`。首次 run `33164186855` 虽生成两个架构的大 bundle，却因 finalizer 未安装根依赖而无法形成索引；它被保留为失败运行中间件。提交 `37abfa16` 补齐三个 finalizer 的 frozen install 并新增静态回归门，证明阶段产物判定确实会拒绝“有 archive、无闭合索引”的状态。
 
 提交 `4239464af6937d56528a0a2c573d12329bc7ca55` 已形成最新 owner-private arm64 工程候选：
 
@@ -38,7 +45,7 @@ D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完�
 
 该本地 archive 不是新的 v2 Local Alpha Trial Kit。它在 ADR-0506 前生成，manifest v1 会无条件写入 `passed`，且 macOS Docker Desktop 因 bind-mount UID 映射无法对 exact 本地 archive 完成 Owner pepper 旅程；原生 CI 证明同源码实现，不自动证明另一个 archive 的 exact image bytes。它因此保留为工程候选，不冒充已获 workflow evidence 的用户 Alpha。
 
-ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verification，ADR-0511 的 `@v3` 增加 canonical quickstart，ADR-0513 的 `@v4` 再把 `headless|console` 变体绑定到 image、SBOM、verification、milestone 和 stage index。旧 runtime-only、v1/v2/v3 bundle 均为历史工程证据，不能通过 v4 auditor。下一项外部里程碑仍是维护者授权 `produce_alpha_artifacts=true`，由同一次原生 milestone job 生成并实际执行所选变体的双架构可下载 archive。
+ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verification，ADR-0511 的 `@v3` 增加 canonical quickstart，ADR-0513 的 `@v4` 再把 `headless|console` 变体绑定到 image、SBOM、verification、milestone 和 stage index，ADR-0514 的 `@v5` 增加标准 Owner credential presentation 与首自动化旅程。旧 runtime-only、v1/v2/v3/v4 bundle 均为历史工程证据，不能通过 v5 auditor。下一项 Local 外部里程碑是为同一阶段单独生成默认低配 headless v5；Cluster milestone、跨 Profile stage index 和 Public Release Set 仍分别受各自门禁约束。
 
 ## 生成
 
