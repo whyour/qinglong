@@ -216,3 +216,27 @@ test('workflow audit rejects missing final offline audit', (t) => {
     report.findings.includes('CLUSTER_MILESTONE_FINALIZER_CONTRACT_DRIFT'),
   );
 });
+
+test('workflow audit rejects a finalizer without installed dependencies', (t) => {
+  const fixtureRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-cluster-alpha-dependencies-'),
+  );
+  t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
+  const workflowDirectory = path.join(fixtureRoot, '.github/workflows');
+  fs.mkdirSync(workflowDirectory, { recursive: true });
+  const source = fs.readFileSync(
+    path.join(root, '.github/workflows/ql3-ci.yml'),
+    'utf8',
+  );
+  const marker = '\n  cluster-alpha-milestone:\n';
+  const markerIndex = source.indexOf(marker);
+  const workflow = `${source.slice(0, markerIndex)}${source
+    .slice(markerIndex)
+    .replace('pnpm install --frozen-lockfile --ignore-scripts', 'true')}`;
+  fs.writeFileSync(path.join(workflowDirectory, 'ql3-ci.yml'), workflow);
+  const report = auditClusterAlphaMilestoneWorkflow(fixtureRoot);
+  assert.equal(report.compatible, false);
+  assert.ok(
+    report.findings.includes('CLUSTER_MILESTONE_FINALIZER_CONTRACT_DRIFT'),
+  );
+});

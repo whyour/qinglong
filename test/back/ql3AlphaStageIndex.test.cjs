@@ -327,6 +327,34 @@ test('workflow audit rejects a partial or prematurely uploaded stage index', (t)
   );
 });
 
+test('workflow audit rejects a stage finalizer without installed dependencies', (t) => {
+  const fixtureRoot = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-alpha-stage-dependencies-')),
+  );
+  t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(fixtureRoot, '.github/workflows'), {
+    recursive: true,
+  });
+  const source = fs.readFileSync(
+    path.join(root, '.github/workflows/ql3-ci.yml'),
+    'utf8',
+  );
+  const marker = '\n  alpha-stage-index:\n';
+  const markerIndex = source.indexOf(marker);
+  const workflow = `${source.slice(0, markerIndex)}${source
+    .slice(markerIndex)
+    .replace('pnpm install --frozen-lockfile --ignore-scripts', 'true')}`;
+  fs.writeFileSync(
+    path.join(fixtureRoot, '.github/workflows/ql3-ci.yml'),
+    workflow,
+  );
+  const report = auditAlphaStageIndexWorkflow(fixtureRoot);
+  assert.equal(report.compatible, false);
+  assert.ok(
+    report.findings.includes('ALPHA_STAGE_INDEX_FINALIZER_CONTRACT_DRIFT'),
+  );
+});
+
 test('CLI grammar keeps cross-index audit explicit', () => {
   assert.deepEqual(
     parseArguments([

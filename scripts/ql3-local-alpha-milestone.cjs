@@ -527,6 +527,9 @@ function auditLocalAlphaMilestoneWorkflow(root = DEFAULT_ROOT) {
   const milestoneTokens = [
     '    name: Finalize the Local Alpha milestone',
     '    needs:',
+    'pnpm/action-setup@v6',
+    'cache-dependency-path: pnpm-lock.yaml',
+    'pnpm install --frozen-lockfile --ignore-scripts',
     'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
     `name: ql3-alpha-${'${{ github.sha }}'}-local-${'${{ inputs.local_alpha_variant }}'}-amd64`,
     `name: ql3-alpha-${'${{ github.sha }}'}-local-${'${{ inputs.local_alpha_variant }}'}-arm64`,
@@ -547,11 +550,15 @@ function auditLocalAlphaMilestoneWorkflow(root = DEFAULT_ROOT) {
   ) {
     findings.push('MILESTONE_FINALIZER_CONTRACT_DRIFT');
   }
+  const dependencyInstallIndex = milestone.indexOf(
+    'pnpm install --frozen-lockfile --ignore-scripts',
+  );
   const finalizerIndex = milestone.indexOf('--mode=finalize');
   const auditIndex = milestone.indexOf('--mode=audit');
   const uploadIndex = milestone.lastIndexOf('actions/upload-artifact@');
   if (
-    finalizerIndex < 0 ||
+    dependencyInstallIndex < 0 ||
+    finalizerIndex <= dependencyInstallIndex ||
     auditIndex <= finalizerIndex ||
     uploadIndex <= auditIndex
   ) {

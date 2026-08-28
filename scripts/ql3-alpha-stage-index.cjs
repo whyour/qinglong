@@ -559,6 +559,9 @@ function auditAlphaStageIndexWorkflow(root = DEFAULT_ROOT) {
     `if: ${condition}`,
     '      - local-alpha-milestone\n',
     '      - cluster-alpha-milestone\n',
+    'pnpm/action-setup@v6',
+    'cache-dependency-path: pnpm-lock.yaml',
+    'pnpm install --frozen-lockfile --ignore-scripts',
     `name: ql3-alpha-${'${{ github.sha }}'}-local-${'${{ inputs.local_alpha_variant }}'}-milestone`,
     `name: ql3-alpha-${'${{ github.sha }}'}-cluster-milestone`,
     'scripts/ql3-alpha-stage-index.cjs',
@@ -571,11 +574,15 @@ function auditAlphaStageIndexWorkflow(root = DEFAULT_ROOT) {
   if (!stage || tokens.some((token) => !stage.includes(token))) {
     findings.push('ALPHA_STAGE_INDEX_FINALIZER_CONTRACT_DRIFT');
   }
+  const dependencyInstallIndex = stage.indexOf(
+    'pnpm install --frozen-lockfile --ignore-scripts',
+  );
   const finalizeIndex = stage.indexOf('--mode=finalize');
   const auditIndex = stage.indexOf('--mode=audit');
   const uploadIndex = stage.indexOf('actions/upload-artifact@');
   if (
-    finalizeIndex < 0 ||
+    dependencyInstallIndex < 0 ||
+    finalizeIndex <= dependencyInstallIndex ||
     auditIndex <= finalizeIndex ||
     uploadIndex <= auditIndex
   ) {
