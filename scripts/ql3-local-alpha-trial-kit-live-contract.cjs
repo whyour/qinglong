@@ -474,15 +474,20 @@ async function apiRequest(pathname, token, options = {}) {
   return Object.freeze({ status: response.status, body });
 }
 
-async function consoleSurfaceContract(state) {
-  let lastError;
+async function consoleSurfaceContract(state, adapters = {}) {
+  const request = adapters.apiRequest ?? apiRequest;
+  const fetchSurface = adapters.fetch ?? fetch;
+  const wait = adapters.delay ?? delay;
+  const readCredential = adapters.credentialToken ?? credentialToken;
+  let ready = false;
+  let lastReadyError;
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
-      const root = await fetch('http://127.0.0.1:5700/', {
+      const root = await fetchSurface('http://127.0.0.1:5700/', {
         redirect: 'manual',
         signal: AbortSignal.timeout(2_000),
       });
-      const api = await fetch(
+      const api = await fetchSurface(
         'http://127.0.0.1:5700/api/v3/projects/default/tasks',
         {
           redirect: 'manual',
@@ -496,88 +501,118 @@ async function consoleSurfaceContract(state) {
           `Console HTTP contract drifted: root=${root.status}, unauthenticatedApi=${api.status}`,
         );
       }
-      const token = credentialToken(state);
-      const task = await apiRequest(
-        '/api/v3/projects/default/tasks/alpha-first-automation',
-        token,
-      );
-      if (
-        task.status !== 200 ||
-        task.body?.task?.revision !== 1 ||
-        !/^[0-9a-f]{64}$/u.test(task.body?.task?.contentDigest ?? '')
-      ) {
-        fail(
-          'starter Task is not visible through the authenticated Console API',
-        );
-      }
-      const started = await apiRequest(
-        '/api/v3/projects/default/tasks/alpha-first-automation/runs',
-        token,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            schema: 'qinglong/task-start@v1',
-            mutationId: '019f8680-143d-7000-8000-000000000041',
-            expectedRevision: task.body.task.revision,
-            expectedContentDigest: task.body.task.contentDigest,
-          }),
-        },
-      );
-      if (
-        started.status !== 202 ||
-        started.body?.status !== 'accepted' ||
-        typeof started.body?.runId !== 'string' ||
-        typeof started.body?.attemptId !== 'string'
-      ) {
-        fail('starter Task did not accept one fenced Run');
-      }
-      let terminal;
-      for (let attempt = 0; attempt < 80; attempt += 1) {
-        const current = await apiRequest(
-          `/api/v3/projects/default/runs/${started.body.runId}`,
-          token,
-        );
-        if (current.status !== 200) fail('starter Run became unreadable');
-        if (
-          ['succeeded', 'failed', 'cancelled', 'timed_out'].includes(
-            current.body?.run?.status,
-          )
-        ) {
-          terminal = current.body.run.status;
-          break;
-        }
-        await delay(250);
-      }
-      if (terminal !== 'succeeded') {
-        fail(`starter Run did not succeed: ${terminal ?? 'timeout'}`);
-      }
-      const log = await apiRequest(
-        `/api/v3/projects/default/runs/${started.body.runId}/attempts/${started.body.attemptId}/log?offset=0&length=32768`,
-        token,
-      );
-      const logText =
-        log.status === 200 && log.body?.status === 'available'
-          ? Buffer.from(log.body.content, 'base64').toString('utf8')
-          : '';
-      if (!logText.includes('qinglong3-alpha-first-automation')) {
-        fail('starter Run log does not contain the bounded work marker');
-      }
-      return Object.freeze({
-        listener: '127.0.0.1:5700',
-        rootStatus: 200,
-        unauthenticatedApiStatus: 401,
-        firstAutomation: Object.freeze({
-          taskId: 'alpha-first-automation',
-          runStatus: terminal,
-          logMarkerObserved: true,
-        }),
-      });
+      ready = true;
+      break;
     } catch (error) {
-      lastError = error;
-      await delay(250);
+      lastReadyError = error;
+      await wait(250);
     }
   }
-  throw lastError || new Error('Console listener did not become ready');
+  if (!ready) {
+    throw lastReadyError || new Error('Console listener did not become ready');
+  }
+
+  const token = readCredential(state);
+  const task = await request(
+    '/api/v3/projects/default/tasks/alpha-first-automation',
+    token,
+  );
+  if (
+    task.status !== 200 ||
+    task.body?.task?.revision !== 1 ||
+    !/^[0-9a-f]{64}$/u.test(task.body?.task?.contentDigest ?? '')
+  ) {
+    fail('starter Task is not visible through the authenticated Console API');
+  }
+  const started = await request(
+    '/api/v3/projects/default/tasks/alpha-first-automation/runs',
+    token,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        schema: 'qinglong/task-start@v1',
+        mutationId: '019f8680-143d-7000-8000-000000000041',
+        expectedRevision: task.body.task.revision,
+        expectedContentDigest: task.body.task.contentDigest,
+      }),
+    },
+  );
+  const accepted =
+    (started.status === 202 && started.body?.status === 'accepted') ||
+    (started.status === 200 && started.body?.status === 'existing');
+  if (
+    !accepted ||
+    typeof started.body?.runId !== 'string' ||
+    typeof started.body?.attemptId !== 'string'
+  ) {
+    fail(
+      `starter Task did not converge one fenced Run: status=${
+        started.status
+      }, code=${
+        started.body?.code ?? started.body?.status ?? 'unknown'
+      }, reason=${started.body?.reason ?? 'none'}`,
+    );
+  }
+
+  let terminal;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const current = await request(
+      `/api/v3/projects/default/runs/${started.body.runId}`,
+      token,
+    );
+    if (current.status !== 200) {
+      fail(
+        `starter Run became unreadable: status=${current.status}, code=${
+          current.body?.code ?? 'unknown'
+        }`,
+      );
+    }
+    if (
+      ['succeeded', 'failed', 'cancelled', 'timed_out'].includes(
+        current.body?.run?.status,
+      )
+    ) {
+      terminal = current.body.run.status;
+      break;
+    }
+    await wait(250);
+  }
+  if (terminal !== 'succeeded') {
+    fail(`starter Run did not succeed: ${terminal ?? 'timeout'}`);
+  }
+
+  let logText;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const log = await request(
+      `/api/v3/projects/default/runs/${started.body.runId}/attempts/${started.body.attemptId}/log?offset=0&length=32768`,
+      token,
+    );
+    if (log.status === 200 && log.body?.status === 'available') {
+      logText = Buffer.from(log.body.content, 'base64').toString('utf8');
+      break;
+    }
+    if (log.status !== 202 || log.body?.status !== 'pending') {
+      fail(
+        `starter Run log became unavailable: status=${log.status}, code=${
+          log.body?.code ?? log.body?.status ?? 'unknown'
+        }`,
+      );
+    }
+    await wait(250);
+  }
+  if (!logText?.includes('qinglong3-alpha-first-automation')) {
+    fail('starter Run log does not contain the bounded work marker');
+  }
+  return Object.freeze({
+    listener: '127.0.0.1:5700',
+    rootStatus: 200,
+    unauthenticatedApiStatus: 401,
+    firstAutomation: Object.freeze({
+      taskId: 'alpha-first-automation',
+      runStatus: terminal,
+      logMarkerObserved: true,
+    }),
+  });
 }
 
 async function runApplication(state) {
@@ -777,9 +812,13 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(
-    `${error instanceof Error ? error.message : String(error)}\n`,
-  );
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  });
+}
+
+module.exports = Object.freeze({ consoleSurfaceContract });
