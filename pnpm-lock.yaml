@@ -1,7 +1,7 @@
 lockfileVersion: '6.0'
 
 overrides:
-  sqlite3: npm:@whyour/sqlite3@1.1.0
+  sqlite3: npm:@whyour/sqlite3@1.1.2
   '@codemirror/state': 6.5.4
   '@codemirror/view': 6.39.16
 
@@ -116,13 +116,13 @@ dependencies:
     version: 3.3.0
   sequelize:
     specifier: ^6.37.5
-    version: 6.37.5(@whyour/sqlite3@1.1.0)
+    version: 6.37.5(@whyour/sqlite3@1.1.2)
   sockjs:
     specifier: ^0.3.24
     version: 0.3.24
   sqlite3:
-    specifier: npm:@whyour/sqlite3@1.1.0
-    version: /@whyour/sqlite3@1.1.0
+    specifier: npm:@whyour/sqlite3@1.1.2
+    version: /@whyour/sqlite3@1.1.2
   toad-scheduler:
     specifier: ^3.0.1
     version: 3.0.1
@@ -3190,7 +3190,7 @@ packages:
     resolution: {integrity: sha512-Ngs9jhElXN7efS9WvvCC/p6rXMbihna8eNLVBc421Zf+VcFd+pR4DOcS6yA9V22EKtAy4DEj7LtvEEIm0bb80A==}
     engines: {node: '>= 18'}
     dependencies:
-      sqlite3: /@whyour/sqlite3@1.1.0
+      sqlite3: /@whyour/sqlite3@1.1.2
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -5614,8 +5614,8 @@ packages:
       - supports-color
     dev: true
 
-  /@whyour/sqlite3@1.1.0:
-    resolution: {integrity: sha512-5g9xsjkv9sUepCvBBKmev6JSKSKjp0ebpW25uSsuV5kurIYrd7AnkbffNMNIswxwsQJSLPewVEX5ROsQfETfnA==}
+  /@whyour/sqlite3@1.1.2:
+    resolution: {integrity: sha512-OY24/OJMqLHIGolo4GCFW4lrJKAoOB+ZqERXb7u7DKZQz7QR3f0GALE99BZWQBSZEVVZ/StVeAb2fCkMfTtuDQ==}
     requiresBuild: true
     peerDependenciesMeta:
       node-gyp:
@@ -13939,7 +13939,7 @@ packages:
     engines: {node: '>= 10.0.0'}
     dev: false
 
-  /sequelize@6.37.5(@whyour/sqlite3@1.1.0):
+  /sequelize@6.37.5(@whyour/sqlite3@1.1.2):
     resolution: {integrity: sha512-10WA4poUb3XWnUROThqL2Apq9C2NhyV1xHPMZuybNMCucDsbbFuKg51jhmyvvAUyUqCiimwTZamc3AHhMoBr2Q==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
@@ -13984,7 +13984,7 @@ packages:
       retry-as-promised: 7.0.4
       semver: 7.6.3
       sequelize-pool: 7.1.0
-      sqlite3: /@whyour/sqlite3@1.1.0
+      sqlite3: /@whyour/sqlite3@1.1.2
       toposort-class: 1.0.1
       uuid: 8.3.2
       validator: 13.12.0
