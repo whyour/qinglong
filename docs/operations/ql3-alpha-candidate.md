@@ -26,21 +26,23 @@
 | D-419 Console 首自动化闭环 | quickstart 创建无网络/SecretRef/Trigger 的示例 Task；原生 CI 使用真实 Owner credential 完成 read、fenced start、`succeeded` 与 bounded log marker | 仍不提供 Web Task 编辑、2.x 升级或生产远程管理 |
 | D-420 Console Run 日志观察面 | 选择 Run 后经既有认证/Policy/Audit 链读取 latest Attempt 首个 32 KiB，展示 range、truncation、pending/retired 等明确状态 | 不自动轮询、不提供整文件下载；Web Task 创建/修订仍待独立强认证事务切片 |
 | D-421 Console Task 创建切片 | request-scoped credential fence、两分钟一次性本机 proof、同事务 Policy/Audit/Task mutation 已完成；Console 可创建 command Task；同源双架构 Console v5 Trial Kit 与 milestone 已生成并验真 | Web update 等待 authoring read/lease；Cluster 不复用 Local proof；仍不是生产或公开发布 |
-| D-422 Console Task 安全编辑切片 | 源码候选已实现强认证完整定义读取、10 分钟一次性 authoring lease、第二份 exact save proof 与 revision/content/credential fence；Console 可无损编辑内建 argv command Task；本地完整 package/Profile/浏览器门已通过 | 待远端主 CI 和新同源双架构 Console milestone；现有 D-421 archive 不包含本能力 |
+| D-422 Console Task 安全编辑切片 | 强认证完整定义读取、10 分钟一次性 authoring lease、第二份 exact save proof 与 revision/content/credential fence 已完成；Console 可无损编辑内建 argv command Task；同源双架构 Console v5 Trial Kit 与 milestone 已生成并验真 | Cluster 不复用 Local proof；尚无通用 workflow 编辑器、2.x 升级或生产远程管理；仍不是正式发布 |
 
 D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，而且没有改名复用 run `33173769047` 的旧 archive。修复提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 的普通主 CI [run 33229592307](https://github.com/whyour/qinglong/actions/runs/33229592307) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33229592293](https://github.com/whyour/qinglong/actions/runs/33229592293) 成功；随后显式 Local Console milestone [run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006) 为 42 success/2 scope skip/0 fail。由此 Web 创建能力已进入新的阶段实物，而不再只是候选源码。
 
-D-422 当前仍按“源码候选”登记：本地真实 SQLite/loopback 已证明读取、租约、第二次 proof、更新与新围栏启动闭环；18-package clean build/test 为 `3,038 total / 3,016 pass / 22 conditional skip / 0 fail`，Local API `64/64`，默认 Edge 与 opt-in Edge/Standalone Console 资源门及真实 Chromium 双证明编辑均通过。但在远端主 CI 和新的显式双架构 milestone 闭合前，不声称现有下载物已经包含 Web 编辑。阶段产物必须绑定新的 exact commit/run/artifact digest，禁止沿用 D-421 的 archive 名称或证据。
+D-422 已从“源码候选”升级为阶段实物：本地真实 SQLite/loopback 已证明读取、租约、第二次 proof、更新与新围栏启动闭环；18-package clean build/test 为 `3,038 total / 3,016 pass / 22 conditional skip / 0 fail`，Local API `64/64`，默认 Edge 与 opt-in Edge/Standalone Console 资源门及真实 Chromium 双证明编辑均通过。修复提交 `f28bf74d1bd29e9b8a8727915de19509f4bda9cf` 的普通主 CI [run 33236204273](https://github.com/whyour/qinglong/actions/runs/33236204273) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33236204254](https://github.com/whyour/qinglong/actions/runs/33236204254) 为 1/1；随后显式 Local Console milestone [run 33237026187](https://github.com/whyour/qinglong/actions/runs/33237026187) 为 42 success/2 scope skip/0 fail。阶段产物绑定新的 exact commit/run/artifact digest，没有沿用或改名复用 D-421 archive。
 
 D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完整操作”：源码与普通 CI 已具备生成、审计和实跑两种 Trial Kit 的能力，但只有显式 artifact run 生成且被同 run 的双架构 milestone 收录后，才是可下载阶段产物。操作说明见 [Local Alpha Trial Kit](./ql3-local-alpha-trial-kit.md) 与 [Local Web Console](./ql3-local-web-console.md)。
 
-当前最新可交付 Local Console v5 绑定提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 与 [GitHub Actions run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006)，保留至 2026-09-28：
+当前最新可交付 Local Console v5 绑定提交 `f28bf74d1bd29e9b8a8727915de19509f4bda9cf` 与 [GitHub Actions run 33237026187](https://github.com/whyour/qinglong/actions/runs/33237026187)，保留至 2026-09-28：
 
-- `ql3-alpha-dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f-local-console-amd64`：187,797,970 bytes，GitHub artifact SHA-256 `5b51547d98d56f0e6997a922ef2da853f2355115c1f3d22a7cd31dad916516cb`，内部 Docker archive SHA-256 `877e899d8379a3834ed6d89138dd4b0209725cfea3621f542c7bc4825b249cf4`；
-- `ql3-alpha-dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f-local-console-arm64`：185,029,586 bytes，GitHub artifact SHA-256 `1b5b30acbd9f31d7c96b710f1b929cbec25996a13c8600f088343f884c4c9ca6`，内部 Docker archive SHA-256 `82cce3524355957eb5166adf146e3a1dcbcad7b8f53935fe3a15403b865c7b0b`；
-- `ql3-alpha-dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f-local-console-milestone`：5,623 bytes，GitHub artifact SHA-256 `70a49da1e9466322c9b198567559eb313a51171ea0609875d1419a83de407813`。
+- `ql3-alpha-f28bf74d1bd29e9b8a8727915de19509f4bda9cf-local-console-amd64`：187,834,834 bytes，GitHub artifact SHA-256 `60cfb88c783f0d5bf1ce78819868ddb7a0d28dcbdb3841f00545a7178ff9419a`，内部 Docker archive SHA-256 `da74659043687dddd1cf33c8079ea343a4290107d59ae9f7a1dd83d668937d5a`；
+- `ql3-alpha-f28bf74d1bd29e9b8a8727915de19509f4bda9cf-local-console-arm64`：185,066,450 bytes，GitHub artifact SHA-256 `b5381deec99d1418d52155ce11b7d7c1006a9bc0b456091f4e437a1bbb6b8439`，内部 Docker archive SHA-256 `6b05e8d75e10f884c55173808a48a2baf3b2cb3154c722b6d3d2775322964225`；
+- `ql3-alpha-f28bf74d1bd29e9b8a8727915de19509f4bda9cf-local-console-milestone`：5,623 bytes，GitHub artifact SHA-256 `02026bdf665573097977e6d895e01a758d664b98a55054330937e107dbc2851f`。
 
 > 注：GitHub 返回的 artifact digest 绑定其下载 ZIP，milestone 内的 `archiveSha256` 绑定 Trial Kit 中的 Docker archive，二者不是同一个文件。下载后的 milestone `SHA256SUMS` 已复核，仓库 auditor 返回 `schema=qinglong/alpha-local-milestone-audit@v2`、`compatible=true`，并确认 `3.0.0-alpha.2`、`console`、amd64/arm64、run/attempt/sourceRevision 全部闭合。
+
+上一份仅包含 D-421 Web 创建能力的 Local Console v5 绑定提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 与 [GitHub Actions run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006)，不包含 D-422 Web 编辑能力。
 
 前一份首自动化/日志观察阶段的 Local Console v5 绑定提交 `37abfa160da7669b2628c0a70dbd52f50f7dcec1` 与 [GitHub Actions run 33173769047](https://github.com/whyour/qinglong/actions/runs/33173769047)，保留至 2026-09-27：
 
