@@ -76,7 +76,7 @@ export interface LocalApiTaskPutRouteOptions {
   readonly taskDefinitions: TaskDefinitionSource;
   readonly taskDefinitionAdministrationForCredential: (
     fence: Readonly<AuthenticatedLocalApiRequest['credentialFence']>,
-  ) => TaskDefinitionAdministrationRepository;
+  ) => Promise<TaskDefinitionAdministrationRepository>;
   readonly securityAudit: SecurityAuditSink;
   readonly presenceProof: LocalPresenceProofManager;
   readonly now?: () => number;
@@ -406,11 +406,13 @@ export function createLocalApiTaskPutRoute(
         return response(503, { code: 'authentication_unavailable' });
       }
       try {
+        const mutations =
+          await options.taskDefinitionAdministrationForCredential(
+            request.authenticated.credentialFence,
+          );
         const service = createLocalTaskDefinitionAdministrationService(
           options.projectPolicy,
-          options.taskDefinitionAdministrationForCredential(
-            request.authenticated.credentialFence,
-          ),
+          mutations,
           options.taskDefinitions,
           options.securityAudit,
           { now },

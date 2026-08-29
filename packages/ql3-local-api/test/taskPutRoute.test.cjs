@@ -123,7 +123,7 @@ function fixture(t, overrides = {}) {
   const route = createLocalApiTaskPutRoute({
     projectPolicy,
     taskDefinitions,
-    taskDefinitionAdministrationForCredential(fence) {
+    async taskDefinitionAdministrationForCredential(fence) {
       calls.push(['credential-fence', fence]);
       return {
         async appendAuthorizedTaskDefinitionRevision(mutation) {

@@ -171,12 +171,10 @@ async function fixture(t) {
 
 test('keeps simultaneous Task mutation credentials request-scoped and rechecks both fences in-transaction', async (t) => {
   const value = await fixture(t);
-  const repositoryA = value.runtime.taskDefinitionAdministrationForCredential(
-    value.fenceA,
-  );
-  const repositoryB = value.runtime.taskDefinitionAdministrationForCredential(
-    value.fenceB,
-  );
+  const repositoryA =
+    await value.runtime.taskDefinitionAdministrationForCredential(value.fenceA);
+  const repositoryB =
+    await value.runtime.taskDefinitionAdministrationForCredential(value.fenceB);
   const policyA = await value.runtime.projectPolicy.resolve('default', {
     type: 'user',
     id: 'request-user-a',

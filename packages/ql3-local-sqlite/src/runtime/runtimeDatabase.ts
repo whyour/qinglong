@@ -51,12 +51,7 @@ import { LocalSqliteApiCredentialRepository } from '../security/apiCredentialRep
 import { LocalSqliteOwnerPepperRepository } from '../local-owner/ownerPepperRepository';
 import { LocalSqliteOperationAuthority } from '../authority/operationAuthority';
 import { LocalSqliteTaskDefinitionRepository } from '../task-definition/taskDefinitionRepository';
-import { LocalSqliteTaskDefinitionAdministrationRepository } from '../task-definition/taskDefinitionAdministration';
-import {
-  confirmLocalSqliteAuthenticatedUserCredentialFence,
-  LocalSqliteAuthenticatedManagementFenceError,
-  type LocalSqliteAuthenticatedUserCredentialFence,
-} from '../administration/packageManagement';
+import type { LocalSqliteAuthenticatedUserCredentialFence } from '../administration/packageManagement';
 import {
   TaskSpecSemanticRegistry,
   createBuiltInTaskSpecSemanticRegistry,
@@ -105,7 +100,7 @@ export interface LocalSqliteRuntimeDatabase {
   readonly taskDefinitions: LocalSqliteTaskDefinitionRepository;
   taskDefinitionAdministrationForCredential(
     fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
-  ): TaskDefinitionAdministrationRepository;
+  ): Promise<TaskDefinitionAdministrationRepository>;
   readonly triggers: LocalSqliteTriggerRepository;
   readonly schedules: LocalSqliteScheduleRepository;
   readonly localDispatch: LocalDispatchStore;
@@ -257,9 +252,19 @@ export async function openLocalSqliteRuntimeDatabase(
       readiness,
       runRepository,
       taskDefinitions,
-      taskDefinitionAdministrationForCredential(
+      async taskDefinitionAdministrationForCredential(
         fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
       ) {
+        const [administration, taskAdministration] = await Promise.all([
+          import('../administration/packageManagement.js'),
+          import('../task-definition/taskDefinitionAdministration.js'),
+        ]);
+        const {
+          confirmLocalSqliteAuthenticatedUserCredentialFence,
+          LocalSqliteAuthenticatedManagementFenceError,
+        } = administration;
+        const { LocalSqliteTaskDefinitionAdministrationRepository } =
+          taskAdministration;
         confirmLocalSqliteAuthenticatedUserCredentialFence(authority, fence);
         return new LocalSqliteTaskDefinitionAdministrationRepository(
           authority,

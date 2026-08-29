@@ -23,7 +23,7 @@ PUT /api/v3/projects/:projectId/tasks/:taskId
 
 请求体使用既有 immutable TaskDefinition command：`expectedRevision=null` 创建，`expectedRevision=current` 修订；mutation ID、occurredAt、name/kind/spec/labels/enabled 都参与规范化。Bearer 只建立 `single_factor` session，并交付该次认证解析出的 exact credential fence；服务不设置进程级 active credential。
 
-SQLite runtime 以 `taskDefinitionAdministrationForCredential(fence)` 为每个请求创建独立 repository。factory 建立时先复验 credential/Identity/pepper；写事务内再次复验同一 exact fence、actor subject、Project version 与 latest RoleBinding version/state。allowed audit、Task head/revision、mutation replay 与适用的 local execution revision仍在一个事务中提交。两个同时存活的 repository 不共享可变 credential 状态。
+SQLite runtime 以异步 `taskDefinitionAdministrationForCredential(fence)` 为每个请求创建独立 repository。只有 opt-in API 已验证本机 proof 并实际调用 factory 时，才惰性加载 authenticated-management 与 Task administration authority；factory 建立时先复验 credential/Identity/pepper，写事务内再次复验同一 exact fence、actor subject、Project version 与 latest RoleBinding version/state。allowed audit、Task head/revision、mutation replay 与适用的 local execution revision仍在一个事务中提交。两个同时存活的 repository 不共享可变 credential 状态。
 
 ### 2. 本机存在证明是第二权威，不经 HTTP 交付 secret
 
@@ -68,7 +68,9 @@ HTTP contract 已同时支持 create/update。当前 bounded Task read 有意不
 
 定向验证覆盖：proof 文件权限与无身份泄漏、exact request/credential/subject 绑定、一次性消费、Edge 容量与过期惰性清理；Task route 的 challenge→confirm→strong Policy→事务 mutation、内容漂移、非 User、过期和失败关闭；两个同时存活的 credential repository、单方 credential revoke、另一方继续写入与 RoleBinding 漂移原子拒绝；真实 loopback HTTP→私有 proof file→SQLite Task/audit 创建；真实 Chromium 的 Task 编辑器与 proof ticket 可访问性/布局。
 
-本地 18-package clean build/test 已通过：`3,030 total / 3,008 pass / 22 conditional、platform 或 external-service skip / 0 fail`；Local API 完整 loopback/SQLite/Console 回归为 `56/56`，新增双 credential request-fence 为 `1/1`，package boundary 契约为 `10/10`。package/source、Local image、122-module Edge import 与 Cluster dependency audit 均 `compatible=true`。离线 Console 三资产合计 62,632 bytes；默认 Edge 为 2,736,982 bytes/329 files/3 packages/83 loaded modules，仍低于 4 MiB/512-file/20 MiB RSS-delta 门；opt-in `edge-application-api|standalone-application-api` 为 4,040,893/4,041,037 bytes、472 files、12 packages、94 loaded modules，仍低于 6 MiB/640-file/28 MiB RSS-delta 门。真实 Chromium 的创建编辑器与 proof ticket 已完成桌面布局、键盘焦点与可访问树检查。
+本地 18-package clean build/test 已通过：`3,030 total / 3,008 pass / 22 conditional、platform 或 external-service skip / 0 fail`；Local API 完整 loopback/SQLite/Console 回归为 `56/56`，新增双 credential request-fence 为 `1/1`，package boundary 契约为 `10/10`。package/source、Local image、122-module Edge import 与 Cluster dependency audit 均 `compatible=true`。离线 Console 三资产合计 62,632 bytes；默认 Edge 为 2,737,205 bytes/329 files/3 packages/58 loaded modules，仍低于 4 MiB/512-file/20 MiB RSS-delta 门；opt-in `edge-application-api|standalone-application-api` 为 4,041,294/4,041,438 bytes、472 files、12 packages、94 loaded modules，仍低于 6 MiB/640-file/28 MiB RSS-delta 门。真实 Chromium 的创建编辑器与 proof ticket 已完成桌面布局、键盘焦点与可访问树检查。
+
+阶段提交 `884912d1` 的首轮远端主 CI 为 40 success/3 expected artifact-finalizer skip/1 fail，Kubernetes deployment 与三节点 Security live 均成功。唯一失败在 x64 默认 Edge import RSS：静态引入 request-scoped administration 后 loaded modules 从历史 58 增至 83，RSS 为 21,229,568 bytes，超过 20 MiB 门 258,048 bytes；failed-only attempt 2 确认同一确定性结果。修复没有扩大预算，而是把两个 authority 改成 request-time dynamic import；默认 Edge 恢复 58 loaded modules，本机 RSS delta 为 11,157,504 bytes，Console 仍为 94 modules。最终远端 CI 与里程碑证据由后续修复提交重新闭合。
 
 本机 2.x backend 兼容门首次运行得到 `1,348 total / 1,293 pass / 53 fail / 2 skip`，其中 52 个文件在加载 Sequelize 前统一因锁定的 `@whyour/sqlite3` 原生绑定缺失而失败，另一个 loopback 用例受当前 sandbox 拒绝；依赖重建先因 GitHub 预编译包下载超时、再因本机 C++ SDK 缺少 `<functional>` 失败，未伪装成源码回归。唯一实际源码契约漂移是 Local API 文件计数 18/17→20/19，修正后 package-boundary `10/10` 通过。完整 backend 与原生 Linux loopback 必须由阶段提交的远端 CI 闭合。
 
