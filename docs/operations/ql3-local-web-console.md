@@ -11,7 +11,7 @@ Local Web Console 是 `@qinglong/local-api` 的 opt-in 操作界面，用来创�
 | 普通单节点服务器 | 选择 `standalone-application-api` |
 | Kubernetes/Cluster 节点 | 不使用本 Local Console；继续使用 Cluster Control/Console 路径 |
 
-D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一步安装可直接使用的 Owner credential presentation，并创建默认不自动运行的 `alpha-first-automation`。D-420 又把该 Run 的 latest Attempt 首个 32 KiB 日志带到 Console。D-421/D-422 依次增加 request-scoped strong-auth Task 创建与双 proof 无损编辑；绑定提交 `f28bf74d1bd29e9b8a8727915de19509f4bda9cf` 的最新双架构实物已由 [milestone run 33237026187](https://github.com/whyour/qinglong/actions/runs/33237026187) 生成。D-423 源码候选继续开放既有 immutable Trigger/cron authority；在新的 exact-commit milestone 成功前，当前下载物仍不包含该能力。
+D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一步安装可直接使用的 Owner credential presentation，并创建默认不自动运行的 `alpha-first-automation`。D-420 又把该 Run 的 latest Attempt 首个 32 KiB 日志带到 Console。D-421/D-422 依次增加 request-scoped strong-auth Task 创建与双 proof 无损编辑。D-423 继续开放既有 immutable Trigger/cron authority；绑定提交 `b970e2aede516c350b1cdb409e0d0d3038a5deee` 的最新双架构实物已由 [milestone run 33245745837](https://github.com/whyour/qinglong/actions/runs/33245745837) 生成并完成离线审计。
 
 ## 前置条件
 
@@ -69,7 +69,7 @@ Credential 只存在当前页面内存，不进入 URL、Cookie 或 Web Storage�
 
 ## 当前阶段可用边界
 
-D-423 源码候选的可操作闭环是内建 argv command Task create/list/read/update/enable/disable/start、`qinglong/cron@v1` Trigger list/read/create/update/enable/disable，以及 Run list/read/events/steps/log/cancel。Task 编辑器只修改当前展示字段并保留完整快照中的其他 config/labels；其他 Task kind 或 Trigger schema 继续使用受信管理入口。页面暂不负责：
+D-423 阶段实物的可操作闭环是内建 argv command Task create/list/read/update/enable/disable/start、`qinglong/cron@v1` Trigger list/read/create/update/enable/disable，以及 Run list/read/events/steps/log/cancel。Task 编辑器只修改当前展示字段并保留完整快照中的其他 config/labels；其他 Task kind 或 Trigger schema 继续使用受信管理入口。页面暂不负责：
 
 - Identity、Policy、Secret、Plugin Package 或 AI 配置管理；
 - Trigger 删除、通用 Trigger provider/schema 编辑或 Cluster Trigger 管理；
