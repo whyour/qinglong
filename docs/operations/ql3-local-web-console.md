@@ -11,7 +11,7 @@ Local Web Console 是 `@qinglong/local-api` 的 opt-in 操作界面，用来创�
 | 普通单节点服务器 | 选择 `standalone-application-api` |
 | Kubernetes/Cluster 节点 | 不使用本 Local Console；继续使用 Cluster Control/Console 路径 |
 
-D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一步安装可直接使用的 Owner credential presentation，并创建默认不自动运行的 `alpha-first-automation`。D-420 又把该 Run 的 latest Attempt 首个 32 KiB 日志带到 Console。D-421 增加 request-scoped strong-auth Task PUT 与 Console command Task 创建器；它不复用 CLI 的进程级 active credential，也不让单因子 Bearer 直接写 Task。实际大 archive 仍只由维护者显式 artifact run 生成；普通 push 的源码和 CI 不是公开下载物。
+D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一步安装可直接使用的 Owner credential presentation，并创建默认不自动运行的 `alpha-first-automation`。D-420 又把该 Run 的 latest Attempt 首个 32 KiB 日志带到 Console。D-421 增加 request-scoped strong-auth Task PUT 与 Console command Task 创建器；它不复用 CLI 的进程级 active credential，也不让单因子 Bearer 直接写 Task。绑定提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 的双架构实物已由 [milestone run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006) 生成；普通 push 的源码和 CI 仍不是公开下载物。
 
 ## 前置条件
 
@@ -73,6 +73,6 @@ Credential 只存在当前页面内存，不进入 URL、Cookie 或 Web Storage�
 - 日志整文件下载、终端、文件管理或 2.x 数据迁移；
 - LAN/public 暴露、TLS termination、多用户 Web session 或 Cluster 管理。
 
-三项静态资产总计 48,318 bytes，不依赖 CDN、网络字体或前端框架，仍低于 192 KiB 总闭包和单文件 96 KiB 门。`edge-application-api|standalone-application-api` 为 3,960,535 / 3,960,679 bytes、467 files、12 packages、90 loaded modules，仍低于 6 MiB/640-file 门；基础 headless Edge 保持 2,669,390 bytes、325 files、3 packages、58 modules，不携带这些资产。
+三项静态资产总计 62,632 bytes，不依赖 CDN、网络字体或前端框架，仍低于 192 KiB 总闭包和单文件 96 KiB 门。`edge-application-api|standalone-application-api` 为 4,041,294 / 4,041,438 bytes、472 files、12 packages、94 loaded modules，仍低于 6 MiB/640-file 门；基础 headless Edge 保持 2,737,205 bytes、329 files、3 packages、58 modules，不携带这些资产。
 
 停止 Local API 进程走与 Application 相同的 drain/shutdown 路径。Console 没有独立数据库、后台任务或需要额外清理的持久状态。

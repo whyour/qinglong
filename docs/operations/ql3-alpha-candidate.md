@@ -25,13 +25,21 @@
 | Local headless Trial Kit v5 | 默认低配变体；同一源码支持 POSIX shell + Docker 一条命令完成 fresh setup、首 Owner与 Application active/stop；无 listener、示例 Task 或 Console 增量 | 尚未为当前提交单独触发 headless 双架构 milestone；不能把 Console archive 改名复用 |
 | D-419 Console 首自动化闭环 | quickstart 创建无网络/SecretRef/Trigger 的示例 Task；原生 CI 使用真实 Owner credential 完成 read、fenced start、`succeeded` 与 bounded log marker | 仍不提供 Web Task 编辑、2.x 升级或生产远程管理 |
 | D-420 Console Run 日志观察面 | 选择 Run 后经既有认证/Policy/Audit 链读取 latest Attempt 首个 32 KiB，展示 range、truncation、pending/retired 等明确状态 | 不自动轮询、不提供整文件下载；Web Task 创建/修订仍待独立强认证事务切片 |
-| D-421 Console Task 创建切片 | request-scoped credential fence、两分钟一次性本机 proof、同事务 Policy/Audit/Task mutation 已完成；Console 可创建 command Task | 当前源码尚未重新生成双架构 Trial Kit；Web update 等待 authoring read/lease，Cluster 不复用 Local proof |
+| D-421 Console Task 创建切片 | request-scoped credential fence、两分钟一次性本机 proof、同事务 Policy/Audit/Task mutation 已完成；Console 可创建 command Task；同源双架构 Console v5 Trial Kit 与 milestone 已生成并验真 | Web update 等待 authoring read/lease；Cluster 不复用 Local proof；仍不是生产或公开发布 |
 
-D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，但不能据此把 run `33173769047` 的旧 archive 改名为新产物。只有 D-421 阶段提交通过远端 CI，并由同源显式 Local Console milestone run 重新生成 amd64/arm64 Trial Kit 与 milestone index 后，下载者才能把该 Web 创建能力视为新的阶段实物；在此之前，旧 Console v5 仍是最新可下载实物，本工作树/提交只是下一候选源码。
+D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，而且没有改名复用 run `33173769047` 的旧 archive。修复提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 的普通主 CI [run 33229592307](https://github.com/whyour/qinglong/actions/runs/33229592307) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33229592293](https://github.com/whyour/qinglong/actions/runs/33229592293) 成功；随后显式 Local Console milestone [run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006) 为 42 success/2 scope skip/0 fail。由此 Web 创建能力已进入新的阶段实物，而不再只是候选源码。
 
 D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完整操作”：源码与普通 CI 已具备生成、审计和实跑两种 Trial Kit 的能力，但只有显式 artifact run 生成且被同 run 的双架构 milestone 收录后，才是可下载阶段产物。操作说明见 [Local Alpha Trial Kit](./ql3-local-alpha-trial-kit.md) 与 [Local Web Console](./ql3-local-web-console.md)。
 
-当前首份可交付 Local Console v5 绑定提交 `37abfa160da7669b2628c0a70dbd52f50f7dcec1` 与 [GitHub Actions run 33173769047](https://github.com/whyour/qinglong/actions/runs/33173769047)，保留至 2026-09-27：
+当前最新可交付 Local Console v5 绑定提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 与 [GitHub Actions run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006)，保留至 2026-09-28：
+
+- `ql3-alpha-dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f-local-console-amd64`：187,797,970 bytes，GitHub artifact SHA-256 `5b51547d98d56f0e6997a922ef2da853f2355115c1f3d22a7cd31dad916516cb`，内部 Docker archive SHA-256 `877e899d8379a3834ed6d89138dd4b0209725cfea3621f542c7bc4825b249cf4`；
+- `ql3-alpha-dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f-local-console-arm64`：185,029,586 bytes，GitHub artifact SHA-256 `1b5b30acbd9f31d7c96b710f1b929cbec25996a13c8600f088343f884c4c9ca6`，内部 Docker archive SHA-256 `82cce3524355957eb5166adf146e3a1dcbcad7b8f53935fe3a15403b865c7b0b`；
+- `ql3-alpha-dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f-local-console-milestone`：5,623 bytes，GitHub artifact SHA-256 `70a49da1e9466322c9b198567559eb313a51171ea0609875d1419a83de407813`。
+
+> 注：GitHub 返回的 artifact digest 绑定其下载 ZIP，milestone 内的 `archiveSha256` 绑定 Trial Kit 中的 Docker archive，二者不是同一个文件。下载后的 milestone `SHA256SUMS` 已复核，仓库 auditor 返回 `schema=qinglong/alpha-local-milestone-audit@v2`、`compatible=true`，并确认 `3.0.0-alpha.2`、`console`、amd64/arm64、run/attempt/sourceRevision 全部闭合。
+
+前一份首自动化/日志观察阶段的 Local Console v5 绑定提交 `37abfa160da7669b2628c0a70dbd52f50f7dcec1` 与 [GitHub Actions run 33173769047](https://github.com/whyour/qinglong/actions/runs/33173769047)，保留至 2026-09-27：
 
 - `ql3-alpha-37abfa160da7669b2628c0a70dbd52f50f7dcec1-local-console-amd64`：187,712,409 bytes，GitHub artifact SHA-256 `baf9861b70ebaccccab45fb49714589dc2d2083da4dc122a4393052285890b2f`，内部 Docker archive SHA-256 `5a7ccda8d50bb902077faa021cf9481631ff9331fc513352fc874a93bffbf5be`；
 - `ql3-alpha-37abfa160da7669b2628c0a70dbd52f50f7dcec1-local-console-arm64`：184,944,025 bytes，GitHub artifact SHA-256 `880574fcabf0214051eec424e1befd5a972dec907d386e5b06d0f8a6dcfe70dc`，内部 Docker archive SHA-256 `812a6ab375f79bcedaab2592acd915b4c715d016c6aa9722a8c3fda21649abab`；
