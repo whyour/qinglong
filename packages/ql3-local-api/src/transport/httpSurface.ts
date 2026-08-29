@@ -21,7 +21,7 @@ import type { LocalApiResponse } from './contract';
 
 const MAX_HEADER_BYTES = 8 * 1_024;
 const MAX_URL_BYTES = 512;
-const MAX_RESPONSE_BYTES = 64 * 1_024;
+const MAX_RESPONSE_BYTES = 80 * 1_024;
 const RUN_READ_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/;
 const RUN_LIST_ROUTE_PATTERN =
@@ -40,6 +40,8 @@ const TASK_READ_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/;
 const TASK_START_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs$/;
+const TASK_AUTHORING_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/authoring$/;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const LOCAL_CONSOLE_CONTENT_SECURITY_POLICY =
@@ -93,6 +95,15 @@ function localPresence(request: IncomingMessage): string | null {
   if (values.length === 0) return null;
   if (values.length !== 1 || values[0]!.length > 160) {
     throw new TypeError('invalid_local_presence');
+  }
+  return values[0]!;
+}
+
+function taskAuthoringLease(request: IncomingMessage): string | null {
+  const values = rawHeaderValues(request, 'x-qinglong-task-authoring-lease');
+  if (values.length === 0) return null;
+  if (values.length !== 1 || values[0]!.length > 160) {
+    throw new TypeError('invalid_task_authoring_lease');
   }
   return values[0]!;
 }
@@ -445,6 +456,14 @@ function route(
   const path = separator < 0 ? rawUrl : rawUrl.slice(0, separator);
   const rawQuery = separator < 0 ? undefined : rawUrl.slice(separator + 1);
   if (request.method === 'POST') {
+    const taskAuthoringMatch = TASK_AUTHORING_ROUTE_PATTERN.exec(path);
+    if (taskAuthoringMatch && rawQuery === undefined) {
+      return Object.freeze({
+        operationId: 'task.authoring',
+        projectId: taskAuthoringMatch[1]!,
+        taskId: taskAuthoringMatch[2]!,
+      });
+    }
     const taskStartMatch = TASK_START_ROUTE_PATTERN.exec(path);
     if (taskStartMatch && rawQuery === undefined) {
       return Object.freeze({
@@ -720,11 +739,24 @@ export async function startLocalApiHttpSurface(
         request.resume();
         return;
       }
+      let presentedTaskAuthoringLease: string | null;
+      try {
+        presentedTaskAuthoringLease = taskAuthoringLease(request);
+      } catch {
+        send(
+          response,
+          requestId,
+          errorResponse(400, 'invalid_task_authoring_lease'),
+        );
+        request.resume();
+        return;
+      }
       const admissionRequest: LocalApiAdmissionRequest = Object.freeze({
         requestId,
         operation: resolvedRoute,
         authorization: authorization(request),
         localPresence: presentedLocalPresence,
+        taskAuthoringLease: presentedTaskAuthoringLease,
         signal: abort.signal,
       });
       let operation: Promise<void>;

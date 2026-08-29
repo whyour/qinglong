@@ -26,8 +26,11 @@
 | D-419 Console 首自动化闭环 | quickstart 创建无网络/SecretRef/Trigger 的示例 Task；原生 CI 使用真实 Owner credential 完成 read、fenced start、`succeeded` 与 bounded log marker | 仍不提供 Web Task 编辑、2.x 升级或生产远程管理 |
 | D-420 Console Run 日志观察面 | 选择 Run 后经既有认证/Policy/Audit 链读取 latest Attempt 首个 32 KiB，展示 range、truncation、pending/retired 等明确状态 | 不自动轮询、不提供整文件下载；Web Task 创建/修订仍待独立强认证事务切片 |
 | D-421 Console Task 创建切片 | request-scoped credential fence、两分钟一次性本机 proof、同事务 Policy/Audit/Task mutation 已完成；Console 可创建 command Task；同源双架构 Console v5 Trial Kit 与 milestone 已生成并验真 | Web update 等待 authoring read/lease；Cluster 不复用 Local proof；仍不是生产或公开发布 |
+| D-422 Console Task 安全编辑切片 | 源码候选已实现强认证完整定义读取、10 分钟一次性 authoring lease、第二份 exact save proof 与 revision/content/credential fence；Console 可无损编辑内建 argv command Task；本地完整 package/Profile/浏览器门已通过 | 待远端主 CI 和新同源双架构 Console milestone；现有 D-421 archive 不包含本能力 |
 
 D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，而且没有改名复用 run `33173769047` 的旧 archive。修复提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 的普通主 CI [run 33229592307](https://github.com/whyour/qinglong/actions/runs/33229592307) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33229592293](https://github.com/whyour/qinglong/actions/runs/33229592293) 成功；随后显式 Local Console milestone [run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006) 为 42 success/2 scope skip/0 fail。由此 Web 创建能力已进入新的阶段实物，而不再只是候选源码。
+
+D-422 当前仍按“源码候选”登记：本地真实 SQLite/loopback 已证明读取、租约、第二次 proof、更新与新围栏启动闭环；18-package clean build/test 为 `3,038 total / 3,016 pass / 22 conditional skip / 0 fail`，Local API `64/64`，默认 Edge 与 opt-in Edge/Standalone Console 资源门及真实 Chromium 双证明编辑均通过。但在远端主 CI 和新的显式双架构 milestone 闭合前，不声称现有下载物已经包含 Web 编辑。阶段产物必须绑定新的 exact commit/run/artifact digest，禁止沿用 D-421 的 archive 名称或证据。
 
 D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完整操作”：源码与普通 CI 已具备生成、审计和实跑两种 Trial Kit 的能力，但只有显式 artifact run 生成且被同 run 的双架构 milestone 收录后，才是可下载阶段产物。操作说明见 [Local Alpha Trial Kit](./ql3-local-alpha-trial-kit.md) 与 [Local Web Console](./ql3-local-web-console.md)。
 

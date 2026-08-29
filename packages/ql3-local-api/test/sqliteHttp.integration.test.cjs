@@ -586,11 +586,119 @@ test('serves an authenticated Run through one real SQLite authority and durable 
   assert.equal(JSON.stringify(taskCreated).includes('console-created'), true);
   assert.equal(JSON.stringify(taskCreated).includes('/bin/echo'), false);
 
+  const authoringPath = '/api/v3/projects/default/tasks/task-1/authoring';
+  const authoringChallenge = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    authoringPath,
+    { method: 'POST' },
+  );
+  assert.equal(authoringChallenge.statusCode, 428);
+  assert.equal(authoringChallenge.body.code, 'local_presence_required');
+  const authoringProof = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        root,
+        'console-presence',
+        authoringChallenge.body.proofFileName,
+      ),
+      'utf8',
+    ),
+  );
+  const authoring = await request(port, `Bearer ${TOKEN}`, authoringPath, {
+    method: 'POST',
+    headers: {
+      'x-qinglong-local-presence': authoringProof.proof,
+    },
+  });
+  assert.equal(authoring.statusCode, 200);
+  assert.equal(authoring.body.task.revision, 1);
+  assert.deepEqual(
+    authoring.body.task.spec,
+    JSON.parse(JSON.stringify(taskDefinition.spec)),
+  );
+  assert.deepEqual(
+    authoring.body.task.labels,
+    JSON.parse(JSON.stringify(taskDefinition.labels)),
+  );
+  assert.equal(
+    authoring.body.authoring.contentDigest,
+    taskDefinition.contentDigest,
+  );
+  assert.match(authoring.body.authoring.lease, /^ql3a_[A-Za-z0-9_-]+$/);
+
+  const taskUpdateBody = JSON.stringify({
+    expectedRevision: authoring.body.task.revision,
+    mutationId: '019f7300-0000-4000-8000-000000000702',
+    name: 'Local API Task updated',
+    ...(authoring.body.task.description === undefined
+      ? {}
+      : { description: authoring.body.task.description }),
+    kind: authoring.body.task.kind,
+    spec: authoring.body.task.spec,
+    labels: authoring.body.task.labels,
+    enabled: true,
+    occurredAtMs: NOW,
+  });
+  const taskUpdateOptions = {
+    method: 'PUT',
+    headers: {
+      'x-qinglong-task-authoring-lease': authoring.body.authoring.lease,
+      'content-type': 'application/json',
+      'content-length': String(Buffer.byteLength(taskUpdateBody)),
+    },
+    body: taskUpdateBody,
+  };
+  const taskUpdateChallenge = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    '/api/v3/projects/default/tasks/task-1',
+    taskUpdateOptions,
+  );
+  assert.equal(taskUpdateChallenge.statusCode, 428);
+  const taskUpdateProof = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        root,
+        'console-presence',
+        taskUpdateChallenge.body.proofFileName,
+      ),
+      'utf8',
+    ),
+  );
+  const taskUpdated = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    '/api/v3/projects/default/tasks/task-1',
+    {
+      ...taskUpdateOptions,
+      headers: {
+        ...taskUpdateOptions.headers,
+        'x-qinglong-local-presence': taskUpdateProof.proof,
+      },
+    },
+  );
+  assert.equal(taskUpdated.statusCode, 200);
+  assert.equal(taskUpdated.body.status, 'updated');
+  assert.equal(taskUpdated.body.task.revision, 2);
+  assert.equal(taskUpdated.body.task.name, 'Local API Task updated');
+  assert.equal(taskUpdated.body.task.enabled, true);
+
+  const updatedTask = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    '/api/v3/projects/default/tasks/task-1',
+  );
+  assert.equal(updatedTask.body.task.revision, 2);
+  assert.equal(updatedTask.body.task.name, 'Local API Task updated');
+  assert.equal(updatedTask.body.task.enabled, true);
+  assert.equal(JSON.stringify(updatedTask).includes('/bin/echo'), false);
+
   const taskStartBody = JSON.stringify({
     schema: 'qinglong/task-start@v1',
     mutationId: '019f7300-0000-7000-8000-000000000800',
-    expectedRevision: taskDefinition.revision,
-    expectedContentDigest: taskDefinition.contentDigest,
+    expectedRevision: updatedTask.body.task.revision,
+    expectedContentDigest: updatedTask.body.task.contentDigest,
   });
   const taskStartOptions = {
     method: 'POST',
@@ -607,12 +715,15 @@ test('serves an authenticated Run through one real SQLite authority and durable 
     taskStartPath,
     taskStartOptions,
   );
-  assert.equal(started.statusCode, 202);
+  assert.equal(started.statusCode, 202, JSON.stringify(started));
   assert.equal(started.body.schema, 'qinglong/task-start@v1');
   assert.equal(started.body.status, 'accepted');
   assert.equal(started.body.runStatus, 'queued');
   assert.equal(started.body.executorType, 'local_process');
-  assert.equal(started.body.taskContentDigest, taskDefinition.contentDigest);
+  assert.equal(
+    started.body.taskContentDigest,
+    updatedTask.body.task.contentDigest,
+  );
   const taskStartReplay = await request(
     port,
     `Bearer ${TOKEN}`,
@@ -745,8 +856,8 @@ test('serves an authenticated Run through one real SQLite authority and durable 
           `SELECT operation_id, outcome FROM "QingLong3SecurityAuditEvents"
            WHERE operation_id IN (
              'run.get', 'run.list', 'run.events.list', 'run.steps.list',
-             'run.cancel', 'task.create', 'task.get', 'task.list'
-             , 'task.start', 'run.log.read'
+             'run.cancel', 'task.authoring.read', 'task.create', 'task.get',
+             'task.list', 'task.start', 'task.update', 'run.log.read'
            )
            ORDER BY operation_id, outcome`,
         )
@@ -761,13 +872,18 @@ test('serves an authenticated Run through one real SQLite authority and durable 
         'run.list:allowed',
         'run.log.read:allowed',
         'run.steps.list:allowed',
+        'task.authoring.read:allowed',
+        'task.authoring.read:approval_required',
         'task.create:allowed',
         'task.create:approval_required',
+        'task.get:allowed',
         'task.get:allowed',
         'task.get:allowed',
         'task.list:allowed',
         'task.start:allowed',
         'task.start:allowed',
+        'task.update:allowed',
+        'task.update:approval_required',
       ],
     );
     assert.deepEqual(

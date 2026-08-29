@@ -135,11 +135,11 @@
         <div class="dialog-heading">
           <div>
             <p class="eyebrow">Task authoring</p>
-            <h2>创建命令任务</h2>
+            <h2 id="task-editor-title">创建命令任务</h2>
           </div>
           <button class="quiet-button" id="task-editor-close" type="button">关闭</button>
         </div>
-        <p class="editor-intro">
+        <p class="editor-intro" id="task-editor-intro">
           定义会先绑定到一次本机证明，再以同一事务写入 Task revision 与安全审计。
         </p>
         <div class="editor-grid">
@@ -171,10 +171,10 @@
           </label>
           <label class="editor-check">
             <input id="task-enabled-input" type="checkbox" checked />
-            <span>创建后允许运行</span>
+            <span id="task-enabled-label">创建后允许运行</span>
           </label>
         </div>
-        <p class="editor-note">
+        <p class="editor-note" id="task-editor-note">
           Alpha 当前从 Console 创建 <code>qinglong/command@v1</code>；高级 Task schema 仍使用受信任管理入口。
         </p>
         <div class="dialog-actions">
@@ -189,8 +189,8 @@
       <form id="presence-form" autocomplete="off">
         <p class="eyebrow">Local presence · 02:00</p>
         <h2>从部署设备取得证明</h2>
-        <p>
-          使用部署 QingLong 的系统用户读取下面的私有文件。证明只绑定这次 Task 内容，且只能使用一次。
+        <p id="presence-copy">
+          使用部署 QingLong 的系统用户读取下面的私有文件。证明只绑定这次操作，且只能使用一次。
         </p>
         <code class="proof-ticket" id="presence-file"></code>
         <label class="presence-input">
@@ -208,7 +208,7 @@
         <p class="presence-error" id="presence-error" role="alert" hidden></p>
         <div class="dialog-actions">
           <button class="quiet-button" id="presence-cancel" type="button">取消</button>
-          <button class="primary-button" id="presence-submit" type="submit">验证并创建</button>
+          <button class="primary-button" id="presence-submit" type="submit">验证并继续</button>
         </div>
       </form>
     </dialog>

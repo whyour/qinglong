@@ -78,13 +78,21 @@ test('loads one bounded offline Console asset closure', () => {
       assert.match(text, /日志已按保留策略清理/u);
       assert.match(text, /method: 'PUT'/u);
       assert.match(text, /x-qinglong-local-presence/u);
+      assert.match(text, /x-qinglong-task-authoring-lease/u);
       assert.match(text, /local_presence_required/u);
-      assert.match(text, /state\.pendingTaskMutation/u);
+      assert.match(text, /state\.pendingPresence/u);
+      assert.match(text, /tasks\/\$\{task\.taskId\}\/authoring/u);
+      assert.match(text, /\^ql3p_/u);
+      assert.match(text, /\.\.\.snapshot\.task\.spec\.config/u);
+      assert.match(text, /snapshot\.task\.labels/u);
+      assert.match(text, /setAttribute\('aria-readonly', 'true'\)/u);
     }
     if (requestPath === '/') {
       assert.match(text, /id="task-editor-dialog"/u);
       assert.match(text, /id="presence-dialog"/u);
       assert.match(text, /保存并生成本机证明/u);
+      assert.match(text, /id="task-editor-title"/u);
+      assert.match(text, /id="presence-copy"/u);
     }
   }
   assert.ok(totalBytes <= 192 * 1024);

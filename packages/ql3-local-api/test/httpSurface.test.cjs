@@ -298,6 +298,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
       headers: {
         authorization: 'Bearer opaque',
         'x-qinglong-local-presence': 'ql3p_request_bound_proof',
+        'x-qinglong-task-authoring-lease': 'ql3a_exact_snapshot_lease',
         'content-type': 'application/json',
         'content-length': String(Buffer.byteLength(taskPutBody)),
       },
@@ -312,6 +313,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     taskId: 'task_1',
   });
   assert.equal(observed[8].localPresence, 'ql3p_request_bound_proof');
+  assert.equal(observed[8].taskAuthoringLease, 'ql3a_exact_snapshot_lease');
 
   const log = await request(
     port,
@@ -334,6 +336,25 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
   assert.deepEqual(defaultLog.body, {
     range: { offset: 0, length: 16 * 1024 },
   });
+
+  const authoring = await request(
+    port,
+    '/api/v3/projects/prj_default/tasks/task_1/authoring',
+    {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer opaque',
+        'x-qinglong-local-presence': 'ql3p_authoring_read_proof',
+      },
+    },
+  );
+  assert.equal(authoring.statusCode, 200);
+  assert.deepEqual(observed[11].operation, {
+    operationId: 'task.authoring',
+    projectId: 'prj_default',
+    taskId: 'task_1',
+  });
+  assert.equal(observed[11].localPresence, 'ql3p_authoring_read_proof');
 
   for (const invalidPath of [
     '/api/v3/projects/prj_default/runs/run_123?expanded=true',
@@ -404,7 +425,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     assert.equal(invalid.statusCode, 400);
     assert.deepEqual(invalid.body, { code: 'invalid_run_step_list_query' });
   }
-  assert.equal(observed.length, 11);
+  assert.equal(observed.length, 12);
   assert.deepEqual(
     await Promise.all([surface.stopAndDrain(), surface.stopAndDrain()]),
     ['stopped', 'stopped'],
@@ -679,6 +700,37 @@ test('serves the reviewed worst-case 64-item Run Step list inside the fixed resp
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.steps.length, 64);
   assert.ok(Number(response.headers['content-length']) < 65_536);
+});
+
+test('serves one maximum-size Task authoring snapshot inside the bounded response cap', async (t) => {
+  const port = await reservePort();
+  const surface = await startLocalApiHttpSurface({
+    profile: 'edge',
+    host: '127.0.0.1',
+    port,
+    admission: preparedAdmission(async (value) => ({
+      statusCode: 200,
+      body: {
+        task: {
+          taskId: value.operation.taskId,
+          spec: {
+            schema: 'qinglong/command@v1',
+            payload: 'x'.repeat(64 * 1024),
+          },
+        },
+      },
+    })),
+  });
+  t.after(() => surface.stopAndDrain());
+  const response = await request(
+    port,
+    '/api/v3/projects/default/tasks/task-large/authoring',
+    { method: 'POST' },
+  );
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.task.taskId, 'task-large');
+  assert.ok(Number(response.headers['content-length']) > 64 * 1024);
+  assert.ok(Number(response.headers['content-length']) < 80 * 1024);
 });
 
 test('bounds Edge admission concurrency and drains accepted work', async (t) => {

@@ -55,24 +55,24 @@ ssh -L 5701:127.0.0.1:5701 router.example
 
 1. 输入 Project ID 和 `ql3c_…` API credential，选择“连接本机”。
 2. 选择“创建任务”，填写 Task ID、名称、argv 可执行文件和逐行参数，再选择“保存并生成本机证明”。
-3. 在部署设备上以 QingLong 数据目录 owner 读取 `<deploymentRoot>/console-presence/<页面显示的 basename>`；把 JSON 的 `proof` 值粘贴回页面。文件为 `0600`、两分钟有效且只能用于这份 exact Task 一次。不要通过聊天、日志或 URL 转发 proof。
-4. 创建成功后核对 revision/content fence，再选择“运行一次”。fresh Console Trial Kit 也可直接使用 `alpha-first-automation`。
-5. 在“运行”中选择 durable Run，按 Event sequence 判断实际进度；Bounded log 只显示 latest Attempt 的首个 32 KiB，后续内容仍需通过 API 分页读取。
-6. 日志 pending 时使用“刷新”显式重读；retired 表示内容已按保留策略清理，不代表 Run/Event 事实丢失。
-7. “请求取消”只提交 durable cancellation intent；界面出现 `cancelled|failed|succeeded|timed_out` 终态前，不要认为进程已经停止。
-8. 完成后选择“断开并清除凭据”，再关闭页面。
+3. 在部署设备上以 QingLong 数据目录 owner 读取 `<deploymentRoot>/console-presence/<页面显示的 basename>`；把 JSON 的完整 `ql3p_…` proof 值粘贴回页面。文件为 `0600`、两分钟有效且只能用于这份 exact 操作一次。不要通过聊天、日志或 URL 转发 proof。
+4. 编辑现有内建 command Task 时先选择“编辑任务”，完成第一次本机证明以读取完整定义并取得 10 分钟一次性编辑租约。保存新内容时页面会要求第二份 proof；第一份只授权读取，不能复用来保存。Task ID 只读，未展示的 command config 与 labels 会原样保留。
+5. 创建或更新成功后核对 revision/content fence，再选择“运行一次”。fresh Console Trial Kit 也可直接使用 `alpha-first-automation`。
+6. 在“运行”中选择 durable Run，按 Event sequence 判断实际进度；Bounded log 只显示 latest Attempt 的首个 32 KiB，后续内容仍需通过 API 分页读取。
+7. 日志 pending 时使用“刷新”显式重读；retired 表示内容已按保留策略清理，不代表 Run/Event 事实丢失。
+8. “请求取消”只提交 durable cancellation intent；界面出现 `cancelled|failed|succeeded|timed_out` 终态前，不要认为进程已经停止。
+9. 完成后选择“断开并清除凭据”，再关闭页面。
 
 Credential 只存在当前页面内存，不进入 URL、Cookie 或 Web Storage。页面刷新会丢失 credential，需要重新输入；这是当前安全边界，不是缺陷。
 
 ## 当前阶段可用边界
 
-当前可操作闭环是 command Task create/list/read/start 与 Run list/read/events/steps/log/cancel。HTTP `PUT` 也支持提供完整 exact definition 的 update；页面暂不负责：
+当前可操作闭环是内建 argv command Task create/list/read/update/enable/disable/start 与 Run list/read/events/steps/log/cancel。编辑器只修改当前展示字段，并保留完整快照中的其他 config/labels；其他 kind/schema 继续使用受信管理入口。页面暂不负责：
 
-- 编辑/启停现有 Task（bounded read 不返回完整 spec，不能据此安全覆盖；继续使用 `ql3-task`，后续由 authoring lease/read 切片补齐）；
 - Identity、Policy、Secret、Plugin Package 或 AI 配置管理；
 - 日志整文件下载、终端、文件管理或 2.x 数据迁移；
 - LAN/public 暴露、TLS termination、多用户 Web session 或 Cluster 管理。
 
-三项静态资产总计 62,632 bytes，不依赖 CDN、网络字体或前端框架，仍低于 192 KiB 总闭包和单文件 96 KiB 门。`edge-application-api|standalone-application-api` 为 4,041,294 / 4,041,438 bytes、472 files、12 packages、94 loaded modules，仍低于 6 MiB/640-file 门；基础 headless Edge 保持 2,737,205 bytes、329 files、3 packages、58 modules，不携带这些资产。
+三项静态资产总计 69,723 bytes，不依赖 CDN、网络字体或前端框架，仍低于 192 KiB 总闭包和单文件 96 KiB 门。`edge-application-api|standalone-application-api` 为 4,077,890 / 4,078,034 bytes、473 files、12 packages、95 loaded modules，仍低于 6 MiB/640-file 门；本机 RSS delta 为 16,269,312 / 16,318,464 bytes，低于 28 MiB。基础 headless Edge 保持 2,737,205 bytes、329 files、3 packages、58 modules，不携带这些资产。
 
 停止 Local API 进程走与 Application 相同的 drain/shutdown 路径。Console 没有独立数据库、后台任务或需要额外清理的持久状态。

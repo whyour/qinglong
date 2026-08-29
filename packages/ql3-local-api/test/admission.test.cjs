@@ -23,6 +23,7 @@ function request(overrides = {}) {
     }),
     authorization: 'Bearer opaque',
     localPresence: null,
+    taskAuthoringLease: null,
     signal: new AbortController().signal,
     ...overrides,
   });
@@ -143,6 +144,12 @@ function fixture(overrides = {}) {
       async handle(value) {
         events.push(`task-put:${value.projectId}:${value.taskId}`);
         return { statusCode: 201, body: { status: 'created' } };
+      },
+    },
+    taskAuthoringRoute: {
+      async handle(value) {
+        events.push(`task-authoring:${value.projectId}:${value.taskId}`);
+        return { statusCode: 200, body: { task: { taskId: value.taskId } } };
       },
     },
     now: () => 10_000,
@@ -420,6 +427,31 @@ test('defers Task put Policy, audit and strong confirmation to the request-bound
     body: { status: 'created' },
   });
   assert.deepEqual(events, ['authenticate', 'task-put:prj_default:task-a']);
+});
+
+test('defers strong Task authoring read and local presence to the route', async () => {
+  const { admission, events } = fixture();
+  const prepared = await admission.prepare(
+    request({
+      operation: Object.freeze({
+        operationId: 'task.authoring',
+        projectId: 'prj_default',
+        taskId: 'task-a',
+      }),
+      localPresence: 'ql3p_proof',
+    }),
+  );
+  assert.equal(prepared.bodyMode, 'none');
+  assert.equal(prepared.maximumBodyBytes, 0);
+  assert.deepEqual(events, ['authenticate']);
+  assert.deepEqual(await prepared.handle(null), {
+    statusCode: 200,
+    body: { task: { taskId: 'task-a' } },
+  });
+  assert.deepEqual(events, [
+    'authenticate',
+    'task-authoring:prj_default:task-a',
+  ]);
 });
 
 test('audits authentication rejection before returning a challenge', async () => {

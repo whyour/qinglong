@@ -21,6 +21,7 @@ import { createLocalApiTaskListRoute } from '../task/taskListRoute';
 import { createLocalApiTaskReadRoute } from '../task/taskReadRoute';
 import { createLocalApiTaskStartRoute } from '../task/taskStartRoute';
 import { createLocalApiTaskPutRoute } from '../task/taskPutRoute';
+import { createLocalApiTaskAuthoringRoute } from '../task/taskAuthoringRoute';
 import { startLocalApiHttpSurface } from '../transport/httpSurface';
 
 export interface LocalApiProductSurfaceEvent {
@@ -133,6 +134,17 @@ export function createLocalApiProductSurface(
         authority.taskStart,
         options.randomUuid ?? randomUUID,
       );
+      const taskAuthoringRoute = createLocalApiTaskAuthoringRoute({
+        profile: authority.profile,
+        projectPolicy: authority.projectPolicy,
+        taskDefinitions: authority.taskDefinitions,
+        securityAudit: authority.securityAudit,
+        presenceProof,
+        ...(options.now === undefined ? {} : { now: options.now }),
+        ...(options.randomUuid === undefined
+          ? {}
+          : { randomUuid: options.randomUuid }),
+      });
       const taskPutRoute = createLocalApiTaskPutRoute({
         projectPolicy: authority.projectPolicy,
         taskDefinitions: authority.taskDefinitions,
@@ -147,6 +159,7 @@ export function createLocalApiProductSurface(
         },
         securityAudit: authority.securityAudit,
         presenceProof,
+        taskAuthoringLeases: taskAuthoringRoute.leases,
         ...(options.now === undefined ? {} : { now: options.now }),
         ...(options.randomUuid === undefined
           ? {}
@@ -166,6 +179,7 @@ export function createLocalApiProductSurface(
         taskReadRoute,
         taskStartRoute,
         taskPutRoute,
+        taskAuthoringRoute,
         ...(options.now === undefined ? {} : { now: options.now }),
         ...(options.randomUuid === undefined
           ? {}
@@ -183,6 +197,7 @@ export function createLocalApiProductSurface(
             : { randomUuid: options.randomUuid }),
         });
       } catch (error) {
+        taskAuthoringRoute.close();
         presenceProof.close();
         throw error;
       }
@@ -201,6 +216,7 @@ export function createLocalApiProductSurface(
             );
             let stopResult = await active.stopAndDrain();
             try {
+              taskAuthoringRoute.close();
               presenceProof.close();
             } catch {
               stopResult = 'timed_out';

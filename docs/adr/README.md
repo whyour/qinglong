@@ -520,6 +520,7 @@
 | [ADR-0514](./ADR-0514-stage-usable-first-automation-journey.md)                                    | 阶段可用的首个自动化旅程                                                                                                                                                                                                        | Accepted（Console v5 双架构实物已由 D-420 闭合） |
 | [ADR-0515](./ADR-0515-bounded-local-console-run-log.md)                                            | Local Console 的有界 Run 日志观察面                                                                                                                                                                                             | Accepted（首份实际 Console v5 双架构 milestone 已交付） |
 | [ADR-0516](./ADR-0516-request-scoped-local-console-task-mutation.md)                               | request-scoped Local Console Task mutation                                                                                                                                                                                      | Accepted（新双架构 Trial Kit 待本阶段 milestone） |
+| [ADR-0517](./ADR-0517-strong-local-console-task-authoring-lease.md)                               | 强认证 Local Console Task authoring lease                                                                                                                                                                                        | Accepted（源码候选，待 CI 与新双架构 milestone） |
 
 ## 规则
 

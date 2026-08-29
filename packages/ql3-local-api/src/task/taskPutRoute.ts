@@ -44,6 +44,10 @@ import {
   type LocalPresenceProofManager,
 } from '../authentication/localPresenceProof';
 import type { LocalApiResponse } from '../transport/contract';
+import type {
+  LocalApiTaskAuthoringLeaseBinding,
+  LocalApiTaskAuthoringLeases,
+} from './taskAuthoringRoute';
 
 const BODY_KEYS = Object.freeze([
   'enabled',
@@ -63,6 +67,7 @@ export interface LocalApiTaskPutRequest {
   readonly taskId: string;
   readonly body: unknown | null;
   readonly presence: string | null;
+  readonly authoringLease: string | null;
   readonly authenticated: Readonly<AuthenticatedLocalApiRequest>;
   readonly signal: AbortSignal;
 }
@@ -79,6 +84,7 @@ export interface LocalApiTaskPutRouteOptions {
   ) => Promise<TaskDefinitionAdministrationRepository>;
   readonly securityAudit: SecurityAuditSink;
   readonly presenceProof: LocalPresenceProofManager;
+  readonly taskAuthoringLeases: LocalApiTaskAuthoringLeases;
   readonly now?: () => number;
   readonly randomUuid?: () => string;
 }
@@ -171,6 +177,31 @@ function operationId(
   return command.expectedRevision === null ? 'task.create' : 'task.update';
 }
 
+function authoringLeaseBinding(
+  command: Readonly<AppendTaskDefinitionRevisionCommand>,
+  definition: Readonly<TaskDefinitionRecord>,
+  authenticated: Readonly<AuthenticatedLocalApiRequest>,
+): Readonly<LocalApiTaskAuthoringLeaseBinding> {
+  if (
+    command.expectedRevision === null ||
+    authenticated.credentialFence.subjectType !== 'user'
+  ) {
+    throw new LocalPresenceProofUnavailableError(
+      'Task authoring lease requires an update by a User credential',
+    );
+  }
+  return Object.freeze({
+    projectId: command.projectId,
+    taskId: command.taskId,
+    revision: definition.revision,
+    contentDigest: definition.contentDigest,
+    credentialId: authenticated.credentialFence.credentialId,
+    credentialVersion: authenticated.credentialFence.credentialVersion,
+    subjectType: 'user',
+    subjectId: authenticated.credentialFence.subjectId,
+  });
+}
+
 function summary(value: Readonly<TaskDefinitionRecord>) {
   return Object.freeze({
     taskId: value.taskId,
@@ -244,6 +275,8 @@ export function createLocalApiTaskPutRoute(
     typeof options.securityAudit?.record !== 'function' ||
     typeof options.presenceProof?.issue !== 'function' ||
     typeof options.presenceProof?.consume !== 'function' ||
+    typeof options.taskAuthoringLeases?.inspect !== 'function' ||
+    typeof options.taskAuthoringLeases?.consume !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function') ||
     (options.randomUuid !== undefined &&
       typeof options.randomUuid !== 'function')
@@ -326,6 +359,75 @@ export function createLocalApiTaskPutRoute(
               : 'forbidden',
         });
       }
+      let inspectedAuthoringBinding:
+        | Readonly<LocalApiTaskAuthoringLeaseBinding>
+        | undefined;
+      if (command.expectedRevision === null) {
+        if (request.authoringLease !== null) {
+          return response(400, { code: 'invalid_task_authoring_lease' });
+        }
+      } else {
+        if (request.authoringLease === null) {
+          const audited = await recordAudit(options.securityAudit, {
+            eventId: uuid(),
+            requestId: request.requestId,
+            operationId: operation,
+            projectId: request.projectId,
+            authenticated: request.authenticated,
+            outcome: 'denied',
+            reasons: ['task_authoring_lease_required'],
+            fence: decision.fence,
+            occurredAtMs,
+          });
+          return audited
+            ? response(428, { code: 'task_authoring_lease_required' })
+            : response(503, { code: 'security_audit_unavailable' });
+        }
+        try {
+          const definition =
+            await options.taskDefinitions.findCurrentTaskDefinition(
+              command.projectId,
+              command.taskId,
+            );
+          if (!definition) {
+            return response(409, { code: 'task_authoring_lease_rejected' });
+          }
+          inspectedAuthoringBinding = authoringLeaseBinding(
+            command,
+            definition,
+            request.authenticated,
+          );
+          if (
+            definition.revision !== command.expectedRevision ||
+            !options.taskAuthoringLeases.inspect(
+              request.authoringLease,
+              inspectedAuthoringBinding,
+            )
+          ) {
+            const audited = await recordAudit(options.securityAudit, {
+              eventId: uuid(),
+              requestId: request.requestId,
+              operationId: operation,
+              projectId: request.projectId,
+              authenticated: request.authenticated,
+              outcome: 'denied',
+              reasons: ['task_authoring_lease_rejected'],
+              fence: decision.fence,
+              occurredAtMs,
+            });
+            return audited
+              ? response(409, { code: 'task_authoring_lease_rejected' })
+              : response(503, { code: 'security_audit_unavailable' });
+          }
+        } catch (error) {
+          return response(503, {
+            code:
+              error instanceof TaskDefinitionUnavailableError
+                ? 'task_definition_unavailable'
+                : 'task_authoring_unavailable',
+          });
+        }
+      }
       let binding: Readonly<LocalPresenceBinding>;
       try {
         binding = presenceBinding(command, request.authenticated);
@@ -404,6 +506,32 @@ export function createLocalApiTaskPutRoute(
         );
       } catch {
         return response(503, { code: 'authentication_unavailable' });
+      }
+      if (inspectedAuthoringBinding) {
+        try {
+          const current =
+            await options.taskDefinitions.findCurrentTaskDefinition(
+              command.projectId,
+              command.taskId,
+            );
+          if (
+            !current ||
+            current.revision !== command.expectedRevision ||
+            !options.taskAuthoringLeases.consume(
+              request.authoringLease,
+              authoringLeaseBinding(command, current, request.authenticated),
+            )
+          ) {
+            return response(409, { code: 'task_authoring_lease_rejected' });
+          }
+        } catch (error) {
+          return response(503, {
+            code:
+              error instanceof TaskDefinitionUnavailableError
+                ? 'task_definition_unavailable'
+                : 'task_authoring_unavailable',
+          });
+        }
       }
       try {
         const mutations =

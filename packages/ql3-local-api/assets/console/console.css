@@ -798,6 +798,12 @@ textarea:focus-visible,
   resize: vertical;
 }
 
+.editor-grid input[readonly] {
+  color: var(--muted);
+  border-left: 4px solid var(--signal);
+  background: var(--fog);
+}
+
 .editor-wide {
   grid-column: 1 / -1;
 }

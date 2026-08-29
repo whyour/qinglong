@@ -27,6 +27,7 @@ import type { LocalApiTaskListRoute } from '../task/taskListRoute';
 import type { LocalApiTaskReadRoute } from '../task/taskReadRoute';
 import type { LocalApiTaskStartRoute } from '../task/taskStartRoute';
 import type { LocalApiTaskPutRoute } from '../task/taskPutRoute';
+import type { LocalApiTaskAuthoringRoute } from '../task/taskAuthoringRoute';
 import type { LocalApiResponse } from '../transport/contract';
 
 export type LocalApiAdmissionOperation =
@@ -84,6 +85,11 @@ export type LocalApiAdmissionOperation =
       operationId: 'task.put';
       projectId: string;
       taskId: string;
+    }>
+  | Readonly<{
+      operationId: 'task.authoring';
+      projectId: string;
+      taskId: string;
     }>;
 
 export interface LocalApiAdmissionRequest {
@@ -91,6 +97,7 @@ export interface LocalApiAdmissionRequest {
   readonly operation: LocalApiAdmissionOperation;
   readonly authorization: string | null;
   readonly localPresence: string | null;
+  readonly taskAuthoringLease: string | null;
   readonly signal: AbortSignal;
 }
 
@@ -120,6 +127,7 @@ export interface LocalApiAdmissionOptions {
   readonly taskReadRoute: LocalApiTaskReadRoute;
   readonly taskStartRoute: LocalApiTaskStartRoute;
   readonly taskPutRoute: LocalApiTaskPutRoute;
+  readonly taskAuthoringRoute: LocalApiTaskAuthoringRoute;
   readonly now?: () => number;
   readonly randomUuid?: () => string;
 }
@@ -199,6 +207,7 @@ export function createLocalApiAdmission(
     typeof options.taskReadRoute?.handle !== 'function' ||
     typeof options.taskStartRoute?.handle !== 'function' ||
     typeof options.taskPutRoute?.handle !== 'function' ||
+    typeof options.taskAuthoringRoute?.handle !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function') ||
     (options.randomUuid !== undefined &&
       typeof options.randomUuid !== 'function')
@@ -259,6 +268,26 @@ export function createLocalApiAdmission(
               projectId: taskPutOperation.projectId,
               taskId: taskPutOperation.taskId,
               body,
+              presence: request.localPresence,
+              authoringLease: request.taskAuthoringLease,
+              authenticated,
+              signal: request.signal,
+            });
+          },
+        });
+      }
+
+      if (request.operation.operationId === 'task.authoring') {
+        const taskAuthoringOperation = request.operation;
+        return Object.freeze({
+          bodyMode: 'none' as const,
+          maximumBodyBytes: 0,
+          async handle(body: unknown | null) {
+            if (body !== null) return response(400, 'invalid_request_body');
+            return options.taskAuthoringRoute.handle({
+              requestId: request.requestId,
+              projectId: taskAuthoringOperation.projectId,
+              taskId: taskAuthoringOperation.taskId,
               presence: request.localPresence,
               authenticated,
               signal: request.signal,
@@ -415,6 +444,7 @@ export function createLocalApiAdmission(
                 policyFence: decision.fence,
               });
             case 'task.put':
+            case 'task.authoring':
               return response(503, 'request_unavailable');
           }
         },

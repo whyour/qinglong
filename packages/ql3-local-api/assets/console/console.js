@@ -5,7 +5,10 @@
   const TASK_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
   const TOKEN_PATTERN =
     /^ql3c_[A-Za-z0-9][A-Za-z0-9._:-]{0,63}_[A-Za-z0-9_-]{43}$/;
-  const PRESENCE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+  const PRESENCE_PATTERN =
+    /^ql3p_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}_[A-Za-z0-9_-]{43}$/;
+  const AUTHORING_LEASE_PATTERN =
+    /^ql3a_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}_[A-Za-z0-9_-]{43}$/;
   const LOG_READ_BYTES = 32 * 1024;
   const TERMINAL = new Set(['succeeded', 'failed', 'cancelled', 'timed_out']);
   const STATUS_LABELS = Object.freeze({
@@ -39,7 +42,13 @@
     strong_authentication_required:
       '当前凭据不能执行管理操作；请使用本机 User API Credential。',
     task_definition_fence_rejected:
-      'Task 或授权在确认期间发生变化。请刷新后重新创建。',
+      'Task 或授权在确认期间发生变化。请刷新后重新编辑。',
+    task_authoring_lease_required:
+      '更新 Task 前必须重新读取完整定义。请关闭编辑器后选择“编辑任务”。',
+    task_authoring_lease_rejected:
+      'Task、凭据或编辑租约已经变化。请关闭编辑器后重新读取。',
+    task_authoring_unavailable:
+      '暂时无法建立安全编辑会话。请稍后重新读取 Task。',
     invalid_task_definition: 'Task 定义无效。请检查 ID、命令与参数。',
     task_definition_unavailable: 'Task 暂时无法保存。请检查数据库状态。',
     run_cancellation_fence_rejected:
@@ -67,6 +76,9 @@
     dialogCopy: document.getElementById('confirmation-copy'),
     dialogAccept: document.getElementById('confirmation-accept'),
     taskEditor: document.getElementById('task-editor-dialog'),
+    taskEditorTitle: document.getElementById('task-editor-title'),
+    taskEditorIntro: document.getElementById('task-editor-intro'),
+    taskEditorNote: document.getElementById('task-editor-note'),
     taskEditorForm: document.getElementById('task-editor-form'),
     taskEditorClose: document.getElementById('task-editor-close'),
     taskEditorSave: document.getElementById('task-editor-save'),
@@ -76,8 +88,10 @@
     taskCommand: document.getElementById('task-command-input'),
     taskArgs: document.getElementById('task-args-input'),
     taskEnabled: document.getElementById('task-enabled-input'),
+    taskEnabledLabel: document.getElementById('task-enabled-label'),
     presenceDialog: document.getElementById('presence-dialog'),
     presenceForm: document.getElementById('presence-form'),
+    presenceCopy: document.getElementById('presence-copy'),
     presenceFile: document.getElementById('presence-file'),
     presenceProof: document.getElementById('presence-proof-input'),
     presenceExpiry: document.getElementById('presence-expiry'),
@@ -93,7 +107,8 @@
     view: 'tasks',
     selectedId: null,
     pendingAction: null,
-    pendingTaskMutation: null,
+    pendingPresence: null,
+    authoringSnapshot: null,
     toastTimer: null,
   };
 
@@ -203,6 +218,9 @@
     }
     if (options.presence !== undefined) {
       headers['x-qinglong-local-presence'] = options.presence;
+    }
+    if (options.authoringLease !== undefined) {
+      headers['x-qinglong-task-authoring-lease'] = options.authoringLease;
     }
     let response;
     try {
@@ -345,13 +363,74 @@
     nodes.dialog.showModal();
   }
 
-  function openTaskEditor() {
+  function openTaskEditor(snapshot = null) {
+    state.authoringSnapshot = snapshot;
     nodes.taskEditorForm.reset();
-    nodes.taskCommand.value = '/bin/echo';
-    nodes.taskEnabled.checked = true;
+    const editing = snapshot !== null;
+    nodes.taskEditorTitle.textContent = editing
+      ? '编辑命令任务'
+      : '创建命令任务';
+    nodes.taskEditorIntro.textContent = editing
+      ? `完整定义已由本机证明读取，并绑定 revision ${snapshot.task.revision}。保存时还会生成一份只绑定新内容的证明。`
+      : '定义会先绑定到一次本机证明，再以同一事务写入 Task revision 与安全审计。';
+    nodes.taskEditorNote.textContent = editing
+      ? `编辑租约将在 ${formatTime(
+          snapshot.authoring.expiresAtMs,
+        )} 失效；关闭后重新选择“编辑任务”可取得新快照。`
+      : 'Alpha 当前从 Console 创建 qinglong/command@v1；高级 Task schema 仍使用受信任管理入口。';
+    nodes.taskEnabledLabel.textContent = editing
+      ? '保存后允许运行'
+      : '创建后允许运行';
+    nodes.taskId.readOnly = editing;
+    if (editing) nodes.taskId.setAttribute('aria-readonly', 'true');
+    else nodes.taskId.removeAttribute('aria-readonly');
+    if (editing) {
+      const command = snapshot.task.spec.config.command;
+      nodes.taskId.value = snapshot.task.taskId;
+      nodes.taskName.value = snapshot.task.name;
+      nodes.taskDescription.value = snapshot.task.description || '';
+      nodes.taskCommand.value = command.file;
+      nodes.taskArgs.value = command.args.join('\n');
+      nodes.taskEnabled.checked = snapshot.task.enabled;
+    } else {
+      nodes.taskCommand.value = '/bin/echo';
+      nodes.taskEnabled.checked = true;
+    }
     nodes.taskEditor.returnValue = '';
     nodes.taskEditor.showModal();
-    nodes.taskId.focus();
+    (editing ? nodes.taskName : nodes.taskId).focus();
+  }
+
+  function authoringSnapshot(value, expectedTaskId) {
+    const task = value?.task;
+    const authoring = value?.authoring;
+    const command = task?.spec?.config?.command;
+    if (
+      !task ||
+      task.taskId !== expectedTaskId ||
+      !Number.isSafeInteger(task.revision) ||
+      task.revision < 1 ||
+      typeof task.contentDigest !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(task.contentDigest) ||
+      task.kind !== 'command' ||
+      task.spec?.schema !== 'qinglong/command@v1' ||
+      command?.kind !== 'argv' ||
+      typeof command.file !== 'string' ||
+      !Array.isArray(command.args) ||
+      command.args.length > 128 ||
+      command.args.some((entry) => typeof entry !== 'string') ||
+      !task.labels ||
+      typeof task.labels !== 'object' ||
+      Array.isArray(task.labels) ||
+      !authoring ||
+      !AUTHORING_LEASE_PATTERN.test(authoring.lease) ||
+      !Number.isSafeInteger(authoring.expiresAtMs) ||
+      authoring.revision !== task.revision ||
+      authoring.contentDigest !== task.contentDigest
+    ) {
+      throw new ConsoleRequestError('response_unavailable', 503, null);
+    }
+    return Object.freeze({ task, authoring });
   }
 
   function taskDraft() {
@@ -369,28 +448,46 @@
     if (!name || !file || args.length > 128) {
       throw new TypeError('名称、命令或参数数量无效。');
     }
-    return Object.freeze({
-      taskId,
-      body: Object.freeze({
-        expectedRevision: null,
-        mutationId: newMutationId(),
-        name,
-        ...(description ? { description } : {}),
-        kind: 'command',
-        spec: Object.freeze({
+    const snapshot = state.authoringSnapshot;
+    const spec = snapshot
+      ? Object.freeze({
+          ...snapshot.task.spec,
+          config: Object.freeze({
+            ...snapshot.task.spec.config,
+            command: Object.freeze({
+              ...snapshot.task.spec.config.command,
+              kind: 'argv',
+              file,
+              args,
+            }),
+          }),
+        })
+      : Object.freeze({
           schema: 'qinglong/command@v1',
           config: Object.freeze({
             command: Object.freeze({ kind: 'argv', file, args }),
           }),
-        }),
-        labels: Object.freeze({ 'qinglong.source': 'local-console' }),
+        });
+    return Object.freeze({
+      taskId,
+      ...(snapshot ? { authoringLease: snapshot.authoring.lease } : {}),
+      body: Object.freeze({
+        expectedRevision: snapshot ? snapshot.task.revision : null,
+        mutationId: newMutationId(),
+        name,
+        ...(description ? { description } : {}),
+        kind: 'command',
+        spec,
+        labels: snapshot
+          ? snapshot.task.labels
+          : Object.freeze({ 'qinglong.source': 'local-console' }),
         enabled: nodes.taskEnabled.checked,
         occurredAtMs: Date.now(),
       }),
     });
   }
 
-  function showPresenceChallenge(mutation, challenge) {
+  function showPresenceChallenge(action, challenge) {
     if (
       challenge?.code !== 'local_presence_required' ||
       typeof challenge.proofFileName !== 'string' ||
@@ -399,7 +496,16 @@
     ) {
       throw new ConsoleRequestError('response_unavailable', 503, null);
     }
-    state.pendingTaskMutation = Object.freeze({ mutation, challenge });
+    state.pendingPresence = Object.freeze({ ...action, challenge });
+    const authoringRead = action.kind === 'authoring';
+    nodes.presenceCopy.textContent = authoringRead
+      ? '读取完整 Task 定义需要部署设备上的一次性证明。返回的编辑租约不替代保存时的新内容证明。'
+      : '使用部署 QingLong 的系统用户读取下面的私有文件。证明只绑定这次 Task 内容，且只能使用一次。';
+    nodes.presenceSubmit.textContent = authoringRead
+      ? '验证并加载定义'
+      : action.mutation.body.expectedRevision === null
+      ? '验证并创建'
+      : '验证并更新';
     nodes.presenceFile.textContent = `console-presence/${challenge.proofFileName}`;
     nodes.presenceExpiry.textContent = `证明将在 ${formatTime(
       challenge.expiresAtMs,
@@ -432,10 +538,13 @@
           method: 'PUT',
           body: mutation.body,
           acceptStatus: 428,
+          ...(mutation.authoringLease
+            ? { authoringLease: mutation.authoringLease }
+            : {}),
         },
       );
       if (value.code === 'local_presence_required') {
-        showPresenceChallenge(mutation, value);
+        showPresenceChallenge({ kind: 'mutation', mutation }, value);
         return;
       }
       throw new ConsoleRequestError('response_unavailable', 503, null);
@@ -446,8 +555,27 @@
     }
   }
 
+  async function beginTaskAuthoring(task) {
+    try {
+      const value = await api(
+        `/api/v3/projects/${state.project}/tasks/${task.taskId}/authoring`,
+        { method: 'POST', acceptStatus: 428 },
+      );
+      if (value.code === 'local_presence_required') {
+        showPresenceChallenge(
+          { kind: 'authoring', taskId: task.taskId },
+          value,
+        );
+        return;
+      }
+      throw new ConsoleRequestError('response_unavailable', 503, null);
+    } catch (error) {
+      showToast(describeError(error), 'error');
+    }
+  }
+
   async function completeTaskMutation() {
-    const pending = state.pendingTaskMutation;
+    const pending = state.pendingPresence;
     const proof = nodes.presenceProof.value.trim();
     if (!pending || !PRESENCE_PATTERN.test(proof)) {
       nodes.presenceError.textContent =
@@ -459,20 +587,40 @@
     nodes.presenceSubmit.disabled = true;
     nodes.presenceError.hidden = true;
     try {
+      if (pending.kind === 'authoring') {
+        const value = await api(
+          `/api/v3/projects/${state.project}/tasks/${pending.taskId}/authoring`,
+          { method: 'POST', presence: proof },
+        );
+        const snapshot = authoringSnapshot(value, pending.taskId);
+        state.pendingPresence = null;
+        nodes.presenceProof.value = '';
+        nodes.presenceDialog.close();
+        openTaskEditor(snapshot);
+        showToast('完整 Task 定义已加载；保存仍需要新的本机证明。');
+        return;
+      }
       const value = await api(
         `/api/v3/projects/${state.project}/tasks/${pending.mutation.taskId}`,
         {
           method: 'PUT',
           body: pending.mutation.body,
           presence: proof,
+          ...(pending.mutation.authoringLease
+            ? { authoringLease: pending.mutation.authoringLease }
+            : {}),
         },
       );
-      state.pendingTaskMutation = null;
+      const updated = pending.mutation.body.expectedRevision !== null;
+      state.pendingPresence = null;
+      state.authoringSnapshot = null;
       nodes.presenceProof.value = '';
       nodes.presenceDialog.close();
       showToast(
         value.status === 'existing'
           ? '已找到同一 Task 请求。'
+          : updated
+          ? 'Task 已更新。'
           : 'Task 已创建。',
       );
       state.selectedId = pending.mutation.taskId;
@@ -575,6 +723,9 @@
     );
     fragment.append(facts);
     const actions = element('div', 'detail-actions');
+    if (task.kind === 'command' && task.specSchema === 'qinglong/command@v1') {
+      actions.append(actionButton('编辑任务', () => beginTaskAuthoring(task)));
+    }
     if (task.enabled) {
       actions.append(
         actionButton('运行一次', () => {
@@ -933,7 +1084,8 @@
     state.token = null;
     state.selectedId = null;
     state.pendingAction = null;
-    state.pendingTaskMutation = null;
+    state.pendingPresence = null;
+    state.authoringSnapshot = null;
     if (nodes.taskEditor.open) nodes.taskEditor.close();
     if (nodes.presenceDialog.open) nodes.presenceDialog.close();
     nodes.token.value = '';
@@ -980,16 +1132,18 @@
 
   nodes.disconnect.addEventListener('click', disconnect);
   nodes.refresh.addEventListener('click', refresh);
-  nodes.createTask.addEventListener('click', openTaskEditor);
-  nodes.taskEditorClose.addEventListener('click', () =>
-    nodes.taskEditor.close(),
-  );
+  nodes.createTask.addEventListener('click', () => openTaskEditor());
+  nodes.taskEditorClose.addEventListener('click', () => {
+    state.authoringSnapshot = null;
+    nodes.taskEditor.close();
+  });
   nodes.taskEditorForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     await saveTaskDraft();
   });
   nodes.presenceCancel.addEventListener('click', () => {
-    state.pendingTaskMutation = null;
+    state.pendingPresence = null;
+    state.authoringSnapshot = null;
     nodes.presenceProof.value = '';
     nodes.presenceDialog.close();
   });

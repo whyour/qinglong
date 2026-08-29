@@ -65,12 +65,17 @@ function uuidFactory() {
 }
 
 function fixture(t, overrides = {}) {
+  const {
+    currentDefinition: initialCurrentDefinition = null,
+    ...routeOverrides
+  } = overrides;
   const deploymentRoot = fs.mkdtempSync(
     path.join(os.tmpdir(), 'ql3-task-put-'),
   );
   fs.chmodSync(deploymentRoot, 0o700);
   t.after(() => fs.rmSync(deploymentRoot, { recursive: true, force: true }));
   let now = 10_000;
+  let currentDefinition = initialCurrentDefinition;
   const calls = [];
   const presenceProof = createLocalPresenceProofManager({
     deploymentRoot,
@@ -111,7 +116,7 @@ function fixture(t, overrides = {}) {
   };
   const taskDefinitions = {
     async findCurrentTaskDefinition() {
-      return null;
+      return currentDefinition;
     },
     async findTaskDefinitionRevision() {
       return null;
@@ -144,9 +149,17 @@ function fixture(t, overrides = {}) {
       },
     },
     presenceProof,
+    taskAuthoringLeases: {
+      inspect() {
+        return true;
+      },
+      consume() {
+        return true;
+      },
+    },
     now: () => now,
     randomUuid: uuidFactory(),
-    ...overrides,
+    ...routeOverrides,
   });
   const authenticated = Object.freeze({
     principal: PRINCIPAL,
@@ -163,6 +176,9 @@ function fixture(t, overrides = {}) {
     setNow(value) {
       now = value;
     },
+    setCurrentDefinition(value) {
+      currentDefinition = value;
+    },
   };
 }
 
@@ -173,6 +189,7 @@ function request(state, body, overrides = {}) {
     taskId: 'task-console',
     body,
     presence: null,
+    authoringLease: null,
     authenticated: state.authenticated,
     signal: new AbortController().signal,
     ...overrides,
@@ -289,4 +306,96 @@ test('fails closed for malformed bodies, non-User credentials and expired presen
     { statusCode: 401, body: { code: 'local_presence_rejected' } },
   );
   assert.equal(state.calls.filter(([kind]) => kind === 'mutation').length, 0);
+});
+
+test('requires and consumes one exact authoring lease before an update mutation', async (t) => {
+  const current = createTaskDefinitionRecord(
+    { projectId: 'default', taskId: 'task-console', ...taskBody() },
+    10_000,
+  );
+  let consumed = false;
+  const state = fixture(t, {
+    currentDefinition: current,
+    taskAuthoringLeases: {
+      inspect(value, binding) {
+        state.calls.push(['lease-inspect', value, binding]);
+        return value === 'ql3a_exact_lease' && !consumed;
+      },
+      consume(value, binding) {
+        state.calls.push(['lease-consume', value, binding]);
+        if (value !== 'ql3a_exact_lease' || consumed) return false;
+        consumed = true;
+        return true;
+      },
+    },
+  });
+  const update = taskBody({
+    expectedRevision: current.revision,
+    mutationId: '019f9000-0000-4000-8000-000000000102',
+    name: 'Updated through an authoring lease',
+  });
+  assert.deepEqual(await state.route.handle(request(state, update)), {
+    statusCode: 428,
+    body: { code: 'task_authoring_lease_required' },
+  });
+  const challenge = await state.route.handle(
+    request(state, update, { authoringLease: 'ql3a_exact_lease' }),
+  );
+  assert.equal(challenge.statusCode, 428);
+  const updated = await state.route.handle(
+    request(state, update, {
+      authoringLease: 'ql3a_exact_lease',
+      presence: readProof(state, challenge),
+    }),
+  );
+  assert.equal(updated.statusCode, 200);
+  assert.equal(updated.body.status, 'updated');
+  assert.equal(
+    state.calls.filter(([kind]) => kind === 'lease-inspect').length,
+    2,
+  );
+  assert.equal(
+    state.calls.filter(([kind]) => kind === 'lease-consume').length,
+    1,
+  );
+  assert.equal(state.calls.filter(([kind]) => kind === 'mutation').length, 1);
+  assert.deepEqual(
+    await state.route.handle(
+      request(state, update, { authoringLease: 'ql3a_exact_lease' }),
+    ),
+    { statusCode: 409, body: { code: 'task_authoring_lease_rejected' } },
+  );
+});
+
+test('rejects a stale authoring lease before issuing a second local proof', async (t) => {
+  const current = createTaskDefinitionRecord(
+    { projectId: 'default', taskId: 'task-console', ...taskBody() },
+    10_000,
+  );
+  const state = fixture(t, {
+    currentDefinition: current,
+    taskAuthoringLeases: {
+      inspect(_value, binding) {
+        return binding.revision === current.revision;
+      },
+      consume() {
+        return true;
+      },
+    },
+  });
+  const update = taskBody({
+    expectedRevision: current.revision,
+    mutationId: '019f9000-0000-4000-8000-000000000103',
+  });
+  state.setCurrentDefinition(Object.freeze({ ...current, revision: 2 }));
+  assert.deepEqual(
+    await state.route.handle(
+      request(state, update, { authoringLease: 'ql3a_stale_lease' }),
+    ),
+    { statusCode: 409, body: { code: 'task_authoring_lease_rejected' } },
+  );
+  assert.deepEqual(
+    fs.readdirSync(path.join(state.deploymentRoot, 'console-presence')),
+    [],
+  );
 });
