@@ -14,6 +14,7 @@ import { AuthInfo } from '../data/system';
 import path from 'path';
 import { t } from '../shared/i18n';
 import { AppScope } from '../data/open';
+import protectedPathCase from '../middlewares/protectedPathCase';
 
 function resolveTrustProxy(value = process.env.QL_TRUST_PROXY) {
   const setting = value?.trim();
@@ -36,25 +37,9 @@ export default ({ app }: { app: Application }) => {
   app.set('trust proxy', resolveTrustProxy());
   app.use(cors());
 
-  // Security: Path normalization middleware to prevent case variation attacks
-  app.use((req, res, next) => {
-    const originalPath = req.path;
-    const normalizedPath = originalPath.toLowerCase();
-
-    // Block requests with case variations on protected paths
-    if (
-      originalPath !== normalizedPath &&
-      (normalizedPath.startsWith('/api/') ||
-        normalizedPath.startsWith('/open/'))
-    ) {
-      return res.status(400).json({
-        code: 400,
-        message: 'Invalid path format',
-      });
-    }
-
-    next();
-  });
+  // Security: Reject case variations under protected API namespaces before
+  // authentication checks can interpret the request differently from routing.
+  app.use(protectedPathCase);
 
   // Rewrite URLs to strip baseUrl prefix if configured
   // This allows the rest of the app to work without baseUrl awareness

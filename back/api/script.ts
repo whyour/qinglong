@@ -103,25 +103,11 @@ export default (app: Router) => {
 
   route.get(
     '/:file',
-    celebrate({
-      params: Joi.object({
-        file: Joi.string().required(),
-      }),
-      query: Joi.object({
-        path: Joi.string().optional().allow(''),
-      }).unknown(true),
-    }),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const scriptService = Container.get(ScriptService);
-        const content = await scriptService.getFile(
-          req.query?.path as string || '',
-          req.params.file,
-        );
-        res.send({ code: 200, data: content });
-      } catch (e) {
-        return next(e);
-      }
+    (req: Request, res: Response) => {
+      return res.send({
+        code: 410,
+        message: t('接口已下线，请使用 /scripts/detail 接口'),
+      });
     },
   );
 

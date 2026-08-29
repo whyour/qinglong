@@ -609,10 +609,18 @@ export default class SystemService {
     if (!type || !['node', 'python3'].includes(type)) {
       return { code: 400, message: t('参数错误') };
     }
-    try {
-      const finalPath = path.join(config.dependenceCachePath, type);
-      await fs.promises.rm(finalPath, { recursive: true });
-    } catch (error) { }
+    const finalPath = path.join(config.dependenceCachePath, type);
+    await fs.promises.rm(finalPath, { recursive: true, force: true });
+    await DependenceModel.update(
+      { status: DependenceStatus.installFailed },
+      {
+        where: {
+          type:
+            type === 'node' ? DependenceTypes.nodejs : DependenceTypes.python3,
+          status: DependenceStatus.installed,
+        },
+      },
+    );
     return { code: 200 };
   }
 }
