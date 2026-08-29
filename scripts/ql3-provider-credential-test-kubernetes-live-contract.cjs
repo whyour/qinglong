@@ -1105,11 +1105,24 @@ request.on('timeout',()=>request.destroy(Object.assign(new Error('timeout'),{cod
   return evidence;
 }
 
-async function retryProviderEvidence(read, pause = undefined) {
+async function retryProviderEvidence(read, options = {}) {
   assert.equal(typeof read, 'function');
-  assert.ok(pause === undefined || typeof pause === 'function');
+  assert.equal(typeof options, 'object');
+  assert.ok(options !== null && !Array.isArray(options));
+  const pause =
+    options.pause ??
+    ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
+  const now = options.now ?? Date.now;
+  const intervalMs = options.intervalMs ?? 1_000;
+  const timeoutMs = options.timeoutMs ?? 3 * 60_000;
+  const maxAttempts = options.maxAttempts ?? 16;
+  assert.equal(typeof pause, 'function');
+  assert.equal(typeof now, 'function');
+  assert.ok(Number.isSafeInteger(intervalMs) && intervalMs >= 0);
+  assert.ok(Number.isSafeInteger(timeoutMs) && timeoutMs > 0);
+  assert.ok(Number.isSafeInteger(maxAttempts) && maxAttempts > 0);
+  const startedAt = now();
   let lastError;
-  const maxAttempts = 8;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       return await read();
@@ -1119,13 +1132,12 @@ async function retryProviderEvidence(read, pause = undefined) {
         !/\b(?:ECONNREFUSED|ECONNRESET|ETIMEDOUT|TIMEOUT)\b/.test(
           error instanceof Error ? error.message : String(error),
         ) ||
-        attempt === maxAttempts
+        attempt === maxAttempts ||
+        now() - startedAt >= timeoutMs
       ) {
         throw error;
       }
-      await (
-        pause ?? (() => new Promise((resolve) => setTimeout(resolve, 1_000)))
-      )();
+      await pause(intervalMs);
     }
   }
   throw lastError;

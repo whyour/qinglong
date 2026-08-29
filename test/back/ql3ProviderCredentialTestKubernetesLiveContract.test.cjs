@@ -377,7 +377,7 @@ test('retries only bounded transient provider evidence failures', async () => {
       if (attempts < 3) throw new Error('{"code":"ECONNREFUSED"}');
       return { requestCount: 1 };
     },
-    async () => {},
+    { pause: async () => {} },
   );
   assert.deepEqual(evidence, { requestCount: 1 });
   assert.equal(attempts, 3);
@@ -386,7 +386,7 @@ test('retries only bounded transient provider evidence failures', async () => {
       async () => {
         throw new Error('invalid evidence schema');
       },
-      async () => {},
+      { pause: async () => {} },
     ),
     /invalid evidence schema/,
   );
@@ -398,11 +398,33 @@ test('retries only bounded transient provider evidence failures', async () => {
         attempts += 1;
         throw new Error('{"code":"ECONNREFUSED"}');
       },
-      async () => {},
+      { maxAttempts: 8, pause: async () => {} },
     ),
     /ECONNREFUSED/,
   );
   assert.equal(attempts, 8);
+
+  attempts = 0;
+  let elapsedMs = 0;
+  await assert.rejects(
+    retryProviderEvidence(
+      async () => {
+        attempts += 1;
+        throw new Error('{"code":"ETIMEDOUT"}');
+      },
+      {
+        intervalMs: 1_000,
+        maxAttempts: 100,
+        now: () => elapsedMs,
+        pause: async (delayMs) => {
+          elapsedMs += delayMs;
+        },
+        timeoutMs: 3_000,
+      },
+    ),
+    /ETIMEDOUT/,
+  );
+  assert.equal(attempts, 4);
 });
 
 test('provider fixture logs only generation and authorization decision', () => {
