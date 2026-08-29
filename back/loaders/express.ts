@@ -36,26 +36,6 @@ export default ({ app }: { app: Application }) => {
   app.set('trust proxy', resolveTrustProxy());
   app.use(cors());
 
-  // Security: Path normalization middleware to prevent case variation attacks
-  app.use((req, res, next) => {
-    const originalPath = req.path;
-    const normalizedPath = originalPath.toLowerCase();
-
-    // Block requests with case variations on protected paths
-    if (
-      originalPath !== normalizedPath &&
-      (normalizedPath.startsWith('/api/') ||
-        normalizedPath.startsWith('/open/'))
-    ) {
-      return res.status(400).json({
-        code: 400,
-        message: 'Invalid path format',
-      });
-    }
-
-    next();
-  });
-
   // Rewrite URLs to strip baseUrl prefix if configured
   // This allows the rest of the app to work without baseUrl awareness
   if (config.baseUrl) {

@@ -98,13 +98,11 @@ export default (app: Router) => {
 
   route.get(
     '/:file',
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const configService = Container.get(ConfigService);
-        await configService.getFile(req.params.file, res);
-      } catch (e) {
-        return next(e);
-      }
+    (req: Request, res: Response) => {
+      return res.send({
+        code: 410,
+        message: t('接口已下线，请使用 /configs/detail 接口'),
+      });
     },
   );
 };

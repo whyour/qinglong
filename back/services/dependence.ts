@@ -16,6 +16,7 @@ import {
   getPid,
   killTask,
   promiseExecSuccess,
+  concurrentRun,
   getInstallCommand,
   getUninstallCommand,
   getGetCommand,
@@ -110,6 +111,11 @@ export default class DependenceService {
     query: any = {},
   ): Promise<Dependence[]> {
     let condition = query;
+    const dependenceType =
+      type && DependenceTypes[type] !== undefined
+        ? DependenceTypes[type]
+        : undefined;
+    await this.refreshInstalledStatuses(dependenceType);
     if (type && DependenceTypes[type] !== undefined) {
       condition.type = DependenceTypes[type];
     }
@@ -130,6 +136,69 @@ export default class DependenceService {
     } catch (error) {
       throw error;
     }
+  }
+
+  private async refreshInstalledStatuses(type?: DependenceTypes) {
+    const cacheDependenceTypes = [
+      DependenceTypes.nodejs,
+      DependenceTypes.python3,
+    ];
+    if (type !== undefined && !cacheDependenceTypes.includes(type)) {
+      return;
+    }
+
+    const docs = await DependenceModel.findAll({
+      where: {
+        status: DependenceStatus.installed,
+        type: type === undefined ? { [Op.in]: cacheDependenceTypes } : type,
+      },
+    });
+    const checks = await concurrentRun(
+      docs.map((doc) => async () => {
+        return (await this.isDependenceInstalled(doc)) ? undefined : doc.id;
+      }),
+      5,
+    );
+    const missingIds = (checks || []).filter(
+      (id): id is number => id !== undefined,
+    );
+
+    if (missingIds.length) {
+      await DependenceModel.update(
+        { status: DependenceStatus.installFailed },
+        { where: { id: missingIds } },
+      );
+    }
+  }
+
+  private async isDependenceInstalled(dependency: Dependence) {
+    let depName = dependency.name.trim();
+    const depVersionStr = versionDependenceCommandTypes[dependency.type];
+    let depVersion = '';
+    if (depName.includes(depVersionStr)) {
+      const symbolRegx = new RegExp(
+        `(.*)${depVersionStr}([0-9\\.\\-\\+a-zA-Z]*)`,
+      );
+      const [, parsedName, parsedVersion] = depName.match(symbolRegx) || [];
+      if (parsedVersion && parsedName) {
+        depName = parsedName;
+        depVersion = parsedVersion;
+      }
+    }
+
+    const depInfo = (
+      await promiseExecSuccess(getGetCommand(dependency.type, depName))
+    )
+      .replace(/\s{2,}/, ' ')
+      .replace(/\s+$/, '');
+    const nameMatches =
+      (dependency.type === DependenceTypes.nodejs &&
+        depInfo.split(' ')?.[0] === depName) ||
+      dependency.type === DependenceTypes.python3;
+
+    return Boolean(
+      depInfo && nameMatches && (!depVersion || depInfo.includes(depVersion)),
+    );
   }
 
   public installDependenceOneByOne(

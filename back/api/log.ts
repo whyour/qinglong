@@ -5,7 +5,6 @@ import { Logger } from 'winston';
 import config from '../config';
 import { t } from '../shared/i18n';
 import {
-  getFileContentByName,
   readDirs,
   removeAnsi,
   rmPath,
@@ -89,24 +88,11 @@ export default (app: Router) => {
 
   route.get(
     '/:file',
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const logService = Container.get(LogService);
-        const finalPath = logService.checkFilePath(
-          (req.query.path as string) || '',
-          (req.params.file as string) || '',
-        );
-        if (!finalPath || blacklist.includes(req.query.path as string)) {
-          return res.send({
-            code: 403,
-            message: t('暂无权限'),
-          });
-        }
-        const content = await getFileContentByName(finalPath);
-        res.send({ code: 200, data: content });
-      } catch (e) {
-        return next(e);
-      }
+    (req: Request, res: Response) => {
+      return res.send({
+        code: 410,
+        message: t('接口已下线，请使用 /logs/detail 接口'),
+      });
     },
   );
 
