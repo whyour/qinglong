@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "concurrently -n w: npm:start:*",
-    "start:back": "nodemon ./back/app.ts",
+    "start:back": "source shell/dev-env.sh && nodemon ./back/app.ts",
     "start:front": "max dev",
     "build:front": "max build",
     "build:back": "tsc -p back/tsconfig.json",
