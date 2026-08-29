@@ -1,6 +1,6 @@
 # ADR-0519：Local Console Secret-backed 自动化
 
-- 状态：Accepted（源码候选；阶段产物待远端门闭合）
+- 状态：Accepted（D-424 双架构 milestone 已交付）
 - 日期：2026-08-29
 - 对应 RFC 切片：D-424
 - 关联：ADR-0069、ADR-0071、ADR-0512、ADR-0516、ADR-0517、ADR-0518
@@ -64,4 +64,4 @@ Console 使用逐行 `ENV_NAME=secret-name[@version]` 绑定。省略 version �
 
 三项 Console 静态资产合计 102,182 bytes，低于 192 KiB 总闭包与 96 KiB 单文件门。默认 Edge 为 2,760,847 bytes/332 files/3 packages/59 loaded modules，RSS delta 11,026,432 bytes；opt-in Edge/Standalone Console 为 4,210,024/4,210,168 bytes、482 files/12 packages/111 loaded modules，RSS delta 20,447,232/18,399,232 bytes，均低于既有门。Edge executor benchmark 继续通过。
 
-这些证据只把 D-424 提升为可提交的源码候选。必须等待 exact source commit 的普通主 CI、Kubernetes deployment 和显式 Local Console 双架构 milestone 全绿，并下载复核 milestone checksum/auditor 后，才能把 D-424 称为新的阶段可用实物。在此之前，D-423 run `33245745837` 仍是最新可下载、可验真的 Console Trial Kit。
+提交 `f46fb44ac9534315b6965865bb3e990715bb2417` 的普通主 CI run `33250825989` 为 41 success/3 expected artifact-finalizer skip/0 fail，Kubernetes deployment run `33250826046` 与 Security Administration Kubernetes run `33250825974` 成功。显式 Local Console milestone run `33252179178` 为 42 success/2 scope skip/0 fail；同源双架构 Trial Kit 与 milestone 保留至 2026-09-28，下载后三件套 checksum 及双架构 Trial Kit/milestone auditor 均返回 `compatible=true`。因此 D-424 已是当前可下载、可验真的阶段实物。首次 artifact run `33251389615` 触发 x64 router 绝对 RSS 门；同源码 ordinary run 仅有约 1.73 MiB headroom，表现与 runner 基线波动一致。没有提高预算或修改代码，第二次全新 run 对相同 source 通过同一门。该结论不把 Alpha 扩张成公开 release、2.x 生产升级或 Cluster HA 交付。
