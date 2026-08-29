@@ -13,6 +13,7 @@ import type { BoundedRunListInput } from '@qinglong/runtime-core/bounded-run-lis
 import type { BoundedRunEventListInput } from '@qinglong/runtime-core/bounded-run-event-list-projection';
 import type { BoundedRunStepListInput } from '@qinglong/runtime-core/bounded-run-step-list-projection';
 import type { BoundedTaskListInput } from '@qinglong/runtime-core/bounded-task-list-projection';
+import { assertLocalSecretName } from '@qinglong/runtime-core/local-secret';
 import {
   loadLocalConsoleAssets,
   type LocalConsoleAsset,
@@ -46,6 +47,8 @@ const TRIGGER_LIST_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/triggers$/;
 const TRIGGER_READ_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/triggers\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/;
+const SECRET_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/secrets$/;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const LOCAL_CONSOLE_CONTENT_SECURITY_POLICY =
@@ -60,7 +63,8 @@ type LocalApiRouteResolution =
         | 'invalid_run_step_list_query'
         | 'invalid_run_log_read_query'
         | 'invalid_task_list_query'
-        | 'invalid_trigger_list_query';
+        | 'invalid_trigger_list_query'
+        | 'invalid_secret_list_query';
     }>;
 
 export interface LocalApiHttpSurfaceOptions {
@@ -445,6 +449,62 @@ function parseTriggerListQuery(
   });
 }
 
+function parseSecretListQuery(
+  rawQuery: string | undefined,
+  profile: LocalApplicationProfile,
+): Readonly<{
+  limit: number;
+  after?: Readonly<{ readonly name: string }>;
+}> {
+  if (rawQuery === undefined) {
+    return Object.freeze({ limit: profile === 'edge' ? 16 : 32 });
+  }
+  if (rawQuery.length === 0) throw new TypeError();
+  const values = new Map<string, string>();
+  for (const field of rawQuery.split('&')) {
+    const separator = field.indexOf('=');
+    if (
+      separator < 1 ||
+      separator !== field.lastIndexOf('=') ||
+      separator === field.length - 1
+    ) {
+      throw new TypeError();
+    }
+    const name = field.slice(0, separator);
+    const value = field.slice(separator + 1);
+    if (values.has(name) || (name !== 'limit' && name !== 'after')) {
+      throw new TypeError();
+    }
+    values.set(name, value);
+  }
+  const rawLimit = values.get('limit');
+  const limit =
+    rawLimit === undefined ? (profile === 'edge' ? 16 : 32) : Number(rawLimit);
+  if (
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    limit > 64 ||
+    (rawLimit !== undefined && String(limit) !== rawLimit)
+  ) {
+    throw new TypeError();
+  }
+  const encoded = values.get('after');
+  if (encoded === undefined) return Object.freeze({ limit });
+  if (encoded.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(encoded)) {
+    throw new TypeError();
+  }
+  const bytes = Buffer.from(encoded, 'base64url');
+  let name: string;
+  try {
+    if (bytes.toString('base64url') !== encoded) throw new TypeError();
+    name = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    assertLocalSecretName(name);
+  } finally {
+    bytes.fill(0);
+  }
+  return Object.freeze({ limit, after: Object.freeze({ name }) });
+}
+
 function parseRunAttemptLogReadQuery(
   rawQuery: string | undefined,
   profile: LocalApplicationProfile,
@@ -534,6 +594,13 @@ function route(
       : null;
   }
   if (request.method === 'PUT') {
+    const secretPutMatch = SECRET_ROUTE_PATTERN.exec(path);
+    if (secretPutMatch && rawQuery === undefined) {
+      return Object.freeze({
+        operationId: 'secret.put',
+        projectId: secretPutMatch[1]!,
+      });
+    }
     const triggerPutMatch = TRIGGER_READ_ROUTE_PATTERN.exec(path);
     if (triggerPutMatch && rawQuery === undefined) {
       return Object.freeze({
@@ -552,6 +619,18 @@ function route(
       : null;
   }
   if (request.method !== 'GET') return null;
+  const secretListMatch = SECRET_ROUTE_PATTERN.exec(path);
+  if (secretListMatch) {
+    try {
+      return Object.freeze({
+        operationId: 'secret.list',
+        projectId: secretListMatch[1]!,
+        ...parseSecretListQuery(rawQuery, profile),
+      });
+    } catch {
+      return Object.freeze({ errorCode: 'invalid_secret_list_query' });
+    }
+  }
   const triggerReadMatch = TRIGGER_READ_ROUTE_PATTERN.exec(path);
   if (triggerReadMatch) {
     return rawQuery === undefined

@@ -22,6 +22,7 @@ import type {
   RunAttemptLogReadRequest,
   RunAttemptLogReadResult,
 } from '@qinglong/runtime-core/run-attempt-log-read';
+import type { LocalSecretKeyProvider } from '@qinglong/runtime-core/local-secret';
 
 export type LocalApplicationProfile = 'edge' | 'standalone';
 
@@ -71,6 +72,9 @@ export interface LocalApplicationProductSurfaceAuthority {
   readonly taskDefinitionAdministrationForCredential: ReadyFreshStorage['taskDefinitionAdministrationForCredential'];
   readonly triggers: ReadyFreshStorage['triggers'];
   readonly triggerAdministrationForCredential: ReadyFreshStorage['triggerAdministrationForCredential'];
+  readonly localSecretMetadata: ReadyFreshStorage['localSecretMetadata'];
+  readonly localSecretAdministrationForCredential: ReadyFreshStorage['localSecretAdministrationForCredential'];
+  readonly localSecretKeys: LocalSecretKeyProvider;
   readonly runAttemptLogRead: Readonly<{
     read(
       request: Readonly<RunAttemptLogReadRequest>,

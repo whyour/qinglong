@@ -522,6 +522,7 @@
 | [ADR-0516](./ADR-0516-request-scoped-local-console-task-mutation.md)                               | request-scoped Local Console Task mutation                                                                                                                                                                                      | Accepted（新双架构 Trial Kit 待本阶段 milestone） |
 | [ADR-0517](./ADR-0517-strong-local-console-task-authoring-lease.md)                               | 强认证 Local Console Task authoring lease                                                                                                                                                                                        | Accepted（D-422 双架构 milestone 已交付） |
 | [ADR-0518](./ADR-0518-local-console-cron-trigger-administration.md)                               | Local Console cron Trigger 管理                                                                                                                                                                                                  | Accepted（D-423 双架构 milestone 已交付） |
+| [ADR-0519](./ADR-0519-local-console-secret-backed-automation.md)                                  | Local Console Secret-backed 自动化                                                                                                                                                                                               | Accepted（D-424 源码候选；阶段产物待远端门闭合） |
 
 ## 规则
 

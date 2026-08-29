@@ -187,8 +187,8 @@ function seed(databasePath, materialDigest) {
            "role", "mutation_id", "changed_by_type", "changed_by_id",
            "created_at_ms"
          ) VALUES (
-           'default', 'user', 'local-api-user', 1, 'active', 'operator',
-           'grant-local-api-operator', 'user', 'local-api-user', ?
+           'default', 'user', 'local-api-user', 1, 'active', 'owner',
+           'grant-local-api-owner', 'user', 'local-api-user', ?
          )`,
       )
       .run(NOW - 500);
@@ -442,6 +442,19 @@ test('serves an authenticated Run through one real SQLite authority and durable 
     triggers: runtime.triggers,
     triggerAdministrationForCredential:
       runtime.triggerAdministrationForCredential,
+    localSecretMetadata: runtime.localSecretMetadata,
+    localSecretAdministrationForCredential:
+      runtime.localSecretAdministrationForCredential,
+    localSecretKeys: {
+      async active() {
+        return { keyId: 'integration-key', key: Buffer.alloc(32, 83) };
+      },
+      async resolve(keyId) {
+        return keyId === 'integration-key'
+          ? { keyId, key: Buffer.alloc(32, 83) }
+          : null;
+      },
+    },
     apiCredentials: runtime.apiCredentials,
     ownerPepper: runtime.ownerPepper,
     projectPolicy: runtime.projectPolicy,
@@ -531,6 +544,63 @@ test('serves an authenticated Run through one real SQLite authority and durable 
     { statusCode: 404, body: { code: 'task_not_found' } },
   );
 
+  const secretPlaintext = 'local-api-secret-value';
+  const secretBody = JSON.stringify({
+    name: 'github-token',
+    plaintext: secretPlaintext,
+    mutationId: '019f7300-0000-4000-8000-000000000700',
+    expectedCurrentVersion: 0,
+  });
+  const secretPath = '/api/v3/projects/default/secrets';
+  const secretOptions = {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      'content-length': String(Buffer.byteLength(secretBody)),
+    },
+    body: secretBody,
+  };
+  const secretChallenge = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    secretPath,
+    secretOptions,
+  );
+  assert.equal(secretChallenge.statusCode, 428);
+  assert.equal(secretChallenge.body.code, 'local_presence_required');
+  const secretProof = JSON.parse(
+    fs.readFileSync(
+      path.join(root, 'console-presence', secretChallenge.body.proofFileName),
+      'utf8',
+    ),
+  );
+  const secretCreated = await request(port, `Bearer ${TOKEN}`, secretPath, {
+    ...secretOptions,
+    headers: {
+      ...secretOptions.headers,
+      'x-qinglong-local-presence': secretProof.proof,
+    },
+  });
+  assert.equal(secretCreated.statusCode, 201);
+  assert.equal(secretCreated.body.secret.currentVersion, 1);
+  assert.match(secretCreated.body.secret.secretRef, /^qlsecret:v1:/u);
+  assert.equal(JSON.stringify(secretCreated).includes(secretPlaintext), false);
+
+  const secretList = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    `${secretPath}?limit=64`,
+  );
+  assert.equal(secretList.statusCode, 200);
+  assert.deepEqual(secretList.body.secrets, [
+    { ...secretCreated.body.secret, createdAtMs: NOW },
+  ]);
+  assert.equal(secretList.body.truncated, false);
+  assert.doesNotMatch(
+    JSON.stringify(secretList),
+    new RegExp(`${secretPlaintext}|ciphertext|keyId|mutationId`, 'u'),
+  );
+
   const taskCreateBody = JSON.stringify({
     expectedRevision: null,
     mutationId: '019f7300-0000-4000-8000-000000000701',
@@ -545,6 +615,13 @@ test('serves an authenticated Run through one real SQLite authority and durable 
           file: '/bin/echo',
           args: ['console-created'],
         },
+        environment: [
+          {
+            name: 'API_TOKEN',
+            kind: 'secret',
+            secretRef: secretCreated.body.secret.secretRef,
+          },
+        ],
       },
     },
     labels: { source: 'local-console' },
@@ -973,6 +1050,40 @@ test('serves an authenticated Run through one real SQLite authority and durable 
   );
   const auditReader = new DatabaseSync(databasePath, { readOnly: true });
   try {
+    const encryptedSecret = auditReader
+      .prepare(
+        `SELECT ciphertext FROM "QingLong3LocalSecretEnvelopes"
+         WHERE project_id = 'default' AND secret_name = 'github-token'
+           AND version = 1`,
+      )
+      .get();
+    assert.equal(
+      Buffer.from(encryptedSecret.ciphertext).includes(
+        Buffer.from(secretPlaintext),
+      ),
+      false,
+    );
+    const createdSpec = JSON.parse(
+      auditReader
+        .prepare(
+          `SELECT revision.spec_json AS specJson
+             FROM "QingLong3TaskDefinitions" AS head
+             JOIN "QingLong3TaskDefinitionRevisions" AS revision
+               ON revision.project_id = head.project_id
+              AND revision.task_id = head.task_id
+              AND revision.revision = head.current_revision
+            WHERE head.project_id = 'default'
+              AND head.task_id = 'task-console-created'`,
+        )
+        .get().specJson,
+    );
+    assert.deepEqual(createdSpec.config.environment, [
+      {
+        name: 'API_TOKEN',
+        kind: 'secret',
+        secretRef: secretCreated.body.secret.secretRef,
+      },
+    ]);
     assert.deepEqual(
       auditReader
         .prepare(
@@ -981,7 +1092,8 @@ test('serves an authenticated Run through one real SQLite authority and durable 
              'run.get', 'run.list', 'run.events.list', 'run.steps.list',
              'run.cancel', 'task.authoring.read', 'task.create', 'task.get',
              'task.list', 'task.start', 'task.update', 'run.log.read',
-             'trigger.create', 'trigger.get', 'trigger.list', 'trigger.update'
+             'trigger.create', 'trigger.get', 'trigger.list', 'trigger.update',
+             'secret.create', 'secret.list'
            )
            ORDER BY operation_id, outcome`,
         )
@@ -996,6 +1108,9 @@ test('serves an authenticated Run through one real SQLite authority and durable 
         'run.list:allowed',
         'run.log.read:allowed',
         'run.steps.list:allowed',
+        'secret.create:allowed',
+        'secret.create:approval_required',
+        'secret.list:allowed',
         'task.authoring.read:allowed',
         'task.authoring.read:approval_required',
         'task.create:allowed',

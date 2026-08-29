@@ -52,7 +52,9 @@ export type LocalProfileStorageBootstrapResult =
       readonly runAttemptLogRetention: LocalSqliteRuntimeDatabase['runAttemptLogRetention'];
       readonly runLostRetry: LocalSqliteRuntimeDatabase['runLostRetry'];
       readonly localSecrets: LocalSqliteRuntimeDatabase['localSecrets'];
+      readonly localSecretMetadata: LocalSqliteRuntimeDatabase['localSecretMetadata'];
       readonly localSecretAdministration: LocalSqliteRuntimeDatabase['localSecretAdministration'];
+      readonly localSecretAdministrationForCredential: LocalSqliteRuntimeDatabase['localSecretAdministrationForCredential'];
       readonly projectPolicy: LocalSqliteRuntimeDatabase['projectPolicy'];
       readonly securityAudit: LocalSqliteRuntimeDatabase['securityAudit'];
       readonly apiCredentials: LocalSqliteRuntimeDatabase['apiCredentials'];
@@ -153,7 +155,10 @@ export async function bootstrapLocalProfileStorage(
       runAttemptLogRetention: database.runAttemptLogRetention,
       runLostRetry: database.runLostRetry,
       localSecrets: database.localSecrets,
+      localSecretMetadata: database.localSecretMetadata,
       localSecretAdministration: database.localSecretAdministration,
+      localSecretAdministrationForCredential:
+        database.localSecretAdministrationForCredential,
       projectPolicy: database.projectPolicy,
       securityAudit: database.securityAudit,
       apiCredentials: database.apiCredentials,

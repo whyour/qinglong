@@ -25,8 +25,11 @@ type TriggerAdministrationForCredential =
 type LocalScheduleStore = ReadyLocalStorage['schedules'];
 type LocalDispatchStore = ReadyLocalStorage['dispatch'];
 type LocalSecretEnvelopeRepository = ReadyLocalStorage['localSecrets'];
+type LocalSecretMetadataSource = ReadyLocalStorage['localSecretMetadata'];
 type LocalSecretAdministrationRepository =
   ReadyLocalStorage['localSecretAdministration'];
+type LocalSecretAdministrationForCredential =
+  ReadyLocalStorage['localSecretAdministrationForCredential'];
 type ProjectPolicyRepository = ReadyLocalStorage['projectPolicy'];
 type SecurityAuditSink = ReadyLocalStorage['securityAudit'];
 type ApiCredentialRepository = ReadyLocalStorage['apiCredentials'];
@@ -102,7 +105,9 @@ export type LocalAdoptedProfileBootstrapResult =
       readonly runAttemptLogRetention: ReadyLocalStorage['runAttemptLogRetention'];
       readonly runLostRetry: ReadyLocalStorage['runLostRetry'];
       readonly localSecrets: LocalSecretEnvelopeRepository;
+      readonly localSecretMetadata: LocalSecretMetadataSource;
       readonly localSecretAdministration: LocalSecretAdministrationRepository;
+      readonly localSecretAdministrationForCredential: LocalSecretAdministrationForCredential;
       readonly projectPolicy: ProjectPolicyRepository;
       readonly securityAudit: SecurityAuditSink;
       readonly apiCredentials: ApiCredentialRepository;
@@ -255,7 +260,10 @@ export async function bootstrapLocalAdoptedProfileStorage(
       runAttemptLogRetention: readyStorage.runAttemptLogRetention,
       runLostRetry: readyStorage.runLostRetry,
       localSecrets: readyStorage.localSecrets,
+      localSecretMetadata: readyStorage.localSecretMetadata,
       localSecretAdministration: readyStorage.localSecretAdministration,
+      localSecretAdministrationForCredential:
+        readyStorage.localSecretAdministrationForCredential,
       projectPolicy: readyStorage.projectPolicy,
       securityAudit: readyStorage.securityAudit,
       apiCredentials: readyStorage.apiCredentials,

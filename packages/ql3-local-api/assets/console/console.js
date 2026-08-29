@@ -3,6 +3,8 @@
 
   const PROJECT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
   const TASK_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+  const ENVIRONMENT_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  const SECRET_REF_PREFIX = 'qlsecret:v1:';
   const CRON_FIELD_PATTERN = /^[0-9A-Za-z*?,/#LW-]+$/;
   const TOKEN_PATTERN =
     /^ql3c_[A-Za-z0-9][A-Za-z0-9._:-]{0,63}_[A-Za-z0-9_-]{43}$/;
@@ -57,6 +59,11 @@
       'Trigger、Task 或授权在确认期间发生变化。请刷新后重新编辑。',
     invalid_trigger: '定时配置无效。请检查表达式、时区与 Task 状态。',
     trigger_unavailable: '定时配置暂时无法保存。请检查数据库状态。',
+    secret_query_unavailable: 'Secret 元数据暂时不可读取。请检查数据库状态。',
+    secret_fence_rejected:
+      'Secret、凭据或授权在确认期间发生变化。请刷新后重新保存。',
+    invalid_secret: 'Secret 名称、版本或明文无效。',
+    secret_unavailable: 'Secret 暂时无法加密保存。请检查密钥与数据库状态。',
     run_cancellation_fence_rejected:
       '运行在确认期间发生变化，本次取消已安全拒绝。请刷新后重试。',
     request_unavailable: '本次请求没有完成，请确认服务仍在运行。',
@@ -78,6 +85,7 @@
     refresh: document.getElementById('refresh-button'),
     createTask: document.getElementById('create-task-button'),
     createTrigger: document.getElementById('create-trigger-button'),
+    createSecret: document.getElementById('create-secret-button'),
     dialog: document.getElementById('confirmation-dialog'),
     dialogTitle: document.getElementById('confirmation-title'),
     dialogCopy: document.getElementById('confirmation-copy'),
@@ -94,6 +102,7 @@
     taskDescription: document.getElementById('task-description-input'),
     taskCommand: document.getElementById('task-command-input'),
     taskArgs: document.getElementById('task-args-input'),
+    taskSecretBindings: document.getElementById('task-secret-bindings-input'),
     taskEnabled: document.getElementById('task-enabled-input'),
     taskEnabledLabel: document.getElementById('task-enabled-label'),
     triggerEditor: document.getElementById('trigger-editor-dialog'),
@@ -108,6 +117,15 @@
     triggerTimezone: document.getElementById('trigger-timezone-input'),
     triggerMisfire: document.getElementById('trigger-misfire-input'),
     triggerEnabled: document.getElementById('trigger-enabled-input'),
+    secretEditor: document.getElementById('secret-editor-dialog'),
+    secretEditorTitle: document.getElementById('secret-editor-title'),
+    secretEditorIntro: document.getElementById('secret-editor-intro'),
+    secretEditorNote: document.getElementById('secret-editor-note'),
+    secretEditorForm: document.getElementById('secret-editor-form'),
+    secretEditorClose: document.getElementById('secret-editor-close'),
+    secretEditorSave: document.getElementById('secret-editor-save'),
+    secretName: document.getElementById('secret-name-input'),
+    secretValue: document.getElementById('secret-value-input'),
     presenceDialog: document.getElementById('presence-dialog'),
     presenceForm: document.getElementById('presence-form'),
     presenceCopy: document.getElementById('presence-copy'),
@@ -129,6 +147,8 @@
     pendingPresence: null,
     authoringSnapshot: null,
     triggerSnapshot: null,
+    secretSnapshot: null,
+    secretCatalog: [],
     toastTimer: null,
   };
 
@@ -221,6 +241,138 @@
     return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex
       .slice(6, 8)
       .join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`;
+  }
+
+  function encodeBase64UrlUtf8(value) {
+    const bytes = new TextEncoder().encode(value);
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return window
+      .btoa(binary)
+      .replace(/\+/gu, '-')
+      .replace(/\//gu, '_')
+      .replace(/=+$/gu, '');
+  }
+
+  function decodeBase64UrlUtf8(value) {
+    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/u.test(value)) {
+      throw new TypeError('SecretRef 编码无效。');
+    }
+    const padding = '='.repeat((4 - (value.length % 4)) % 4);
+    const binary = window.atob(
+      value.replace(/-/gu, '+').replace(/_/gu, '/') + padding,
+    );
+    const bytes = Uint8Array.from(binary, (character) =>
+      character.charCodeAt(0),
+    );
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  }
+
+  function createSecretRef(projectId, name, version) {
+    const payload = JSON.stringify({ projectId, name, version });
+    const result = `${SECRET_REF_PREFIX}${encodeBase64UrlUtf8(payload)}`;
+    if (result.length > 512) throw new TypeError('SecretRef 过长。');
+    return result;
+  }
+
+  function parseSecretRef(value) {
+    if (
+      typeof value !== 'string' ||
+      value.length > 512 ||
+      !value.startsWith(SECRET_REF_PREFIX)
+    ) {
+      throw new TypeError('SecretRef 无效。');
+    }
+    const encoded = value.slice(SECRET_REF_PREFIX.length);
+    const parsed = JSON.parse(decodeBase64UrlUtf8(encoded));
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed) ||
+      Object.keys(parsed).sort().join(',') !== 'name,projectId,version' ||
+      typeof parsed.projectId !== 'string' ||
+      typeof parsed.name !== 'string' ||
+      !Number.isSafeInteger(parsed.version) ||
+      parsed.version < 1 ||
+      createSecretRef(parsed.projectId, parsed.name, parsed.version) !== value
+    ) {
+      throw new TypeError('SecretRef 无效。');
+    }
+    return Object.freeze(parsed);
+  }
+
+  function isValidSecretName(value) {
+    return (
+      typeof value === 'string' &&
+      value.length > 0 &&
+      new TextEncoder().encode(value).length <= 128 &&
+      !/[\u0000-\u001f\u007f]/u.test(value)
+    );
+  }
+
+  function secretBindingsFromTask(task) {
+    const environment = task?.spec?.config?.environment;
+    if (environment === undefined) return '';
+    if (!Array.isArray(environment) || environment.length > 256) {
+      throw new TypeError('Task 环境变量定义无效。');
+    }
+    return environment
+      .filter((entry) => entry?.kind === 'secret')
+      .map((entry) => {
+        const reference = parseSecretRef(entry.secretRef);
+        if (
+          !ENVIRONMENT_NAME_PATTERN.test(entry.name) ||
+          entry.name.startsWith('QL3_') ||
+          reference.projectId !== state.project ||
+          !TASK_PATTERN.test(reference.name)
+        ) {
+          throw new TypeError(
+            '当前 Task 包含 Console 无法安全编辑的 Secret 绑定。',
+          );
+        }
+        return `${entry.name}=${reference.name}@${reference.version}`;
+      })
+      .join('\n');
+  }
+
+  function parseSecretBindings(value) {
+    const entries = [];
+    const names = new Set();
+    const lines = value
+      .split(/\r?\n/u)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    if (lines.length > 256) throw new TypeError('Secret 绑定不能超过 256 条。');
+    for (const line of lines) {
+      const match =
+        /^([A-Za-z_][A-Za-z0-9_]*)=([A-Za-z0-9][A-Za-z0-9._:-]{0,127})(?:@([1-9][0-9]{0,9}))?$/u.exec(
+          line,
+        );
+      if (!match || match[1].startsWith('QL3_') || names.has(match[1])) {
+        throw new TypeError(`Secret 绑定无效：${line}`);
+      }
+      const available = state.secretCatalog.find(
+        (secret) => secret.name === match[2],
+      );
+      const version = match[3] ? Number(match[3]) : available?.currentVersion;
+      if (
+        !available ||
+        !Number.isSafeInteger(version) ||
+        version < 1 ||
+        version > available.currentVersion
+      ) {
+        throw new TypeError(`找不到 Secret 当前版本：${match[2]}`);
+      }
+      names.add(match[1]);
+      entries.push(
+        Object.freeze({
+          name: match[1],
+          kind: 'secret',
+          secretRef: createSecretRef(state.project, match[2], version),
+        }),
+      );
+    }
+    return Object.freeze(entries);
   }
 
   async function api(path, options = {}) {
@@ -393,11 +545,17 @@
     nodes.taskEditorIntro.textContent = editing
       ? `完整定义已由本机证明读取，并绑定 revision ${snapshot.task.revision}。保存时还会生成一份只绑定新内容的证明。`
       : '定义会先绑定到一次本机证明，再以同一事务写入 Task revision 与安全审计。';
+    const secretHint =
+      state.secretCatalog.length === 0
+        ? '当前没有可绑定 Secret；可先到“凭据”创建。'
+        : `当前可绑定：${state.secretCatalog
+            .map((secret) => `${secret.name}@${secret.currentVersion}`)
+            .join('、')}`;
     nodes.taskEditorNote.textContent = editing
       ? `编辑租约将在 ${formatTime(
           snapshot.authoring.expiresAtMs,
-        )} 失效；关闭后重新选择“编辑任务”可取得新快照。`
-      : 'Alpha 当前从 Console 创建 qinglong/command@v1；高级 Task schema 仍使用受信任管理入口。';
+        )} 失效。${secretHint}`
+      : `Console 创建 qinglong/command@v1。${secretHint}`;
     nodes.taskEnabledLabel.textContent = editing
       ? '保存后允许运行'
       : '创建后允许运行';
@@ -411,9 +569,11 @@
       nodes.taskDescription.value = snapshot.task.description || '';
       nodes.taskCommand.value = command.file;
       nodes.taskArgs.value = command.args.join('\n');
+      nodes.taskSecretBindings.value = secretBindingsFromTask(snapshot.task);
       nodes.taskEnabled.checked = snapshot.task.enabled;
     } else {
       nodes.taskCommand.value = '/bin/echo';
+      nodes.taskSecretBindings.value = '';
       nodes.taskEnabled.checked = true;
     }
     nodes.taskEditor.returnValue = '';
@@ -462,6 +622,9 @@
       .split(/\r?\n/u)
       .map((value) => value.trim())
       .filter((value) => value.length > 0);
+    const secretEnvironment = parseSecretBindings(
+      nodes.taskSecretBindings.value,
+    );
     if (!TASK_PATTERN.test(taskId)) {
       throw new TypeError('Task ID 格式无效。');
     }
@@ -469,11 +632,24 @@
       throw new TypeError('名称、命令或参数数量无效。');
     }
     const snapshot = state.authoringSnapshot;
+    const publicEnvironment = snapshot
+      ? (snapshot.task.spec.config.environment || []).filter(
+          (entry) => entry?.kind === 'public',
+        )
+      : [];
+    const environment = Object.freeze([
+      ...publicEnvironment,
+      ...secretEnvironment,
+    ]);
+    if (environment.length > 256) {
+      throw new TypeError('环境变量总数不能超过 256 条。');
+    }
     const spec = snapshot
       ? Object.freeze({
           ...snapshot.task.spec,
           config: Object.freeze({
             ...snapshot.task.spec.config,
+            environment,
             command: Object.freeze({
               ...snapshot.task.spec.config.command,
               kind: 'argv',
@@ -486,6 +662,7 @@
           schema: 'qinglong/command@v1',
           config: Object.freeze({
             command: Object.freeze({ kind: 'argv', file, args }),
+            environment,
           }),
         });
     return Object.freeze({
@@ -622,6 +799,205 @@
     }
   }
 
+  function normalizeSecretMetadata(value) {
+    const secrets = Array.isArray(value?.secrets) ? value.secrets : null;
+    if (
+      !secrets ||
+      secrets.length > 64 ||
+      secrets.some((secret) => {
+        if (
+          !secret ||
+          !isValidSecretName(secret.name) ||
+          !Number.isSafeInteger(secret.currentVersion) ||
+          secret.currentVersion < 1 ||
+          !Number.isSafeInteger(secret.createdAtMs) ||
+          secret.createdAtMs < 0
+        ) {
+          return true;
+        }
+        const reference = parseSecretRef(secret.secretRef);
+        return (
+          reference.projectId !== state.project ||
+          reference.name !== secret.name ||
+          reference.version !== secret.currentVersion
+        );
+      })
+    ) {
+      throw new ConsoleRequestError('response_unavailable', 503, null);
+    }
+    return Object.freeze(secrets.map((secret) => Object.freeze(secret)));
+  }
+
+  async function loadSecretCatalog() {
+    const value = await api(
+      `/api/v3/projects/${state.project}/secrets?limit=64`,
+    );
+    state.secretCatalog = normalizeSecretMetadata(value);
+    return Object.freeze({
+      secrets: state.secretCatalog,
+      truncated: value.truncated === true,
+    });
+  }
+
+  function openSecretEditor(snapshot = null) {
+    state.secretSnapshot = snapshot;
+    nodes.secretEditorForm.reset();
+    const rotating = snapshot !== null;
+    nodes.secretEditorTitle.textContent = rotating
+      ? '轮换加密凭据'
+      : '创建加密凭据';
+    nodes.secretEditorIntro.textContent = rotating
+      ? `新值将写入 ${snapshot.name} 的 version ${
+          snapshot.currentVersion + 1
+        }；已有 Task 仍固定使用旧版本。`
+      : '明文只在当前页面内存和本次 loopback 请求中短暂存在；服务端只持久化 AES-256-GCM 密文。';
+    nodes.secretEditorNote.textContent = rotating
+      ? '轮换不会悄悄改变现有自动化；请编辑 Task 明确切换到新版本。'
+      : '保存需要一次性本机证明；API、审计、Console 与日志都不会返回明文。';
+    nodes.secretName.readOnly = rotating;
+    if (rotating) {
+      nodes.secretName.setAttribute('aria-readonly', 'true');
+      nodes.secretName.value = snapshot.name;
+    } else {
+      nodes.secretName.removeAttribute('aria-readonly');
+    }
+    nodes.secretValue.value = '';
+    nodes.secretEditor.returnValue = '';
+    nodes.secretEditor.showModal();
+    (rotating ? nodes.secretValue : nodes.secretName).focus();
+  }
+
+  function secretDraft() {
+    const name = nodes.secretName.value.trim();
+    const plaintext = nodes.secretValue.value;
+    nodes.secretValue.value = '';
+    if (!TASK_PATTERN.test(name)) {
+      throw new TypeError('Secret 名称格式无效。');
+    }
+    if (!plaintext || new TextEncoder().encode(plaintext).length > 16 * 1024) {
+      throw new TypeError('Secret 新值必须为 1–16384 bytes。');
+    }
+    return Object.freeze({
+      name,
+      plaintext,
+      mutationId: newMutationId(),
+      expectedCurrentVersion: state.secretSnapshot?.currentVersion || 0,
+    });
+  }
+
+  async function saveSecretDraft() {
+    let body;
+    try {
+      body = secretDraft();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Secret 定义无效。',
+        'error',
+      );
+      return;
+    }
+    nodes.secretEditorSave.disabled = true;
+    try {
+      const value = await api(`/api/v3/projects/${state.project}/secrets`, {
+        method: 'PUT',
+        body,
+        acceptStatus: 428,
+      });
+      if (value.code === 'local_presence_required') {
+        showPresenceChallenge({ kind: 'secret-mutation', body }, value);
+        return;
+      }
+      throw new ConsoleRequestError('response_unavailable', 503, null);
+    } catch (error) {
+      body = null;
+      showToast(describeError(error), 'error');
+    } finally {
+      nodes.secretEditorSave.disabled = false;
+    }
+  }
+
+  async function renderSecrets() {
+    const value = await loadSecretCatalog();
+    if (value.secrets.length === 0) {
+      empty('还没有加密 Secret。创建后可在命令 Task 中绑定固定版本。');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    fragment.append(
+      listHeader('Encrypted Secret catalog', value.secrets.length),
+    );
+    const list = element('div', 'record-list');
+    for (const secret of value.secrets) {
+      const button = element('button', 'record');
+      button.type = 'button';
+      button.dataset.identity = secret.name;
+      if (state.selectedId === secret.name) {
+        button.setAttribute('aria-current', 'true');
+      }
+      const main = element('span');
+      main.append(element('span', 'record-title', secret.name));
+      main.append(
+        recordMeta([`version ${secret.currentVersion}`, 'AES-256-GCM']),
+      );
+      const side = element('span', 'record-side');
+      const status = element('span', 'status', '已加密');
+      status.dataset.tone = 'active';
+      side.append(status);
+      side.append(
+        element('span', 'record-time', formatTime(secret.createdAtMs)),
+      );
+      button.append(main, side);
+      button.addEventListener('click', () => selectSecret(secret.name));
+      list.append(button);
+    }
+    fragment.append(list);
+    if (value.truncated) {
+      fragment.append(
+        element(
+          'p',
+          'privacy-note',
+          '当前只展示前 64 条；使用 API 可继续读取下一页。',
+        ),
+      );
+    }
+    replace(nodes.ledger, fragment);
+  }
+
+  function selectSecret(name) {
+    state.selectedId = name;
+    for (const row of nodes.ledger.querySelectorAll('.record')) {
+      if (row.dataset.identity === name)
+        row.setAttribute('aria-current', 'true');
+      else row.removeAttribute('aria-current');
+    }
+    const secret = state.secretCatalog.find((entry) => entry.name === name);
+    if (!secret) {
+      detailEmpty('Secret 元数据已变化，请刷新后重试。');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    fragment.append(detailHeader('Encrypted Secret', secret.name, secret.name));
+    const facts = element('div', 'facts');
+    facts.append(
+      fact('当前版本', secret.currentVersion),
+      fact('存储', 'AES-256-GCM 密文'),
+      fact('Pinned ref', shortDigest(secret.secretRef)),
+      fact('版本时间', formatTime(secret.createdAtMs)),
+    );
+    fragment.append(facts);
+    const actions = element('div', 'detail-actions');
+    actions.append(actionButton('轮换新版本', () => openSecretEditor(secret)));
+    fragment.append(actions);
+    fragment.append(
+      element(
+        'p',
+        'privacy-note',
+        'Task 只绑定固定版本；轮换后必须显式编辑 Task 才会采用新值。明文永不从此接口返回。',
+      ),
+    );
+    replace(nodes.detail, fragment);
+  }
+
   function showPresenceChallenge(action, challenge) {
     if (
       challenge?.code !== 'local_presence_required' ||
@@ -634,13 +1010,20 @@
     state.pendingPresence = Object.freeze({ ...action, challenge });
     const authoringRead = action.kind === 'authoring';
     const triggerMutation = action.kind === 'trigger-mutation';
+    const secretMutation = action.kind === 'secret-mutation';
     nodes.presenceCopy.textContent = authoringRead
       ? '读取完整 Task 定义需要部署设备上的一次性证明。返回的编辑租约不替代保存时的新内容证明。'
       : triggerMutation
       ? '使用部署 QingLong 的系统用户读取下面的私有文件。证明只绑定这次 Trigger 与 Task revision，且只能使用一次。'
+      : secretMutation
+      ? '使用部署 QingLong 的系统用户读取下面的私有文件。证明绑定这次 Secret 内容摘要、当前版本和 User Credential，且只能使用一次。'
       : '使用部署 QingLong 的系统用户读取下面的私有文件。证明只绑定这次 Task 内容，且只能使用一次。';
     nodes.presenceSubmit.textContent = authoringRead
       ? '验证并加载定义'
+      : secretMutation
+      ? action.body.expectedCurrentVersion === 0
+        ? '验证并加密创建'
+        : '验证并轮换版本'
       : action.mutation.body.expectedRevision === null
       ? '验证并创建'
       : '验证并更新';
@@ -653,6 +1036,7 @@
     nodes.presenceError.hidden = true;
     nodes.taskEditor.close();
     nodes.triggerEditor.close();
+    nodes.secretEditor.close();
     nodes.presenceDialog.returnValue = '';
     nodes.presenceDialog.showModal();
     nodes.presenceProof.focus();
@@ -735,6 +1119,15 @@
         state.pendingPresence = null;
         nodes.presenceProof.value = '';
         nodes.presenceDialog.close();
+        try {
+          await loadSecretCatalog();
+        } catch {
+          state.secretCatalog = [];
+          showToast(
+            'Task 已加载，但 Secret 目录暂不可用；已有绑定仍会保留。',
+            'error',
+          );
+        }
         openTaskEditor(snapshot);
         showToast('完整 Task 定义已加载；保存仍需要新的本机证明。');
         return;
@@ -765,6 +1158,32 @@
         updateNavigation();
         await refresh();
         await selectTrigger(pending.mutation.triggerId);
+        return;
+      }
+      if (pending.kind === 'secret-mutation') {
+        const value = await api(`/api/v3/projects/${state.project}/secrets`, {
+          method: 'PUT',
+          body: pending.body,
+          presence: proof,
+        });
+        const rotated = pending.body.expectedCurrentVersion > 0;
+        state.pendingPresence = null;
+        state.secretSnapshot = null;
+        nodes.secretValue.value = '';
+        nodes.presenceProof.value = '';
+        nodes.presenceDialog.close();
+        showToast(
+          value.status === 'existing'
+            ? '已找到同一 Secret 请求。'
+            : rotated
+            ? `Secret 已轮换到 version ${value.secret.currentVersion}。`
+            : 'Secret 已加密创建。',
+        );
+        state.view = 'secrets';
+        state.selectedId = pending.body.name;
+        updateNavigation();
+        await refresh();
+        selectSecret(pending.body.name);
         return;
       }
       const value = await api(
@@ -1326,6 +1745,7 @@
     if (state.view === 'tasks') {
       nodes.createTask.hidden = false;
       nodes.createTrigger.hidden = true;
+      nodes.createSecret.hidden = true;
       nodes.kicker.textContent = 'Project task authority';
       nodes.title.textContent = '任务调度台';
       nodes.description.textContent =
@@ -1333,13 +1753,23 @@
     } else if (state.view === 'triggers') {
       nodes.createTask.hidden = true;
       nodes.createTrigger.hidden = false;
+      nodes.createSecret.hidden = true;
       nodes.kicker.textContent = 'Durable cron authority';
       nodes.title.textContent = '定时触发器';
       nodes.description.textContent =
         '配置内置 cron Trigger，绑定 Task 当前 revision；停用只追加历史，不删除证据。';
+    } else if (state.view === 'secrets') {
+      nodes.createTask.hidden = true;
+      nodes.createTrigger.hidden = true;
+      nodes.createSecret.hidden = false;
+      nodes.kicker.textContent = 'Encrypted local custody';
+      nodes.title.textContent = 'Secret 凭据库';
+      nodes.description.textContent =
+        '只展示名称和当前版本；明文经本机证明后加密保存，Task 显式绑定固定版本。';
     } else {
       nodes.createTask.hidden = true;
       nodes.createTrigger.hidden = true;
+      nodes.createSecret.hidden = true;
       nodes.kicker.textContent = 'Durable run evidence';
       nodes.title.textContent = '运行事实账本';
       nodes.description.textContent =
@@ -1353,6 +1783,7 @@
     try {
       if (state.view === 'tasks') await renderTasks();
       else if (state.view === 'triggers') await renderTriggers();
+      else if (state.view === 'secrets') await renderSecrets();
       else await renderRuns();
       setConnection('connected', `${state.project} · 已连接`);
     } catch (error) {
@@ -1387,8 +1818,11 @@
     state.pendingPresence = null;
     state.authoringSnapshot = null;
     state.triggerSnapshot = null;
+    state.secretSnapshot = null;
+    state.secretCatalog = [];
     if (nodes.taskEditor.open) nodes.taskEditor.close();
     if (nodes.triggerEditor.open) nodes.triggerEditor.close();
+    if (nodes.secretEditor.open) nodes.secretEditor.close();
     if (nodes.presenceDialog.open) nodes.presenceDialog.close();
     nodes.token.value = '';
     nodes.token.disabled = false;
@@ -1399,6 +1833,7 @@
     nodes.refresh.hidden = true;
     nodes.createTask.hidden = true;
     nodes.createTrigger.hidden = true;
+    nodes.createSecret.hidden = true;
     setConnection('idle', '等待凭据');
     nodes.kicker.textContent = 'Connection gate';
     nodes.title.textContent = '先建立一条本机连接';
@@ -1435,8 +1870,16 @@
 
   nodes.disconnect.addEventListener('click', disconnect);
   nodes.refresh.addEventListener('click', refresh);
-  nodes.createTask.addEventListener('click', () => openTaskEditor());
+  nodes.createTask.addEventListener('click', async () => {
+    try {
+      await loadSecretCatalog();
+      openTaskEditor();
+    } catch (error) {
+      showToast(describeError(error), 'error');
+    }
+  });
   nodes.createTrigger.addEventListener('click', () => openTriggerEditor());
+  nodes.createSecret.addEventListener('click', () => openSecretEditor());
   nodes.taskEditorClose.addEventListener('click', () => {
     state.authoringSnapshot = null;
     nodes.taskEditor.close();
@@ -1453,10 +1896,21 @@
     event.preventDefault();
     await saveTriggerDraft();
   });
+  nodes.secretEditorClose.addEventListener('click', () => {
+    state.secretSnapshot = null;
+    nodes.secretValue.value = '';
+    nodes.secretEditor.close();
+  });
+  nodes.secretEditorForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await saveSecretDraft();
+  });
   nodes.presenceCancel.addEventListener('click', () => {
     state.pendingPresence = null;
     state.authoringSnapshot = null;
     state.triggerSnapshot = null;
+    state.secretSnapshot = null;
+    nodes.secretValue.value = '';
     nodes.presenceProof.value = '';
     nodes.presenceDialog.close();
   });
@@ -1495,6 +1949,7 @@
       nodes.dialog.open ||
       nodes.taskEditor.open ||
       nodes.triggerEditor.open ||
+      nodes.secretEditor.open ||
       nodes.presenceDialog.open
     ) {
       return;
@@ -1504,6 +1959,8 @@
         ? 'tasks'
         : event.key.toLowerCase() === 's'
         ? 'triggers'
+        : event.key.toLowerCase() === 'k'
+        ? 'secrets'
         : event.key.toLowerCase() === 'r'
         ? 'runs'
         : null;

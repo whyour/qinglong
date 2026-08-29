@@ -76,6 +76,36 @@ export interface LocalSecretEnvironmentProvider {
   }): Promise<readonly string[] | null>;
 }
 
+export interface LocalSecretMetadata {
+  readonly projectId: string;
+  readonly name: string;
+  readonly currentVersion: number;
+  readonly createdAtMs: number;
+}
+
+export interface LocalSecretMetadataPage {
+  readonly secrets: readonly Readonly<LocalSecretMetadata>[];
+  readonly truncated: boolean;
+  readonly next?: Readonly<{ readonly name: string }>;
+}
+
+export interface LocalSecretMetadataSource {
+  listLocalSecretMetadata(options: {
+    readonly projectId: string;
+    readonly limit: number;
+    readonly after?: Readonly<{ readonly name: string }>;
+  }): Promise<Readonly<LocalSecretMetadataPage>>;
+}
+
+export class LocalSecretMetadataUnavailableError extends Error {
+  readonly code = 'LOCAL_SECRET_METADATA_UNAVAILABLE';
+
+  constructor() {
+    super('Local Secret metadata is unavailable');
+    this.name = 'LocalSecretMetadataUnavailableError';
+  }
+}
+
 export interface PutEncryptedLocalSecretCommand {
   readonly projectId: string;
   readonly name: string;
@@ -151,7 +181,9 @@ function assertIdentifier(
   }
 }
 
-export function assertLocalSecretProjectId(value: unknown): asserts value is string {
+export function assertLocalSecretProjectId(
+  value: unknown,
+): asserts value is string {
   assertIdentifier('projectId', value, 128);
 }
 
@@ -159,7 +191,9 @@ export function assertLocalSecretName(value: unknown): asserts value is string {
   assertIdentifier('name', value, MAX_LOCAL_SECRET_NAME_BYTES);
 }
 
-export function assertLocalSecretVersion(value: unknown): asserts value is number {
+export function assertLocalSecretVersion(
+  value: unknown,
+): asserts value is number {
   if (
     !Number.isSafeInteger(value) ||
     (value as number) < 1 ||
@@ -169,11 +203,15 @@ export function assertLocalSecretVersion(value: unknown): asserts value is numbe
   }
 }
 
-export function assertLocalSecretMutationId(value: unknown): asserts value is string {
+export function assertLocalSecretMutationId(
+  value: unknown,
+): asserts value is string {
   assertIdentifier('mutationId', value, MAX_LOCAL_SECRET_MUTATION_ID_BYTES);
 }
 
-export function assertLocalSecretKeyId(value: unknown): asserts value is string {
+export function assertLocalSecretKeyId(
+  value: unknown,
+): asserts value is string {
   if (
     typeof value !== 'string' ||
     value.length === 0 ||
@@ -184,7 +222,9 @@ export function assertLocalSecretKeyId(value: unknown): asserts value is string 
   }
 }
 
-export function assertLocalSecretPlaintext(value: unknown): asserts value is string {
+export function assertLocalSecretPlaintext(
+  value: unknown,
+): asserts value is string {
   if (
     typeof value !== 'string' ||
     value.includes('\0') ||
@@ -194,7 +234,9 @@ export function assertLocalSecretPlaintext(value: unknown): asserts value is str
   }
 }
 
-export function assertLocalSecretExpectedVersion(value: unknown): asserts value is number {
+export function assertLocalSecretExpectedVersion(
+  value: unknown,
+): asserts value is number {
   if (
     !Number.isSafeInteger(value) ||
     (value as number) < 0 ||

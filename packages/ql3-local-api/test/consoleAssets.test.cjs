@@ -90,6 +90,15 @@ test('loads one bounded offline Console asset closure', () => {
       assert.match(text, /triggers\/\$\{mutation\.triggerId\}/u);
       assert.match(text, /state\.view === 'triggers'/u);
       assert.match(text, /trigger_fence_rejected/u);
+      assert.match(text, /state\.view === 'secrets'/u);
+      assert.match(text, /secret-mutation/u);
+      assert.match(text, /createSecretRef/u);
+      assert.match(text, /kind: 'secret'/u);
+      assert.match(text, /secret_query_unavailable/u);
+      assert.equal(
+        /localStorage.*plaintext|sessionStorage.*plaintext/u.test(text),
+        false,
+      );
     }
     if (requestPath === '/') {
       assert.match(text, /id="task-editor-dialog"/u);
@@ -99,6 +108,10 @@ test('loads one bounded offline Console asset closure', () => {
       assert.match(text, /id="presence-copy"/u);
       assert.match(text, /id="trigger-editor-dialog"/u);
       assert.match(text, /data-view="triggers"/u);
+      assert.match(text, /data-view="secrets"/u);
+      assert.match(text, /id="secret-editor-dialog"/u);
+      assert.match(text, /id="task-secret-bindings-input"/u);
+      assert.match(text, /AES-256-GCM/u);
     }
   }
   assert.ok(totalBytes <= 192 * 1024);

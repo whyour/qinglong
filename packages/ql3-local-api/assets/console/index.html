@@ -70,6 +70,9 @@
           <button type="button" data-view="triggers">
             <span>定时</span><kbd>S</kbd>
           </button>
+          <button type="button" data-view="secrets">
+            <span>凭据</span><kbd>K</kbd>
+          </button>
           <button type="button" data-view="runs">
             <span>运行</span><kbd>R</kbd>
           </button>
@@ -96,6 +99,9 @@
             </button>
             <button class="action-button" id="create-trigger-button" type="button" hidden>
               <span aria-hidden="true">＋</span> 创建定时
+            </button>
+            <button class="action-button" id="create-secret-button" type="button" hidden>
+              <span aria-hidden="true">＋</span> 创建凭据
             </button>
             <button class="refresh-button" id="refresh-button" type="button" hidden>
               <span aria-hidden="true">↻</span> 刷新
@@ -175,6 +181,10 @@
             <span>参数 · 每行一个</span>
             <textarea id="task-args-input" rows="5" maxlength="16384" spellcheck="false"></textarea>
           </label>
+          <label class="editor-wide">
+            <span>Secret 环境变量 · 每行 ENV=secret-name@version</span>
+            <textarea id="task-secret-bindings-input" rows="4" maxlength="24576" spellcheck="false" placeholder="API_TOKEN=github-token"></textarea>
+          </label>
           <label class="editor-check">
             <input id="task-enabled-input" type="checkbox" checked />
             <span id="task-enabled-label">创建后允许运行</span>
@@ -238,6 +248,39 @@
         <div class="dialog-actions">
           <button class="primary-button" id="trigger-editor-save" type="submit">
             保存并生成本机证明
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="secret-editor-dialog" class="task-editor-dialog">
+      <form id="secret-editor-form" autocomplete="off">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Encrypted Secret custody</p>
+            <h2 id="secret-editor-title">创建加密凭据</h2>
+          </div>
+          <button class="quiet-button" id="secret-editor-close" type="button">关闭</button>
+        </div>
+        <p class="editor-intro" id="secret-editor-intro">
+          明文只在当前页面内存和本次 loopback 请求中短暂存在；服务端只持久化 AES-256-GCM 密文。
+        </p>
+        <div class="editor-grid">
+          <label class="editor-wide">
+            <span>Secret 名称</span>
+            <input id="secret-name-input" maxlength="128" spellcheck="false" autocomplete="off" required />
+          </label>
+          <label class="editor-wide">
+            <span>新值</span>
+            <input id="secret-value-input" type="password" maxlength="16384" spellcheck="false" autocomplete="new-password" required />
+          </label>
+        </div>
+        <p class="editor-note" id="secret-editor-note">
+          保存需要一次性本机证明；API、审计、Console 与日志都不会返回明文。
+        </p>
+        <div class="dialog-actions">
+          <button class="primary-button" id="secret-editor-save" type="submit">
+            加密保存并生成本机证明
           </button>
         </div>
       </form>

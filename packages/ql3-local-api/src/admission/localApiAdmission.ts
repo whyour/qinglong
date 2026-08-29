@@ -33,6 +33,10 @@ import type {
   LocalApiTriggerReadRoute,
 } from '../trigger/triggerReadRoutes';
 import type { LocalApiTriggerPutRoute } from '../trigger/triggerPutRoute';
+import type {
+  LocalApiSecretListRoute,
+  LocalApiSecretPutRoute,
+} from '../secret/secretRoutes';
 import type { LocalApiResponse } from '../transport/contract';
 
 export type LocalApiAdmissionOperation =
@@ -111,6 +115,16 @@ export type LocalApiAdmissionOperation =
       operationId: 'trigger.put';
       projectId: string;
       triggerId: string;
+    }>
+  | Readonly<{
+      operationId: 'secret.list';
+      projectId: string;
+      limit: number;
+      after?: Readonly<{ readonly name: string }>;
+    }>
+  | Readonly<{
+      operationId: 'secret.put';
+      projectId: string;
     }>;
 
 export interface LocalApiAdmissionRequest {
@@ -152,6 +166,8 @@ export interface LocalApiAdmissionOptions {
   readonly triggerListRoute: LocalApiTriggerListRoute;
   readonly triggerReadRoute: LocalApiTriggerReadRoute;
   readonly triggerPutRoute: LocalApiTriggerPutRoute;
+  readonly secretListRoute: LocalApiSecretListRoute;
+  readonly secretPutRoute: LocalApiSecretPutRoute;
   readonly now?: () => number;
   readonly randomUuid?: () => string;
 }
@@ -235,6 +251,8 @@ export function createLocalApiAdmission(
     typeof options.triggerListRoute?.handle !== 'function' ||
     typeof options.triggerReadRoute?.handle !== 'function' ||
     typeof options.triggerPutRoute?.handle !== 'function' ||
+    typeof options.secretListRoute?.handle !== 'function' ||
+    typeof options.secretPutRoute?.handle !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function') ||
     (options.randomUuid !== undefined &&
       typeof options.randomUuid !== 'function')
@@ -342,6 +360,24 @@ export function createLocalApiAdmission(
         });
       }
 
+      if (request.operation.operationId === 'secret.put') {
+        const secretPutOperation = request.operation;
+        return Object.freeze({
+          bodyMode: 'json' as const,
+          maximumBodyBytes: 20 * 1_024,
+          async handle(body: unknown | null) {
+            return options.secretPutRoute.handle({
+              requestId: request.requestId,
+              projectId: secretPutOperation.projectId,
+              body,
+              presence: request.localPresence,
+              authenticated,
+              signal: request.signal,
+            });
+          },
+        });
+      }
+
       let decision: Readonly<SecurityPolicyDecision>;
       try {
         decision = normalizeSecurityPolicyDecision(
@@ -359,6 +395,8 @@ export function createLocalApiAdmission(
                 request.operation.operationId === 'trigger.list' ||
                 request.operation.operationId === 'trigger.get'
               ? 'task.read'
+              : request.operation.operationId === 'secret.list'
+              ? 'secret.manage'
               : 'run.read',
           ),
         );
@@ -506,9 +544,19 @@ export function createLocalApiAdmission(
                 projectId: request.operation.projectId,
                 triggerId: request.operation.triggerId,
               });
+            case 'secret.list':
+              if (body !== null) return response(400, 'invalid_request_body');
+              return options.secretListRoute.handle({
+                projectId: request.operation.projectId,
+                limit: request.operation.limit,
+                ...(request.operation.after
+                  ? { after: request.operation.after }
+                  : {}),
+              });
             case 'task.put':
             case 'task.authoring':
             case 'trigger.put':
+            case 'secret.put':
               return response(503, 'request_unavailable');
           }
         },

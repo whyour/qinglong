@@ -17,7 +17,10 @@ import type { LocalRunStartupRecoverySource } from '@qinglong/runtime-core/local
 import type { LocalDispatchStore } from '@qinglong/runtime-core/local-dispatch';
 import type { LocalExecutionControlSource } from '@qinglong/runtime-core/local-execution-control';
 import type { LocalCompletionReceiptJournal } from '@qinglong/runtime-core/local-completion-receipt-journal';
-import type { LocalSecretEnvelopeRepository } from '@qinglong/runtime-core/local-secret';
+import type {
+  LocalSecretEnvelopeRepository,
+  LocalSecretMetadataSource,
+} from '@qinglong/runtime-core/local-secret';
 import type { LocalSecretAdministrationRepository } from '@qinglong/runtime-core/local-secret-administration';
 import type { ProjectPolicyRepository } from '@qinglong/runtime-core/project-policy';
 import type { SecurityAuditSink } from '@qinglong/runtime-core/security-audit';
@@ -49,6 +52,7 @@ import type {
   ProjectToolDefinitionSnapshotSourceRepository,
 } from '@qinglong/runtime-core/project-tool-definition-snapshot';
 import { LocalSqliteApiCredentialRepository } from '../security/apiCredentialRepository';
+import { LocalSqliteSecretMetadataRepository } from '../security/secretMetadataRepository';
 import { LocalSqliteOwnerPepperRepository } from '../local-owner/ownerPepperRepository';
 import { LocalSqliteOperationAuthority } from '../authority/operationAuthority';
 import { LocalSqliteTaskDefinitionRepository } from '../task-definition/taskDefinitionRepository';
@@ -113,7 +117,11 @@ export interface LocalSqliteRuntimeDatabase {
   readonly runAttemptLogRetention: LocalSqliteRunAttemptLogRetentionRepository;
   readonly runLostRetry: LocalSqliteRunLostRetryRepository;
   readonly localSecrets: LocalSecretEnvelopeRepository;
+  readonly localSecretMetadata: LocalSecretMetadataSource;
   readonly localSecretAdministration: LocalSecretAdministrationRepository;
+  localSecretAdministrationForCredential(
+    fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+  ): Promise<LocalSecretAdministrationRepository>;
   readonly projectPolicy: ProjectPolicyRepository;
   readonly securityAudit: SecurityAuditSink;
   readonly apiCredentials: ApiCredentialRepository;
@@ -184,6 +192,9 @@ export async function openLocalSqliteRuntimeDatabase(
     const runRuntimeCapabilities =
       createLocalSqliteRunRuntimeCapabilities(authority);
     const securityAuthority = new LocalSqliteSecurityAuthorityStore(authority);
+    const localSecretMetadata = new LocalSqliteSecretMetadataRepository(
+      authority,
+    );
     const taskDefinitions = new LocalSqliteTaskDefinitionRepository(
       authority,
       taskSpecSemanticRegistry,
@@ -326,7 +337,23 @@ export async function openLocalSqliteRuntimeDatabase(
       runAttemptLogRetention,
       runLostRetry,
       localSecrets: securityAuthority,
+      localSecretMetadata,
       localSecretAdministration: securityAuthority,
+      async localSecretAdministrationForCredential(
+        fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+      ) {
+        const { confirmLocalSqliteAuthenticatedUserCredentialFence } =
+          await import('../administration/packageManagement.js');
+        confirmLocalSqliteAuthenticatedUserCredentialFence(authority, fence);
+        return new LocalSqliteSecurityAuthorityStore(authority, {
+          beforeAuthorizedLocalSecretMutation() {
+            confirmLocalSqliteAuthenticatedUserCredentialFence(
+              authority,
+              fence,
+            );
+          },
+        });
+      },
       projectPolicy,
       securityAudit: securityAuthority,
       apiCredentials,

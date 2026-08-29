@@ -1566,10 +1566,11 @@ function auditSourceImports(root, packagePath, findings) {
         continue;
       }
       if (
-        !(
-          packagePath === 'packages/ql3-local-owner-cli' &&
-          path.relative(packageDirectory, filePath) ===
-            'src/security-management/secretCommand.ts'
+        ![
+          'packages/ql3-local-owner-cli:src/security-management/secretCommand.ts',
+          'packages/ql3-local-api:src/secret/secretRoutes.ts',
+        ].includes(
+          `${packagePath}:${path.relative(packageDirectory, filePath)}`,
         ) &&
         specifier === '@qinglong/local-admin/secret-administration'
       ) {
@@ -2684,6 +2685,11 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/application-runtime/contract.ts' &&
+          specifier === '@qinglong/runtime-core/local-secret'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/production-process/pluginPackageRecoveryCatalog.ts' &&
           [
             '@qinglong/runtime-core/plugin-package',
@@ -3165,6 +3171,14 @@ function auditSourceImports(root, packagePath, findings) {
         path.relative(packageDirectory, filePath) ===
           'src/task/taskPutRoute.ts' &&
         specifier === '@qinglong/local-admin/task-definition-administration'
+      ) {
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-api' &&
+        path.relative(packageDirectory, filePath) ===
+          'src/secret/secretRoutes.ts' &&
+        specifier === '@qinglong/local-admin/secret-administration'
       ) {
         continue;
       }

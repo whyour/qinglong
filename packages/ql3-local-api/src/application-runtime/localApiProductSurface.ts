@@ -27,6 +27,10 @@ import {
   createLocalApiTriggerReadRoute,
 } from '../trigger/triggerReadRoutes';
 import { createLocalApiTriggerPutRoute } from '../trigger/triggerPutRoute';
+import {
+  createLocalApiSecretListRoute,
+  createLocalApiSecretPutRoute,
+} from '../secret/secretRoutes';
 import { startLocalApiHttpSurface } from '../transport/httpSurface';
 
 export interface LocalApiProductSurfaceEvent {
@@ -195,6 +199,28 @@ export function createLocalApiProductSurface(
           ? {}
           : { randomUuid: options.randomUuid }),
       });
+      const secretListRoute = createLocalApiSecretListRoute(
+        authority.localSecretMetadata,
+      );
+      const secretPutRoute = createLocalApiSecretPutRoute({
+        projectPolicy: authority.projectPolicy,
+        secretAdministrationForCredential: (fence) => {
+          if (fence.subjectType !== 'user') {
+            throw new TypeError('Secret mutation requires a User credential');
+          }
+          return authority.localSecretAdministrationForCredential({
+            ...fence,
+            subjectType: 'user',
+          });
+        },
+        securityAudit: authority.securityAudit,
+        secretKeys: authority.localSecretKeys,
+        presenceProof,
+        ...(options.now === undefined ? {} : { now: options.now }),
+        ...(options.randomUuid === undefined
+          ? {}
+          : { randomUuid: options.randomUuid }),
+      });
       const admission = createLocalApiAdmission({
         authenticator,
         policy,
@@ -213,6 +239,8 @@ export function createLocalApiProductSurface(
         triggerListRoute,
         triggerReadRoute,
         triggerPutRoute,
+        secretListRoute,
+        secretPutRoute,
         ...(options.now === undefined ? {} : { now: options.now }),
         ...(options.randomUuid === undefined
           ? {}

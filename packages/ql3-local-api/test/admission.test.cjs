@@ -86,6 +86,51 @@ test('defers Trigger put Policy, presence and mutation to the route', async () =
   ]);
 });
 
+test('uses secret.manage for bounded Secret metadata and never widens the route input', async () => {
+  const { admission, events } = fixture();
+  assert.deepEqual(
+    await execute(
+      admission,
+      request({
+        operation: {
+          operationId: 'secret.list',
+          projectId: 'prj_default',
+          limit: 16,
+          after: { name: 'alpha' },
+        },
+      }),
+    ),
+    { statusCode: 200, body: { secrets: [], truncated: false } },
+  );
+  assert.deepEqual(events, [
+    'authenticate',
+    'authorize:secret.manage:prj_default',
+    'audit:allowed:secret.list',
+    'confirm',
+    'secrets:prj_default:16',
+  ]);
+});
+
+test('defers Secret put Policy, presence and plaintext body to the fenced route', async () => {
+  const { admission, events } = fixture();
+  const prepared = await admission.prepare(
+    request({
+      localPresence: 'ql3p_bound',
+      operation: {
+        operationId: 'secret.put',
+        projectId: 'prj_default',
+      },
+    }),
+  );
+  assert.equal(prepared.bodyMode, 'json');
+  assert.equal(prepared.maximumBodyBytes, 20 * 1024);
+  assert.deepEqual(await prepared.handle({ plaintext: 'ephemeral' }), {
+    statusCode: 201,
+    body: { status: 'inserted' },
+  });
+  assert.deepEqual(events, ['authenticate', 'secret-put:prj_default']);
+});
+
 function request(overrides = {}) {
   return Object.freeze({
     requestId: 'local:019f70c0-0000-7000-8000-000000000001',
@@ -244,6 +289,18 @@ function fixture(overrides = {}) {
       async handle(value) {
         events.push(`trigger-put:${value.projectId}:${value.triggerId}`);
         return { statusCode: 201, body: { status: 'created' } };
+      },
+    },
+    secretListRoute: {
+      async handle(value) {
+        events.push(`secrets:${value.projectId}:${value.limit}`);
+        return { statusCode: 200, body: { secrets: [], truncated: false } };
+      },
+    },
+    secretPutRoute: {
+      async handle(value) {
+        events.push(`secret-put:${value.projectId}`);
+        return { statusCode: 201, body: { status: 'inserted' } };
       },
     },
     now: () => 10_000,

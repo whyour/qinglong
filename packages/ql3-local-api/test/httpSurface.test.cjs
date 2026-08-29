@@ -52,14 +52,19 @@ function request(port, path, options = {}) {
 function preparedAdmission(handler) {
   return {
     async prepare(value) {
-      const json = ['run.cancel', 'task.start', 'task.put'].includes(
-        value.operation.operationId,
-      );
+      const json = [
+        'run.cancel',
+        'task.start',
+        'task.put',
+        'secret.put',
+      ].includes(value.operation.operationId);
       return {
         bodyMode: json ? 'json' : 'none',
         maximumBodyBytes:
           value.operation.operationId === 'task.put'
             ? 72 * 1024
+            : value.operation.operationId === 'secret.put'
+            ? 20 * 1024
             : json
             ? 512
             : 0,
@@ -83,7 +88,8 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
       if (
         value.operation.operationId === 'run.cancel' ||
         value.operation.operationId === 'task.start' ||
-        value.operation.operationId === 'task.put'
+        value.operation.operationId === 'task.put' ||
+        value.operation.operationId === 'secret.put'
       ) {
         return { statusCode: 202, body: { accepted: body } };
       }
@@ -138,6 +144,12 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
         return {
           statusCode: 200,
           body: { task: { taskId: value.operation.taskId } },
+        };
+      }
+      if (value.operation.operationId === 'secret.list') {
+        return {
+          statusCode: 200,
+          body: { secrets: [], truncated: false },
         };
       }
       return {
@@ -356,6 +368,41 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
   });
   assert.equal(observed[11].localPresence, 'ql3p_authoring_read_proof');
 
+  const secrets = await request(
+    port,
+    '/api/v3/projects/prj_default/secrets?limit=8&after=YWxwaGE',
+  );
+  assert.deepEqual(secrets.body, { secrets: [], truncated: false });
+  assert.deepEqual(observed[12].operation, {
+    operationId: 'secret.list',
+    projectId: 'prj_default',
+    limit: 8,
+    after: { name: 'alpha' },
+  });
+
+  const secretPutBody = JSON.stringify({ name: 'github-token' });
+  const secretPut = await request(
+    port,
+    '/api/v3/projects/prj_default/secrets',
+    {
+      method: 'PUT',
+      headers: {
+        authorization: 'Bearer opaque',
+        'x-qinglong-local-presence': 'ql3p_secret_bound_proof',
+        'content-type': 'application/json',
+        'content-length': String(Buffer.byteLength(secretPutBody)),
+      },
+      body: secretPutBody,
+    },
+  );
+  assert.equal(secretPut.statusCode, 202);
+  assert.deepEqual(secretPut.body.accepted, JSON.parse(secretPutBody));
+  assert.deepEqual(observed[13].operation, {
+    operationId: 'secret.put',
+    projectId: 'prj_default',
+  });
+  assert.equal(observed[13].localPresence, 'ql3p_secret_bound_proof');
+
   for (const invalidPath of [
     '/api/v3/projects/prj_default/runs/run_123?expanded=true',
     '/api/v3/projects/prj_default/runs/run%5f123',
@@ -403,6 +450,17 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     assert.deepEqual(invalid.body, { code: 'invalid_task_list_query' });
   }
   for (const invalidQuery of [
+    '/api/v3/projects/prj_default/secrets?',
+    '/api/v3/projects/prj_default/secrets?limit=08',
+    '/api/v3/projects/prj_default/secrets?limit=65',
+    '/api/v3/projects/prj_default/secrets?after=Y',
+    '/api/v3/projects/prj_default/secrets?unknown=value',
+  ]) {
+    const invalid = await request(port, invalidQuery);
+    assert.equal(invalid.statusCode, 400);
+    assert.deepEqual(invalid.body, { code: 'invalid_secret_list_query' });
+  }
+  for (const invalidQuery of [
     '/api/v3/projects/prj_default/runs/run_123/events?',
     '/api/v3/projects/prj_default/runs/run_123/events?after_sequence=07',
     '/api/v3/projects/prj_default/runs/run_123/events?after_sequence=-1',
@@ -425,7 +483,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     assert.equal(invalid.statusCode, 400);
     assert.deepEqual(invalid.body, { code: 'invalid_run_step_list_query' });
   }
-  assert.equal(observed.length, 12);
+  assert.equal(observed.length, 14);
   assert.deepEqual(
     await Promise.all([surface.stopAndDrain(), surface.stopAndDrain()]),
     ['stopped', 'stopped'],
