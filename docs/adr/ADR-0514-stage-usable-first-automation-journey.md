@@ -1,6 +1,6 @@
 # ADR-0514：阶段可用的首个自动化旅程
 
-- 状态：Accepted（首份真实双架构 v5 Trial Kit 待维护者授权）
+- 状态：Accepted（v5 headless/Console 双变体 milestone 已交付）
 - 日期：2026-08-28
 - 对应 RFC 切片：D-419
 
@@ -64,3 +64,5 @@ Trial Kit 升级为 `qinglong/alpha-local-trial-kit@v5`（manifest schemaVersion
 ## 结果与剩余边界
 
 D-419 形成“下载、验真、启动、认证、执行、观察终态”的首个阶段可用业务闭环。它仍是 fresh Alpha，不是 2.x 升级、生产 HA、公开 release、签名或 LTS。实际大 archive 继续只允许维护者显式设置 `produce_alpha_artifacts=true`；普通 push 的绿色 CI 证明源码可生成和实跑，不自动产生可下载大产物。
+
+Console v5 已由 run `33252179178` 交付最新 Secret-backed 自动化闭环；默认低配 headless v5 随后由独立 run `33258604609` 形成双架构 milestone，只安装 Owner presentation，不创建示例 Task 或开放 listener。两个变体下载后三件套的 checksum 与仓库 auditor 均返回 `compatible=true`，没有把 Console archive 改名给 headless 用户。

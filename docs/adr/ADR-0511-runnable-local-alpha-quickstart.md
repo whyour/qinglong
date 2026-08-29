@@ -1,6 +1,6 @@
 # ADR-0511：可直接试运行的 Local Alpha Quickstart
 
-- 状态：Accepted（首份实际 v3 Trial Kit 待维护者授权）
+- 状态：Accepted（当前 v5 headless/Console 双变体 milestone 已交付）
 - 日期：2026-08-28
 - 决策：D-416
 - 关联：ADR-0193、ADR-0503、ADR-0504、ADR-0506、ADR-0508、ADR-0510
@@ -66,7 +66,7 @@ Cluster 节点继续使用 Cluster Integration Candidate 和 Kubernetes/CloudNat
 - bundle 从七个文件增加为八个小文件，不新增镜像 layer、workspace package、runtime dependency、端口、后台 timer 或稳态 RSS；
 - Edge/Standalone 继续共用同一镜像，差异只体现在 quickstart 的 memory/PID limit；
 - `@v2` 仍是历史 verification-evidence 阶段格式，首份面向部署者的实际下载物必须使用 `@v3`；
-- 首份真实 amd64/arm64 v3 Trial Kit、Local milestone 与 stage index 仍需维护者显式授权 artifact workflow，普通 push 不生成大归档。
+- 真实 amd64/arm64 Trial Kit 仍需维护者显式授权 artifact workflow，普通 push 不生成大归档；当前严格 v5 的 Console 与 headless 已分别形成双架构 Local milestone，跨 Profile stage index 仍需独立 `all` scope run。
 
 ## 验证
 
@@ -75,4 +75,4 @@ Cluster 节点继续使用 Cluster Integration Candidate 和 Kubernetes/CloudNat
 - Local operator workflow 静态审计要求 `create → audit → quickstart → stop → upload` 顺序；
 - 聚焦门为 `26/26`，完整 backend 为 `1636 total / 1634 pass / 2 conditional skip / 0 fail`，18-package clean build/test、package/dependency/Edge import、镜像/版本和 14 档 Local artifact audit 全部通过；
 - 历史同源 arm64 Application/operator 已物化为 184,648,192-byte v3 开发 bundle并通过 checksum、canonical audit、load 与 exact identity；Docker Desktop 在 Owner POSIX directory ownership 处按已知不等价失败关闭，未被记录为 native quickstart 成功；
-- 手动 artifact job 在原生 amd64/arm64 runner 上执行将要上传的 exact quickstart；首份实际运行结果待维护者授权触发后记录。
+- 手动 artifact job 在原生 amd64/arm64 runner 上执行将要上传的 exact quickstart；Console v5 run `33252179178` 与 headless v5 run `33258604609` 均已生成双架构 milestone，下载后三件套 checksum/auditor 返回 `compatible=true`。

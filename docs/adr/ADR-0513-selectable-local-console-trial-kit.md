@@ -69,7 +69,7 @@ manifest、verification、SBOM、archive 名、artifact 名、milestone 和 stag
 - Console image 有独立 12-package、6 MiB/640-file 上限、SBOM、OS vulnerability policy 与双架构 live gate；
 - Local milestone 和 stage index 升级 schema，旧 v1/v3 索引不会被新 auditor 静默接受；
 - 该决策提供 Alpha/Linux 试运行产物，不等于 public release、生产 ingress、HA、签名或 LTS；
-- 首份真实可下载双架构产物仍需维护者显式授权 workflow，普通 CI 成功只证明产物链可生成。
+- 真实可下载双架构产物仍需维护者显式授权 workflow，普通 CI 成功只证明产物链可生成；当前 Console v5 run `33252179178` 与 headless v5 run `33258604609` 已分别形成独立 Local milestone，没有跨变体复用 archive。
 
 ## 验证
 
@@ -81,3 +81,4 @@ manifest、verification、SBOM、archive 名、artifact 名、milestone 和 stag
 - 本机实际镜像库存为 headless `10 packages / 425 files / 3,638,399 bytes`、Console `12 packages / 455 files / 3,831,208 bytes`，两者均在 128 MiB/64 PID entrypoint 门内且排除 AI；
 - macOS Docker Desktop 的 bind mount 不能提供与原生 Linux 等价的 POSIX Owner UID/mode 证据，Console fresh lifecycle 因此在 owner-private directory 门失败关闭；不得把该宿主限制冒充应用通过，最终双架构证据由推送后的原生 Linux CI 关闭；
 - GitNexus 变更审计、镜像静态门和 Docker 实物门在提交前执行。
+- 当前两个变体的下载后三件套均通过 checksum、双架构 Trial Kit auditor 与 milestone auditor；headless 明确不含 listener、Console、示例 Task 或 Console 管理 package。
