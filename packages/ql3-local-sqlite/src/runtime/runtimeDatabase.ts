@@ -37,6 +37,7 @@ import type { StepRunRepository } from '@qinglong/runtime-core/step-run';
 import type { RunCancellationRepository } from '@qinglong/runtime-core/run-cancellation';
 import type { TaskStartRepository } from '@qinglong/runtime-core/task-start';
 import type { TaskDefinitionAdministrationRepository } from '@qinglong/runtime-core/task-definition-administration';
+import type { TriggerAdministrationRepository } from '@qinglong/runtime-core/trigger-administration';
 import type { ToolExecutionCompletionRepository } from '@qinglong/runtime-core/tool-execution-completion';
 import type { ToolExecutionFailureCompletionRepository } from '@qinglong/runtime-core/tool-execution-failure-completion';
 import type { ToolExecutionStartBarrierRepository } from '@qinglong/runtime-core/tool-execution-start-barrier';
@@ -102,6 +103,9 @@ export interface LocalSqliteRuntimeDatabase {
     fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
   ): Promise<TaskDefinitionAdministrationRepository>;
   readonly triggers: LocalSqliteTriggerRepository;
+  triggerAdministrationForCredential(
+    fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+  ): Promise<TriggerAdministrationRepository>;
   readonly schedules: LocalSqliteScheduleRepository;
   readonly localDispatch: LocalDispatchStore;
   readonly executionControl: LocalExecutionControlSource;
@@ -284,6 +288,37 @@ export async function openLocalSqliteRuntimeDatabase(
         );
       },
       triggers,
+      async triggerAdministrationForCredential(
+        fence: Readonly<LocalSqliteAuthenticatedUserCredentialFence>,
+      ) {
+        const [administration, triggerAdministration] = await Promise.all([
+          import('../administration/packageManagement.js'),
+          import('../scheduling/triggerAdministration.js'),
+        ]);
+        const {
+          confirmLocalSqliteAuthenticatedUserCredentialFence,
+          LocalSqliteAuthenticatedManagementFenceError,
+        } = administration;
+        const { LocalSqliteTriggerAdministrationRepository } =
+          triggerAdministration;
+        confirmLocalSqliteAuthenticatedUserCredentialFence(authority, fence);
+        return new LocalSqliteTriggerAdministrationRepository(
+          authority,
+          triggers,
+          (actor) => {
+            if (
+              actor.type !== fence.subjectType ||
+              actor.id !== fence.subjectId
+            ) {
+              throw new LocalSqliteAuthenticatedManagementFenceError();
+            }
+            confirmLocalSqliteAuthenticatedUserCredentialFence(
+              authority,
+              fence,
+            );
+          },
+        );
+      },
       schedules,
       localDispatch: runRuntimeCapabilities.dispatch,
       executionControl: runRuntimeCapabilities.executionControl,

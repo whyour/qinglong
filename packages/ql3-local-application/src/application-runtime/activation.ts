@@ -522,6 +522,9 @@ export async function bootstrapLocalApplication(
           taskDefinitions: storage.taskDefinitions,
           taskDefinitionAdministrationForCredential:
             storage.taskDefinitionAdministrationForCredential,
+          triggers: storage.triggers,
+          triggerAdministrationForCredential:
+            storage.triggerAdministrationForCredential,
           apiCredentials: storage.apiCredentials,
           ownerPepper: storage.ownerPepper,
           projectPolicy: storage.projectPolicy,

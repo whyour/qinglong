@@ -67,6 +67,9 @@
           <button type="button" data-view="tasks" aria-current="page">
             <span>任务</span><kbd>T</kbd>
           </button>
+          <button type="button" data-view="triggers">
+            <span>定时</span><kbd>S</kbd>
+          </button>
           <button type="button" data-view="runs">
             <span>运行</span><kbd>R</kbd>
           </button>
@@ -90,6 +93,9 @@
           <div class="masthead-actions">
             <button class="action-button" id="create-task-button" type="button" hidden>
               <span aria-hidden="true">＋</span> 创建任务
+            </button>
+            <button class="action-button" id="create-trigger-button" type="button" hidden>
+              <span aria-hidden="true">＋</span> 创建定时
             </button>
             <button class="refresh-button" id="refresh-button" type="button" hidden>
               <span aria-hidden="true">↻</span> 刷新
@@ -179,6 +185,58 @@
         </p>
         <div class="dialog-actions">
           <button class="primary-button" id="task-editor-save" type="submit">
+            保存并生成本机证明
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="trigger-editor-dialog" class="task-editor-dialog">
+      <form id="trigger-editor-form" autocomplete="off">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Cron scheduling</p>
+            <h2 id="trigger-editor-title">创建定时触发器</h2>
+          </div>
+          <button class="quiet-button" id="trigger-editor-close" type="button">关闭</button>
+        </div>
+        <p class="editor-intro" id="trigger-editor-intro">
+          Trigger 会绑定 Task 当前 revision 与内容摘要；Task 改变后需重新保存定时配置。
+        </p>
+        <div class="editor-grid">
+          <label>
+            <span>Trigger ID</span>
+            <input id="trigger-id-input" maxlength="128" spellcheck="false" required />
+          </label>
+          <label>
+            <span>Task ID</span>
+            <input id="trigger-task-id-input" maxlength="128" spellcheck="false" required />
+          </label>
+          <label class="editor-wide">
+            <span>Cron 表达式 · 5 或 6 段</span>
+            <input id="trigger-expression-input" value="0 * * * *" maxlength="512" spellcheck="false" required />
+          </label>
+          <label>
+            <span>时区</span>
+            <input id="trigger-timezone-input" value="UTC" maxlength="128" spellcheck="false" required />
+          </label>
+          <label>
+            <span>错过执行窗口</span>
+            <select id="trigger-misfire-input">
+              <option value="skip">跳过</option>
+              <option value="fire_once">补跑一次</option>
+            </select>
+          </label>
+          <label class="editor-check">
+            <input id="trigger-enabled-input" type="checkbox" checked />
+            <span>保存后启用自动执行</span>
+          </label>
+        </div>
+        <p class="editor-note">
+          当前 Console 只开放内置 <code>qinglong/cron@v1</code>；停用会写入新 revision，不删除历史。
+        </p>
+        <div class="dialog-actions">
+          <button class="primary-button" id="trigger-editor-save" type="submit">
             保存并生成本机证明
           </button>
         </div>

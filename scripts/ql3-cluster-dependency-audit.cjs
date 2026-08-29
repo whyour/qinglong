@@ -3169,6 +3169,14 @@ function auditSourceImports(root, packagePath, findings) {
         continue;
       }
       if (
+        packagePath === 'packages/ql3-local-api' &&
+        path.relative(packageDirectory, filePath) ===
+          'src/trigger/triggerPutRoute.ts' &&
+        specifier === '@qinglong/local-admin/trigger-administration'
+      ) {
+        continue;
+      }
+      if (
         path.isAbsolute(specifier) ||
         forbidden.some(
           (packageName) =>

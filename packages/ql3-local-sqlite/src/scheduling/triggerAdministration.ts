@@ -97,7 +97,7 @@ function sameCredentialFence(
   );
 }
 
-class LocalSqliteTriggerAdministrationRepository
+export class LocalSqliteTriggerAdministrationRepository
   implements TriggerAdministrationRepository
 {
   constructor(

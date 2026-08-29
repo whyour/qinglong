@@ -28,6 +28,11 @@ import type { LocalApiTaskReadRoute } from '../task/taskReadRoute';
 import type { LocalApiTaskStartRoute } from '../task/taskStartRoute';
 import type { LocalApiTaskPutRoute } from '../task/taskPutRoute';
 import type { LocalApiTaskAuthoringRoute } from '../task/taskAuthoringRoute';
+import type {
+  LocalApiTriggerListRoute,
+  LocalApiTriggerReadRoute,
+} from '../trigger/triggerReadRoutes';
+import type { LocalApiTriggerPutRoute } from '../trigger/triggerPutRoute';
 import type { LocalApiResponse } from '../transport/contract';
 
 export type LocalApiAdmissionOperation =
@@ -90,6 +95,22 @@ export type LocalApiAdmissionOperation =
       operationId: 'task.authoring';
       projectId: string;
       taskId: string;
+    }>
+  | Readonly<{
+      operationId: 'trigger.list';
+      projectId: string;
+      limit: number;
+      after?: Readonly<{ readonly triggerId: string }>;
+    }>
+  | Readonly<{
+      operationId: 'trigger.get';
+      projectId: string;
+      triggerId: string;
+    }>
+  | Readonly<{
+      operationId: 'trigger.put';
+      projectId: string;
+      triggerId: string;
     }>;
 
 export interface LocalApiAdmissionRequest {
@@ -128,6 +149,9 @@ export interface LocalApiAdmissionOptions {
   readonly taskStartRoute: LocalApiTaskStartRoute;
   readonly taskPutRoute: LocalApiTaskPutRoute;
   readonly taskAuthoringRoute: LocalApiTaskAuthoringRoute;
+  readonly triggerListRoute: LocalApiTriggerListRoute;
+  readonly triggerReadRoute: LocalApiTriggerReadRoute;
+  readonly triggerPutRoute: LocalApiTriggerPutRoute;
   readonly now?: () => number;
   readonly randomUuid?: () => string;
 }
@@ -208,6 +232,9 @@ export function createLocalApiAdmission(
     typeof options.taskStartRoute?.handle !== 'function' ||
     typeof options.taskPutRoute?.handle !== 'function' ||
     typeof options.taskAuthoringRoute?.handle !== 'function' ||
+    typeof options.triggerListRoute?.handle !== 'function' ||
+    typeof options.triggerReadRoute?.handle !== 'function' ||
+    typeof options.triggerPutRoute?.handle !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function') ||
     (options.randomUuid !== undefined &&
       typeof options.randomUuid !== 'function')
@@ -296,6 +323,25 @@ export function createLocalApiAdmission(
         });
       }
 
+      if (request.operation.operationId === 'trigger.put') {
+        const triggerPutOperation = request.operation;
+        return Object.freeze({
+          bodyMode: 'json' as const,
+          maximumBodyBytes: 20 * 1_024,
+          async handle(body: unknown | null) {
+            return options.triggerPutRoute.handle({
+              requestId: request.requestId,
+              projectId: triggerPutOperation.projectId,
+              triggerId: triggerPutOperation.triggerId,
+              body,
+              presence: request.localPresence,
+              authenticated,
+              signal: request.signal,
+            });
+          },
+        });
+      }
+
       let decision: Readonly<SecurityPolicyDecision>;
       try {
         decision = normalizeSecurityPolicyDecision(
@@ -309,7 +355,9 @@ export function createLocalApiAdmission(
               : request.operation.operationId === 'task.start'
               ? 'run.start'
               : request.operation.operationId === 'task.list' ||
-                request.operation.operationId === 'task.get'
+                request.operation.operationId === 'task.get' ||
+                request.operation.operationId === 'trigger.list' ||
+                request.operation.operationId === 'trigger.get'
               ? 'task.read'
               : 'run.read',
           ),
@@ -443,8 +491,24 @@ export function createLocalApiAdmission(
                 principal: authenticated.principal,
                 policyFence: decision.fence,
               });
+            case 'trigger.list':
+              if (body !== null) return response(400, 'invalid_request_body');
+              return options.triggerListRoute.handle({
+                projectId: request.operation.projectId,
+                limit: request.operation.limit,
+                ...(request.operation.after
+                  ? { after: request.operation.after }
+                  : {}),
+              });
+            case 'trigger.get':
+              if (body !== null) return response(400, 'invalid_request_body');
+              return options.triggerReadRoute.handle({
+                projectId: request.operation.projectId,
+                triggerId: request.operation.triggerId,
+              });
             case 'task.put':
             case 'task.authoring':
+            case 'trigger.put':
               return response(503, 'request_unavailable');
           }
         },

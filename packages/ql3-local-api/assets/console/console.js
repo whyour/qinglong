@@ -3,6 +3,7 @@
 
   const PROJECT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
   const TASK_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+  const CRON_FIELD_PATTERN = /^[0-9A-Za-z*?,/#LW-]+$/;
   const TOKEN_PATTERN =
     /^ql3c_[A-Za-z0-9][A-Za-z0-9._:-]{0,63}_[A-Za-z0-9_-]{43}$/;
   const PRESENCE_PATTERN =
@@ -51,6 +52,11 @@
       '暂时无法建立安全编辑会话。请稍后重新读取 Task。',
     invalid_task_definition: 'Task 定义无效。请检查 ID、命令与参数。',
     task_definition_unavailable: 'Task 暂时无法保存。请检查数据库状态。',
+    trigger_query_unavailable: '定时触发器暂时不可读取。请检查数据库状态。',
+    trigger_fence_rejected:
+      'Trigger、Task 或授权在确认期间发生变化。请刷新后重新编辑。',
+    invalid_trigger: '定时配置无效。请检查表达式、时区与 Task 状态。',
+    trigger_unavailable: '定时配置暂时无法保存。请检查数据库状态。',
     run_cancellation_fence_rejected:
       '运行在确认期间发生变化，本次取消已安全拒绝。请刷新后重试。',
     request_unavailable: '本次请求没有完成，请确认服务仍在运行。',
@@ -71,6 +77,7 @@
     description: document.getElementById('section-description'),
     refresh: document.getElementById('refresh-button'),
     createTask: document.getElementById('create-task-button'),
+    createTrigger: document.getElementById('create-trigger-button'),
     dialog: document.getElementById('confirmation-dialog'),
     dialogTitle: document.getElementById('confirmation-title'),
     dialogCopy: document.getElementById('confirmation-copy'),
@@ -89,6 +96,18 @@
     taskArgs: document.getElementById('task-args-input'),
     taskEnabled: document.getElementById('task-enabled-input'),
     taskEnabledLabel: document.getElementById('task-enabled-label'),
+    triggerEditor: document.getElementById('trigger-editor-dialog'),
+    triggerEditorTitle: document.getElementById('trigger-editor-title'),
+    triggerEditorIntro: document.getElementById('trigger-editor-intro'),
+    triggerEditorForm: document.getElementById('trigger-editor-form'),
+    triggerEditorClose: document.getElementById('trigger-editor-close'),
+    triggerEditorSave: document.getElementById('trigger-editor-save'),
+    triggerId: document.getElementById('trigger-id-input'),
+    triggerTaskId: document.getElementById('trigger-task-id-input'),
+    triggerExpression: document.getElementById('trigger-expression-input'),
+    triggerTimezone: document.getElementById('trigger-timezone-input'),
+    triggerMisfire: document.getElementById('trigger-misfire-input'),
+    triggerEnabled: document.getElementById('trigger-enabled-input'),
     presenceDialog: document.getElementById('presence-dialog'),
     presenceForm: document.getElementById('presence-form'),
     presenceCopy: document.getElementById('presence-copy'),
@@ -109,6 +128,7 @@
     pendingAction: null,
     pendingPresence: null,
     authoringSnapshot: null,
+    triggerSnapshot: null,
     toastTimer: null,
   };
 
@@ -487,6 +507,121 @@
     });
   }
 
+  function openTriggerEditor(snapshot = null, task = null) {
+    state.triggerSnapshot = snapshot;
+    nodes.triggerEditorForm.reset();
+    const editing = snapshot !== null;
+    nodes.triggerEditorTitle.textContent = editing
+      ? '编辑定时触发器'
+      : '创建定时触发器';
+    nodes.triggerEditorIntro.textContent = editing
+      ? `将基于 Trigger revision ${snapshot.revision} 写入新 revision，并重新绑定 Task 当前内容。`
+      : 'Trigger 会绑定 Task 当前 revision 与内容摘要；Task 改变后需重新保存定时配置。';
+    nodes.triggerId.readOnly = editing;
+    nodes.triggerTaskId.readOnly = editing;
+    if (editing) {
+      nodes.triggerId.setAttribute('aria-readonly', 'true');
+      nodes.triggerTaskId.setAttribute('aria-readonly', 'true');
+      nodes.triggerId.value = snapshot.triggerId;
+      nodes.triggerTaskId.value = snapshot.taskId;
+      nodes.triggerExpression.value = snapshot.spec.config.expression;
+      nodes.triggerTimezone.value = snapshot.spec.config.timezone;
+      nodes.triggerMisfire.value = snapshot.spec.config.misfirePolicy;
+      nodes.triggerEnabled.checked = snapshot.enabled;
+    } else {
+      nodes.triggerId.removeAttribute('aria-readonly');
+      nodes.triggerTaskId.removeAttribute('aria-readonly');
+      nodes.triggerExpression.value = '0 * * * *';
+      nodes.triggerTimezone.value = 'UTC';
+      nodes.triggerMisfire.value = 'skip';
+      nodes.triggerEnabled.checked = true;
+      if (task) {
+        nodes.triggerTaskId.value = task.taskId;
+        nodes.triggerId.value = `cron:${task.taskId}`;
+      }
+    }
+    nodes.triggerEditor.returnValue = '';
+    nodes.triggerEditor.showModal();
+    (editing || task ? nodes.triggerExpression : nodes.triggerId).focus();
+  }
+
+  async function triggerDraft() {
+    const triggerId = nodes.triggerId.value.trim();
+    const taskId = nodes.triggerTaskId.value.trim();
+    const expression = nodes.triggerExpression.value
+      .trim()
+      .replace(/\s+/gu, ' ');
+    const timezone = nodes.triggerTimezone.value.trim();
+    const fields = expression.split(' ');
+    if (!TASK_PATTERN.test(triggerId) || !TASK_PATTERN.test(taskId)) {
+      throw new TypeError('Trigger ID 或 Task ID 格式无效。');
+    }
+    if (
+      (fields.length !== 5 && fields.length !== 6) ||
+      fields.some((field) => !CRON_FIELD_PATTERN.test(field)) ||
+      !timezone
+    ) {
+      throw new TypeError('Cron 表达式或时区无效。');
+    }
+    const taskValue = await api(
+      `/api/v3/projects/${state.project}/tasks/${taskId}`,
+    );
+    const task = taskValue.task;
+    if (
+      !task ||
+      task.taskId !== taskId ||
+      !Number.isSafeInteger(task.revision) ||
+      !/^[a-f0-9]{64}$/u.test(task.contentDigest)
+    ) {
+      throw new ConsoleRequestError('response_unavailable', 503, null);
+    }
+    const snapshot = state.triggerSnapshot;
+    return Object.freeze({
+      triggerId,
+      body: Object.freeze({
+        expectedRevision: snapshot ? snapshot.revision : null,
+        mutationId: newMutationId(),
+        taskId,
+        taskRevision: task.revision,
+        taskContentDigest: task.contentDigest,
+        spec: Object.freeze({
+          schema: 'qinglong/cron@v1',
+          config: Object.freeze({
+            expression,
+            timezone,
+            misfirePolicy: nodes.triggerMisfire.value,
+          }),
+        }),
+        enabled: nodes.triggerEnabled.checked,
+        occurredAtMs: Date.now(),
+      }),
+    });
+  }
+
+  async function saveTriggerDraft() {
+    nodes.triggerEditorSave.disabled = true;
+    try {
+      const mutation = await triggerDraft();
+      const value = await api(
+        `/api/v3/projects/${state.project}/triggers/${mutation.triggerId}`,
+        {
+          method: 'PUT',
+          body: mutation.body,
+          acceptStatus: 428,
+        },
+      );
+      if (value.code === 'local_presence_required') {
+        showPresenceChallenge({ kind: 'trigger-mutation', mutation }, value);
+        return;
+      }
+      throw new ConsoleRequestError('response_unavailable', 503, null);
+    } catch (error) {
+      showToast(describeError(error), 'error');
+    } finally {
+      nodes.triggerEditorSave.disabled = false;
+    }
+  }
+
   function showPresenceChallenge(action, challenge) {
     if (
       challenge?.code !== 'local_presence_required' ||
@@ -498,8 +633,11 @@
     }
     state.pendingPresence = Object.freeze({ ...action, challenge });
     const authoringRead = action.kind === 'authoring';
+    const triggerMutation = action.kind === 'trigger-mutation';
     nodes.presenceCopy.textContent = authoringRead
       ? '读取完整 Task 定义需要部署设备上的一次性证明。返回的编辑租约不替代保存时的新内容证明。'
+      : triggerMutation
+      ? '使用部署 QingLong 的系统用户读取下面的私有文件。证明只绑定这次 Trigger 与 Task revision，且只能使用一次。'
       : '使用部署 QingLong 的系统用户读取下面的私有文件。证明只绑定这次 Task 内容，且只能使用一次。';
     nodes.presenceSubmit.textContent = authoringRead
       ? '验证并加载定义'
@@ -514,6 +652,7 @@
     nodes.presenceError.textContent = '';
     nodes.presenceError.hidden = true;
     nodes.taskEditor.close();
+    nodes.triggerEditor.close();
     nodes.presenceDialog.returnValue = '';
     nodes.presenceDialog.showModal();
     nodes.presenceProof.focus();
@@ -598,6 +737,34 @@
         nodes.presenceDialog.close();
         openTaskEditor(snapshot);
         showToast('完整 Task 定义已加载；保存仍需要新的本机证明。');
+        return;
+      }
+      if (pending.kind === 'trigger-mutation') {
+        const value = await api(
+          `/api/v3/projects/${state.project}/triggers/${pending.mutation.triggerId}`,
+          {
+            method: 'PUT',
+            body: pending.mutation.body,
+            presence: proof,
+          },
+        );
+        const updated = pending.mutation.body.expectedRevision !== null;
+        state.pendingPresence = null;
+        state.triggerSnapshot = null;
+        nodes.presenceProof.value = '';
+        nodes.presenceDialog.close();
+        showToast(
+          value.status === 'existing'
+            ? '已找到同一 Trigger 请求。'
+            : updated
+            ? '定时触发器已更新。'
+            : '定时触发器已创建。',
+        );
+        state.view = 'triggers';
+        state.selectedId = pending.mutation.triggerId;
+        updateNavigation();
+        await refresh();
+        await selectTrigger(pending.mutation.triggerId);
         return;
       }
       const value = await api(
@@ -726,6 +893,9 @@
     if (task.kind === 'command' && task.specSchema === 'qinglong/command@v1') {
       actions.append(actionButton('编辑任务', () => beginTaskAuthoring(task)));
     }
+    actions.append(
+      actionButton('添加定时', () => openTriggerEditor(null, task)),
+    );
     if (task.enabled) {
       actions.append(
         actionButton('运行一次', () => {
@@ -769,6 +939,126 @@
     } catch (error) {
       showToast(describeError(error), 'error');
     }
+  }
+
+  async function renderTriggers() {
+    const value = await api(
+      `/api/v3/projects/${state.project}/triggers?limit=64`,
+    );
+    const triggers = Array.isArray(value.triggers) ? value.triggers : [];
+    if (triggers.length === 0) {
+      empty('还没有定时触发器。创建后，现有本地调度器会按 cron 自动生成 Run。');
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    fragment.append(listHeader('Cron trigger ledger', triggers.length));
+    const list = element('div', 'record-list');
+    for (const trigger of triggers) {
+      const button = element('button', 'record');
+      button.type = 'button';
+      button.dataset.identity = trigger.triggerId;
+      if (state.selectedId === trigger.triggerId) {
+        button.setAttribute('aria-current', 'true');
+      }
+      const main = element('span');
+      main.append(element('span', 'record-title', trigger.triggerId));
+      main.append(
+        recordMeta([
+          trigger.taskId,
+          `trigger rev ${trigger.revision}`,
+          `task rev ${trigger.taskRevision}`,
+        ]),
+      );
+      const side = element('span', 'record-side');
+      const enabled = element(
+        'span',
+        'status',
+        trigger.enabled ? '自动执行' : '已停用',
+      );
+      enabled.dataset.tone = trigger.enabled ? 'active' : 'quiet';
+      side.append(enabled);
+      side.append(
+        element('span', 'record-time', formatTime(trigger.updatedAtMs)),
+      );
+      button.append(main, side);
+      button.addEventListener('click', () => selectTrigger(trigger.triggerId));
+      list.append(button);
+    }
+    fragment.append(list);
+    if (value.truncated) {
+      fragment.append(
+        element(
+          'p',
+          'privacy-note',
+          '当前只展示前 64 条；使用 API 可继续读取下一页。',
+        ),
+      );
+    }
+    replace(nodes.ledger, fragment);
+  }
+
+  async function selectTrigger(triggerId) {
+    state.selectedId = triggerId;
+    for (const row of nodes.ledger.querySelectorAll('.record')) {
+      if (row.dataset.identity === triggerId) {
+        row.setAttribute('aria-current', 'true');
+      } else {
+        row.removeAttribute('aria-current');
+      }
+    }
+    const loadingBox = element('div', 'loading-state');
+    loadingBox.append(element('span'));
+    replace(nodes.detail, loadingBox);
+    try {
+      const value = await api(
+        `/api/v3/projects/${state.project}/triggers/${triggerId}`,
+      );
+      renderTriggerDetail(value.trigger);
+    } catch (error) {
+      detailEmpty(describeError(error));
+    }
+  }
+
+  function renderTriggerDetail(trigger) {
+    const config = trigger?.spec?.config;
+    const fragment = document.createDocumentFragment();
+    fragment.append(
+      detailHeader('Cron trigger', trigger.triggerId, trigger.taskId),
+    );
+    const facts = element('div', 'facts');
+    facts.append(
+      fact('状态', trigger.enabled ? '自动执行' : '已停用'),
+      fact('Revision', trigger.revision),
+      fact('Cron', config?.expression || '—'),
+      fact('时区', config?.timezone || '—'),
+      fact('Misfire', config?.misfirePolicy || '—'),
+      fact(
+        'Task fence',
+        `rev ${trigger.taskRevision} · ${shortDigest(
+          trigger.taskContentDigest,
+        )}`,
+      ),
+      fact('Content fence', shortDigest(trigger.contentDigest)),
+      fact('更新时间', formatTime(trigger.updatedAtMs)),
+    );
+    fragment.append(facts);
+    const actions = element('div', 'detail-actions');
+    if (trigger.spec?.schema === 'qinglong/cron@v1') {
+      actions.append(
+        actionButton('编辑或停用', () => openTriggerEditor(trigger)),
+      );
+    }
+    actions.append(
+      actionButton('查看绑定任务', async () => {
+        state.view = 'tasks';
+        state.selectedId = trigger.taskId;
+        updateNavigation();
+        await refresh();
+        await selectTask(trigger.taskId);
+      }),
+    );
+    fragment.append(actions);
+    replace(nodes.detail, fragment);
   }
 
   async function renderRuns() {
@@ -1035,12 +1325,21 @@
     }
     if (state.view === 'tasks') {
       nodes.createTask.hidden = false;
+      nodes.createTrigger.hidden = true;
       nodes.kicker.textContent = 'Project task authority';
       nodes.title.textContent = '任务调度台';
       nodes.description.textContent =
         '创建命令 Task，查看当前 revision 与内容围栏。管理写入需要部署设备上的一次性本机证明。';
+    } else if (state.view === 'triggers') {
+      nodes.createTask.hidden = true;
+      nodes.createTrigger.hidden = false;
+      nodes.kicker.textContent = 'Durable cron authority';
+      nodes.title.textContent = '定时触发器';
+      nodes.description.textContent =
+        '配置内置 cron Trigger，绑定 Task 当前 revision；停用只追加历史，不删除证据。';
     } else {
       nodes.createTask.hidden = true;
+      nodes.createTrigger.hidden = true;
       nodes.kicker.textContent = 'Durable run evidence';
       nodes.title.textContent = '运行事实账本';
       nodes.description.textContent =
@@ -1053,6 +1352,7 @@
     loading();
     try {
       if (state.view === 'tasks') await renderTasks();
+      else if (state.view === 'triggers') await renderTriggers();
       else await renderRuns();
       setConnection('connected', `${state.project} · 已连接`);
     } catch (error) {
@@ -1086,7 +1386,9 @@
     state.pendingAction = null;
     state.pendingPresence = null;
     state.authoringSnapshot = null;
+    state.triggerSnapshot = null;
     if (nodes.taskEditor.open) nodes.taskEditor.close();
+    if (nodes.triggerEditor.open) nodes.triggerEditor.close();
     if (nodes.presenceDialog.open) nodes.presenceDialog.close();
     nodes.token.value = '';
     nodes.token.disabled = false;
@@ -1096,6 +1398,7 @@
     nodes.nav.hidden = true;
     nodes.refresh.hidden = true;
     nodes.createTask.hidden = true;
+    nodes.createTrigger.hidden = true;
     setConnection('idle', '等待凭据');
     nodes.kicker.textContent = 'Connection gate';
     nodes.title.textContent = '先建立一条本机连接';
@@ -1133,6 +1436,7 @@
   nodes.disconnect.addEventListener('click', disconnect);
   nodes.refresh.addEventListener('click', refresh);
   nodes.createTask.addEventListener('click', () => openTaskEditor());
+  nodes.createTrigger.addEventListener('click', () => openTriggerEditor());
   nodes.taskEditorClose.addEventListener('click', () => {
     state.authoringSnapshot = null;
     nodes.taskEditor.close();
@@ -1141,9 +1445,18 @@
     event.preventDefault();
     await saveTaskDraft();
   });
+  nodes.triggerEditorClose.addEventListener('click', () => {
+    state.triggerSnapshot = null;
+    nodes.triggerEditor.close();
+  });
+  nodes.triggerEditorForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await saveTriggerDraft();
+  });
   nodes.presenceCancel.addEventListener('click', () => {
     state.pendingPresence = null;
     state.authoringSnapshot = null;
+    state.triggerSnapshot = null;
     nodes.presenceProof.value = '';
     nodes.presenceDialog.close();
   });
@@ -1181,6 +1494,7 @@
       event.target instanceof HTMLTextAreaElement ||
       nodes.dialog.open ||
       nodes.taskEditor.open ||
+      nodes.triggerEditor.open ||
       nodes.presenceDialog.open
     ) {
       return;
@@ -1188,6 +1502,8 @@
     const view =
       event.key.toLowerCase() === 't'
         ? 'tasks'
+        : event.key.toLowerCase() === 's'
+        ? 'triggers'
         : event.key.toLowerCase() === 'r'
         ? 'runs'
         : null;

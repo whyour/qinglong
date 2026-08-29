@@ -1,5 +1,7 @@
 # QingLong 3.0 Architecture RFC
 
+- D-423/ADR-0518（已实现源码候选，待远程阶段实物验收）：Local Console 复用既有 immutable Trigger revision、固定 Task revision/content digest、semantic cron validation、durable schedule cursor 与原子 Run admission，新增有界 `GET /api/v3/projects/:projectId/triggers[/:triggerId]` 和强认证 `PUT /api/v3/projects/:projectId/triggers/:triggerId`。列表只返回低敏摘要，精确读取才返回完整 spec/Task digest；读取走 `task.read`，mutation 要求 User credential、`task.update`、两分钟一次性 owner-private exact-content proof、credential reconfirm，并由 request-scoped SQLite Trigger repository 在同一事务重验 Policy/RoleBinding/Task pin/credential fence、追加 immutable revision、初始化或更新 schedule 与 durable audit。Console 仅支持冻结的 `qinglong/cron@v1` expression/timezone/`skip|fire_once`，编辑、启停均追加 revision，不提供删除或通用 provider 编辑。Fresh/adopted Profile 共用现有 database close fence；不新增 package、migration、connection、daemon、watcher、每 Trigger timer 或第二 scheduler。默认 headless 不携带 API/Console 资产与 listener，Cluster 不复用 Local POSIX proof/SQLite authority。18-package clean build/test `3,044 total / 3,022 pass / 22 conditional skip / 0 fail`，完整 backend `1,653 total / 1,651 pass / 2 Linux conditional skip / 0 fail`，Local API `70/70`；package boundary、122-module Edge import 与精确 Cluster dependency audit compatible。默认 Edge 2,754,742 bytes/331 files/58 modules，opt-in Edge/Standalone Console 4,150,439/4,150,583 bytes、479 files/101 modules，三资产 84,401 bytes。该结论目前只证明可进入远程验收；最新可下载实物仍是 D-422，必须等 D-423 exact commit 的 CI、Kubernetes、双架构 Console milestone 与下载离线复核闭合后再升级。
+
 - RFC ID: QL-RFC-0001
 - 标题：QingLong 3.0 运行时、工作流与 AI 自动化架构
 - 状态：Draft

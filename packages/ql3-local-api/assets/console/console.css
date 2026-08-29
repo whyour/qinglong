@@ -784,6 +784,7 @@ textarea:focus-visible,
 
 .editor-grid input:not([type='checkbox']),
 .editor-grid textarea,
+.editor-grid select,
 .presence-input input {
   width: 100%;
   padding: 11px 12px;

@@ -13,6 +13,79 @@ const PRINCIPAL = Object.freeze({
   assurance: 'single_factor',
 });
 
+test('uses task.read for bounded Trigger list and read projections', async () => {
+  const { admission, events } = fixture();
+  assert.deepEqual(
+    await execute(
+      admission,
+      request({
+        operation: {
+          operationId: 'trigger.list',
+          projectId: 'prj_default',
+          limit: 16,
+        },
+      }),
+    ),
+    { statusCode: 200, body: { triggers: [], truncated: false } },
+  );
+  assert.deepEqual(events, [
+    'authenticate',
+    'authorize:task.read:prj_default',
+    'audit:allowed:trigger.list',
+    'confirm',
+    'triggers:prj_default:16',
+  ]);
+
+  events.length = 0;
+  assert.deepEqual(
+    await execute(
+      admission,
+      request({
+        operation: {
+          operationId: 'trigger.get',
+          projectId: 'prj_default',
+          triggerId: 'cron:task-a',
+        },
+      }),
+    ),
+    {
+      statusCode: 200,
+      body: { trigger: { triggerId: 'cron:task-a' } },
+    },
+  );
+  assert.deepEqual(events, [
+    'authenticate',
+    'authorize:task.read:prj_default',
+    'audit:allowed:trigger.get',
+    'confirm',
+    'trigger:prj_default:cron:task-a',
+  ]);
+});
+
+test('defers Trigger put Policy, presence and mutation to the route', async () => {
+  const { admission, events } = fixture();
+  const prepared = await admission.prepare(
+    request({
+      localPresence: 'ql3p_bound',
+      operation: {
+        operationId: 'trigger.put',
+        projectId: 'prj_default',
+        triggerId: 'cron:task-a',
+      },
+    }),
+  );
+  assert.equal(prepared.bodyMode, 'json');
+  assert.equal(prepared.maximumBodyBytes, 20 * 1024);
+  assert.deepEqual(await prepared.handle({ enabled: true }), {
+    statusCode: 201,
+    body: { status: 'created' },
+  });
+  assert.deepEqual(events, [
+    'authenticate',
+    'trigger-put:prj_default:cron:task-a',
+  ]);
+});
+
 function request(overrides = {}) {
   return Object.freeze({
     requestId: 'local:019f70c0-0000-7000-8000-000000000001',
@@ -150,6 +223,27 @@ function fixture(overrides = {}) {
       async handle(value) {
         events.push(`task-authoring:${value.projectId}:${value.taskId}`);
         return { statusCode: 200, body: { task: { taskId: value.taskId } } };
+      },
+    },
+    triggerListRoute: {
+      async handle(value) {
+        events.push(`triggers:${value.projectId}:${value.limit}`);
+        return { statusCode: 200, body: { triggers: [], truncated: false } };
+      },
+    },
+    triggerReadRoute: {
+      async handle(value) {
+        events.push(`trigger:${value.projectId}:${value.triggerId}`);
+        return {
+          statusCode: 200,
+          body: { trigger: { triggerId: value.triggerId } },
+        };
+      },
+    },
+    triggerPutRoute: {
+      async handle(value) {
+        events.push(`trigger-put:${value.projectId}:${value.triggerId}`);
+        return { statusCode: 201, body: { status: 'created' } };
       },
     },
     now: () => 10_000,

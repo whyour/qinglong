@@ -42,6 +42,10 @@ const TASK_START_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/runs$/;
 const TASK_AUTHORING_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/tasks\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/authoring$/;
+const TRIGGER_LIST_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/triggers$/;
+const TRIGGER_READ_ROUTE_PATTERN =
+  /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/triggers\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const LOCAL_CONSOLE_CONTENT_SECURITY_POLICY =
@@ -55,7 +59,8 @@ type LocalApiRouteResolution =
         | 'invalid_run_event_list_query'
         | 'invalid_run_step_list_query'
         | 'invalid_run_log_read_query'
-        | 'invalid_task_list_query';
+        | 'invalid_task_list_query'
+        | 'invalid_trigger_list_query';
     }>;
 
 export interface LocalApiHttpSurfaceOptions {
@@ -393,6 +398,53 @@ function parseTaskListQuery(
   });
 }
 
+function parseTriggerListQuery(
+  rawQuery: string | undefined,
+  profile: LocalApplicationProfile,
+): Readonly<{
+  limit: number;
+  after?: Readonly<{ readonly triggerId: string }>;
+}> {
+  if (rawQuery === undefined) {
+    return Object.freeze({ limit: profile === 'edge' ? 16 : 32 });
+  }
+  if (rawQuery.length === 0) throw new TypeError();
+  const values = new Map<string, string>();
+  for (const field of rawQuery.split('&')) {
+    const separator = field.indexOf('=');
+    if (
+      separator < 1 ||
+      separator !== field.lastIndexOf('=') ||
+      separator === field.length - 1
+    ) {
+      throw new TypeError();
+    }
+    const name = field.slice(0, separator);
+    const value = field.slice(separator + 1);
+    if (values.has(name) || (name !== 'limit' && name !== 'after_trigger_id')) {
+      throw new TypeError();
+    }
+    values.set(name, value);
+  }
+  const rawLimit = values.get('limit');
+  const limit =
+    rawLimit === undefined ? (profile === 'edge' ? 16 : 32) : Number(rawLimit);
+  const triggerId = values.get('after_trigger_id');
+  if (
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    limit > 64 ||
+    (rawLimit !== undefined && String(limit) !== rawLimit) ||
+    (triggerId !== undefined && !TASK_ID_PATTERN.test(triggerId))
+  ) {
+    throw new TypeError();
+  }
+  return Object.freeze({
+    limit,
+    ...(triggerId === undefined ? {} : { after: Object.freeze({ triggerId }) }),
+  });
+}
+
 function parseRunAttemptLogReadQuery(
   rawQuery: string | undefined,
   profile: LocalApplicationProfile,
@@ -482,6 +534,14 @@ function route(
       : null;
   }
   if (request.method === 'PUT') {
+    const triggerPutMatch = TRIGGER_READ_ROUTE_PATTERN.exec(path);
+    if (triggerPutMatch && rawQuery === undefined) {
+      return Object.freeze({
+        operationId: 'trigger.put',
+        projectId: triggerPutMatch[1]!,
+        triggerId: triggerPutMatch[2]!,
+      });
+    }
     const taskPutMatch = TASK_READ_ROUTE_PATTERN.exec(path);
     return taskPutMatch && rawQuery === undefined
       ? Object.freeze({
@@ -492,6 +552,29 @@ function route(
       : null;
   }
   if (request.method !== 'GET') return null;
+  const triggerReadMatch = TRIGGER_READ_ROUTE_PATTERN.exec(path);
+  if (triggerReadMatch) {
+    return rawQuery === undefined
+      ? Object.freeze({
+          operationId: 'trigger.get',
+          projectId: triggerReadMatch[1]!,
+          triggerId: triggerReadMatch[2]!,
+        })
+      : null;
+  }
+  const triggerListMatch = TRIGGER_LIST_ROUTE_PATTERN.exec(path);
+  if (triggerListMatch) {
+    try {
+      const input = parseTriggerListQuery(rawQuery, profile);
+      return Object.freeze({
+        operationId: 'trigger.list',
+        projectId: triggerListMatch[1]!,
+        ...input,
+      });
+    } catch {
+      return Object.freeze({ errorCode: 'invalid_trigger_list_query' });
+    }
+  }
   const runAttemptLogReadMatch = RUN_ATTEMPT_LOG_READ_ROUTE_PATTERN.exec(path);
   if (runAttemptLogReadMatch) {
     try {

@@ -1759,6 +1759,11 @@ test('starts an optional product surface after recovery and drains it before own
             typeof authority.taskDefinitions.listTaskDefinitions,
             'function',
           );
+          assert.equal(typeof authority.triggers.listTriggers, 'function');
+          assert.equal(
+            typeof authority.triggerAdministrationForCredential,
+            'function',
+          );
           assert.equal(typeof authority.runAttemptLogRead.read, 'function');
           assert.equal(typeof authority.apiCredentials.resolve, 'function');
           assert.equal(typeof authority.ownerPepper.resolveKey, 'function');

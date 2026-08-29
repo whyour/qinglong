@@ -2541,6 +2541,10 @@ test('confines Local API identity authentication to its exact read-only adapter'
       "import { destroy } from '@qinglong/local-owner-console/pepper-custody/destructive';",
     'transport/widened.ts':
       "import { authenticate } from '@qinglong/local-owner-console/identity-authentication';",
+    'trigger/triggerPutRoute.ts':
+      "import { put } from '@qinglong/local-admin/trigger-administration';",
+    'trigger/widened.ts':
+      "import { put } from '@qinglong/local-admin/trigger-administration';",
   };
   for (const [relativePath, source] of Object.entries(sources)) {
     const filePath = path.join(packageDirectory, relativePath);
@@ -2561,6 +2565,10 @@ test('confines Local API identity authentication to its exact read-only adapter'
       {
         code: 'FORBIDDEN_LOCAL_IDENTITY_AUTHORITY_IMPORT',
         file: 'packages/ql3-local-api/src/transport/widened.ts',
+      },
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-api/src/trigger/widened.ts',
       },
     ],
   );

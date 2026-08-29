@@ -22,6 +22,11 @@ import { createLocalApiTaskReadRoute } from '../task/taskReadRoute';
 import { createLocalApiTaskStartRoute } from '../task/taskStartRoute';
 import { createLocalApiTaskPutRoute } from '../task/taskPutRoute';
 import { createLocalApiTaskAuthoringRoute } from '../task/taskAuthoringRoute';
+import {
+  createLocalApiTriggerListRoute,
+  createLocalApiTriggerReadRoute,
+} from '../trigger/triggerReadRoutes';
+import { createLocalApiTriggerPutRoute } from '../trigger/triggerPutRoute';
 import { startLocalApiHttpSurface } from '../transport/httpSurface';
 
 export interface LocalApiProductSurfaceEvent {
@@ -165,6 +170,31 @@ export function createLocalApiProductSurface(
           ? {}
           : { randomUuid: options.randomUuid }),
       });
+      const triggerListRoute = createLocalApiTriggerListRoute(
+        authority.triggers,
+      );
+      const triggerReadRoute = createLocalApiTriggerReadRoute(
+        authority.triggers,
+      );
+      const triggerPutRoute = createLocalApiTriggerPutRoute({
+        projectPolicy: authority.projectPolicy,
+        triggers: authority.triggers,
+        triggerAdministrationForCredential: (fence) => {
+          if (fence.subjectType !== 'user') {
+            throw new TypeError('Trigger mutation requires a User credential');
+          }
+          return authority.triggerAdministrationForCredential({
+            ...fence,
+            subjectType: 'user',
+          });
+        },
+        securityAudit: authority.securityAudit,
+        presenceProof,
+        ...(options.now === undefined ? {} : { now: options.now }),
+        ...(options.randomUuid === undefined
+          ? {}
+          : { randomUuid: options.randomUuid }),
+      });
       const admission = createLocalApiAdmission({
         authenticator,
         policy,
@@ -180,6 +210,9 @@ export function createLocalApiProductSurface(
         taskStartRoute,
         taskPutRoute,
         taskAuthoringRoute,
+        triggerListRoute,
+        triggerReadRoute,
+        triggerPutRoute,
         ...(options.now === undefined ? {} : { now: options.now }),
         ...(options.randomUuid === undefined
           ? {}

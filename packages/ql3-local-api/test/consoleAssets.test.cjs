@@ -86,6 +86,10 @@ test('loads one bounded offline Console asset closure', () => {
       assert.match(text, /\.\.\.snapshot\.task\.spec\.config/u);
       assert.match(text, /snapshot\.task\.labels/u);
       assert.match(text, /setAttribute\('aria-readonly', 'true'\)/u);
+      assert.match(text, /qinglong\/cron@v1/u);
+      assert.match(text, /triggers\/\$\{mutation\.triggerId\}/u);
+      assert.match(text, /state\.view === 'triggers'/u);
+      assert.match(text, /trigger_fence_rejected/u);
     }
     if (requestPath === '/') {
       assert.match(text, /id="task-editor-dialog"/u);
@@ -93,6 +97,8 @@ test('loads one bounded offline Console asset closure', () => {
       assert.match(text, /保存并生成本机证明/u);
       assert.match(text, /id="task-editor-title"/u);
       assert.match(text, /id="presence-copy"/u);
+      assert.match(text, /id="trigger-editor-dialog"/u);
+      assert.match(text, /data-view="triggers"/u);
     }
   }
   assert.ok(totalBytes <= 192 * 1024);

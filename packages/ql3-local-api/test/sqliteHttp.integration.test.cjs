@@ -439,6 +439,9 @@ test('serves an authenticated Run through one real SQLite authority and durable 
     taskDefinitions: runtime.taskDefinitions,
     taskDefinitionAdministrationForCredential:
       runtime.taskDefinitionAdministrationForCredential,
+    triggers: runtime.triggers,
+    triggerAdministrationForCredential:
+      runtime.triggerAdministrationForCredential,
     apiCredentials: runtime.apiCredentials,
     ownerPepper: runtime.ownerPepper,
     projectPolicy: runtime.projectPolicy,
@@ -694,6 +697,126 @@ test('serves an authenticated Run through one real SQLite authority and durable 
   assert.equal(updatedTask.body.task.enabled, true);
   assert.equal(JSON.stringify(updatedTask).includes('/bin/echo'), false);
 
+  const triggerPath = '/api/v3/projects/default/triggers/cron:task-1';
+  const triggerBody = JSON.stringify({
+    expectedRevision: null,
+    mutationId: '019f7300-0000-4000-8000-000000000703',
+    taskId: 'task-1',
+    taskRevision: updatedTask.body.task.revision,
+    taskContentDigest: updatedTask.body.task.contentDigest,
+    spec: {
+      schema: 'qinglong/cron@v1',
+      config: {
+        expression: '0 * * * *',
+        timezone: 'UTC',
+        misfirePolicy: 'skip',
+      },
+    },
+    enabled: true,
+    occurredAtMs: NOW,
+  });
+  const triggerOptions = {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      'content-length': String(Buffer.byteLength(triggerBody)),
+    },
+    body: triggerBody,
+  };
+  const triggerChallenge = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    triggerPath,
+    triggerOptions,
+  );
+  assert.equal(triggerChallenge.statusCode, 428);
+  assert.equal(triggerChallenge.body.code, 'local_presence_required');
+  const triggerProof = JSON.parse(
+    fs.readFileSync(
+      path.join(root, 'console-presence', triggerChallenge.body.proofFileName),
+      'utf8',
+    ),
+  );
+  const triggerCreated = await request(port, `Bearer ${TOKEN}`, triggerPath, {
+    ...triggerOptions,
+    headers: {
+      ...triggerOptions.headers,
+      'x-qinglong-local-presence': triggerProof.proof,
+    },
+  });
+  assert.equal(triggerCreated.statusCode, 201, JSON.stringify(triggerCreated));
+  assert.equal(triggerCreated.body.status, 'created');
+  assert.equal(triggerCreated.body.trigger.revision, 1);
+  assert.equal(triggerCreated.body.trigger.enabled, true);
+
+  const triggerList = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    '/api/v3/projects/default/triggers?limit=16',
+  );
+  assert.equal(triggerList.statusCode, 200);
+  assert.equal(triggerList.body.triggers.length, 1);
+  assert.equal(triggerList.body.triggers[0].triggerId, 'cron:task-1');
+  assert.equal(triggerList.body.triggers[0].spec, undefined);
+
+  const triggerRead = await request(port, `Bearer ${TOKEN}`, triggerPath);
+  assert.equal(triggerRead.statusCode, 200);
+  assert.deepEqual(triggerRead.body.trigger.spec, {
+    schema: 'qinglong/cron@v1',
+    config: {
+      expression: '0 * * * *',
+      timezone: 'UTC',
+      misfirePolicy: 'skip',
+    },
+  });
+  assert.equal(
+    triggerRead.body.trigger.taskContentDigest,
+    updatedTask.body.task.contentDigest,
+  );
+
+  const triggerDisableBody = JSON.stringify({
+    ...JSON.parse(triggerBody),
+    expectedRevision: 1,
+    mutationId: '019f7300-0000-4000-8000-000000000704',
+    enabled: false,
+  });
+  const triggerDisableOptions = {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      'content-length': String(Buffer.byteLength(triggerDisableBody)),
+    },
+    body: triggerDisableBody,
+  };
+  const triggerDisableChallenge = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    triggerPath,
+    triggerDisableOptions,
+  );
+  assert.equal(triggerDisableChallenge.statusCode, 428);
+  const triggerDisableProof = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        root,
+        'console-presence',
+        triggerDisableChallenge.body.proofFileName,
+      ),
+      'utf8',
+    ),
+  );
+  const triggerDisabled = await request(port, `Bearer ${TOKEN}`, triggerPath, {
+    ...triggerDisableOptions,
+    headers: {
+      ...triggerDisableOptions.headers,
+      'x-qinglong-local-presence': triggerDisableProof.proof,
+    },
+  });
+  assert.equal(triggerDisabled.statusCode, 200);
+  assert.equal(triggerDisabled.body.status, 'updated');
+  assert.equal(triggerDisabled.body.trigger.revision, 2);
+  assert.equal(triggerDisabled.body.trigger.enabled, false);
+
   const taskStartBody = JSON.stringify({
     schema: 'qinglong/task-start@v1',
     mutationId: '019f7300-0000-7000-8000-000000000800',
@@ -857,7 +980,8 @@ test('serves an authenticated Run through one real SQLite authority and durable 
            WHERE operation_id IN (
              'run.get', 'run.list', 'run.events.list', 'run.steps.list',
              'run.cancel', 'task.authoring.read', 'task.create', 'task.get',
-             'task.list', 'task.start', 'task.update', 'run.log.read'
+             'task.list', 'task.start', 'task.update', 'run.log.read',
+             'trigger.create', 'trigger.get', 'trigger.list', 'trigger.update'
            )
            ORDER BY operation_id, outcome`,
         )
@@ -884,6 +1008,12 @@ test('serves an authenticated Run through one real SQLite authority and durable 
         'task.start:allowed',
         'task.update:allowed',
         'task.update:approval_required',
+        'trigger.create:allowed',
+        'trigger.create:approval_required',
+        'trigger.get:allowed',
+        'trigger.list:allowed',
+        'trigger.update:allowed',
+        'trigger.update:approval_required',
       ],
     );
     assert.deepEqual(

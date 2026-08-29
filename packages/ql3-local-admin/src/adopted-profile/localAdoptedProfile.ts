@@ -19,6 +19,9 @@ type LocalSqliteTaskStartRepository = ReadyLocalStorage['taskStartRepository'];
 type TaskDefinitionRepository = ReadyLocalStorage['taskDefinitions'];
 type TaskDefinitionAdministrationForCredential =
   ReadyLocalStorage['taskDefinitionAdministrationForCredential'];
+type TriggerRepository = ReadyLocalStorage['triggers'];
+type TriggerAdministrationForCredential =
+  ReadyLocalStorage['triggerAdministrationForCredential'];
 type LocalScheduleStore = ReadyLocalStorage['schedules'];
 type LocalDispatchStore = ReadyLocalStorage['dispatch'];
 type LocalSecretEnvelopeRepository = ReadyLocalStorage['localSecrets'];
@@ -90,6 +93,8 @@ export type LocalAdoptedProfileBootstrapResult =
       readonly taskStartRepository: LocalSqliteTaskStartRepository;
       readonly taskDefinitions: TaskDefinitionRepository;
       readonly taskDefinitionAdministrationForCredential: TaskDefinitionAdministrationForCredential;
+      readonly triggers: TriggerRepository;
+      readonly triggerAdministrationForCredential: TriggerAdministrationForCredential;
       readonly schedules: LocalScheduleStore;
       readonly dispatch: LocalDispatchStore;
       readonly executionControl: ReadyLocalStorage['executionControl'];
@@ -240,6 +245,9 @@ export async function bootstrapLocalAdoptedProfileStorage(
       taskDefinitions: readyStorage.taskDefinitions,
       taskDefinitionAdministrationForCredential:
         readyStorage.taskDefinitionAdministrationForCredential,
+      triggers: readyStorage.triggers,
+      triggerAdministrationForCredential:
+        readyStorage.triggerAdministrationForCredential,
       schedules: readyStorage.schedules,
       dispatch: readyStorage.dispatch,
       executionControl: readyStorage.executionControl,

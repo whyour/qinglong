@@ -1,12 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import {
-  LocalTaskDefinitionAdministrationAuthenticationError,
-  LocalTaskDefinitionAdministrationAuthorizationError,
-  LocalTaskDefinitionAdministrationConfigurationError,
-  LocalTaskDefinitionAdministrationUnavailableError,
-  createLocalTaskDefinitionAdministrationService,
-} from '@qinglong/local-admin/task-definition-administration';
+  LocalTriggerAdministrationAuthenticationError,
+  LocalTriggerAdministrationAuthorizationError,
+  LocalTriggerAdministrationConfigurationError,
+  LocalTriggerAdministrationUnavailableError,
+  createLocalTriggerAdministrationService,
+} from '@qinglong/local-admin/trigger-administration';
 import {
   ProjectPolicyEngine,
   ProjectPolicyUnavailableError,
@@ -22,69 +22,66 @@ import {
   type SecurityAuditSink,
 } from '@qinglong/runtime-core/security-audit';
 import {
-  InvalidTaskDefinitionError,
-  TaskDefinitionConflictError,
-  TaskDefinitionUnavailableError,
-  normalizeAppendTaskDefinitionRevisionCommand,
-  type AppendTaskDefinitionRevisionCommand,
-  type TaskDefinitionRecord,
-  type TaskDefinitionSource,
-} from '@qinglong/runtime-core/task-definition';
+  InvalidTriggerError,
+  InvalidTriggerSpecSemanticError,
+  TriggerConflictError,
+  TriggerUnavailableError,
+  UnsupportedTriggerSpecError,
+  normalizeAppendTriggerRevisionCommand,
+  type AppendTriggerRevisionCommand,
+  type TriggerRecord,
+  type TriggerSource,
+} from '@qinglong/runtime-core/trigger';
 import {
-  TaskDefinitionAdministrationAuthorizationFenceConflictError,
-  TaskDefinitionAdministrationMutationConflictError,
-  type TaskDefinitionAdministrationRepository,
-} from '@qinglong/runtime-core/task-definition-administration';
+  TriggerAdministrationAuthorizationFenceConflictError,
+  TriggerAdministrationMutationConflictError,
+  type TriggerAdministrationRepository,
+} from '@qinglong/runtime-core/trigger-administration';
 
 import type { AuthenticatedLocalApiRequest } from '../authentication/credentialAuthenticator';
-import { strongLocalConsolePrincipal } from '../authentication/strongLocalPrincipal';
 import {
   LocalPresenceProofUnavailableError,
   type LocalPresenceBinding,
   type LocalPresenceProofManager,
 } from '../authentication/localPresenceProof';
+import { strongLocalConsolePrincipal } from '../authentication/strongLocalPrincipal';
 import type { LocalApiResponse } from '../transport/contract';
-import type {
-  LocalApiTaskAuthoringLeaseBinding,
-  LocalApiTaskAuthoringLeases,
-} from './taskAuthoringRoute';
 
 const BODY_KEYS = Object.freeze([
   'enabled',
   'expectedRevision',
-  'kind',
-  'labels',
   'mutationId',
-  'name',
   'occurredAtMs',
   'spec',
+  'taskContentDigest',
+  'taskId',
+  'taskRevision',
 ]);
-const OPTIONAL_BODY_KEYS = Object.freeze(['description']);
 
-export interface LocalApiTaskPutRequest {
+export interface LocalApiTriggerPutRequest {
   readonly requestId: string;
   readonly projectId: string;
-  readonly taskId: string;
+  readonly triggerId: string;
   readonly body: unknown | null;
   readonly presence: string | null;
-  readonly authoringLease: string | null;
   readonly authenticated: Readonly<AuthenticatedLocalApiRequest>;
   readonly signal: AbortSignal;
 }
 
-export interface LocalApiTaskPutRoute {
-  handle(request: Readonly<LocalApiTaskPutRequest>): Promise<LocalApiResponse>;
+export interface LocalApiTriggerPutRoute {
+  handle(
+    request: Readonly<LocalApiTriggerPutRequest>,
+  ): Promise<LocalApiResponse>;
 }
 
-export interface LocalApiTaskPutRouteOptions {
+export interface LocalApiTriggerPutRouteOptions {
   readonly projectPolicy: ProjectPolicyRepository;
-  readonly taskDefinitions: TaskDefinitionSource;
-  readonly taskDefinitionAdministrationForCredential: (
+  readonly triggers: TriggerSource;
+  readonly triggerAdministrationForCredential: (
     fence: Readonly<AuthenticatedLocalApiRequest['credentialFence']>,
-  ) => Promise<TaskDefinitionAdministrationRepository>;
+  ) => Promise<TriggerAdministrationRepository>;
   readonly securityAudit: SecurityAuditSink;
   readonly presenceProof: LocalPresenceProofManager;
-  readonly taskAuthoringLeases: LocalApiTaskAuthoringLeases;
   readonly now?: () => number;
   readonly randomUuid?: () => string;
 }
@@ -118,40 +115,44 @@ function canonicalJson(value: unknown): string {
 function normalizeBody(
   body: unknown | null,
   projectId: string,
-  taskId: string,
-): Readonly<AppendTaskDefinitionRevisionCommand> {
+  triggerId: string,
+): Readonly<AppendTriggerRevisionCommand> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    throw new InvalidTaskDefinitionError('HTTP body must be an object');
+    throw new InvalidTriggerError('HTTP body must be an object');
   }
   const keys = Object.keys(body).sort();
-  const allowed = new Set([...BODY_KEYS, ...OPTIONAL_BODY_KEYS]);
   if (
     BODY_KEYS.some((key) => !keys.includes(key)) ||
-    keys.some((key) => !allowed.has(key))
+    keys.some((key) => !BODY_KEYS.includes(key))
   ) {
-    throw new InvalidTaskDefinitionError('HTTP body has an invalid shape');
+    throw new InvalidTriggerError('HTTP body has an invalid shape');
   }
-  return normalizeAppendTaskDefinitionRevisionCommand({
+  return normalizeAppendTriggerRevisionCommand({
     projectId,
-    taskId,
-    ...(body as Omit<
-      AppendTaskDefinitionRevisionCommand,
-      'projectId' | 'taskId'
-    >),
+    triggerId,
+    ...(body as Omit<AppendTriggerRevisionCommand, 'projectId' | 'triggerId'>),
   });
 }
 
+function operationId(
+  command: Readonly<AppendTriggerRevisionCommand>,
+): 'trigger.create' | 'trigger.update' {
+  return command.expectedRevision === null
+    ? 'trigger.create'
+    : 'trigger.update';
+}
+
 function requestDigest(
-  command: Readonly<AppendTaskDefinitionRevisionCommand>,
+  command: Readonly<AppendTriggerRevisionCommand>,
 ): string {
   return createHash('sha256')
-    .update('qinglong3.local-api-task-put.v1\0', 'utf8')
+    .update('qinglong3.local-api-trigger-put.v1\0', 'utf8')
     .update(canonicalJson(command), 'utf8')
     .digest('hex');
 }
 
 function presenceBinding(
-  command: Readonly<AppendTaskDefinitionRevisionCommand>,
+  command: Readonly<AppendTriggerRevisionCommand>,
   authenticated: Readonly<AuthenticatedLocalApiRequest>,
 ): Readonly<LocalPresenceBinding> {
   if (
@@ -171,51 +172,6 @@ function presenceBinding(
   });
 }
 
-function operationId(
-  command: Readonly<AppendTaskDefinitionRevisionCommand>,
-): 'task.create' | 'task.update' {
-  return command.expectedRevision === null ? 'task.create' : 'task.update';
-}
-
-function authoringLeaseBinding(
-  command: Readonly<AppendTaskDefinitionRevisionCommand>,
-  definition: Readonly<TaskDefinitionRecord>,
-  authenticated: Readonly<AuthenticatedLocalApiRequest>,
-): Readonly<LocalApiTaskAuthoringLeaseBinding> {
-  if (
-    command.expectedRevision === null ||
-    authenticated.credentialFence.subjectType !== 'user'
-  ) {
-    throw new LocalPresenceProofUnavailableError(
-      'Task authoring lease requires an update by a User credential',
-    );
-  }
-  return Object.freeze({
-    projectId: command.projectId,
-    taskId: command.taskId,
-    revision: definition.revision,
-    contentDigest: definition.contentDigest,
-    credentialId: authenticated.credentialFence.credentialId,
-    credentialVersion: authenticated.credentialFence.credentialVersion,
-    subjectType: 'user',
-    subjectId: authenticated.credentialFence.subjectId,
-  });
-}
-
-function summary(value: Readonly<TaskDefinitionRecord>) {
-  return Object.freeze({
-    taskId: value.taskId,
-    revision: value.revision,
-    name: value.name,
-    kind: value.kind,
-    specSchema: value.spec.schema,
-    enabled: value.enabled,
-    contentDigest: value.contentDigest,
-    createdAtMs: value.createdAtMs,
-    updatedAtMs: value.updatedAtMs,
-  });
-}
-
 function timestamp(now: () => number): number {
   const value = now();
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -229,7 +185,7 @@ async function recordAudit(
   values: {
     readonly eventId: string;
     readonly requestId: string;
-    readonly operationId: 'task.create' | 'task.update';
+    readonly operationId: 'trigger.create' | 'trigger.update';
     readonly projectId: string;
     readonly authenticated: Readonly<AuthenticatedLocalApiRequest> | null;
     readonly outcome: SecurityAuditOutcome;
@@ -260,59 +216,86 @@ async function recordAudit(
   }
 }
 
-export function createLocalApiTaskPutRoute(
-  options: Readonly<LocalApiTaskPutRouteOptions>,
-): Readonly<LocalApiTaskPutRoute> {
+function summary(trigger: Readonly<TriggerRecord>) {
+  return Object.freeze({
+    triggerId: trigger.triggerId,
+    revision: trigger.revision,
+    taskId: trigger.taskId,
+    taskRevision: trigger.taskRevision,
+    taskContentDigest: trigger.taskContentDigest,
+    spec: trigger.spec,
+    enabled: trigger.enabled,
+    contentDigest: trigger.contentDigest,
+    createdAtMs: trigger.createdAtMs,
+    updatedAtMs: trigger.updatedAtMs,
+  });
+}
+
+function isCredentialFenceConflict(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    error.code.startsWith('LOCAL_SQLITE_AUTHENTICATED_')
+  );
+}
+
+export function createLocalApiTriggerPutRoute(
+  options: Readonly<LocalApiTriggerPutRouteOptions>,
+): Readonly<LocalApiTriggerPutRoute> {
   if (
     !options ||
     typeof options !== 'object' ||
     Array.isArray(options) ||
     typeof options.projectPolicy?.resolve !== 'function' ||
-    typeof options.taskDefinitions?.findCurrentTaskDefinition !== 'function' ||
-    typeof options.taskDefinitions?.findTaskDefinitionRevision !== 'function' ||
-    typeof options.taskDefinitions?.listTaskDefinitions !== 'function' ||
-    typeof options.taskDefinitionAdministrationForCredential !== 'function' ||
+    typeof options.triggers?.findCurrentTrigger !== 'function' ||
+    typeof options.triggers?.listTriggers !== 'function' ||
+    typeof options.triggerAdministrationForCredential !== 'function' ||
     typeof options.securityAudit?.record !== 'function' ||
     typeof options.presenceProof?.issue !== 'function' ||
     typeof options.presenceProof?.consume !== 'function' ||
-    typeof options.taskAuthoringLeases?.inspect !== 'function' ||
-    typeof options.taskAuthoringLeases?.consume !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function') ||
     (options.randomUuid !== undefined &&
       typeof options.randomUuid !== 'function')
   ) {
-    throw new TypeError('Local API Task put route options are invalid');
+    throw new TypeError('Local API Trigger put route options are invalid');
   }
   const now = options.now ?? Date.now;
   const uuid = options.randomUuid ?? randomUUID;
   const policy = new ProjectPolicyEngine(options.projectPolicy);
 
   return Object.freeze({
-    async handle(request: Readonly<LocalApiTaskPutRequest>) {
+    async handle(request: Readonly<LocalApiTriggerPutRequest>) {
       if (request.signal.aborted) {
         return response(503, { code: 'request_unavailable' });
       }
-      let command: Readonly<AppendTaskDefinitionRevisionCommand>;
+      let command: Readonly<AppendTriggerRevisionCommand>;
       try {
         command = normalizeBody(
           request.body,
           request.projectId,
-          request.taskId,
+          request.triggerId,
         );
       } catch (error) {
-        return error instanceof InvalidTaskDefinitionError
-          ? response(400, { code: 'invalid_task_definition' })
-          : response(503, { code: 'task_definition_unavailable' });
+        return error instanceof InvalidTriggerError
+          ? response(400, { code: 'invalid_trigger' })
+          : response(503, { code: 'trigger_unavailable' });
       }
       const operation = operationId(command);
-      const occurredAtMs = timestamp(now);
+      let occurredAtMs: number;
+      try {
+        occurredAtMs = timestamp(now);
+      } catch {
+        return response(503, { code: 'local_presence_unavailable' });
+      }
       let decision: Readonly<SecurityPolicyDecision>;
       try {
         decision = normalizeSecurityPolicyDecision(
           await policy.authorize(
             request.authenticated.principal,
             request.projectId,
-            operation,
+            'task.update',
           ),
         );
       } catch (error) {
@@ -358,75 +341,6 @@ export function createLocalApiTaskPutRoute(
               ? 'approval_required'
               : 'forbidden',
         });
-      }
-      let inspectedAuthoringBinding:
-        | Readonly<LocalApiTaskAuthoringLeaseBinding>
-        | undefined;
-      if (command.expectedRevision === null) {
-        if (request.authoringLease !== null) {
-          return response(400, { code: 'invalid_task_authoring_lease' });
-        }
-      } else {
-        if (request.authoringLease === null) {
-          const audited = await recordAudit(options.securityAudit, {
-            eventId: uuid(),
-            requestId: request.requestId,
-            operationId: operation,
-            projectId: request.projectId,
-            authenticated: request.authenticated,
-            outcome: 'denied',
-            reasons: ['task_authoring_lease_required'],
-            fence: decision.fence,
-            occurredAtMs,
-          });
-          return audited
-            ? response(428, { code: 'task_authoring_lease_required' })
-            : response(503, { code: 'security_audit_unavailable' });
-        }
-        try {
-          const definition =
-            await options.taskDefinitions.findCurrentTaskDefinition(
-              command.projectId,
-              command.taskId,
-            );
-          if (!definition) {
-            return response(409, { code: 'task_authoring_lease_rejected' });
-          }
-          inspectedAuthoringBinding = authoringLeaseBinding(
-            command,
-            definition,
-            request.authenticated,
-          );
-          if (
-            definition.revision !== command.expectedRevision ||
-            !options.taskAuthoringLeases.inspect(
-              request.authoringLease,
-              inspectedAuthoringBinding,
-            )
-          ) {
-            const audited = await recordAudit(options.securityAudit, {
-              eventId: uuid(),
-              requestId: request.requestId,
-              operationId: operation,
-              projectId: request.projectId,
-              authenticated: request.authenticated,
-              outcome: 'denied',
-              reasons: ['task_authoring_lease_rejected'],
-              fence: decision.fence,
-              occurredAtMs,
-            });
-            return audited
-              ? response(409, { code: 'task_authoring_lease_rejected' })
-              : response(503, { code: 'security_audit_unavailable' });
-          }
-        } catch (error) {
-          return response(503, {
-            code:
-              error instanceof TaskDefinitionUnavailableError
-                ? 'task_definition_unavailable'
-                : 'task_authoring_unavailable',
-          });
-        }
       }
       let binding: Readonly<LocalPresenceBinding>;
       try {
@@ -498,41 +412,14 @@ export function createLocalApiTaskPutRoute(
       } catch {
         return response(503, { code: 'authentication_unavailable' });
       }
-      if (inspectedAuthoringBinding) {
-        try {
-          const current =
-            await options.taskDefinitions.findCurrentTaskDefinition(
-              command.projectId,
-              command.taskId,
-            );
-          if (
-            !current ||
-            current.revision !== command.expectedRevision ||
-            !options.taskAuthoringLeases.consume(
-              request.authoringLease,
-              authoringLeaseBinding(command, current, request.authenticated),
-            )
-          ) {
-            return response(409, { code: 'task_authoring_lease_rejected' });
-          }
-        } catch (error) {
-          return response(503, {
-            code:
-              error instanceof TaskDefinitionUnavailableError
-                ? 'task_definition_unavailable'
-                : 'task_authoring_unavailable',
-          });
-        }
-      }
       try {
-        const mutations =
-          await options.taskDefinitionAdministrationForCredential(
-            request.authenticated.credentialFence,
-          );
-        const service = createLocalTaskDefinitionAdministrationService(
+        const mutations = await options.triggerAdministrationForCredential(
+          request.authenticated.credentialFence,
+        );
+        const service = createLocalTriggerAdministrationService(
           options.projectPolicy,
           mutations,
-          options.taskDefinitions,
+          options.triggers,
           options.securityAudit,
           { now },
         );
@@ -543,40 +430,39 @@ export function createLocalApiTaskPutRoute(
         });
         return response(result.status === 'created' ? 201 : 200, {
           status: result.status,
-          task: summary(result.definition),
+          trigger: summary(result.trigger),
         });
       } catch (error) {
         if (
-          error instanceof TaskDefinitionConflictError ||
-          error instanceof TaskDefinitionAdministrationMutationConflictError ||
+          error instanceof TriggerConflictError ||
+          error instanceof TriggerAdministrationMutationConflictError ||
           error instanceof
-            TaskDefinitionAdministrationAuthorizationFenceConflictError
+            TriggerAdministrationAuthorizationFenceConflictError ||
+          isCredentialFenceConflict(error)
         ) {
-          return response(409, { code: 'task_definition_fence_rejected' });
+          return response(409, { code: 'trigger_fence_rejected' });
         }
-        if (
-          error instanceof LocalTaskDefinitionAdministrationAuthenticationError
-        ) {
+        if (error instanceof LocalTriggerAdministrationAuthenticationError) {
           return response(401, { code: 'strong_authentication_required' });
         }
-        if (
-          error instanceof LocalTaskDefinitionAdministrationAuthorizationError
-        ) {
+        if (error instanceof LocalTriggerAdministrationAuthorizationError) {
           return response(403, { code: 'forbidden' });
         }
         if (
-          error instanceof InvalidTaskDefinitionError ||
-          error instanceof LocalTaskDefinitionAdministrationConfigurationError
+          error instanceof InvalidTriggerError ||
+          error instanceof InvalidTriggerSpecSemanticError ||
+          error instanceof UnsupportedTriggerSpecError ||
+          error instanceof LocalTriggerAdministrationConfigurationError
         ) {
-          return response(400, { code: 'invalid_task_definition' });
+          return response(400, { code: 'invalid_trigger' });
         }
         if (
-          error instanceof TaskDefinitionUnavailableError ||
-          error instanceof LocalTaskDefinitionAdministrationUnavailableError
+          error instanceof TriggerUnavailableError ||
+          error instanceof LocalTriggerAdministrationUnavailableError
         ) {
-          return response(503, { code: 'task_definition_unavailable' });
+          return response(503, { code: 'trigger_unavailable' });
         }
-        return response(503, { code: 'task_definition_unavailable' });
+        return response(503, { code: 'trigger_unavailable' });
       }
     },
   });
