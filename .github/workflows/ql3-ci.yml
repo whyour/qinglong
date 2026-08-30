@@ -773,6 +773,20 @@ jobs:
             "${UPGRADE_EVIDENCE_ROOT}/results/sqlite-inspect.result.json"
           grep -q '"status":"inspected"' \
             "${UPGRADE_EVIDENCE_ROOT}/results/data-directory-inspect.result.json"
+          SQLITE_PLAN_DIGEST="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).evidence.planDigest)' \
+            "${UPGRADE_EVIDENCE_ROOT}/results/sqlite-inspect.result.json")"
+          DIRECTORY_PLAN_DIGEST="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).evidence.planDigest)' \
+            "${UPGRADE_EVIDENCE_ROOT}/results/data-directory-inspect.result.json")"
+          UPGRADE_REHEARSAL_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-rehearsal-${{ matrix.image_arch }}"
+          sh "${BUNDLE_ROOT}/upgrade-rehearsal.sh" \
+            edge "${LEGACY_READINESS_ROOT}" "${UPGRADE_REHEARSAL_ROOT}" \
+            "${SQLITE_PLAN_DIGEST}" "${DIRECTORY_PLAN_DIGEST}"
+          grep -q '"status":"verified"' \
+            "${UPGRADE_REHEARSAL_ROOT}/stage-summary.json"
+          grep -q '"legacySource":"read_only"' \
+            "${UPGRADE_REHEARSAL_ROOT}/stage-summary.json"
+          grep -q '"cutover":"not_authorized"' \
+            "${UPGRADE_REHEARSAL_ROOT}/stage-summary.json"
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-wal"
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-journal"
           trap - EXIT

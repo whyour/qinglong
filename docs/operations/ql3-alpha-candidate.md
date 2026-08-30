@@ -31,6 +31,7 @@
 | D-423 Console cron Trigger 管理切片 | 已复用既有 immutable Trigger、Task pin、durable schedule 与原子 audit authority；Console/API 可 list/read/create/update/enable/disable `qinglong/cron@v1`，真实 SQLite/loopback 与同源双架构 Console milestone 已通过 | Cluster 不复用 Local proof；不提供删除或通用 Trigger schema 编辑；仍不是正式发布或生产升级 |
 | D-424 Console Secret-backed 自动化切片 | current-only metadata、强认证 AES-256-GCM create/rotate 与 Task pinned `SecretRef` 绑定已完成；真实 SQLite/loopback、本地与远端门、同源双架构 Console milestone 及离线 auditor 均通过 | Cluster 不复用 Local proof/custody；不提供明文读取、删除或历史浏览；仍不是正式发布或生产升级 |
 | D-425 2.x 升级就绪盘点 | 同源 v6 Trial Kit 已交付 amd64/arm64 headless 阶段实物；canonical `upgrade-readiness.sh` 把 2.x root 只读挂载，在 128 MiB/无网络边界内由 exact Operator 生成 SQLite 与完整目录两个计划；artifact job 实跑、bundle auditor 与 milestone v3 均闭合 | 只完成 inspect，不授权 stage、activation、cutover 或 rollback；不是 Public Release |
+| D-426a Side-by-side 暂存 | v7 Trial Kit 源码候选新增 reviewed-plan `upgrade-rehearsal.sh`，在新的私有 root 中执行 SQLite stage/verify/activation 与完整目录 stage/verify；legacy root 始终只读，summary 固定 `cutover=not_authorized` | 原生 amd64/arm64 artifact 与 milestone v4 待生成；不执行 transform/apply、目标启动或回退 |
 
 D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，而且没有改名复用 run `33173769047` 的旧 archive。修复提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 的普通主 CI [run 33229592307](https://github.com/whyour/qinglong/actions/runs/33229592307) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33229592293](https://github.com/whyour/qinglong/actions/runs/33229592293) 成功；随后显式 Local Console milestone [run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006) 为 42 success/2 scope skip/0 fail。由此 Web 创建能力已进入新的阶段实物，而不再只是候选源码。
 
@@ -106,7 +107,7 @@ ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verif
 Local artifact 含：
 
 - 一个包含所选 Application 与短生命周期 operator 的 archive；headless 为 `qinglong3-local-trial-kit-<arch>.docker.tar`，Console 为 `qinglong3-local-console-trial-kit-<arch>.docker.tar`，共享 Node 基础层在 archive 中去重；
-- schema 为 `qinglong/alpha-local-trial-kit@v6` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/upgradeReadiness/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
+- schema 为 `qinglong/alpha-local-trial-kit@v7` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/upgradeReadiness/upgradeRehearsal/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
 - canonical `quickstart.sh`，在目标 Linux 设备上只依赖 POSIX shell、`sha256sum` 和 Docker，完成 checksum、load、identity、fresh Owner 与 Profile-bound Application active；
 - canonical `upgrade-readiness.sh`，把 2.x data root 只读挂载给 128 MiB/无网络 Operator，生成 SQLite 与完整目录两个私有 inspect 计划，不获得 stage/cutover authority；
 - `verification-evidence.json` 绑定 `workflow_dispatch` 的 workflow ref/SHA、run ID/attempt、同架构两个 exact image ID 和完整 gate 集；下载者仍须到 GitHub 交叉检查 run，它不替代正式签名；
@@ -115,7 +116,7 @@ Local artifact 含：
 
 Cluster artifact 是每角色/架构一个六文件闭包：native Docker archive、精确 CycloneDX SBOM、workflow-bound verification evidence、README、`qinglong/alpha-cluster-image@v1` manifest 和覆盖全部内容文件的 `SHA256SUMS`。完整 CI 成功后，八个 bundle 由 `qinglong/alpha-cluster-milestone@v1` 小型索引闭合；索引本身不重复存放大 archive。
 
-Local milestone 是 `qinglong/alpha-local-milestone@v3` 三文件闭包，绑定一个 variant 的双架构 Trial Kit，并直接记录两个架构的 `upgradeReadinessSha256`。Stage index 是 `qinglong/alpha-stage-index@v2` 三文件闭包；它重新审计两个 milestone，要求 version/source/workflow SHA/ref/run/attempt 一致，并把 Local variant/Profile 与 Cluster 的 control/admin/worker 最小集、可选 control-ai 写为机器可读选择；它不重复存放任何镜像 archive。
+Local milestone 是 `qinglong/alpha-local-milestone@v4` 三文件闭包，绑定一个 variant 的双架构 Trial Kit，并直接记录两个架构的 `upgradeReadinessSha256` 与 `upgradeRehearsalSha256`。Stage index 是 `qinglong/alpha-stage-index@v2` 三文件闭包；它重新审计两个 milestone，要求 version/source/workflow SHA/ref/run/attempt 一致，并把 Local variant/Profile 与 Cluster 的 control/admin/worker 最小集、可选 control-ai 写为机器可读选择；它不重复存放任何镜像 archive。
 
 任何 required job 失败时不上传对应产物。artifact 名和 archive 内的 `ci-*` tag 都表示 commit-bound candidate，不能改名后冒充 `v3.x` release。
 

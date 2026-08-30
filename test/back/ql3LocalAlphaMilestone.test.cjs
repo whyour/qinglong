@@ -206,9 +206,13 @@ function finalizeOptions(paths) {
 test('finalizes two exact native trial kits into one closed milestone index', (t) => {
   const paths = fixture(t);
   const manifest = finalizeLocalAlphaMilestone(finalizeOptions(paths));
-  assert.equal(manifest.schema, 'qinglong/alpha-local-milestone@v3');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-milestone@v4');
   assert.match(
     manifest.artifacts.amd64.upgradeReadinessSha256,
+    /^sha256:[0-9a-f]{64}$/,
+  );
+  assert.match(
+    manifest.artifacts.amd64.upgradeRehearsalSha256,
     /^sha256:[0-9a-f]{64}$/,
   );
   assert.equal(manifest.variant, 'headless');

@@ -166,7 +166,7 @@ function adapters(overrides = {}, variant = 'headless') {
 test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const paths = fixture(t);
   const manifest = createLocalAlphaTrialKit(createOptions(paths), adapters());
-  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v6');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v7');
   assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.equal(manifest.architecture, 'arm64');
@@ -176,6 +176,7 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
   assert.equal(manifest.verification.file, 'verification-evidence.json');
   assert.equal(manifest.quickstart.file, 'quickstart.sh');
   assert.equal(manifest.upgradeReadiness.file, 'upgrade-readiness.sh');
+  assert.equal(manifest.upgradeRehearsal.file, 'upgrade-rehearsal.sh');
   const quickstart = path.join(paths.outputRoot, 'quickstart.sh');
   const syntax = spawnSync('sh', ['-n', quickstart], { encoding: 'utf8' });
   assert.equal(syntax.status, 0, syntax.stderr);
@@ -199,6 +200,7 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     'qinglong3-local-trial-kit-arm64.docker.tar',
     'quickstart.sh',
     'upgrade-readiness.sh',
+    'upgrade-rehearsal.sh',
     'verification-evidence.json',
   ]);
 });
@@ -232,6 +234,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
   assert.equal(verification.gates.firstAutomationJourney, 'passed');
   assert.equal(verification.gates.ownerCredentialPresentation, 'passed');
   assert.equal(verification.gates.legacyUpgradeReadiness, 'passed');
+  assert.equal(verification.gates.legacyUpgradeStage, 'passed');
   const quickstartContents = fs.readFileSync(
     path.join(paths.outputRoot, 'quickstart.sh'),
     'utf8',
@@ -255,6 +258,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
     'qinglong3-local-operator.cdx.json',
     'quickstart.sh',
     'upgrade-readiness.sh',
+    'upgrade-rehearsal.sh',
     'verification-evidence.json',
   ]);
 });
@@ -288,6 +292,7 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
     'extra',
     'quickstart',
     'upgrade-readiness',
+    'upgrade-rehearsal',
     'sbom',
     'verification',
   ]) {
@@ -312,6 +317,11 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
     } else if (mutation === 'upgrade-readiness') {
       fs.appendFileSync(
         path.join(paths.outputRoot, 'upgrade-readiness.sh'),
+        '# drift\n',
+      );
+    } else if (mutation === 'upgrade-rehearsal') {
+      fs.appendFileSync(
+        path.join(paths.outputRoot, 'upgrade-rehearsal.sh'),
         '# drift\n',
       );
     } else if (mutation === 'sbom') {
@@ -353,6 +363,7 @@ test('offline audit rejects a rehashed non-canonical quickstart', (t) => {
     'verification-evidence.json',
     'quickstart.sh',
     'upgrade-readiness.sh',
+    'upgrade-rehearsal.sh',
     'README.md',
     'manifest.json',
   ];
@@ -532,6 +543,85 @@ exit 1
   assert.match(calls, /--network none/);
   assert.match(calls, /--memory 128m --memory-swap 128m/);
   assert.doesNotMatch(calls, /adoption\.stage|activation\.prepare|cutover/);
+});
+
+test('generated upgrade rehearsal stages and verifies reviewed legacy plans without cutover', (t) => {
+  const paths = fixture(t);
+  createLocalAlphaTrialKit(createOptions(paths), adapters());
+  const fakeBin = path.join(paths.fixtureRoot, 'rehearsal-fake-bin');
+  fs.mkdirSync(fakeBin);
+  const dockerLog = path.join(paths.fixtureRoot, 'rehearsal-docker.log');
+  const fakeDocker = path.join(fakeBin, 'docker');
+  fs.writeFileSync(
+    fakeDocker,
+    `#!/bin/sh
+printf '%s\n' "$*" >>"$FAKE_DOCKER_LOG"
+case "$1:$2" in
+  info:|load:*) exit 0 ;;
+  image:inspect)
+    printf '%s\n' 'sha256:${'2'.repeat(
+      64,
+    )}|arm64|65532:65532|${revision}|short-lived|none-by-default'
+    exit 0
+    ;;
+esac
+case " $* " in
+  *'/sqlite-stage.json'*) printf '%s\n' '{"status":"staged"}'; exit 0 ;;
+  *'/sqlite-verify.json'*) printf '%s\n' '{"status":"verified","evidence":{"manifestDigest":"${'c'.repeat(
+    64,
+  )}"}}'; exit 0 ;;
+  *'/sqlite-activation.json'*) printf '%s\n' '{"status":"prepared","evidence":{"activationDigest":"${'d'.repeat(
+    64,
+  )}"}}'; exit 0 ;;
+  *'/data-directory-stage.json'*) printf '%s\n' '{"status":"staged","evidence":{"manifestDigest":"${'e'.repeat(
+    64,
+  )}"}}'; exit 0 ;;
+  *'/data-directory-verify.json'*) printf '%s\n' '{"status":"verified"}'; exit 0 ;;
+esac
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  const legacyRoot = path.join(paths.fixtureRoot, 'rehearsal-legacy-data');
+  fs.mkdirSync(path.join(legacyRoot, 'db'), { recursive: true, mode: 0o700 });
+  const legacyDatabase = path.join(legacyRoot, 'db', 'database.sqlite');
+  fs.writeFileSync(legacyDatabase, 'legacy-unchanged', { mode: 0o600 });
+  const rehearsalRoot = path.join(paths.fixtureRoot, 'upgrade-rehearsal');
+  const run = spawnSync(
+    'sh',
+    [
+      path.join(paths.outputRoot, 'upgrade-rehearsal.sh'),
+      'edge',
+      legacyRoot,
+      rehearsalRoot,
+      'a'.repeat(64),
+      'b'.repeat(64),
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        FAKE_DOCKER_LOG: dockerLog,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+      },
+    },
+  );
+  assert.equal(run.status, 0, `${run.stderr}\n${run.stdout}`);
+  assert.match(run.stdout, /side-by-side upgrade stage completed/);
+  assert.equal(fs.readFileSync(legacyDatabase, 'utf8'), 'legacy-unchanged');
+  const summary = JSON.parse(
+    fs.readFileSync(path.join(rehearsalRoot, 'stage-summary.json'), 'utf8'),
+  );
+  assert.equal(summary.status, 'verified');
+  assert.equal(summary.legacySource, 'read_only');
+  assert.equal(summary.cutover, 'not_authorized');
+  assert.equal(summary.sqlite.activationDigest, 'd'.repeat(64));
+  assert.equal(summary.dataDirectory.manifestDigest, 'e'.repeat(64));
+  const calls = fs.readFileSync(dockerLog, 'utf8');
+  assert.match(calls, /dst=\/var\/lib\/qinglong2,readonly/);
+  assert.match(calls, /--network none/);
+  assert.match(calls, /--memory 128m --memory-swap 128m/);
+  assert.doesNotMatch(calls, /cutover|target-start|legacy-rollback/);
 });
 
 test('create rejects an image reference that could alter the shell journey', (t) => {

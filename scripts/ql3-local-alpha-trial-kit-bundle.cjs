@@ -10,8 +10,8 @@ const { auditClusterImageSbom } = require('./ql3-cluster-image-sbom.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-trial-kit@v6';
-const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v4';
+const SCHEMA = 'qinglong/alpha-local-trial-kit@v7';
+const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v5';
 const QUICKSTART_TEMPLATE = path.join(
   DEFAULT_ROOT,
   'scripts/templates/ql3-local-alpha-quickstart.sh',
@@ -20,6 +20,10 @@ const UPGRADE_READINESS_TEMPLATE = path.join(
   DEFAULT_ROOT,
   'scripts/templates/ql3-local-alpha-upgrade-readiness.sh',
 );
+const UPGRADE_REHEARSAL_TEMPLATE = path.join(
+  DEFAULT_ROOT,
+  'scripts/templates/ql3-local-alpha-upgrade-rehearsal.sh',
+);
 const ARCHITECTURES = Object.freeze(['amd64', 'arm64']);
 const VARIANTS = Object.freeze(['headless', 'console']);
 const ARCHIVE_MIN_BYTES = 1024;
@@ -27,6 +31,7 @@ const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const MAX_README_BYTES = 512 * 1024;
 const MAX_QUICKSTART_BYTES = 256 * 1024;
 const MAX_UPGRADE_READINESS_BYTES = 256 * 1024;
+const MAX_UPGRADE_REHEARSAL_BYTES = 256 * 1024;
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const REVISION_PATTERN = /^[0-9a-f]{40}$/u;
 const FILES = Object.freeze({
@@ -35,6 +40,7 @@ const FILES = Object.freeze({
   verificationEvidence: 'verification-evidence.json',
   quickstart: 'quickstart.sh',
   upgradeReadiness: 'upgrade-readiness.sh',
+  upgradeRehearsal: 'upgrade-rehearsal.sh',
   readme: 'README.md',
   manifest: 'manifest.json',
   checksums: 'SHA256SUMS',
@@ -51,6 +57,7 @@ const VERIFICATION = Object.freeze({
   standaloneFreshLifecycle: 'passed',
   localApiCancellation: 'passed',
   legacyUpgradeReadiness: 'passed',
+  legacyUpgradeStage: 'passed',
 });
 
 function verificationGates(variant) {
@@ -480,6 +487,32 @@ function renderUpgradeReadiness(identity) {
   return rendered;
 }
 
+function renderUpgradeRehearsal(identity) {
+  const template = fs.readFileSync(
+    assertCanonicalFile(
+      UPGRADE_REHEARSAL_TEMPLATE,
+      MAX_UPGRADE_REHEARSAL_BYTES,
+      'upgrade rehearsal template',
+    ),
+    'utf8',
+  );
+  const replacements = Object.freeze({
+    '@@OPERATOR_IMAGE@@': identity.images.operator.reference,
+    '@@OPERATOR_ID@@': identity.images.operator.id,
+    '@@ARCHITECTURE@@': identity.architecture,
+    '@@SOURCE_REVISION@@': identity.sourceRevision,
+    '@@ARCHIVE@@': identity.archive.file,
+  });
+  let rendered = template;
+  for (const [token, value] of Object.entries(replacements)) {
+    rendered = rendered.replaceAll(token, value);
+  }
+  if (/@@[A-Z_]+@@/u.test(rendered)) {
+    fail('upgrade rehearsal template contains an unresolved token');
+  }
+  return rendered;
+}
+
 function fileRecord(bundleRoot, name) {
   const filePath = path.join(bundleRoot, name);
   const stat = fs.lstatSync(filePath);
@@ -660,8 +693,13 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       renderUpgradeReadiness(manifestIdentity),
       0o700,
     );
+    writeExclusive(
+      path.join(normalized.outputRoot, FILES.upgradeRehearsal),
+      renderUpgradeRehearsal(manifestIdentity),
+      0o700,
+    );
     const manifest = {
-      schemaVersion: 7,
+      schemaVersion: 8,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',
@@ -680,6 +718,10 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
         normalized.outputRoot,
         FILES.upgradeReadiness,
       ),
+      upgradeRehearsal: fileRecord(
+        normalized.outputRoot,
+        FILES.upgradeRehearsal,
+      ),
       readme: fileRecord(normalized.outputRoot, FILES.readme),
       verification: fileRecord(
         normalized.outputRoot,
@@ -697,6 +739,7 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       FILES.verificationEvidence,
       FILES.quickstart,
       FILES.upgradeReadiness,
+      FILES.upgradeRehearsal,
       FILES.readme,
       FILES.manifest,
     ];
@@ -767,10 +810,11 @@ function auditLocalAlphaTrialKit(options) {
       'sboms',
       'quickstart',
       'upgradeReadiness',
+      'upgradeRehearsal',
       'readme',
       'verification',
     ]) ||
-    manifest.schemaVersion !== 7 ||
+    manifest.schemaVersion !== 8 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
@@ -834,6 +878,23 @@ function auditLocalAlphaTrialKit(options) {
   if (actualUpgradeReadiness !== expectedUpgradeReadiness) {
     fail('upgrade readiness differs from the canonical inspection journey');
   }
+  validateFileRecord(
+    manifest.upgradeRehearsal,
+    FILES.upgradeRehearsal,
+    bundleRoot,
+  );
+  const expectedUpgradeRehearsal = renderUpgradeRehearsal(manifest);
+  const actualUpgradeRehearsal = fs.readFileSync(
+    assertCanonicalFile(
+      path.join(bundleRoot, FILES.upgradeRehearsal),
+      MAX_UPGRADE_REHEARSAL_BYTES,
+      'upgrade rehearsal',
+    ),
+    'utf8',
+  );
+  if (actualUpgradeRehearsal !== expectedUpgradeRehearsal) {
+    fail('upgrade rehearsal differs from the canonical staging journey');
+  }
   validateFileRecord(manifest.readme, FILES.readme, bundleRoot);
   validateOfflineSbom(
     readBoundedJson(
@@ -871,6 +932,7 @@ function auditLocalAlphaTrialKit(options) {
     FILES.verificationEvidence,
     FILES.quickstart,
     FILES.upgradeReadiness,
+    FILES.upgradeRehearsal,
     expectedArchive,
   ].sort();
   const actualFiles = fs
@@ -892,6 +954,7 @@ function auditLocalAlphaTrialKit(options) {
     FILES.verificationEvidence,
     FILES.quickstart,
     FILES.upgradeReadiness,
+    FILES.upgradeRehearsal,
     FILES.readme,
     FILES.manifest,
   ];
@@ -905,7 +968,7 @@ function auditLocalAlphaTrialKit(options) {
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-trial-kit-audit@v3',
+    schema: 'qinglong/alpha-local-trial-kit-audit@v4',
     sourceRevision: manifest.sourceRevision,
     version: manifest.version,
     architecture: manifest.architecture,
@@ -915,6 +978,7 @@ function auditLocalAlphaTrialKit(options) {
     operatorImageId: manifest.images.operator.id,
     quickstartSha256: manifest.quickstart.sha256,
     upgradeReadinessSha256: manifest.upgradeReadiness.sha256,
+    upgradeRehearsalSha256: manifest.upgradeRehearsal.sha256,
     verificationSha256: manifest.verification.sha256,
     workflowRunId: verificationEvidence.workflow.runId,
     workflowRunAttempt: verificationEvidence.workflow.runAttempt,
