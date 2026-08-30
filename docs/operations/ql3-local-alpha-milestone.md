@@ -20,7 +20,7 @@
    ```
 
 2. 打开 `manifest.json`，确认：
-   - `schema` 为 `qinglong/alpha-local-milestone@v4`；
+   - `schema` 为 `qinglong/alpha-local-milestone@v5`；
    - `variant` 为 `headless` 或 `console`，且两个架构记录都使用同一变体；
    - `sourceRevision` 是准备试用的完整 40 位提交；
    - `workflow.event` 为 `workflow_dispatch`，`workflow.job` 为 `local-alpha-milestone`；
@@ -28,7 +28,7 @@
    - `artifacts` 恰好包含 `amd64` 与 `arm64`。
 3. 根据主机架构下载 `artifacts.<architecture>.artifactName` 指向的 Trial Kit。
 4. 对 Trial Kit 先执行其 `SHA256SUMS`，再确认其中 `manifest.json` 的 SHA-256 与 milestone 的 `bundleManifest.sha256` 完全一致。
-5. 确认 milestone 的 `upgradeReadinessSha256`、`upgradeRehearsalSha256` 与 Trial Kit manifest 中同名入口摘要一致，再按 Trial Kit 自带 `README.md` 完成 fresh smoke、只读 2.x 升级就绪盘点或受审核计划的 side-by-side 暂存。
+5. 确认 milestone 的 `upgradeReadinessSha256`、`upgradeRehearsalSha256`、`upgradeCutoverRehearsalSha256` 与 Trial Kit manifest 中同名入口摘要一致，再按 Trial Kit 自带 `README.md` 完成 fresh smoke、只读 2.x 升级就绪盘点、受审核计划的 side-by-side 暂存或隔离切换链演练。
 
 若持有同一版本源码与 Node.js 24，可额外审计 milestone 索引：
 

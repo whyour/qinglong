@@ -110,7 +110,7 @@ ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verif
 Local artifact 含：
 
 - 一个包含所选 Application 与短生命周期 operator 的 archive；headless 为 `qinglong3-local-trial-kit-<arch>.docker.tar`，Console 为 `qinglong3-local-console-trial-kit-<arch>.docker.tar`，共享 Node 基础层在 archive 中去重；
-- schema 为 `qinglong/alpha-local-trial-kit@v7` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/upgradeReadiness/upgradeRehearsal/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
+- schema 为 `qinglong/alpha-local-trial-kit@v8` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/upgradeReadiness/upgradeRehearsal/upgradeCutoverRehearsal/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
 - canonical `quickstart.sh`，在目标 Linux 设备上只依赖 POSIX shell、`sha256sum` 和 Docker，完成 checksum、load、identity、fresh Owner 与 Profile-bound Application active；
 - canonical `upgrade-readiness.sh`，把 2.x data root 只读挂载给 128 MiB/无网络 Operator，生成 SQLite 与完整目录两个私有 inspect 计划，不获得 stage/cutover authority；
 - `verification-evidence.json` 绑定 `workflow_dispatch` 的 workflow ref/SHA、run ID/attempt、同架构两个 exact image ID 和完整 gate 集；下载者仍须到 GitHub 交叉检查 run，它不替代正式签名；
@@ -119,7 +119,7 @@ Local artifact 含：
 
 Cluster artifact 是每角色/架构一个六文件闭包：native Docker archive、精确 CycloneDX SBOM、workflow-bound verification evidence、README、`qinglong/alpha-cluster-image@v1` manifest 和覆盖全部内容文件的 `SHA256SUMS`。完整 CI 成功后，八个 bundle 由 `qinglong/alpha-cluster-milestone@v1` 小型索引闭合；索引本身不重复存放大 archive。
 
-Local milestone 是 `qinglong/alpha-local-milestone@v4` 三文件闭包，绑定一个 variant 的双架构 Trial Kit，并直接记录两个架构的 `upgradeReadinessSha256` 与 `upgradeRehearsalSha256`。Stage index 是 `qinglong/alpha-stage-index@v2` 三文件闭包；它重新审计两个 milestone，要求 version/source/workflow SHA/ref/run/attempt 一致，并把 Local variant/Profile 与 Cluster 的 control/admin/worker 最小集、可选 control-ai 写为机器可读选择；它不重复存放任何镜像 archive。
+Local milestone 是 `qinglong/alpha-local-milestone@v5` 三文件闭包，绑定一个 variant 的双架构 Trial Kit，并直接记录两个架构的 `upgradeReadinessSha256`、`upgradeRehearsalSha256` 与 `upgradeCutoverRehearsalSha256`。Stage index 是 `qinglong/alpha-stage-index@v2` 三文件闭包；它重新审计两个 milestone，要求 version/source/workflow SHA/ref/run/attempt 一致，并把 Local variant/Profile 与 Cluster 的 control/admin/worker 最小集、可选 control-ai 写为机器可读选择；它不重复存放任何镜像 archive。
 
 任何 required job 失败时不上传对应产物。artifact 名和 archive 内的 `ci-*` tag 都表示 commit-bound candidate，不能改名后冒充 `v3.x` release。
 

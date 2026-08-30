@@ -654,6 +654,12 @@ jobs:
             --pids-limit=32 \
             --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
             "${OPERATOR_IMAGE}" setup --help
+          docker run --rm --read-only \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --entrypoint /usr/bin/docker \
+            "${OPERATOR_IMAGE}" --version
       - name: Build the short-lived fresh deployment authority
         working-directory: packages/ql3-local-owner-cli
         run: node ../../scripts/ql3-build-package-closure.cjs
@@ -777,16 +783,35 @@ jobs:
             "${UPGRADE_EVIDENCE_ROOT}/results/sqlite-inspect.result.json")"
           DIRECTORY_PLAN_DIGEST="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).evidence.planDigest)' \
             "${UPGRADE_EVIDENCE_ROOT}/results/data-directory-inspect.result.json")"
-          UPGRADE_REHEARSAL_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-rehearsal-${{ matrix.image_arch }}"
-          sh "${BUNDLE_ROOT}/upgrade-rehearsal.sh" \
-            edge "${LEGACY_READINESS_ROOT}" "${UPGRADE_REHEARSAL_ROOT}" \
-            "${SQLITE_PLAN_DIGEST}" "${DIRECTORY_PLAN_DIGEST}"
+          UPGRADE_REHEARSAL_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-cutover-rehearsal-${{ matrix.image_arch }}"
+          LEGACY_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-upgrade-legacy-${{ matrix.image_arch }}"
+          TARGET_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-upgrade-target-${{ matrix.image_arch }}"
+          trap 'docker rm --force "${QUICKSTART_CONTAINER}" "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}" >/dev/null 2>&1 || true' EXIT
+          if [[ "${TRIAL_VARIANT}" == 'headless' ]]; then
+            sh "${BUNDLE_ROOT}/upgrade-cutover-rehearsal.sh" \
+              edge "${LEGACY_READINESS_ROOT}" "${UPGRADE_REHEARSAL_ROOT}" \
+              "${SQLITE_PLAN_DIGEST}" "${DIRECTORY_PLAN_DIGEST}" \
+              "${LEGACY_CONTAINER}" "${TARGET_CONTAINER}"
+          else
+            sh "${BUNDLE_ROOT}/upgrade-rehearsal.sh" \
+              edge "${LEGACY_READINESS_ROOT}" "${UPGRADE_REHEARSAL_ROOT}" \
+              "${SQLITE_PLAN_DIGEST}" "${DIRECTORY_PLAN_DIGEST}"
+          fi
           grep -q '"status":"verified"' \
             "${UPGRADE_REHEARSAL_ROOT}/stage-summary.json"
           grep -q '"legacySource":"read_only"' \
             "${UPGRADE_REHEARSAL_ROOT}/stage-summary.json"
           grep -q '"cutover":"not_authorized"' \
             "${UPGRADE_REHEARSAL_ROOT}/stage-summary.json"
+          if [[ "${TRIAL_VARIANT}" == 'headless' ]]; then
+            grep -q '"status":"rollback_candidate"' \
+              "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
+            grep -q '"legacySource":"unchanged"' \
+              "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
+            grep -q '"target":"stopped"' \
+              "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
+            docker rm "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}"
+          fi
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-wal"
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-journal"
           trap - EXIT

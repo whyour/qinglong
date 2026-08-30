@@ -166,7 +166,7 @@ function adapters(overrides = {}, variant = 'headless') {
 test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const paths = fixture(t);
   const manifest = createLocalAlphaTrialKit(createOptions(paths), adapters());
-  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v7');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v8');
   assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.equal(manifest.architecture, 'arm64');
@@ -177,6 +177,10 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
   assert.equal(manifest.quickstart.file, 'quickstart.sh');
   assert.equal(manifest.upgradeReadiness.file, 'upgrade-readiness.sh');
   assert.equal(manifest.upgradeRehearsal.file, 'upgrade-rehearsal.sh');
+  assert.equal(
+    manifest.upgradeCutoverRehearsal.file,
+    'upgrade-cutover-rehearsal.sh',
+  );
   const quickstart = path.join(paths.outputRoot, 'quickstart.sh');
   const syntax = spawnSync('sh', ['-n', quickstart], { encoding: 'utf8' });
   assert.equal(syntax.status, 0, syntax.stderr);
@@ -186,6 +190,15 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     /QingLong 3\.0 Local Alpha is active \(\$VARIANT, \$profile, \$ARCHITECTURE\)/,
   );
   assert.match(quickstartContents, /qinglong3-local-application:test-arm64/);
+  const cutoverRehearsal = path.join(
+    paths.outputRoot,
+    'upgrade-cutover-rehearsal.sh',
+  );
+  const cutoverSyntax = spawnSync('sh', ['-n', cutoverRehearsal], {
+    encoding: 'utf8',
+  });
+  assert.equal(cutoverSyntax.status, 0, cutoverSyntax.stderr);
+  assert.match(fs.readFileSync(cutoverRehearsal, 'utf8'), /VARIANT='headless'/);
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);
@@ -199,6 +212,7 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     'qinglong3-local-operator.cdx.json',
     'qinglong3-local-trial-kit-arm64.docker.tar',
     'quickstart.sh',
+    'upgrade-cutover-rehearsal.sh',
     'upgrade-readiness.sh',
     'upgrade-rehearsal.sh',
     'verification-evidence.json',
@@ -235,6 +249,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
   assert.equal(verification.gates.ownerCredentialPresentation, 'passed');
   assert.equal(verification.gates.legacyUpgradeReadiness, 'passed');
   assert.equal(verification.gates.legacyUpgradeStage, 'passed');
+  assert.equal(verification.gates.legacyUpgradeCutover, 'not_applicable');
   const quickstartContents = fs.readFileSync(
     path.join(paths.outputRoot, 'quickstart.sh'),
     'utf8',
@@ -246,6 +261,12 @@ test('materializes a distinct loopback Console trial kit without widening the he
   assert.match(quickstartContents, /Console: http:\/\/127\.0\.0\.1:5700\//);
   assert.match(quickstartContents, /alpha-first-automation/);
   assert.match(quickstartContents, /do not expose the port on LAN/);
+  const cutoverContents = fs.readFileSync(
+    path.join(paths.outputRoot, 'upgrade-cutover-rehearsal.sh'),
+    'utf8',
+  );
+  assert.match(cutoverContents, /VARIANT='console'/);
+  assert.match(cutoverContents, /available only in the headless Trial Kit/);
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.variant, 'console');
@@ -257,6 +278,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
     'qinglong3-local-console-trial-kit-arm64.docker.tar',
     'qinglong3-local-operator.cdx.json',
     'quickstart.sh',
+    'upgrade-cutover-rehearsal.sh',
     'upgrade-readiness.sh',
     'upgrade-rehearsal.sh',
     'verification-evidence.json',
@@ -293,6 +315,7 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
     'quickstart',
     'upgrade-readiness',
     'upgrade-rehearsal',
+    'upgrade-cutover-rehearsal',
     'sbom',
     'verification',
   ]) {
@@ -322,6 +345,11 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
     } else if (mutation === 'upgrade-rehearsal') {
       fs.appendFileSync(
         path.join(paths.outputRoot, 'upgrade-rehearsal.sh'),
+        '# drift\n',
+      );
+    } else if (mutation === 'upgrade-cutover-rehearsal') {
+      fs.appendFileSync(
+        path.join(paths.outputRoot, 'upgrade-cutover-rehearsal.sh'),
         '# drift\n',
       );
     } else if (mutation === 'sbom') {
@@ -364,6 +392,7 @@ test('offline audit rejects a rehashed non-canonical quickstart', (t) => {
     'quickstart.sh',
     'upgrade-readiness.sh',
     'upgrade-rehearsal.sh',
+    'upgrade-cutover-rehearsal.sh',
     'README.md',
     'manifest.json',
   ];
@@ -618,7 +647,10 @@ exit 1
   assert.equal(summary.sqlite.activationDigest, 'd'.repeat(64));
   assert.equal(summary.dataDirectory.manifestDigest, 'e'.repeat(64));
   const calls = fs.readFileSync(dockerLog, 'utf8');
-  assert.match(calls, /dst=\/var\/lib\/qinglong2,readonly/);
+  assert.match(
+    calls,
+    new RegExp(`dst=${legacyRoot.replaceAll('/', '\\/')},readonly`),
+  );
   assert.match(calls, /--network none/);
   assert.match(calls, /--memory 128m --memory-swap 128m/);
   assert.doesNotMatch(calls, /cutover|target-start|legacy-rollback/);

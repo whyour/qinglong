@@ -13,6 +13,7 @@ const RUNTIME_NODE_IMAGE =
   'node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436';
 const RUNTIME_OS_PATCH =
   'RUN apk add --no-cache --upgrade \\\n' +
+  '    docker-cli=29.5.2-r0 \\\n' +
   '    libcrypto3=3.5.8-r0 \\\n' +
   '    libssl3=3.5.8-r0';
 const BUILD_DEPENDENCIES = Object.freeze({
@@ -194,6 +195,7 @@ function auditWorkflow(contents, findings) {
     'ql3-local-operator.cdx.json',
     'image-ref: qinglong3-local-operator:ci-${{ matrix.image_arch }}',
     '"${OPERATOR_IMAGE}" --version',
+    '--entrypoint /usr/bin/docker \\\n            "${OPERATOR_IMAGE}" --version',
     'scripts/ql3-local-alpha-trial-kit-live-contract.cjs',
     'scripts/ql3-local-alpha-trial-kit-bundle.cjs',
     '--mode=record-verification',
@@ -202,6 +204,9 @@ function auditWorkflow(contents, findings) {
     'sh "${BUNDLE_ROOT}/quickstart.sh" \\\n            edge "${QUICKSTART_ROOT}" "${QUICKSTART_CONTAINER}"',
     'docker stop --time 30 "${QUICKSTART_CONTAINER}"',
     'test -s "${QUICKSTART_ROOT}/qinglong3.sqlite"',
+    'sh "${BUNDLE_ROOT}/upgrade-cutover-rehearsal.sh"',
+    '"status":"rollback_candidate"',
+    'docker rm "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}"',
     '--application-sbom="${APPLICATION_SBOM}"',
     '--operator-sbom="${RUNNER_TEMP}/ql3-local-operator.cdx.json"',
     '--verification-evidence="${RUNNER_TEMP}/ql3-local-alpha-verification-${{ matrix.image_arch }}.json"',
@@ -228,6 +233,7 @@ function auditWorkflow(contents, findings) {
     '--mode=create',
     '--mode=audit',
     '/quickstart.sh"',
+    '/upgrade-cutover-rehearsal.sh"',
     'name: Upload the tested native Local Alpha trial kit',
   ]) {
     const index = contents.indexOf(value, cursor + 1);

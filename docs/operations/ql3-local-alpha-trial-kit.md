@@ -25,7 +25,7 @@ sha256sum --check SHA256SUMS
 
 `manifest.json` 必须满足：
 
-- `schema` 为 `qinglong/alpha-local-trial-kit@v7`；
+- `schema` 为 `qinglong/alpha-local-trial-kit@v8`；
 - `variant` 为 `headless` 或 `console`，并与 milestone、application SBOM 和 artifact 名一致；
 - `sourceRevision` 是你准备试用的完整 40 位 commit；
 - `architecture` 与主机相同；
@@ -116,7 +116,7 @@ artifact job 必须在原生 amd64/arm64 上使用生产形态 2.x fixture 运�
 
 ## 受审核计划的 Side-by-side 暂存
 
-审核上一节两个完整结果后，把其中 exact `evidence.planDigest` 作为显式参数交给 v7 bundle 的 canonical `upgrade-rehearsal.sh`：
+审核上一节两个完整结果后，把其中 exact `evidence.planDigest` 作为显式参数交给 v8 bundle 的 canonical `upgrade-rehearsal.sh`：
 
 ```sh
 sh upgrade-rehearsal.sh \
@@ -134,6 +134,27 @@ staging manifest。summary 必须是 `status=verified`、`legacySource=read_only
 这不是升级完成：本阶段不执行 transform/apply，不安装 Owner/Secret，不停止 2.x，不启动 3.0，也不授权 cutover 或 Legacy rollback。不要编辑、移动、
 复用或当作生产数据根；后续 adopted start 必须精确消费这里的 evidence，并走独立的 D-426b 门。artifact job 必须对将要上传的 exact 脚本使用同一个
 生产形态 fixture 实跑，并记录 `verification-evidence.json.gates.legacyUpgradeStage=passed`。
+
+## 隔离的真实切换链演练
+
+v8 headless bundle 进一步提供 `upgrade-cutover-rehearsal.sh`。它只面向 Linux Docker 测试主机，在新的 rehearsal root 和两个专用合成容器上消费上一阶段已审核的两个 plan digest：
+
+```sh
+sh upgrade-cutover-rehearsal.sh \
+  edge \
+  /opt/qinglong/data \
+  /opt/qinglong3-alpha-upgrade-cutover \
+  <reviewed-sqlite-plan-digest> \
+  <reviewed-data-directory-plan-digest> \
+  ql3-alpha-upgrade-legacy \
+  ql3-alpha-upgrade-target
+```
+
+脚本先重跑 canonical stage/verify，再完成 fresh Owner 建立、data-directory transform/apply、真实 Docker socket 上的合成 Legacy 停机和 3.0 target 启停。Operator 镜像仅增加固定版本 Docker CLI，仍不携带 daemon、Compose，也不常驻。Legacy root 在所有容器中均以只读方式挂载；脚本对演练前后的 `db/database.sqlite` 做 SHA-256 闭合校验。
+
+成功时 `cutover-summary.json` 必须同时为 `status=rollback_candidate`、`legacySource=unchanged`、`target=stopped`。两个合成容器会保持停止状态供审查，随后按脚本输出显式 `docker rm`；失败时脚本自动清理。该结果证明打包产物能够走通控制器链和 Docker 证据闭环，但不会停止用户真实 2.x 容器、执行 Legacy restart/rollback 或授权生产升级。
+
+原生 amd64/arm64 headless artifact job 必须从将要上传的目录执行 exact `upgrade-cutover-rehearsal.sh`，检查 summary 和旧 SQLite 未变，并删除合成容器后才能上传；对应 gate 为 `verification-evidence.json.gates.legacyUpgradeCutover=passed`。Console artifact 继续实跑 canonical stage，但该 gate 固定为 `not_applicable`；在 adopted target 证据正式支持 Local API 入口前，不得把 Console fresh journey 冒充升级切换验证。
 
 ## 手工加载与最小 smoke
 
@@ -162,7 +183,7 @@ docker run --rm --read-only --network none --cap-drop ALL \
 
 ## Fresh 试运行边界
 
-完整 fresh setup、首 Owner ceremony、Owner presentation 安装、Application active、SIGTERM drain、SQLite integrity 和原生 cancellation 必须在 `verification-evidence.json` 指向的同架构 milestone job 中验证。Console 还必须证明首页返回 200、未认证 API 返回 401，并用真实 Owner credential 完成 Task read、fenced start、`succeeded` 终态与 bounded log marker。v7 artifact job 必须从将要上传的目录实际执行 `quickstart.sh`、read-only `upgrade-readiness.sh` 和 reviewed-plan `upgrade-rehearsal.sh`，并完成 graceful stop。实际部署时仍必须使用独立目录，并让 operator 以最终数据文件 POSIX owner 的 UID/GID 运行；operator 默认无网络且每次只执行一个命令后退出，不应作为 sidecar 或 daemon 常驻。
+完整 fresh setup、首 Owner ceremony、Owner presentation 安装、Application active、SIGTERM drain、SQLite integrity 和原生 cancellation 必须在 `verification-evidence.json` 指向的同架构 milestone job 中验证。Console 还必须证明首页返回 200、未认证 API 返回 401，并用真实 Owner credential 完成 Task read、fenced start、`succeeded` 终态与 bounded log marker。v8 artifact job 必须从将要上传的目录实际执行 `quickstart.sh`、read-only `upgrade-readiness.sh` 和 isolated `upgrade-cutover-rehearsal.sh`，并完成 graceful stop、rollback-candidate 检查与合成容器清理。实际部署时仍必须使用独立目录，并让 operator 以最终数据文件 POSIX owner 的 UID/GID 运行；operator 默认无网络且每次只执行一个命令后退出，不应作为 sidecar 或 daemon 常驻。
 
 Edge 的验证上限为 Application 128 MiB、0.5 CPU、64 PID；Standalone 为 256 MiB、0.5 CPU、256 PID；operator 为 128 MiB、0.5 CPU、32 PID。这里的数值是试运行门，不是所有 workload 的容量承诺。
 

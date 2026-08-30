@@ -99,10 +99,10 @@ for directory in commands results sqlite data-directory; do
 done
 
 cat >"$rehearsal_root/commands/sqlite-stage.json" <<EOF
-{"schemaVersion":1,"operation":"local-sqlite.adoption.stage","options":{"deploymentRoot":"/var/lib/qinglong3","profile":"$profile","sourcePath":"/var/lib/qinglong2/db/database.sqlite","targetPath":"/var/lib/qinglong3/sqlite/qinglong3.sqlite","recoveryPath":"/var/lib/qinglong3/sqlite/database.pre-ql3.sqlite","manifestPath":"/var/lib/qinglong3/sqlite/qinglong3-adoption.json","expectedPlanDigest":"$sqlite_plan_digest"}}
+{"schemaVersion":1,"operation":"local-sqlite.adoption.stage","options":{"deploymentRoot":"$rehearsal_root","profile":"$profile","sourcePath":"$legacy_root/db/database.sqlite","targetPath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","expectedPlanDigest":"$sqlite_plan_digest"}}
 EOF
 cat >"$rehearsal_root/commands/sqlite-verify.json" <<EOF
-{"schemaVersion":1,"operation":"local-sqlite.adoption.verify","options":{"deploymentRoot":"/var/lib/qinglong3","profile":"$profile","targetPath":"/var/lib/qinglong3/sqlite/qinglong3.sqlite","recoveryPath":"/var/lib/qinglong3/sqlite/database.pre-ql3.sqlite","manifestPath":"/var/lib/qinglong3/sqlite/qinglong3-adoption.json"}}
+{"schemaVersion":1,"operation":"local-sqlite.adoption.verify","options":{"deploymentRoot":"$rehearsal_root","profile":"$profile","targetPath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json"}}
 EOF
 chmod 0600 "$rehearsal_root/commands/sqlite-stage.json" "$rehearsal_root/commands/sqlite-verify.json"
 
@@ -115,10 +115,10 @@ run_adoption() {
     --cap-drop ALL --security-opt no-new-privileges \
     --memory 128m --memory-swap 128m --cpus 0.5 --pids-limit 32 \
     --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
-    --mount "type=bind,src=$legacy_root,dst=/var/lib/qinglong2,readonly" \
-    --mount "type=bind,src=$rehearsal_root,dst=/var/lib/qinglong3" \
+    --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly" \
+    --mount "type=bind,src=$rehearsal_root,dst=$rehearsal_root" \
     "$OPERATOR_IMAGE" adoption run \
-    --command-file "/var/lib/qinglong3/commands/$command_file" \
+    --command-file "$rehearsal_root/commands/$command_file" \
     >"$rehearsal_root/results/$result_file"
 }
 
@@ -129,7 +129,7 @@ grep -q '"status":"verified"' "$rehearsal_root/results/sqlite-verify.result.json
 sqlite_manifest_digest=$(extract_digest "$rehearsal_root/results/sqlite-verify.result.json" manifestDigest)
 
 cat >"$rehearsal_root/commands/sqlite-activation.json" <<EOF
-{"schemaVersion":1,"operation":"local-sqlite.activation.prepare","options":{"deploymentRoot":"/var/lib/qinglong3","profile":"$profile","sourcePath":"/var/lib/qinglong2/db/database.sqlite","targetPath":"/var/lib/qinglong3/sqlite/qinglong3.sqlite","recoveryPath":"/var/lib/qinglong3/sqlite/database.pre-ql3.sqlite","manifestPath":"/var/lib/qinglong3/sqlite/qinglong3-adoption.json","activationPath":"/var/lib/qinglong3/sqlite/qinglong3-activation.json","expectedManifestDigest":"$sqlite_manifest_digest"}}
+{"schemaVersion":1,"operation":"local-sqlite.activation.prepare","options":{"deploymentRoot":"$rehearsal_root","profile":"$profile","sourcePath":"$legacy_root/db/database.sqlite","targetPath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","expectedManifestDigest":"$sqlite_manifest_digest"}}
 EOF
 chmod 0600 "$rehearsal_root/commands/sqlite-activation.json"
 run_adoption sqlite-activation.json sqlite-activation.result.json
@@ -137,7 +137,7 @@ grep -q '"status":"prepared"' "$rehearsal_root/results/sqlite-activation.result.
 activation_digest=$(extract_digest "$rehearsal_root/results/sqlite-activation.result.json" activationDigest)
 
 cat >"$rehearsal_root/commands/data-directory-stage.json" <<EOF
-{"schemaVersion":1,"operation":"local-data-directory.adoption.stage","options":{"deploymentRoot":"/var/lib/qinglong3","dataRoot":"/var/lib/qinglong2","stagingRoot":"/var/lib/qinglong3/data-directory/staged","profile":"$profile","expectedPlanDigest":"$directory_plan_digest","sqlite":{"sourcePath":"/var/lib/qinglong2/db/database.sqlite","targetPath":"/var/lib/qinglong3/sqlite/qinglong3.sqlite","recoveryPath":"/var/lib/qinglong3/sqlite/database.pre-ql3.sqlite","manifestPath":"/var/lib/qinglong3/sqlite/qinglong3-adoption.json","activationPath":"/var/lib/qinglong3/sqlite/qinglong3-activation.json","expectedActivationDigest":"$activation_digest"}}}
+{"schemaVersion":1,"operation":"local-data-directory.adoption.stage","options":{"deploymentRoot":"$rehearsal_root","dataRoot":"$legacy_root","stagingRoot":"$rehearsal_root/data-directory/staged","profile":"$profile","expectedPlanDigest":"$directory_plan_digest","sqlite":{"sourcePath":"$legacy_root/db/database.sqlite","targetPath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","expectedActivationDigest":"$activation_digest"}}}
 EOF
 chmod 0600 "$rehearsal_root/commands/data-directory-stage.json"
 run_adoption data-directory-stage.json data-directory-stage.result.json
@@ -145,7 +145,7 @@ grep -q '"status":"staged"' "$rehearsal_root/results/data-directory-stage.result
 directory_manifest_digest=$(extract_digest "$rehearsal_root/results/data-directory-stage.result.json" manifestDigest)
 
 cat >"$rehearsal_root/commands/data-directory-verify.json" <<EOF
-{"schemaVersion":1,"operation":"local-data-directory.adoption.verify","options":{"deploymentRoot":"/var/lib/qinglong3","dataRoot":"/var/lib/qinglong2","stagingRoot":"/var/lib/qinglong3/data-directory/staged","profile":"$profile","expectedManifestDigest":"$directory_manifest_digest","sqlite":{"sourcePath":"/var/lib/qinglong2/db/database.sqlite","targetPath":"/var/lib/qinglong3/sqlite/qinglong3.sqlite","recoveryPath":"/var/lib/qinglong3/sqlite/database.pre-ql3.sqlite","manifestPath":"/var/lib/qinglong3/sqlite/qinglong3-adoption.json","activationPath":"/var/lib/qinglong3/sqlite/qinglong3-activation.json","expectedActivationDigest":"$activation_digest"}}}
+{"schemaVersion":1,"operation":"local-data-directory.adoption.verify","options":{"deploymentRoot":"$rehearsal_root","dataRoot":"$legacy_root","stagingRoot":"$rehearsal_root/data-directory/staged","profile":"$profile","expectedManifestDigest":"$directory_manifest_digest","sqlite":{"sourcePath":"$legacy_root/db/database.sqlite","targetPath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","expectedActivationDigest":"$activation_digest"}}}
 EOF
 chmod 0600 "$rehearsal_root/commands/data-directory-verify.json"
 run_adoption data-directory-verify.json data-directory-verify.result.json
