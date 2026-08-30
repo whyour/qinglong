@@ -268,6 +268,8 @@ EOF
 chmod 0600 "$rehearsal_root/commands/target-start.json"
 phase 'start exact target container'
 run_deploy cutover-target-start target-start.json target-start.result.json
+printf '%s' 'QingLong Local Alpha target-start result: ' >&2
+sed -n '1p' "$rehearsal_root/results/target-start.result.json" >&2
 grep -q '"state":"target_active"' "$rehearsal_root/results/target-start.result.json" || fail 'target did not become active'
 stop_ms=$((start_ms + 1))
 sed "s/\"operation\":\"local.deployment.cutover.target-start\"/\"operation\":\"local.deployment.cutover.target-stop\"/;s/\"requestedAtMs\":$start_ms/\"requestedAtMs\":$stop_ms/" \
@@ -276,6 +278,8 @@ sed "s/\"operation\":\"local.deployment.cutover.target-start\"/\"operation\":\"l
 chmod 0600 "$rehearsal_root/commands/target-stop.json"
 phase 'stop target and prove rollback candidate'
 run_deploy cutover-target-stop target-stop.json target-stop.result.json
+printf '%s' 'QingLong Local Alpha target-stop result: ' >&2
+sed -n '1p' "$rehearsal_root/results/target-stop.result.json" >&2
 grep -q '"reconciliation":"rollback_candidate"' "$rehearsal_root/results/target-stop.result.json" || fail 'target stop did not produce a clean rollback candidate'
 [ "$(sha256sum "$legacy_root/db/database.sqlite" | sed 's/ .*//')" = "$legacy_sha256" ] || fail 'legacy database changed during rehearsal'
 

@@ -264,6 +264,14 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
       new RegExp(`phase '${phase}'`),
     );
   }
+  assert.match(
+    cutoverRehearsalContents,
+    /QingLong Local Alpha target-start result:/,
+  );
+  assert.match(
+    cutoverRehearsalContents,
+    /QingLong Local Alpha target-stop result:/,
+  );
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);
