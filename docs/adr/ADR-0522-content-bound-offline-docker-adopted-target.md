@@ -1,6 +1,6 @@
 # ADR-0522：内容绑定的离线 Docker Adopted Target
 
-- 状态：Accepted（D-426b 源码候选；阶段实物尚未闭合）
+- 状态：Accepted（D-426b 权威已由 D-426b2b 双架构阶段实物闭合）
 - 日期：2026-08-30
 - 决策：D-426b1
 
@@ -24,10 +24,8 @@ adopted bundle 增加 `docker-target` service kind，生成 `service/docker-targ
 
 ## 阶段实物门
 
-本 ADR 当前只是源码候选，不得称为已交付的 D-426b 阶段实物。只有后续同源原生 amd64/arm64 artifact job 在将要上传的 exact Trial Kit 上完成受认证 transform/apply、生成并验证 `docker-target.json`、真实 target start/stop，并得到 clean `rollback_candidate`，再由 bundle/milestone auditor 闭合，才能把状态升级为“阶段实物已交付”。
-
-在此之前，用户可继续使用 D-426a 的 `upgrade-rehearsal.sh` 完成 read-only legacy + side-by-side stage；不得从本 ADR 推导生产切换授权。
+D-426b2b 已在提交 `79045a0d439074994812d9cd682f933b9e415706` 的原生 amd64/arm64 artifact [run 33326143744](https://github.com/whyour/qinglong/actions/runs/33326143744) 上，从将要上传的 exact Trial Kit 完成受认证 transform/apply、生成并验证 `docker-target.json`、真实 legacy stop、只读 target probe start/stop与 clean `rollback_candidate`，再由 bundle/milestone auditor 闭合。因此本 ADR 的离线 image authority 已进入阶段实物，但不得从中推导生产切换或 Public Release 授权。
 
 ## 后续
 
-D-426b2 接入受认证 transform/apply、descriptor 消费、真实 target start/stop 与 clean rollback candidate；D-426c 处理 target 写入后的 `reconciliation_required`。Public prerelease/release 仍需维护者显式授权。
+D-426c 处理 target 接受业务写入后的 `reconciliation_required`。Public prerelease/release 仍需维护者显式授权。

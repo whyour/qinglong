@@ -1,6 +1,6 @@
 # ADR-0523：Apply 后的 Adopted Target 启动前基线
 
-- 状态：Accepted（D-426b2a 源码候选；阶段实物尚未闭合）
+- 状态：Accepted（D-426b2a 基线已由 D-426b2b 双架构阶段实物闭合）
 - 日期：2026-08-30
 - 决策：D-426b2a
 
@@ -35,7 +35,7 @@ target controller 同时接受原有 Application v3 与 adopted Application v4�
 
 ## 阶段实物门
 
-本 ADR 只闭合此前不合理的 rollback 语义，仍不是新的可下载 Trial Kit。D-426a 双架构 headless bundle 仍是当前可交付的升级阶段实物。只有同源原生 amd64/arm64 artifact job 在将要上传的 exact bundle 上完成：
+本 ADR 的 rollback 语义已由 D-426b2b 新的可下载 Trial Kit 闭合。同源原生 amd64/arm64 artifact job 已在将要上传的 exact bundle 上完成：
 
 1. reviewed stage/verify；
 2. versioned transform/verify；
@@ -45,8 +45,8 @@ target controller 同时接受原有 Application v3 与 adopted Application v4�
 6. v4 baseline 绑定且最终为 clean `rollback_candidate`；
 7. bundle 与 milestone 离线审计；
 
-才能把 D-426b2 升级为阶段实物。任何一步只在仓库测试 fixture 中通过都不能替代 exact 上传包演练。
+提交 `79045a0d439074994812d9cd682f933b9e415706` 的显式 Local headless [run 33326143744](https://github.com/whyour/qinglong/actions/runs/33326143744) 对以上七项全部通过，两个 bundle 与 milestone 下载后再次离线审计为 `compatible=true`。任何后续变更仍不能用仓库 fixture 替代 exact 上传包演练。
 
 ## 后续
 
-D-426b2b 实现并审计上述 exact bundle 用户旅程，随后显式生成新的双架构 artifact。D-426c 继续处理 target 产生业务写入后的 capture、review、reconciliation 与恢复。
+D-426c 继续处理 target 产生业务写入后的 capture、review、reconciliation 与恢复。

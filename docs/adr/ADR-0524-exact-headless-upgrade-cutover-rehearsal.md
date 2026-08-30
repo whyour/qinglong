@@ -1,6 +1,6 @@
 # ADR-0524：Exact Headless 升级切换链演练
 
-- 状态：Accepted（D-426b2b 源码候选；双架构阶段实物待本次 artifact run）
+- 状态：Accepted（D-426b2b 同源双架构阶段实物已交付）
 - 日期：2026-08-30
 - 决策：D-426b2b
 - 关联：ADR-0520、ADR-0521、ADR-0522、ADR-0523
@@ -42,7 +42,9 @@ ADR-0523 已修正 Apply 后 Adopted Target 的回退基线，但仓库内单元
 - package boundary 保持 18 个 workspace package、无 single/shallow package、零 finding；
 - Operator image、milestone workflow、Stage Index workflow auditor 均为 compatible。
 
-真实镜像构建、固定 Docker CLI、双架构 exact rehearsal 和新 artifact 摘要将在本提交的 GitHub artifact run 中补充。只有该 run 成功后，才把状态更新为“阶段实物已闭合”。
+提交 `79045a0d439074994812d9cd682f933b9e415706` 的显式 Local headless [run 33326143744](https://github.com/whyour/qinglong/actions/runs/33326143744) 已完成 `42 success / 2 expected scope skip / 0 fail`。两个原生架构都从将要上传的 exact Trial Kit 实跑 readiness、reviewed stage、Owner credential presentation、transform/apply、真实 Docker legacy stop、只读 target cutover probe start/stop，并得到 clean `rollback_candidate`；普通 Application 启动命令不能冒充 probe。最终器生成同 run 的 milestone v5，三个 artifact ID 为 amd64 `9736356778`、arm64 `9736354298`、milestone `9736502478`，保留至 2026-09-29。
+
+下载后的 milestone 与两个 Trial Kit 已再次用仓库离线 auditor 审计，三者均返回 `compatible=true`。Docker archive 为 amd64 `226122240` bytes / `sha256:1e1c5c83fd2c39b3bbe7b194113998a96cbe810e69d34858c3f40d2638837c60`，arm64 `221521920` bytes / `sha256:dcec37f65382d7d8c06f448780878ec2474e45d6e64b2febb764b1836898d2d6`；两个 verification v6 都把 `legacyUpgradeReadiness`、`legacyUpgradeStage`、`legacyUpgradeCutover` 标记为 `passed`。同 run 的跨架构资源证据还在 128 MiB、0.5 CPU、64 PID 的 CI stress envelope 下记录 x64 `77967360` bytes、arm64 `72581120` bytes peak，并明确该数据不是固定物理设备最低配置承诺。
 
 ## 后续
 
