@@ -20,12 +20,17 @@ export interface LegacySilenceEvidence {
 }
 
 export interface TargetApplicationBinding {
+  readonly schema:
+    | 'qinglong/local-application-process@v3'
+    | 'qinglong/local-application-process@v4';
   readonly configDigest: string;
   readonly targetActivationPath: string;
   readonly targetLegacySourcePath: string;
   readonly targetDatabasePath: string;
   readonly targetRecoveryPath: string;
   readonly targetManifestPath: string;
+  readonly legacyDataApplicationCommitDigest: string | null;
+  readonly legacyDataApplicationReceiptDigest: string | null;
 }
 
 export interface TargetContainerEvidence {
@@ -253,8 +258,22 @@ export function readTargetApplicationBinding(
   );
   const storage = object(config.storage, 'target storage configuration');
   const cutover = object(config.cutover, 'target cutover configuration');
+  const isV4 = config.schema === 'qinglong/local-application-process@v4';
+  const legacyDataApplication = isV4
+    ? object(
+        config.legacyDataApplication,
+        'target legacy data application configuration',
+      )
+    : undefined;
+  if (legacyDataApplication !== undefined) {
+    exact(
+      legacyDataApplication,
+      ['commitPath', 'expectedCommitDigest', 'expectedReceiptDigest'],
+      'target legacy data application configuration',
+    );
+  }
   if (
-    config.schema !== 'qinglong/local-application-process@v3' ||
+    (config.schema !== 'qinglong/local-application-process@v3' && !isV4) ||
     config.profile !== command.request.profile ||
     config.instanceId !== command.request.instanceId ||
     storage.mode !== 'adopted' ||
@@ -278,17 +297,35 @@ export function readTargetApplicationBinding(
     cutover.cutoverId !== command.request.cutoverId ||
     cutover.commitmentPath !== command.request.expectedTargetCommitmentPath ||
     cutover.expectedCommitmentDigest !==
-      command.request.expectedLegacyCommitmentDigest
+      command.request.expectedLegacyCommitmentDigest ||
+    (legacyDataApplication !== undefined &&
+      (typeof legacyDataApplication.commitPath !== 'string' ||
+        !path.isAbsolute(legacyDataApplication.commitPath) ||
+        path.normalize(legacyDataApplication.commitPath) !==
+          legacyDataApplication.commitPath ||
+        typeof legacyDataApplication.expectedCommitDigest !== 'string' ||
+        !DIGEST_PATTERN.test(legacyDataApplication.expectedCommitDigest) ||
+        typeof legacyDataApplication.expectedReceiptDigest !== 'string' ||
+        !DIGEST_PATTERN.test(legacyDataApplication.expectedReceiptDigest)))
   ) {
     configurationError('target application configuration binding is invalid');
   }
   return Object.freeze({
+    schema: config.schema as TargetApplicationBinding['schema'],
     configDigest: cutoverDigest(config),
     targetActivationPath: storage.activationPath,
     targetLegacySourcePath: storage.sourcePath,
     targetDatabasePath: storage.targetPath,
     targetRecoveryPath: storage.recoveryPath,
     targetManifestPath: storage.manifestPath,
+    legacyDataApplicationCommitDigest:
+      legacyDataApplication === undefined
+        ? null
+        : (legacyDataApplication.expectedCommitDigest as string),
+    legacyDataApplicationReceiptDigest:
+      legacyDataApplication === undefined
+        ? null
+        : (legacyDataApplication.expectedReceiptDigest as string),
   });
 }
 

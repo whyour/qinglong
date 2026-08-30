@@ -762,11 +762,39 @@ for (const kind of ['systemd', 'openrc', 'compose', 'docker-target']) {
           readOnly: true,
         },
       ]);
+      const baseline = JSON.parse(
+        fs.readFileSync(
+          path.join(state.root, 'service/adopted-target-baseline.json'),
+          'utf8',
+        ),
+      );
+      const { baselineDigest, ...baselinePayload } = baseline;
+      assert.equal(baseline.kind, 'qinglong3-local-adopted-target-baseline');
+      assert.equal(
+        baseline.applicationConfigDigest,
+        canonicalDigest(application),
+      );
+      assert.equal(
+        baseline.legacyDataApplicationCommitDigest,
+        state.command.request.legacyDataApplication.expectedCommitDigest,
+      );
+      assert.equal(
+        baseline.targetSha256,
+        hexDigest(fs.readFileSync(state.targetPath)),
+      );
+      assert.equal(baseline.targetSidecarsClear, true);
+      assert.equal(baselineDigest, canonicalDigest(baselinePayload));
       assert.equal(
         fs.existsSync(path.join(state.root, 'service/compose.image.yaml')),
         false,
       );
     } else {
+      assert.equal(
+        fs.existsSync(
+          path.join(state.root, 'service/adopted-target-baseline.json'),
+        ),
+        false,
+      );
       assert.equal(
         fs.existsSync(path.join(state.root, 'service/compose.image.yaml')),
         false,

@@ -215,6 +215,17 @@ export function prepareLocalDeploymentAdoptedBundle(
     identity.uid,
     'adopted bundle receipt',
   );
+  if (material.targetBaseline !== null) {
+    preflightPublishedFile(
+      material.paths.targetBaseline,
+      material.targetBaseline,
+      0o600,
+      identity.uid,
+      'adopted target baseline',
+    );
+  } else if (fs.existsSync(material.paths.targetBaseline)) {
+    configurationError('process service cannot inherit a target baseline');
+  }
   if (material.composeSelection !== null) {
     preflightPublishedFile(
       material.paths.composeRevision,
@@ -309,6 +320,16 @@ export function prepareLocalDeploymentAdoptedBundle(
     identity.uid,
     'adopted bundle receipt',
   );
+  const baselineStatus =
+    material.targetBaseline === null
+      ? 'existing'
+      : publishExactFile(
+          material.paths.targetBaseline,
+          material.targetBaseline,
+          0o600,
+          identity.uid,
+          'adopted target baseline',
+        );
   const createdDirectories = directoryStatuses.filter(
     (status) => status === 'prepared',
   ).length;
@@ -318,6 +339,7 @@ export function prepareLocalDeploymentAdoptedBundle(
     serviceStatus === 'prepared' ||
     composeRevisionStatus === 'prepared' ||
     composeSelectionStatus === 'prepared' ||
+    baselineStatus === 'prepared' ||
     receiptStatus === 'prepared';
   return Object.freeze({
     schemaVersion: 1 as const,
@@ -431,6 +453,18 @@ export function verifyLocalDeploymentAdoptedBundle(
     identity.gid,
     'adopted bundle receipt',
   );
+  if (material.targetBaseline !== null) {
+    verifyPublishedFile(
+      material.paths.targetBaseline,
+      material.targetBaseline,
+      0o600,
+      identity.uid,
+      identity.gid,
+      'adopted target baseline',
+    );
+  } else if (fs.existsSync(material.paths.targetBaseline)) {
+    configurationError('process service cannot inherit a target baseline');
+  }
   if (material.composeSelection !== null) {
     verifyPublishedFile(
       material.paths.composeRevision,

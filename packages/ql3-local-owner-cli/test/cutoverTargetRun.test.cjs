@@ -26,6 +26,10 @@ function digest(value) {
     .digest('hex');
 }
 
+function sha256(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+
 function targetPath(state, hostPath) {
   return path.join('/host', path.relative(state.managementRoot, hostPath));
 }
@@ -264,6 +268,72 @@ function fixture(t) {
     { mode: 0o600 },
   );
   return state;
+}
+
+function prepareAdoptedV4Baseline(state) {
+  const commitDigest = 'b'.repeat(64);
+  const receiptDigest = 'c'.repeat(64);
+  const config = {
+    schema: 'qinglong/local-application-process@v4',
+    profile: 'edge',
+    instanceId: 'edge-router-1',
+    storage: {
+      mode: 'adopted',
+      sourcePath: targetPath(state, state.legacySourcePath),
+      targetPath: targetPath(state, state.targetDatabasePath),
+      recoveryPath: targetPath(state, state.recoveryPath),
+      manifestPath: targetPath(state, state.manifestPath),
+      activationPath: targetPath(state, state.activationPath),
+      expectedActivationDigest: state.activationDigest,
+    },
+    cutover: {
+      cutoverId: state.cutoverId,
+      commitmentPath: state.targetCommitmentPath,
+      expectedCommitmentDigest: state.legacyCommitmentDigest,
+    },
+    legacyDataApplication: {
+      commitPath: path.join(
+        state.deploymentRoot,
+        'transformation',
+        'commit.json',
+      ),
+      expectedCommitDigest: commitDigest,
+      expectedReceiptDigest: receiptDigest,
+    },
+  };
+  fs.writeFileSync(state.applicationConfigPath, `${JSON.stringify(config)}\n`, {
+    mode: 0o600,
+  });
+  const target = fs.statSync(state.targetDatabasePath, { bigint: true });
+  const baselinePayload = {
+    schemaVersion: 1,
+    kind: 'qinglong3-local-adopted-target-baseline',
+    state: 'prepared',
+    preparedAtMs: 2_000,
+    profile: 'edge',
+    instanceId: 'edge-router-1',
+    cutoverId: state.cutoverId,
+    activationDigest: state.activationDigest,
+    commitmentDigest: state.legacyCommitmentDigest,
+    applicationConfigDigest: digest(config),
+    legacyDataApplicationCommitDigest: commitDigest,
+    legacyDataApplicationReceiptDigest: receiptDigest,
+    targetPathDigest: sha256(state.targetDatabasePath),
+    targetDevice: target.dev.toString(),
+    targetInode: target.ino.toString(),
+    targetSha256: sha256(fs.readFileSync(state.targetDatabasePath)),
+    targetSidecarsClear: true,
+  };
+  const baseline = {
+    ...baselinePayload,
+    baselineDigest: digest(baselinePayload),
+  };
+  fs.writeFileSync(
+    path.join(state.deploymentRoot, 'service/adopted-target-baseline.json'),
+    `${JSON.stringify(baseline)}\n`,
+    { mode: 0o600 },
+  );
+  return baseline;
 }
 
 function command(state, generation = 1) {
@@ -987,6 +1057,78 @@ test('stops an active target and proves an unchanged rollback candidate', async 
     }),
     /target command is not bound to the instance lineage head/,
   );
+});
+
+test('uses the authenticated v4 post-apply baseline for clean rollback', async (t) => {
+  const state = fixture(t);
+  fs.writeFileSync(state.targetDatabasePath, 'authenticated applied target\n');
+  const baseline = prepareAdoptedV4Baseline(state);
+  await runLocalDeploymentDockerTarget(command(state), harness(state));
+  const stopped = stopLocalDeploymentDockerTarget(
+    stopCommand(state),
+    harness(state),
+  );
+  assert.equal(stopped.state, 'target_stopped');
+  assert.equal(stopped.reconciliation, 'rollback_candidate');
+  const outcome = JSON.parse(
+    fs.readFileSync(
+      path.join(state.journal, '0006-target-stop-outcome.json'),
+      'utf8',
+    ),
+  );
+  const reconciliation = outcome.evidence.reconciliation;
+  assert.equal(reconciliation.baselineKind, 'adopted_target');
+  assert.equal(reconciliation.baselineDigest, baseline.baselineDigest);
+  assert.equal(reconciliation.targetMatchesActivation, false);
+  assert.equal(reconciliation.targetMatchesBaseline, true);
+  assert.equal(reconciliation.sourceMatchesActivation, true);
+});
+
+test('requires reconciliation when the v4 target writes after its baseline', async (t) => {
+  const state = fixture(t);
+  fs.writeFileSync(state.targetDatabasePath, 'authenticated applied target\n');
+  const baseline = prepareAdoptedV4Baseline(state);
+  await runLocalDeploymentDockerTarget(command(state), harness(state));
+  fs.writeFileSync(state.targetDatabasePath, 'post-cutover write\n');
+  const stopped = stopLocalDeploymentDockerTarget(
+    stopCommand(state),
+    harness(state),
+  );
+  assert.equal(stopped.reconciliation, 'reconciliation_required');
+  const outcome = JSON.parse(
+    fs.readFileSync(
+      path.join(state.journal, '0006-target-stop-outcome.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(
+    outcome.evidence.reconciliation.baselineDigest,
+    baseline.baselineDigest,
+  );
+  assert.equal(outcome.evidence.reconciliation.targetMatchesBaseline, false);
+});
+
+test('fails a drifted v4 target baseline closed to manual review', async (t) => {
+  const state = fixture(t);
+  fs.writeFileSync(state.targetDatabasePath, 'authenticated applied target\n');
+  prepareAdoptedV4Baseline(state);
+  await runLocalDeploymentDockerTarget(command(state), harness(state));
+  const baselinePath = path.join(
+    state.deploymentRoot,
+    'service/adopted-target-baseline.json',
+  );
+  const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+  fs.writeFileSync(
+    baselinePath,
+    `${JSON.stringify({ ...baseline, targetSha256: 'd'.repeat(64) })}\n`,
+    { mode: 0o600 },
+  );
+  const stopped = stopLocalDeploymentDockerTarget(
+    stopCommand(state),
+    harness(state),
+  );
+  assert.equal(stopped.state, 'target_stopped');
+  assert.equal(stopped.reconciliation, 'manual_review');
 });
 
 test('prepares and commits an exact legacy rollback without mutating target data', async (t) => {

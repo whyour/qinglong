@@ -8,6 +8,10 @@ import {
 } from '@qinglong/local-sqlite/data-directory-application-commit';
 
 import { initialComposeImageSelectionFromAuthority } from '../compose/composeRevision';
+import {
+  adoptedTargetBaselinePath,
+  createAdoptedTargetBaseline,
+} from '../cutover/targetBaseline';
 import { cutoverDigest } from '../cutover/targetEvidence';
 import { LocalDeploymentConfigurationError } from '../foundation/error';
 import { composeProjectName } from '../foundation/render';
@@ -31,6 +35,7 @@ export interface LocalDeploymentAdoptedBundlePaths {
   readonly applicationConfig: string;
   readonly descriptor: string;
   readonly bundleReceipt: string;
+  readonly targetBaseline: string;
   readonly composeSelection: string;
   readonly composeRevisions: string;
   readonly composeRevision: string;
@@ -52,6 +57,7 @@ export interface LocalDeploymentAdoptedEvidence {
   readonly manifestDigest: string;
   readonly sourceSha256: string;
   readonly recoverySha256: string;
+  readonly targetSha256: string;
   readonly targetDevice: string;
   readonly targetInode: string;
   readonly targetIdentityDigest: string;
@@ -92,6 +98,7 @@ export interface LocalDeploymentAdoptedBundleMaterial {
     mode: number;
   }>;
   readonly composeSelection: string | null;
+  readonly targetBaseline: string | null;
   readonly receipt: Readonly<LocalDeploymentAdoptedBundleReceipt>;
   readonly receiptContents: string;
 }
@@ -323,6 +330,7 @@ export function adoptedBundlePaths(
     applicationConfig: path.join(root, 'local-application.json'),
     descriptor: path.join(service, descriptorName),
     bundleReceipt: path.join(service, 'adopted-bundle.json'),
+    targetBaseline: adoptedTargetBaselinePath(root),
     composeSelection: path.join(service, 'compose.image.yaml'),
     composeRevisions: path.join(service, 'revisions'),
     composeRevision: path.join(service, 'revisions', '1.yaml'),
@@ -538,6 +546,23 @@ export function verifyLocalDeploymentAdoptedEvidence(
     gid,
     'recovery database',
   );
+  const targetSidecars = ['-wal', '-shm', '-journal'].map((suffix) =>
+    fs.existsSync(`${command.request.storage.targetPath}${suffix}`),
+  );
+  const targetSha256 = stableFileSha256(
+    command.request.storage.targetPath,
+    uid,
+    gid,
+    'target database',
+  );
+  if (
+    targetSidecars.some(Boolean) ||
+    ['-wal', '-shm', '-journal'].some((suffix) =>
+      fs.existsSync(`${command.request.storage.targetPath}${suffix}`),
+    )
+  ) {
+    configurationError('target database sidecars must be absent');
+  }
   if (
     activation.targetDevice !== target.device ||
     activation.targetInode !== target.inode ||
@@ -554,6 +579,7 @@ export function verifyLocalDeploymentAdoptedEvidence(
     manifestDigest,
     sourceSha256,
     recoverySha256,
+    targetSha256,
     targetDevice: target.device,
     targetInode: target.inode,
     targetIdentityDigest: cutoverDigest({
@@ -872,6 +898,30 @@ export function renderLocalDeploymentAdoptedBundleMaterial(
           changedAtMs: command.request.preparedAtMs,
         })
       : null;
+  const targetBaseline =
+    command.options.service.kind === 'docker-target'
+      ? `${JSON.stringify(
+          createAdoptedTargetBaseline({
+            preparedAtMs: command.request.preparedAtMs,
+            profile: command.options.profile,
+            instanceId: command.options.instanceId,
+            cutoverId: command.request.cutoverId,
+            activationDigest: evidence.activationDigest,
+            commitmentDigest: evidence.commitmentDigest,
+            applicationConfigDigest: cutoverDigest(
+              JSON.parse(config) as unknown,
+            ),
+            legacyDataApplicationCommitDigest: evidence.commitDigest,
+            legacyDataApplicationReceiptDigest: evidence.receiptDigest,
+            targetPathDigest: sha256(command.request.storage.targetPath),
+            targetDevice: evidence.targetDevice,
+            targetInode: evidence.targetInode,
+            targetSha256: evidence.targetSha256,
+          }),
+          null,
+          2,
+        )}\n`
+      : null;
   const receiptPayload = {
     schemaVersion: 1 as const,
     kind: 'qinglong3-local-adopted-deployment-bundle' as const,
@@ -906,6 +956,7 @@ export function renderLocalDeploymentAdoptedBundleMaterial(
     applicationConfig: config,
     descriptor,
     composeSelection,
+    targetBaseline,
     receipt,
     receiptContents: `${JSON.stringify(receipt, null, 2)}\n`,
   });

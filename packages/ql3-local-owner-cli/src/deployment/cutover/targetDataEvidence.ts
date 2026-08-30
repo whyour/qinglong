@@ -5,7 +5,11 @@ import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
 
 import type { LocalDeploymentTargetReconciliationDisposition } from './targetStopContract';
 import type { LocalDeploymentTargetRunCommand } from './target-run/targetRunContract';
-import { cutoverDigest } from './targetEvidence';
+import {
+  adoptedTargetBaselinePath,
+  readAdoptedTargetBaseline,
+} from './targetBaseline';
+import { cutoverDigest, readTargetApplicationBinding } from './targetEvidence';
 
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 const UNKNOWN_DIGEST = '0'.repeat(64);
@@ -19,6 +23,9 @@ export interface TargetDataReconciliationEvidence {
   readonly sourceSidecarsClear: boolean | null;
   readonly targetFileIdentityDigest: string;
   readonly sourceFileIdentityDigest: string;
+  readonly baselineKind?: 'adopted_target';
+  readonly baselineDigest?: string;
+  readonly targetMatchesBaseline?: boolean | null;
   readonly evidenceDigest: string;
 }
 
@@ -28,6 +35,12 @@ export interface TargetDataReconciliationInput {
   readonly legacySourcePath: string;
   readonly targetDatabasePath: string;
   readonly expectedActivationDigest: string;
+  readonly adoptedTargetBaseline?: Readonly<{
+    baselineDigest: string;
+    targetDevice: string;
+    targetInode: string;
+    targetSha256: string;
+  }>;
 }
 
 interface FileEvidence {
@@ -155,20 +168,73 @@ function evidence(
   return Object.freeze({ ...payload, evidenceDigest: cutoverDigest(payload) });
 }
 
+function manualReviewEvidence(): Readonly<TargetDataReconciliationEvidence> {
+  return evidence({
+    disposition: 'manual_review',
+    targetMatchesActivation: null,
+    sourceMatchesActivation: null,
+    targetSidecarsClear: null,
+    sourceSidecarsClear: null,
+    targetFileIdentityDigest: UNKNOWN_DIGEST,
+    sourceFileIdentityDigest: UNKNOWN_DIGEST,
+  });
+}
+
 export function readTargetDataReconciliationEvidence(
   command: Readonly<LocalDeploymentTargetRunCommand>,
   uid: number,
 ): Readonly<TargetDataReconciliationEvidence> {
-  return readTargetDataReconciliationEvidenceForPaths(
-    {
-      profile: command.request.profile,
-      activationPath: command.request.activationPath,
-      legacySourcePath: command.request.legacySourcePath,
-      targetDatabasePath: command.request.targetDatabasePath,
-      expectedActivationDigest: command.request.expectedActivationDigest,
-    },
-    uid,
-  );
+  try {
+    const application = readTargetApplicationBinding(command);
+    let adoptedTargetBaseline:
+      | TargetDataReconciliationInput['adoptedTargetBaseline']
+      | undefined;
+    if (application.schema === 'qinglong/local-application-process@v4') {
+      const baseline = readAdoptedTargetBaseline(
+        adoptedTargetBaselinePath(command.options.deploymentRoot),
+      );
+      if (
+        baseline.preparedAtMs > command.request.requestedAtMs ||
+        baseline.profile !== command.request.profile ||
+        baseline.instanceId !== command.request.instanceId ||
+        baseline.cutoverId !== command.request.cutoverId ||
+        baseline.activationDigest !==
+          command.request.expectedActivationDigest ||
+        baseline.commitmentDigest !==
+          command.request.expectedLegacyCommitmentDigest ||
+        baseline.applicationConfigDigest !== application.configDigest ||
+        baseline.legacyDataApplicationCommitDigest !==
+          application.legacyDataApplicationCommitDigest ||
+        baseline.legacyDataApplicationReceiptDigest !==
+          application.legacyDataApplicationReceiptDigest ||
+        baseline.targetPathDigest !==
+          textDigest(command.request.targetDatabasePath)
+      ) {
+        throw new Error('adopted target baseline binding drifted');
+      }
+      adoptedTargetBaseline = Object.freeze({
+        baselineDigest: baseline.baselineDigest,
+        targetDevice: baseline.targetDevice,
+        targetInode: baseline.targetInode,
+        targetSha256: baseline.targetSha256,
+      });
+    }
+    return readTargetDataReconciliationEvidenceForPaths(
+      {
+        profile: command.request.profile,
+        activationPath: command.request.activationPath,
+        legacySourcePath: command.request.legacySourcePath,
+        targetDatabasePath: command.request.targetDatabasePath,
+        expectedActivationDigest: command.request.expectedActivationDigest,
+        ...(adoptedTargetBaseline === undefined
+          ? {}
+          : { adoptedTargetBaseline }),
+      },
+      uid,
+    );
+  } catch {
+    return manualReviewEvidence();
+  }
 }
 
 export function readTargetDataReconciliationEvidenceForPaths(
@@ -215,19 +281,26 @@ export function readTargetDataReconciliationEvidenceForPaths(
     if (
       target.pathDigest !== activation.targetPathDigest ||
       target.device !== activation.targetDevice ||
-      target.inode !== activation.targetInode
+      target.inode !== activation.targetInode ||
+      (input.adoptedTargetBaseline !== undefined &&
+        (target.device !== input.adoptedTargetBaseline.targetDevice ||
+          target.inode !== input.adoptedTargetBaseline.targetInode))
     ) {
       throw new Error('target database stable identity drifted');
     }
     const targetMatchesActivation = target.sha256 === activation.targetSha256;
+    const targetMatchesBaseline =
+      input.adoptedTargetBaseline === undefined
+        ? targetMatchesActivation
+        : target.sha256 === input.adoptedTargetBaseline.targetSha256;
     const sourceMatchesActivation = source.sha256 === activation.sourceSha256;
     const disposition =
-      !targetMatchesActivation || !target.sidecarsClear
+      !targetMatchesBaseline || !target.sidecarsClear
         ? ('reconciliation_required' as const)
         : sourceMatchesActivation && source.sidecarsClear
         ? ('rollback_candidate' as const)
         : ('manual_review' as const);
-    return evidence({
+    const reconciliationPayload = {
       disposition,
       targetMatchesActivation,
       sourceMatchesActivation,
@@ -235,17 +308,19 @@ export function readTargetDataReconciliationEvidenceForPaths(
       sourceSidecarsClear: source.sidecarsClear,
       targetFileIdentityDigest: target.identityDigest,
       sourceFileIdentityDigest: source.identityDigest,
-    });
+    };
+    return evidence(
+      input.adoptedTargetBaseline === undefined
+        ? reconciliationPayload
+        : {
+            ...reconciliationPayload,
+            baselineKind: 'adopted_target' as const,
+            baselineDigest: input.adoptedTargetBaseline.baselineDigest,
+            targetMatchesBaseline,
+          },
+    );
   } catch {
-    return evidence({
-      disposition: 'manual_review',
-      targetMatchesActivation: null,
-      sourceMatchesActivation: null,
-      targetSidecarsClear: null,
-      sourceSidecarsClear: null,
-      targetFileIdentityDigest: UNKNOWN_DIGEST,
-      sourceFileIdentityDigest: UNKNOWN_DIGEST,
-    });
+    return manualReviewEvidence();
   }
 }
 
@@ -264,9 +339,16 @@ export function verifyTargetDataReconciliationEvidence(
     'targetMatchesActivation',
     'targetSidecarsClear',
   ].sort();
+  const expectedAdopted = [
+    ...expected,
+    'baselineDigest',
+    'baselineKind',
+    'targetMatchesBaseline',
+  ].sort();
+  const adopted = JSON.stringify(keys) === JSON.stringify(expectedAdopted);
   const { evidenceDigest, ...payload } = candidate;
   if (
-    JSON.stringify(keys) !== JSON.stringify(expected) ||
+    (!adopted && JSON.stringify(keys) !== JSON.stringify(expected)) ||
     (candidate.disposition !== 'rollback_candidate' &&
       candidate.disposition !== 'reconciliation_required' &&
       candidate.disposition !== 'manual_review') ||
@@ -278,6 +360,20 @@ export function verifyTargetDataReconciliationEvidence(
       typeof candidate.targetSidecarsClear !== 'boolean') ||
     (candidate.sourceSidecarsClear !== null &&
       typeof candidate.sourceSidecarsClear !== 'boolean') ||
+    (adopted &&
+      (candidate.baselineKind !== 'adopted_target' ||
+        typeof candidate.baselineDigest !== 'string' ||
+        !DIGEST_PATTERN.test(candidate.baselineDigest) ||
+        (candidate.targetMatchesBaseline !== null &&
+          typeof candidate.targetMatchesBaseline !== 'boolean') ||
+        (candidate.disposition === 'rollback_candidate' &&
+          (candidate.targetMatchesBaseline !== true ||
+            candidate.targetSidecarsClear !== true ||
+            candidate.sourceMatchesActivation !== true ||
+            candidate.sourceSidecarsClear !== true)) ||
+        (candidate.disposition === 'reconciliation_required' &&
+          candidate.targetMatchesBaseline !== false &&
+          candidate.targetSidecarsClear !== false))) ||
     typeof candidate.targetFileIdentityDigest !== 'string' ||
     !DIGEST_PATTERN.test(candidate.targetFileIdentityDigest) ||
     typeof candidate.sourceFileIdentityDigest !== 'string' ||
