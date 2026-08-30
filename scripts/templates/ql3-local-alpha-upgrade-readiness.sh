@@ -70,10 +70,10 @@ mkdir -m 0700 "$evidence_root"
 mkdir -m 0700 "$evidence_root/results"
 
 cat >"$evidence_root/sqlite-inspect.json" <<EOF
-{"schemaVersion":1,"operation":"local-sqlite.adoption.inspect","options":{"deploymentRoot":"/var/lib/qinglong3","profile":"$profile","sourcePath":"/var/lib/qinglong2/db/database.sqlite"}}
+{"schemaVersion":1,"operation":"local-sqlite.adoption.inspect","options":{"deploymentRoot":"/var/lib/qinglong3","profile":"$profile","sourcePath":"$legacy_root/db/database.sqlite"}}
 EOF
 cat >"$evidence_root/data-directory-inspect.json" <<EOF
-{"schemaVersion":1,"operation":"local-data-directory.adoption.inspect","options":{"dataRoot":"/var/lib/qinglong2","profile":"$profile"}}
+{"schemaVersion":1,"operation":"local-data-directory.adoption.inspect","options":{"dataRoot":"$legacy_root","profile":"$profile"}}
 EOF
 chmod 0600 "$evidence_root/sqlite-inspect.json" "$evidence_root/data-directory-inspect.json"
 
@@ -86,7 +86,7 @@ run_inspect() {
     --cap-drop ALL --security-opt no-new-privileges \
     --memory 128m --memory-swap 128m --cpus 0.5 --pids-limit 32 \
     --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
-    --mount "type=bind,src=$legacy_root,dst=/var/lib/qinglong2,readonly" \
+    --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly" \
     --mount "type=bind,src=$evidence_root,dst=/var/lib/qinglong3" \
     "$OPERATOR_IMAGE" adoption run \
     --command-file "/var/lib/qinglong3/$command_file" \

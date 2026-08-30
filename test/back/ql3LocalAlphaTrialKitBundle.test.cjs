@@ -568,7 +568,25 @@ exit 1
     'inspected',
   );
   const calls = fs.readFileSync(dockerLog, 'utf8');
-  assert.match(calls, /dst=\/var\/lib\/qinglong2,readonly/);
+  assert.match(
+    calls,
+    new RegExp(`src=${legacyRoot},dst=${legacyRoot},readonly`),
+  );
+  assert.equal(
+    JSON.parse(
+      fs.readFileSync(path.join(evidenceRoot, 'sqlite-inspect.json'), 'utf8'),
+    ).options.sourcePath,
+    path.join(legacyRoot, 'db', 'database.sqlite'),
+  );
+  assert.equal(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(evidenceRoot, 'data-directory-inspect.json'),
+        'utf8',
+      ),
+    ).options.dataRoot,
+    legacyRoot,
+  );
   assert.match(calls, /--network none/);
   assert.match(calls, /--memory 128m --memory-swap 128m/);
   assert.doesNotMatch(calls, /adoption\.stage|activation\.prepare|cutover/);
