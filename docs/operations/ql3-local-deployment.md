@@ -222,7 +222,7 @@ D-64 全部完成，也不得自动重启 2.x。
 ### 2.3 Docker adopted target 启动与重启屏障
 
 ADR-0310 已补齐上述段落中的 Docker target barrier；ADR-0313 又补齐 Docker `manual_required` 的实例级
-lineage、只读诊断与双阶段新 ceremony 授权。写后回退仍未完成。target 容器必须由 operator 预先创建但保持停止，并满足：完整 ID、不可变 digest image、
+lineage、只读诊断与双阶段新 ceremony 授权。写后回退仍未完成。target 容器必须由 operator 预先创建但保持停止，并满足：完整 ID、受审核镜像引用和精确 Docker content ID、
 `restart=no`、read-only rootfs、非 privileged、`no-new-privileges`，以及能把宿主机 Application v3 config、
 legacy commitment、activation 和 source 精确映射到 config 中路径的唯一读写 bind mount。自动重启策略
 `unless-stopped`/`always` 会绕过每代 Legacy recheck，因此 adopted target 不允许使用。
@@ -245,12 +245,19 @@ legacy commitment、activation 和 source 精确映射到 config 中路径的唯
     "instanceId": "router-edge-1",
     "activationPath": "/opt/qinglong/private/qinglong3-activation.json",
     "legacySourcePath": "/opt/qinglong/data/database.sqlite",
+    "targetDatabasePath": "/opt/qinglong/data/database.ql3.sqlite",
+    "recoveryPath": "/opt/qinglong/data/database.recovery.sqlite",
+    "manifestPath": "/opt/qinglong/private/qinglong3-adoption.json",
     "expectedLegacyDatabasePath": "/ql/data/database.sqlite",
     "expectedActivationDigest": "REPLACE_WITH_64_HEX_ACTIVATION_DIGEST",
     "expectedLegacyCommitmentDigest": "REPLACE_WITH_64_HEX_COMMITMENT_DIGEST",
     "expectedLegacyContainerId": "REPLACE_WITH_FULL_64_HEX_LEGACY_ID",
     "expectedTargetContainerId": "REPLACE_WITH_FULL_64_HEX_TARGET_ID",
-    "expectedTargetImage": "registry.example/qinglong3@sha256:REPLACE_WITH_64_HEX_DIGEST",
+    "targetImage": {
+      "authority": "registry-digest",
+      "reference": "registry.example/qinglong3@sha256:REPLACE_WITH_64_HEX_DIGEST",
+      "imageId": "sha256:REPLACE_WITH_DOCKER_IMAGE_CONTENT_ID"
+    },
     "applicationConfigPath": "/opt/qinglong3/local-application.json",
     "expectedTargetApplicationConfigPath": "/var/lib/qinglong3/local-application.json",
     "expectedTargetCommitmentPath": "/var/lib/qinglong3/service/cutovers/router-edge-1-ql3/0002-legacy-stopped.json",
@@ -265,6 +272,12 @@ chmod 0600 /secure/operator/qinglong3-target-start.json
 ql3-local-deploy cutover-target-start \
   --command-file /secure/operator/qinglong3-target-start.json
 ```
+
+正式 registry 部署必须使用 `authority=registry-digest`，`reference` 仍只接受不可变
+`name@sha256:...`；`imageId` 从创建目标容器的同一 Docker daemon 读取。下载型 Alpha Trial Kit
+没有可诚实声称的 registry RepoDigest，必须改用 `authority=local-image-id`、bundle manifest 中的
+本地 image reference 和 exact image ID。两种模式都会同时核对 `docker inspect` 的
+`Config.Image` 与 `.Image`，不会把 mutable local tag 单独当作权威。
 
 controller 先写固定的 `0003-target-start-decision.json`，其中状态为
 `target_start_requested`，然后至多调用一次 `docker container start <exact-id>`。只有同一容器处于
@@ -298,6 +311,29 @@ Legacy container 必须再次证明与 `0002` 相同的完整 identity/source bi
 上一代 startup receipt 必须仍在，restart 后必须出现不同 receipt。当前每个 cutover 最多支持 15 个 target
 generation（60 条 target journal record），达到上限后必须进入新的受审 cutover/recovery ceremony，不能清理
 旧记录腾位置。
+
+### 2.3.1 离线 Docker adopted target descriptor
+
+`local.deployment.adopted.prepare|verify` 的 service 现在可以显式选择：
+
+```json
+{
+  "kind": "docker-target",
+  "targetImage": {
+    "authority": "local-image-id",
+    "reference": "qinglong3-local-application:ci-amd64",
+    "imageId": "sha256:REPLACE_WITH_TRIAL_KIT_IMAGE_ID"
+  },
+  "allowRootService": false
+}
+```
+
+它生成 `service/docker-target.json` 和同一份 Application v4 配置，固定 numeric UID:GID、
+`restart=no`、无网络、read-only rootfs、drop ALL、no-new-privileges、Profile memory/PID 上限、
+deployment root 可写 mount 与 legacy source 只读 mount。该 descriptor 是内容绑定的创建输入，
+不是启动授权；operator 仍须先按 descriptor 创建并保持容器停止，再把容器完整 ID 和同一个
+`targetImage` 交给 `target-start`。因此离线 Trial Kit 不需要伪造 GHCR catalog/release selection，
+正式 Compose 路径也不因 Alpha 便利性而放宽。
 
 ### 2.4 `manual_required` 诊断与双阶段新 Ceremony
 

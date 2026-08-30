@@ -525,6 +525,7 @@
 | [ADR-0519](./ADR-0519-local-console-secret-backed-automation.md)                                  | Local Console Secret-backed 自动化                                                                                                                                                                                               | Accepted（D-424 双架构 milestone 已交付）         |
 | [ADR-0520](./ADR-0520-downloadable-local-legacy-upgrade-readiness.md)                              | 可下载的 Local Legacy 升级就绪盘点                                                                                                                                                                                               | Accepted（D-425 双架构 Alpha 实物已交付） |
 | [ADR-0521](./ADR-0521-reviewed-side-by-side-local-upgrade-stage.md)                                | 受审核计划驱动的 Local Side-by-side 升级暂存                                                                                                                                                                                       | Accepted（D-426a 双架构 Alpha 实物已交付） |
+| [ADR-0522](./ADR-0522-content-bound-offline-docker-adopted-target.md)                             | 内容绑定的离线 Docker Adopted Target                                                                                                                                                                                               | Accepted（D-426b 源码候选；阶段实物尚未闭合） |
 
 ## 规则
 

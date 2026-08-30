@@ -13,6 +13,10 @@ import {
   type LocalDeploymentProfile,
 } from '../foundation/contract';
 import { LocalDeploymentConfigurationError } from '../foundation/error';
+import {
+  normalizeLocalDeploymentTargetImage,
+  type LocalDeploymentTargetImage,
+} from '../foundation/targetImage';
 
 const MAX_PATH_BYTES = 4_096;
 const SAFE_PATH_PATTERN = /^\/[A-Za-z0-9._/@-]+$/;
@@ -36,13 +40,21 @@ export interface NormalizedLocalDeploymentAdoptedComposeService
   readonly releaseSelection: Readonly<ResolvedLocalComposeReleaseSelection>;
 }
 
+export interface LocalDeploymentAdoptedDockerTargetService {
+  readonly kind: 'docker-target';
+  readonly targetImage: Readonly<LocalDeploymentTargetImage>;
+  readonly allowRootService: boolean;
+}
+
 export type LocalDeploymentAdoptedService =
   | LocalDeploymentProcessService
-  | LocalDeploymentAdoptedComposeService;
+  | LocalDeploymentAdoptedComposeService
+  | LocalDeploymentAdoptedDockerTargetService;
 
 export type NormalizedLocalDeploymentAdoptedService =
   | Readonly<LocalDeploymentProcessService>
-  | Readonly<NormalizedLocalDeploymentAdoptedComposeService>;
+  | Readonly<NormalizedLocalDeploymentAdoptedComposeService>
+  | Readonly<LocalDeploymentAdoptedDockerTargetService>;
 
 export interface LocalDeploymentAdoptedBundleCommand {
   readonly schemaVersion: 1;
@@ -208,6 +220,20 @@ function normalizeService(
         'applicationEntrypoint',
         false,
         uid,
+      ),
+      allowRootService: validateRootAcknowledgement(
+        service.allowRootService,
+        uid,
+      ),
+    });
+  }
+  if (service.kind === 'docker-target') {
+    exact(service, ['allowRootService', 'kind', 'targetImage'], 'service');
+    return Object.freeze({
+      kind: 'docker-target' as const,
+      targetImage: normalizeLocalDeploymentTargetImage(
+        service.targetImage,
+        'service.targetImage',
       ),
       allowRootService: validateRootAcknowledgement(
         service.allowRootService,

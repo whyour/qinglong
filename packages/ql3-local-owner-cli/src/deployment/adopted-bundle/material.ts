@@ -66,7 +66,7 @@ export interface LocalDeploymentAdoptedBundleReceipt {
   readonly profile: 'edge' | 'standalone';
   readonly instanceId: string;
   readonly cutoverId: string;
-  readonly serviceKind: 'systemd' | 'openrc' | 'compose';
+  readonly serviceKind: 'systemd' | 'openrc' | 'compose' | 'docker-target';
   readonly deploymentRootDigest: string;
   readonly sourcePathDigest: string;
   readonly applicationConfigDigest: string;
@@ -308,6 +308,8 @@ export function adoptedBundlePaths(
       ? 'qinglong3.service'
       : command.options.service.kind === 'openrc'
       ? 'qinglong3.openrc'
+      : command.options.service.kind === 'docker-target'
+      ? 'docker-target.json'
       : 'compose.yaml';
   return Object.freeze({
     ownerPepperKeyring: path.join(root, 'owner-peppers'),
@@ -626,7 +628,7 @@ function systemdDescriptor(
   uid: number,
   gid: number,
 ): string {
-  if (command.options.service.kind === 'compose') {
+  if (command.options.service.kind !== 'systemd') {
     configurationError('systemd descriptor requires a process service');
   }
   const edge = command.options.profile === 'edge';
@@ -674,7 +676,7 @@ function openrcDescriptor(
   uid: number,
   gid: number,
 ): string {
-  if (command.options.service.kind === 'compose') {
+  if (command.options.service.kind !== 'openrc') {
     configurationError('OpenRC descriptor requires a process service');
   }
   const edge = command.options.profile === 'edge';
@@ -701,6 +703,58 @@ function openrcDescriptor(
     '}',
     '',
   ].join('\n');
+}
+
+function dockerTargetDescriptor(
+  command: Readonly<NormalizedLocalDeploymentAdoptedBundleCommand>,
+  configPath: string,
+  configDigest: string,
+  uid: number,
+  gid: number,
+): string {
+  if (command.options.service.kind !== 'docker-target') {
+    configurationError('Docker target descriptor requires Docker authority');
+  }
+  const edge = command.options.profile === 'edge';
+  return `${JSON.stringify(
+    {
+      schemaVersion: 1,
+      schema: 'qinglong/local-adopted-docker-target@v1',
+      profile: command.options.profile,
+      instanceId: command.options.instanceId,
+      image: command.options.service.targetImage,
+      applicationConfig: {
+        hostPath: configPath,
+        containerPath: configPath,
+        digest: configDigest,
+      },
+      container: {
+        user: `${uid}:${gid}`,
+        command: ['--config', configPath],
+        networkMode: 'none',
+        readOnlyRootFilesystem: true,
+        restartPolicy: 'no',
+        dropCapabilities: ['ALL'],
+        securityOptions: ['no-new-privileges'],
+        memoryBytes: edge ? 134_217_728 : 268_435_456,
+        pidsLimit: edge ? 64 : 256,
+        mounts: [
+          {
+            source: command.options.deploymentRoot,
+            destination: command.options.deploymentRoot,
+            readOnly: false,
+          },
+          {
+            source: command.request.storage.sourcePath,
+            destination: command.request.storage.sourcePath,
+            readOnly: true,
+          },
+        ],
+      },
+    },
+    null,
+    2,
+  )}\n`;
 }
 
 function composeDescriptor(
@@ -771,6 +825,19 @@ function serviceDescriptor(
       fileName: 'qinglong3.openrc',
       contents: openrcDescriptor(command, configPath, uid, gid),
       mode: 0o700,
+    });
+  }
+  if (command.options.service.kind === 'docker-target') {
+    return Object.freeze({
+      fileName: 'docker-target.json',
+      contents: dockerTargetDescriptor(
+        command,
+        configPath,
+        configDigest,
+        uid,
+        gid,
+      ),
+      mode: 0o600,
     });
   }
   return Object.freeze({

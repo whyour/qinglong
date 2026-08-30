@@ -228,6 +228,16 @@ function fixture(t, kind) {
           releaseSelection: releaseSelection(managementRoot),
           allowRootService: rootAcknowledgement(),
         }
+      : kind === 'docker-target'
+      ? {
+          kind,
+          targetImage: {
+            authority: 'local-image-id',
+            reference: 'qinglong3-local-application:ci-amd64',
+            imageId: `sha256:${'d'.repeat(64)}`,
+          },
+          allowRootService: rootAcknowledgement(),
+        }
       : {
           kind,
           nodeExecutable: fs.realpathSync(process.execPath),
@@ -636,7 +646,7 @@ async function createFailedRestoreState(state, currentGeneration, suffix) {
   return failedCommand;
 }
 
-for (const kind of ['systemd', 'openrc', 'compose']) {
+for (const kind of ['systemd', 'openrc', 'compose', 'docker-target']) {
   test(`prepares and verifies an exact adopted ${kind} bundle without activation`, (t) => {
     const state = fixture(t, kind);
     const prepared = prepareLocalDeploymentAdoptedBundle(state.command);
@@ -718,6 +728,43 @@ for (const kind of ['systemd', 'openrc', 'compose']) {
           path.join(state.root, 'service/revisions/1.yaml'),
           'utf8',
         ),
+      );
+    } else if (kind === 'docker-target') {
+      const descriptor = JSON.parse(
+        fs.readFileSync(
+          path.join(state.root, 'service/docker-target.json'),
+          'utf8',
+        ),
+      );
+      assert.equal(
+        descriptor.schema,
+        'qinglong/local-adopted-docker-target@v1',
+      );
+      assert.deepEqual(
+        descriptor.image,
+        state.command.options.service.targetImage,
+      );
+      assert.equal(descriptor.container.restartPolicy, 'no');
+      assert.equal(descriptor.container.readOnlyRootFilesystem, true);
+      assert.deepEqual(descriptor.container.dropCapabilities, ['ALL']);
+      assert.deepEqual(descriptor.container.securityOptions, [
+        'no-new-privileges',
+      ]);
+      assert.deepEqual(descriptor.container.mounts, [
+        {
+          source: state.root,
+          destination: state.root,
+          readOnly: false,
+        },
+        {
+          source: state.sourcePath,
+          destination: state.sourcePath,
+          readOnly: true,
+        },
+      ]);
+      assert.equal(
+        fs.existsSync(path.join(state.root, 'service/compose.image.yaml')),
+        false,
       );
     } else {
       assert.equal(

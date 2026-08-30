@@ -520,7 +520,8 @@ export function parseTargetContainerEvidence(
     hostConfig.Privileged === true ||
     !Array.isArray(hostConfig.SecurityOpt) ||
     !hostConfig.SecurityOpt.includes('no-new-privileges') ||
-    config.Image !== command.request.expectedTargetImage ||
+    config.Image !== command.request.targetImage.reference ||
+    container.Image !== command.request.targetImage.imageId ||
     JSON.stringify(config.Cmd) !==
       JSON.stringify([
         '--config',
@@ -583,6 +584,8 @@ export function parseTargetContainerEvidence(
       containerId: container.Id,
       created: container.Created,
       image: config.Image,
+      imageAuthority: command.request.targetImage.authority,
+      imageId: container.Image,
       name: container.Name,
     }),
     applicationBindingDigest: cutoverDigest({

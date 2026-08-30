@@ -6,6 +6,10 @@ import {
   LocalDeploymentConfigurationError,
   type LocalDeploymentProfile,
 } from '../../foundation/contract';
+import {
+  normalizeLocalDeploymentTargetImage,
+  type LocalDeploymentTargetImage,
+} from '../../foundation/targetImage';
 
 const MAX_PATH_BYTES = 4_096;
 const SAFE_PATH_PATTERN = /^\/[A-Za-z0-9._/@-]+$/;
@@ -13,8 +17,6 @@ const INSTANCE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
 const CUTOVER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 const CONTAINER_ID_PATTERN = /^[0-9a-f]{64}$/;
-const IMAGE_DIGEST_PATTERN =
-  /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,254}@sha256:[0-9a-f]{64}$/;
 const MAX_TARGET_GENERATION = 15;
 
 export type LocalDeploymentTargetRunOperation =
@@ -44,7 +46,7 @@ export interface LocalDeploymentTargetRunCommand {
     expectedLegacyCommitmentDigest: string;
     expectedLegacyContainerId: string;
     expectedTargetContainerId: string;
-    expectedTargetImage: string;
+    targetImage: Readonly<LocalDeploymentTargetImage>;
     applicationConfigPath: string;
     expectedTargetApplicationConfigPath: string;
     expectedTargetCommitmentPath: string;
@@ -194,7 +196,6 @@ export function normalizeLocalDeploymentTargetRunCommand(
       'expectedTargetApplicationConfigPath',
       'expectedTargetCommitmentPath',
       'expectedTargetContainerId',
-      'expectedTargetImage',
       'generation',
       'instanceId',
       'legacySourcePath',
@@ -203,6 +204,7 @@ export function normalizeLocalDeploymentTargetRunCommand(
       'recoveryPath',
       'requestedAtMs',
       'targetDatabasePath',
+      'targetImage',
     ],
     'request',
   );
@@ -222,8 +224,6 @@ export function normalizeLocalDeploymentTargetRunCommand(
     typeof request.expectedTargetContainerId !== 'string' ||
     !CONTAINER_ID_PATTERN.test(request.expectedTargetContainerId) ||
     request.expectedTargetContainerId === request.expectedLegacyContainerId ||
-    typeof request.expectedTargetImage !== 'string' ||
-    !IMAGE_DIGEST_PATTERN.test(request.expectedTargetImage) ||
     generation > MAX_TARGET_GENERATION ||
     (command.operation === 'local.deployment.cutover.target-start' &&
       generation !== 1) ||
@@ -292,7 +292,7 @@ export function normalizeLocalDeploymentTargetRunCommand(
       expectedLegacyCommitmentDigest: request.expectedLegacyCommitmentDigest,
       expectedLegacyContainerId: request.expectedLegacyContainerId,
       expectedTargetContainerId: request.expectedTargetContainerId,
-      expectedTargetImage: request.expectedTargetImage,
+      targetImage: normalizeLocalDeploymentTargetImage(request.targetImage),
       applicationConfigPath: safeAbsolutePath(
         request.applicationConfigPath,
         'applicationConfigPath',

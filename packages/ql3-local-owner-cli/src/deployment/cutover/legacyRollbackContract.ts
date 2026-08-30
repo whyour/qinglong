@@ -100,7 +100,6 @@ export function normalizeLocalDeploymentLegacyRollbackCommand(
       'expectedTargetApplicationConfigPath',
       'expectedTargetCommitmentPath',
       'expectedTargetContainerId',
-      'expectedTargetImage',
       'generation',
       'instanceId',
       'legacySourcePath',
@@ -110,6 +109,7 @@ export function normalizeLocalDeploymentLegacyRollbackCommand(
       'requestedAtMs',
       'rollbackRequestedAtMs',
       'targetDatabasePath',
+      'targetImage',
     ],
     'request',
   );

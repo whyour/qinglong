@@ -68,9 +68,9 @@ export function targetRequestEvidence(
     targetContainerId: context.command.request.expectedTargetContainerId,
     targetContainerIdentityDigest: target.identityDigest,
     targetApplicationBindingDigest: target.applicationBindingDigest,
-    targetImageDigest: cutoverDigest(
-      context.command.request.expectedTargetImage,
-    ),
+    targetImageDigest: cutoverDigest({
+      ...context.command.request.targetImage,
+    }),
     applicationConfigDigest: context.application.configDigest,
     previousStartupReceiptDigest,
   });
@@ -104,7 +104,9 @@ export function verifyTargetRequestEvidence(
     evidence.targetContainerId !==
       context.command.request.expectedTargetContainerId ||
     evidence.targetImageDigest !==
-      cutoverDigest(context.command.request.expectedTargetImage) ||
+      cutoverDigest({
+        ...context.command.request.targetImage,
+      }) ||
     evidence.applicationConfigDigest !== context.application.configDigest ||
     typeof evidence.targetContainerIdentityDigest !== 'string' ||
     !DIGEST_PATTERN.test(evidence.targetContainerIdentityDigest) ||

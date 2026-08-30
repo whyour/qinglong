@@ -29,7 +29,7 @@ export interface LocalDeploymentAdoptedBundleResult {
   readonly bundleDigest: string;
   readonly profile: 'edge' | 'standalone';
   readonly service: Readonly<{
-    kind: 'systemd' | 'openrc' | 'compose';
+    kind: 'systemd' | 'openrc' | 'compose' | 'docker-target';
     status: 'prepared' | 'existing' | 'verified';
   }>;
   readonly applicationConfiguration: Readonly<{
@@ -117,6 +117,7 @@ function rejectAlternateDescriptors(
     'qinglong3.service',
     'qinglong3.openrc',
     'compose.yaml',
+    'docker-target.json',
   ]) {
     const candidate = path.join(serviceRoot, fileName);
     if (candidate !== selectedPath && fs.existsSync(candidate)) {

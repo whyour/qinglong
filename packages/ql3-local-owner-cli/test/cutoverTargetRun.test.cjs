@@ -88,6 +88,7 @@ function targetInspection(state) {
   return JSON.stringify([
     {
       Id: state.targetContainerId,
+      Image: state.targetImageId,
       Created: '2026-08-09T01:00:00.000000000Z',
       Name: '/qinglong3-target',
       State: {
@@ -193,6 +194,8 @@ function fixture(t) {
     legacyContainerId: '7'.repeat(64),
     targetContainerId: '8'.repeat(64),
     targetImage: `registry.example/qinglong3@sha256:${'9'.repeat(64)}`,
+    targetImageAuthority: 'registry-digest',
+    targetImageId: `sha256:${'a'.repeat(64)}`,
     targetRunning: false,
     legacyRunning: false,
     nextProcessId: 10,
@@ -290,7 +293,11 @@ function command(state, generation = 1) {
       expectedLegacyCommitmentDigest: state.legacyCommitmentDigest,
       expectedLegacyContainerId: state.legacyContainerId,
       expectedTargetContainerId: state.targetContainerId,
-      expectedTargetImage: state.targetImage,
+      targetImage: {
+        authority: state.targetImageAuthority,
+        reference: state.targetImage,
+        imageId: state.targetImageId,
+      },
       applicationConfigPath: state.applicationConfigPath,
       expectedTargetApplicationConfigPath:
         state.targetApplicationConfigPath,
@@ -495,6 +502,47 @@ test('starts an exact target once and replays the active commitment without Dock
   });
   assert.equal(replay.status, 'existing');
   assert.equal(replay.recordDigest, active.recordDigest);
+});
+
+test('starts an offline Trial Kit image only when its local reference and content ID both match', async (t) => {
+  const state = fixture(t);
+  state.targetImageAuthority = 'local-image-id';
+  state.targetImage = 'qinglong3-local-application:ci-amd64';
+  const active = await runLocalDeploymentDockerTarget(
+    command(state),
+    harness(state),
+  );
+  assert.equal(active.state, 'target_active');
+});
+
+test('makes an offline Trial Kit target manual-required when its inspected content ID drifted', async (t) => {
+  const state = fixture(t);
+  state.targetImageAuthority = 'local-image-id';
+  state.targetImage = 'qinglong3-local-application:ci-amd64';
+  const request = command(state);
+  state.targetImageId = `sha256:${'b'.repeat(64)}`;
+  const controller = harness(state);
+  const result = await runLocalDeploymentDockerTarget(request, controller);
+  assert.equal(result.state, 'manual_required');
+  assert.equal(
+    controller.calls.filter((args) => args[1] === 'start').length,
+    0,
+  );
+});
+
+test('rejects a mutable local tag under registry digest authority before Docker access', async (t) => {
+  const state = fixture(t);
+  const request = command(state);
+  request.request.targetImage.reference =
+    'qinglong3-local-application:ci-amd64';
+  await assert.rejects(
+    runLocalDeploymentDockerTarget(request, {
+      validateSocket() {
+        throw new Error('invalid image authority must not reach Docker');
+      },
+    }),
+    /targetImage identity is invalid/,
+  );
 });
 
 test('recovers a crash after the start barrier by inspection without repeating start', async (t) => {
