@@ -280,6 +280,8 @@ phase 'stop target and prove rollback candidate'
 run_deploy cutover-target-stop target-stop.json target-stop.result.json
 printf '%s' 'QingLong Local Alpha target-stop result: ' >&2
 sed -n '1p' "$rehearsal_root/results/target-stop.result.json" >&2
+printf '%s' 'QingLong Local Alpha target-stop evidence: ' >&2
+sed -n '1p' "$rehearsal_root/service/cutovers/alpha-upgrade-cutover/0006-target-stop-outcome.json" >&2
 grep -q '"reconciliation":"rollback_candidate"' "$rehearsal_root/results/target-stop.result.json" || fail 'target stop did not produce a clean rollback candidate'
 [ "$(sha256sum "$legacy_root/db/database.sqlite" | sed 's/ .*//')" = "$legacy_sha256" ] || fail 'legacy database changed during rehearsal'
 

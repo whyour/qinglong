@@ -272,6 +272,10 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     cutoverRehearsalContents,
     /QingLong Local Alpha target-stop result:/,
   );
+  assert.match(
+    cutoverRehearsalContents,
+    /QingLong Local Alpha target-stop evidence:/,
+  );
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);
