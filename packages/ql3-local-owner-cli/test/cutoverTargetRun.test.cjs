@@ -88,7 +88,7 @@ function stoppedLegacyInspection(state, running = false) {
   ]);
 }
 
-function targetInspection(state) {
+function targetInspection(state, options = {}) {
   return JSON.stringify([
     {
       Id: state.targetContainerId,
@@ -115,10 +115,27 @@ function targetInspection(state) {
       Mounts: [
         {
           Type: 'bind',
-          Source: state.managementRoot,
-          Destination: '/host',
+          Source: state.deploymentRoot,
+          Destination: targetPath(state, state.deploymentRoot),
           RW: true,
         },
+        {
+          Type: 'bind',
+          Source: state.legacySourcePath,
+          Destination: targetPath(state, state.legacySourcePath),
+          RW: options.writableLegacySource === true,
+        },
+        ...[
+          state.targetDatabasePath,
+          state.recoveryPath,
+          state.manifestPath,
+          state.activationPath,
+        ].map((filePath) => ({
+          Type: 'bind',
+          Source: filePath,
+          Destination: targetPath(state, filePath),
+          RW: true,
+        })),
       ],
     },
   ]);
@@ -472,7 +489,7 @@ function harness(state, options = {}) {
         );
       }
       if (args[0] === 'container' && args[1] === 'inspect') {
-        return targetInspection(state);
+        return targetInspection(state, options);
       }
       if (args[0] === 'container' && args[1] === 'start') {
         if (args[2] === state.legacyContainerId) {
@@ -572,6 +589,27 @@ test('starts an exact target once and replays the active commitment without Dock
   });
   assert.equal(replay.status, 'existing');
   assert.equal(replay.recordDigest, active.recordDigest);
+});
+
+test('requires the target container to keep the Legacy source read-only', async (t) => {
+  const state = fixture(t);
+  const controller = harness(state, { writableLegacySource: true });
+  const result = await runLocalDeploymentDockerTarget(
+    command(state),
+    controller,
+  );
+  assert.equal(result.state, 'manual_required');
+  assert.equal(
+    controller.calls.filter((args) => args[1] === 'start').length,
+    0,
+  );
+  const request = JSON.parse(
+    fs.readFileSync(
+      path.join(state.journal, '0003-target-start-decision.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(request.evidence.reason, 'target_preflight_unproved');
 });
 
 test('starts an offline Trial Kit image only when its local reference and content ID both match', async (t) => {

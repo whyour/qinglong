@@ -361,6 +361,7 @@ function mappedMount(
   hostPath: string,
   targetPath: string,
   label: string,
+  expectedReadWrite = true,
 ): DockerMount {
   const matches = mounts.filter((mount) => {
     const relative = path.relative(mount.source, hostPath);
@@ -370,8 +371,13 @@ function mappedMount(
       path.join(mount.destination, relative) === targetPath
     );
   });
-  if (matches.length !== 1 || matches[0]?.readWrite !== true) {
-    configurationError(`${label} must have one read-write bind mapping`);
+  if (
+    matches.length !== 1 ||
+    matches[0]?.readWrite !== expectedReadWrite
+  ) {
+    configurationError(
+      `${label} must have one ${expectedReadWrite ? 'read-write' : 'read-only'} bind mapping`,
+    );
   }
   return matches[0]!;
 }
@@ -597,6 +603,7 @@ export function parseTargetContainerEvidence(
     command.request.legacySourcePath,
     application.targetLegacySourcePath,
     'target legacy source',
+    false,
   );
   const databaseMount = mappedMount(
     mounts,
