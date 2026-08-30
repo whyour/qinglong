@@ -309,7 +309,7 @@ function auditApplicationExecutable(artifactDirectory) {
   );
   if (
     output !==
-    'Usage: ql3-local-application --config /absolute/private-config.json'
+    'Usage: ql3-local-application [--cutover-probe] --config /absolute/private-config.json'
   ) {
     fail('local application executable help output is invalid');
   }

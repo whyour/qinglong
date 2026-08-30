@@ -216,3 +216,14 @@ test('keeps the Node 24 compact Profile RSS budget below application and MCP tie
     /DEFAULT_MAX_MCP_RSS_DELTA_BYTES = 48 \* 1024 \* 1024/,
   );
 });
+
+test('pins the Local application cutover probe in the artifact audit', () => {
+  assert.match(
+    LOCAL_PROFILE_AUDIT,
+    /Usage: ql3-local-application \[--cutover-probe\] --config \/absolute\/private-config\.json/,
+  );
+  assert.doesNotMatch(
+    LOCAL_PROFILE_AUDIT,
+    /Usage: ql3-local-application --config \/absolute\/private-config\.json/,
+  );
+});
