@@ -60,10 +60,12 @@ container_name "$target_name" || fail 'target container name is invalid'
 valid_digest "$sqlite_plan_digest" || fail 'reviewed SQLite plan digest is invalid'
 valid_digest "$directory_plan_digest" || fail 'reviewed data-directory plan digest is invalid'
 [ "$(uname -s)" = Linux ] || fail 'cutover rehearsal requires a Linux Docker host'
-for tool in docker sha256sum grep sed stat date; do
+for tool in docker sha256sum grep sed stat date realpath; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
 done
-[ -S /var/run/docker.sock ] || fail 'canonical Docker socket is unavailable'
+docker_socket=$(realpath /var/run/docker.sock)
+[ -S "$docker_socket" ] || fail 'canonical Docker socket is unavailable'
+operator_docker_socket=/run/docker.sock
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 (CDPATH= cd -- "$script_dir" && sha256sum --check SHA256SUMS)
@@ -86,7 +88,7 @@ legacy_sha256=$(sha256sum "$legacy_root/db/database.sqlite" | sed 's/ .*//')
 uid=$(id -u)
 gid=$(id -g)
 [ "$uid" -eq 0 ] && allow_root_service=true || allow_root_service=false
-socket_gid=$(stat -c %g /var/run/docker.sock)
+socket_gid=$(stat -c %g "$docker_socket")
 old_umask=$(umask)
 umask 077
 for directory in owner-peppers owner-pepper-backup owner-delivery receipts artifacts plugin-staging plugin-activation service service/cutovers service/cutovers/alpha-upgrade-cutover; do
@@ -117,7 +119,7 @@ run_deploy() {
     --cap-drop ALL --security-opt no-new-privileges \
     --memory 128m --memory-swap 128m --cpus 0.5 --pids-limit 32 \
     --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
-    --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
+    --mount "type=bind,src=$docker_socket,dst=$operator_docker_socket" \
     --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly" \
     --mount "type=bind,src=$rehearsal_root,dst=$rehearsal_root" \
     "$OPERATOR_IMAGE" deploy "$subcommand" \
@@ -199,7 +201,7 @@ case "$legacy_id" in *[!0-9a-f]*) fail 'legacy container ID is invalid' ;; esac
 
 now_ms=$(($(date +%s) * 1000))
 cat >"$rehearsal_root/commands/legacy-stop.json" <<EOF
-{"schemaVersion":1,"operation":"local.deployment.cutover.legacy-stop","options":{"deploymentRoot":"$rehearsal_root","dockerExecutable":"/usr/bin/docker","dockerSocketPath":"/var/run/docker.sock","allowRootService":$allow_root_service},"request":{"cutoverId":"alpha-upgrade-cutover","profile":"$profile","instanceId":"alpha-upgrade","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","targetDatabasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","expectedLegacyDatabasePath":"$legacy_root/db/database.sqlite","expectedActivationDigest":"$activation_digest","expectedLegacyContainerId":"$legacy_id","requestedAtMs":$now_ms}}
+{"schemaVersion":1,"operation":"local.deployment.cutover.legacy-stop","options":{"deploymentRoot":"$rehearsal_root","dockerExecutable":"/usr/bin/docker","dockerSocketPath":"$operator_docker_socket","allowRootService":$allow_root_service},"request":{"cutoverId":"alpha-upgrade-cutover","profile":"$profile","instanceId":"alpha-upgrade","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","targetDatabasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","expectedLegacyDatabasePath":"$legacy_root/db/database.sqlite","expectedActivationDigest":"$activation_digest","expectedLegacyContainerId":"$legacy_id","requestedAtMs":$now_ms}}
 EOF
 chmod 0600 "$rehearsal_root/commands/legacy-stop.json"
 run_deploy cutover-legacy-stop legacy-stop.json legacy-stop.result.json
@@ -251,7 +253,7 @@ case "$target_id" in *[!0-9a-f]*) fail 'target container ID is invalid' ;; esac
 
 start_ms=$((prepared_ms + 1))
 cat >"$rehearsal_root/commands/target-start.json" <<EOF
-{"schemaVersion":1,"operation":"local.deployment.cutover.target-start","options":{"deploymentRoot":"$rehearsal_root","dockerExecutable":"/usr/bin/docker","dockerSocketPath":"/var/run/docker.sock","allowRootService":$allow_root_service},"request":{"cutoverId":"alpha-upgrade-cutover","profile":"$profile","instanceId":"alpha-upgrade","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","targetDatabasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","expectedLegacyDatabasePath":"$legacy_root/db/database.sqlite","expectedActivationDigest":"$activation_digest","expectedLegacyCommitmentDigest":"$commitment_digest","expectedLegacyContainerId":"$legacy_id","expectedTargetContainerId":"$target_id","targetImage":{"authority":"local-image-id","reference":"$APPLICATION_IMAGE","imageId":"$APPLICATION_ID"},"applicationConfigPath":"$rehearsal_root/local-application.json","expectedTargetApplicationConfigPath":"$rehearsal_root/local-application.json","expectedTargetCommitmentPath":"$rehearsal_root/service/cutovers/alpha-upgrade-cutover/0002-legacy-stopped.json","generation":1,"requestedAtMs":$start_ms}}
+{"schemaVersion":1,"operation":"local.deployment.cutover.target-start","options":{"deploymentRoot":"$rehearsal_root","dockerExecutable":"/usr/bin/docker","dockerSocketPath":"$operator_docker_socket","allowRootService":$allow_root_service},"request":{"cutoverId":"alpha-upgrade-cutover","profile":"$profile","instanceId":"alpha-upgrade","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","targetDatabasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","expectedLegacyDatabasePath":"$legacy_root/db/database.sqlite","expectedActivationDigest":"$activation_digest","expectedLegacyCommitmentDigest":"$commitment_digest","expectedLegacyContainerId":"$legacy_id","expectedTargetContainerId":"$target_id","targetImage":{"authority":"local-image-id","reference":"$APPLICATION_IMAGE","imageId":"$APPLICATION_ID"},"applicationConfigPath":"$rehearsal_root/local-application.json","expectedTargetApplicationConfigPath":"$rehearsal_root/local-application.json","expectedTargetCommitmentPath":"$rehearsal_root/service/cutovers/alpha-upgrade-cutover/0002-legacy-stopped.json","generation":1,"requestedAtMs":$start_ms}}
 EOF
 chmod 0600 "$rehearsal_root/commands/target-start.json"
 run_deploy cutover-target-start target-start.json target-start.result.json

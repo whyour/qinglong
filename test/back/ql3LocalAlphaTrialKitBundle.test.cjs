@@ -208,6 +208,26 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     cutoverRehearsalContents,
     /mkdir[^\n]*data-directory\/transformation|for directory in[^\n]*data-directory\/transformation/,
   );
+  assert.match(
+    cutoverRehearsalContents,
+    /docker_socket=\$\(realpath \/var\/run\/docker\.sock\)/,
+  );
+  assert.match(
+    cutoverRehearsalContents,
+    /operator_docker_socket=\/run\/docker\.sock/,
+  );
+  assert.match(
+    cutoverRehearsalContents,
+    /--mount "type=bind,src=\$docker_socket,dst=\$operator_docker_socket"/,
+  );
+  assert.match(
+    cutoverRehearsalContents,
+    /"dockerSocketPath":"\$operator_docker_socket"/,
+  );
+  assert.doesNotMatch(
+    cutoverRehearsalContents,
+    /"dockerSocketPath":"\/var\/run\/docker\.sock"|dst=\/var\/run\/docker\.sock/,
+  );
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);
