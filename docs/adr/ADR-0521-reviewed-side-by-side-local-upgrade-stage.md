@@ -1,6 +1,6 @@
 # ADR-0521：受审核计划驱动的 Local Side-by-side 升级暂存
 
-- 状态：Proposed（源码候选；原生 amd64/arm64 Trial Kit 实物待 CI 生成）
+- 状态：Accepted（原生 amd64/arm64 headless Trial Kit 与 milestone v4 已交付）
 - 日期：2026-08-30
 - 决策：D-426a
 
@@ -37,6 +37,8 @@ Trial Kit/verification/auditor 升级为 `qinglong/alpha-local-trial-kit@v7`、`
 5. 再由闭合 bundle auditor 和双架构 milestone finalizer 审计后上传。
 
 缺少任一原生架构、完整 CI、milestone v4 或 exact script digest 的 archive 都只是中间文件。
+
+提交 `7a8acacb6cb49bda2116bf029fbbfe447ae5d911` 的普通 CI [run 33306005705](https://github.com/whyour/qinglong/actions/runs/33306005705) 为 41 success/3 expected scope skip/0 fail，同源 Kubernetes deployment [run 33306005706](https://github.com/whyour/qinglong/actions/runs/33306005706) 成功。显式 Local headless [run 33306650776](https://github.com/whyour/qinglong/actions/runs/33306650776) 为 42 success/2 Cluster scope skip/0 fail；两个原生架构都在 exact 上传目录上实跑 readiness 与 rehearsal，最终生成 187,554,547-byte amd64、184,786,163-byte arm64 Trial Kit 和 6,206-byte milestone v4，保留至 2026-09-29。下载后的 milestone 通过 `SHA256SUMS`，离线 auditor 返回 `compatible=true`；其中 amd64/arm64 `upgradeRehearsalSha256` 分别为 `sha256:aa49dcd4ba7fc3c2201d267012fe3ec1aaa534f68142ddaac193299ee328c395` 与 `sha256:d869e9e0be6d35472b193e784d444d428525d7c64cdcb9e0bee169b70dbd732f`。
 
 ## 后续
 
