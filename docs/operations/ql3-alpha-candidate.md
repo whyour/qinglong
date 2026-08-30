@@ -23,6 +23,7 @@
 | --- | --- | --- |
 | Local Console Trial Kit v5 | 双架构实物已生成；一条 quickstart 完成 checksum、load、fresh setup、首 Owner、标准 credential presentation、loopback Console 与示例 Task；用户可显式运行并观察 bounded log | 仍是隔离 Alpha、无 public ingress/TLS/签名；Actions artifact 保留 30 天，不是长期 release 渠道 |
 | Local headless Trial Kit v5 | 默认低配变体的双架构实物已生成并验真；POSIX shell + Docker 一条命令完成 fresh setup、首 Owner与 Application active/stop；无 listener、示例 Task 或 Console 增量 | 仍是隔离 Alpha；Actions artifact 保留 30 天；无固定物理路由器容量承诺、2.x 生产升级或长期 release 渠道 |
+| 全范围 Alpha stage index | 首份 headless Local 双架构 + Cluster 四角色双架构实物已在同一 run 闭合；Edge/Standalone 只选择目标架构 Local 包，Cluster 选择 control/admin/worker 并可选 control-ai | 仍无受保护 tag、GHCR immutable digest、签名、生产 deployment lock、升级/回退或 LTS 承诺 |
 | D-419 Console 首自动化闭环 | quickstart 创建无网络/SecretRef/Trigger 的示例 Task；原生 CI 使用真实 Owner credential 完成 read、fenced start、`succeeded` 与 bounded log marker | 仍不提供 Web Task 编辑、2.x 升级或生产远程管理 |
 | D-420 Console Run 日志观察面 | 选择 Run 后经既有认证/Policy/Audit 链读取 latest Attempt 首个 32 KiB，展示 range、truncation、pending/retired 等明确状态 | 不自动轮询、不提供整文件下载；Web Task 创建/修订仍待独立强认证事务切片 |
 | D-421 Console Task 创建切片 | request-scoped credential fence、两分钟一次性本机 proof、同事务 Policy/Audit/Task mutation 已完成；Console 可创建 command Task；同源双架构 Console v5 Trial Kit 与 milestone 已生成并验真 | Web update 等待 authoring read/lease；Cluster 不复用 Local proof；仍不是生产或公开发布 |
@@ -39,6 +40,10 @@ D-423 已从“源码候选”升级为阶段实物：18-package clean build/tes
 D-424 已从“源码候选”升级为阶段实物：本地 18-package clean build/test 为 `3,052 total / 3,030 pass / 22 conditional skip / 0 fail`，Local SQLite `250/250`、Local API `76/76`，默认 Edge 与 opt-in Console 资源门、Edge benchmark、package/source boundary 和 Cluster dependency audit 均通过。它证明 Secret metadata 不泄漏 custody 字段、create/rotate 必须 exact local presence、SQLite 只保存密文、Task 只保存 pinned `SecretRef`。提交 `f46fb44ac9534315b6965865bb3e990715bb2417` 的普通主 CI [run 33250825989](https://github.com/whyour/qinglong/actions/runs/33250825989) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33250826046](https://github.com/whyour/qinglong/actions/runs/33250826046) 与三节点 Security Administration [run 33250825974](https://github.com/whyour/qinglong/actions/runs/33250825974) 成功；显式 Local Console milestone [run 33252179178](https://github.com/whyour/qinglong/actions/runs/33252179178) 为 42 success/2 scope skip/0 fail。首次 artifact run [33251389615](https://github.com/whyour/qinglong/actions/runs/33251389615) 触发 x64 router 绝对 RSS 门；同源码 ordinary run 的 peak process RSS 为 98,852,864 bytes，距 96 MiB 上限仅约 1.73 MiB，表现与 runner 基线波动一致。没有提高预算、改代码或复用 failed attempt，第二次全新 run 对同一 source 通过该门并闭合产物。
 
 默认低配 headless v5 也已从“可生成”升级为独立阶段实物。绑定提交 `d459c3b45c36e856f4a1cb3ce5147905977d939d` 的显式 Local headless milestone [run 33258604609](https://github.com/whyour/qinglong/actions/runs/33258604609) 为 42 success/2 scope skip/0 fail，完整矩阵继续覆盖双架构资源、Local/Cluster image、PostgreSQL HA、CloudNativePG、Secret/provider rotation 与 Local Profiles。该 run 没有复用 Console archive；下载后的两个 `headless` Trial Kit 与 milestone 均通过 `SHA256SUMS` 和仓库 auditor，返回 `compatible=true`。
+
+首份跨部署全范围阶段实物绑定提交 `97333da34cce48cdfcfa1bbd5e8d48340802d2ef` 与 [run 33265538836](https://github.com/whyour/qinglong/actions/runs/33265538836)，为 `44 success / 0 skip / 0 fail`。它生成 headless Local 双架构、Cluster control/control-ai/admin/worker 双架构、两个 milestone 与 `ql3-alpha-97333da34cce48cdfcfa1bbd5e8d48340802d2ef-stage-index`；三个小索引的 GitHub ZIP digest 分别为 Local `2e3bb8baeeadb40f34c130db68db8b1a7d6cf7a7c92a73a805e84990bf9875dc`、Cluster `292380a72f8b45233f6591624f6073154c2b7d2d00f62908af687193078524e2`、stage `2fbc67d478593df8bbb2ba362beb9f676be1882ac2e5386106057789906adece`，保留至 2026-09-28。下载后三个 `SHA256SUMS` 与仓库 auditor 全部 `compatible=true`；stage auditor 确认 `3.0.0-alpha.2`、同一 source/run/attempt、三种 Profile 和 10 个可选择 artifact。
+
+首次 all-scope run `33261478880` 在 material rotation 后遇到已 Ready provider 的跨节点端点慢收敛，旧固定 8 次窗口以 `ECONNREFUSED` 失败，三个 finalizer 正确跳过。提交 `97333da3` 将瞬态网络重试改为 3 分钟 deadline 与 16 次双重上限，非网络错误仍立即失败；本地完整 back suite 为 `1,653 total / 1,651 pass / 2 conditional skip / 0 fail`，同提交普通 CI [run 33265496193](https://github.com/whyour/qinglong/actions/runs/33265496193) 为 41 success/3 expected artifact-finalizer skip/0 fail，随后全范围 run 独立再次通过 provider live 门。
 
 当前最新可交付 Local headless v5 保留至 2026-09-28：
 
@@ -81,7 +86,7 @@ D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完�
 
 该本地 archive 不是新的 v2 Local Alpha Trial Kit。它在 ADR-0506 前生成，manifest v1 会无条件写入 `passed`，且 macOS Docker Desktop 因 bind-mount UID 映射无法对 exact 本地 archive 完成 Owner pepper 旅程；原生 CI 证明同源码实现，不自动证明另一个 archive 的 exact image bytes。它因此保留为工程候选，不冒充已获 workflow evidence 的用户 Alpha。
 
-ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verification，ADR-0511 的 `@v3` 增加 canonical quickstart，ADR-0513 的 `@v4` 再把 `headless|console` 变体绑定到 image、SBOM、verification、milestone 和 stage index，ADR-0514 的 `@v5` 增加标准 Owner credential presentation 与首自动化旅程。旧 runtime-only、v1/v2/v3/v4 bundle 均为历史工程证据，不能通过 v5 auditor。当前 headless 与 Console v5 已分别形成双架构 milestone；下一项跨部署阶段实物仍是 Cluster milestone 和同 run 的跨 Profile stage index，Public Release Set 继续受更严格发布门禁约束。
+ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verification，ADR-0511 的 `@v3` 增加 canonical quickstart，ADR-0513 的 `@v4` 再把 `headless|console` 变体绑定到 image、SBOM、verification、milestone 和 stage index，ADR-0514 的 `@v5` 增加标准 Owner credential presentation 与首自动化旅程。旧 runtime-only、v1/v2/v3/v4 bundle 均为历史工程证据，不能通过 v5 auditor。当前 headless、Console v5、Cluster 双架构 milestone 与跨 Profile stage index 均已有真实实物；下一阶段不再补“有没有产物”，而是补长期分发、签名、不可变 registry digest、部署锁和升级/回退证据。Public Release Set 继续受更严格发布门禁约束。
 
 ## 生成
 

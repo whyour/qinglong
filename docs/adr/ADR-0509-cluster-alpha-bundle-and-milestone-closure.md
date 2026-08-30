@@ -1,6 +1,6 @@
 # ADR-0509：Cluster Alpha Bundle 与跨架构里程碑闭合
 
-- 状态：Accepted（首份实际 Cluster milestone artifact 待维护者授权）
+- 状态：Accepted（首份实际 Cluster milestone 已交付）
 - 日期：2026-08-28
 - 决策：D-414
 - 关联：ADR-0503、ADR-0506、ADR-0508
@@ -49,4 +49,4 @@ Cluster milestone 的 maturity 固定为 `cluster_integration_candidate_not_publ
 - 负向测试覆盖 root user、archive/SBOM/evidence 篡改、额外文件和 image subject 脱离；
 - milestone 正向测试闭合八项，并覆盖跨 workflow run 混用、index mutation、额外文件和 workflow 门序；
 - 静态 audit 固定 19 个完整 CI dependency、八 artifact 下载和 `finalize → audit → upload`；
-- 首份真实产物仍需维护者显式授权 `produce_alpha_artifacts=true + alpha_artifact_scope=cluster`。
+- 首份真实产物已由显式 `produce_alpha_artifacts=true + alpha_artifact_scope=all` 的 run `33265538836` 生成；八个 bundle 与 milestone 均绑定提交 `97333da34cce48cdfcfa1bbd5e8d48340802d2ef` 和 attempt 1。

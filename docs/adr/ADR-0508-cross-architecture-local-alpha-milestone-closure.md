@@ -1,6 +1,6 @@
 # ADR-0508：跨架构 Local Alpha 里程碑闭合
 
-- 状态：Accepted（首份实际 milestone artifact 待维护者授权）
+- 状态：Accepted（headless 与 Console 实际 milestone 均已交付）
 - 日期：2026-08-27
 - 决策：D-413
 - 关联：ADR-0503、ADR-0504、ADR-0506、ADR-0507
@@ -74,4 +74,4 @@ finalizer 精确要求：
 - finalizer 正向测试生成 exact 三文件 index，并复核双架构、run/attempt、四镜像主体与 archive digest；
 - 负向测试覆盖跨 attempt、跨架构 image identity 复用、index mutation、额外文件和 CLI grammar；
 - 静态 workflow audit 固定 scope 条件、milestone 独立并发域、19 个完整 CI dependency、双 artifact 下载、`finalize → audit → upload` 顺序和 30 天 retention；
-- 首份真实 `produce_alpha_artifacts=true + alpha_artifact_scope=local` 产物仍需维护者显式授权，生成后再把 ADR-0503 从 Proposed 转为 Accepted 并记录 index/bundle digest。
+- headless 与 Console 均已有真实 `produce_alpha_artifacts=true + alpha_artifact_scope=local` 双架构 milestone；最新 headless 也已进入 run `33265538836` 的全范围阶段索引。

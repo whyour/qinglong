@@ -1,6 +1,6 @@
 # ADR-0510：跨 Profile Alpha 阶段交付索引
 
-- 状态：Accepted（首份实际 stage index 待维护者授权）
+- 状态：Accepted（首份实际 stage index 已交付）
 - 日期：2026-08-28
 - 决策：D-415
 - 关联：ADR-0503、ADR-0506、ADR-0508、ADR-0509
@@ -52,4 +52,4 @@ QingLong 3.0 已开发约二十天。D-413 与 D-414 分别闭合了双架构 Lo
 - 正向测试覆盖同 run 的两个 milestone 闭合、十个 artifact 选择与三 Profile 报告；
 - 负向测试覆盖跨 attempt 混用、stage 内容篡改、额外文件、缺少 milestone dependency 和 scope 漂移；
 - workflow audit 固定 `all` 条件、双 milestone dependency 和 `finalize → audit → upload` 顺序；
-- 首份真实索引仍需维护者显式授权 `produce_alpha_artifacts=true + alpha_artifact_scope=all`。
+- 首份真实索引已由显式授权的 run `33265538836` 生成，并与同 run 的 headless Local milestone、Cluster milestone 交叉审计通过。
