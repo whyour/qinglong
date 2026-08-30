@@ -228,6 +228,42 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     cutoverRehearsalContents,
     /"dockerSocketPath":"\/var\/run\/docker\.sock"|dst=\/var\/run\/docker\.sock/,
   );
+  const legacyStopTemplate = cutoverRehearsalContents.match(
+    /cat >"\$rehearsal_root\/commands\/legacy-stop\.json" <<EOF\n([^\n]+)\nEOF/,
+  );
+  assert.ok(legacyStopTemplate, 'legacy-stop command template is missing');
+  const legacyStopCommand = JSON.parse(
+    legacyStopTemplate[1]
+      .replaceAll('$allow_root_service', 'false')
+      .replaceAll('$now_ms', '1')
+      .replace(/\$[a-z_]+/g, 'fixture'),
+  );
+  assert.deepEqual(Object.keys(legacyStopCommand.request).sort(), [
+    'activationPath',
+    'cutoverId',
+    'expectedActivationDigest',
+    'expectedLegacyContainerId',
+    'expectedLegacyDatabasePath',
+    'instanceId',
+    'legacySourcePath',
+    'profile',
+    'requestedAtMs',
+  ]);
+  for (const phase of [
+    'bootstrap Owner authority',
+    'transform reviewed Legacy data',
+    'stop exact Legacy container',
+    'apply transformed Legacy data',
+    'prepare adopted deployment bundle',
+    'create exact target container',
+    'start exact target container',
+    'stop target and prove rollback candidate',
+  ]) {
+    assert.match(
+      cutoverRehearsalContents,
+      new RegExp(`phase '${phase}'`),
+    );
+  }
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);

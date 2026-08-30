@@ -16,6 +16,10 @@ fail() {
   exit 1
 }
 
+phase() {
+  printf '%s\n' "QingLong Local Alpha cutover phase: $1" >&2
+}
+
 usage() {
   printf '%s\n' \
     'usage: sh upgrade-cutover-rehearsal.sh edge|standalone /absolute/legacy-data-root /absolute/new/rehearsal-root <reviewed-sqlite-plan-digest> <reviewed-data-directory-plan-digest> [legacy-container-name] [target-container-name]' >&2
@@ -158,6 +162,7 @@ cat >"$rehearsal_root/commands/owner-credential-install.json" <<EOF
 {"schemaVersion":1,"operation":"owner.credential-presentation.install-from-delivery","options":{"deploymentRoot":"$rehearsal_root","databasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","pepperPath":"$rehearsal_root/owner-peppers/b3duZXItdjE.pepper","pepperKeyId":"owner-v1","secretDeliveryDirectory":"$rehearsal_root/owner-delivery","profile":"$profile","busyTimeoutMs":100},"request":{"credentialMutationId":"019f8680-143d-4000-8000-000000000121","destinationFilePath":"$rehearsal_root/owner-credential.json"}}
 EOF
 chmod 0600 "$rehearsal_root/commands"/*.json
+phase 'bootstrap Owner authority'
 run_operator setup setup.json setup.result.json
 run_operator owner owner-provision.json owner-provision.result.json
 run_operator owner owner-challenge.json owner-challenge.result.json
@@ -171,6 +176,7 @@ cat >"$rehearsal_root/commands/data-directory-transform.json" <<EOF
 {"schemaVersion":1,"operation":"local-data-directory.adoption.transform","options":{"deploymentRoot":"$rehearsal_root","dataRoot":"$legacy_root","stagingRoot":"$rehearsal_root/data-directory/staged","transformationRoot":"$rehearsal_root/data-directory/transformation","projectId":"default","profile":"$profile","expectedManifestDigest":"$directory_manifest_digest","sqlite":{"sourcePath":"$legacy_root/db/database.sqlite","targetPath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","expectedActivationDigest":"$activation_digest"}}}
 EOF
 chmod 0600 "$rehearsal_root/commands/data-directory-transform.json"
+phase 'transform reviewed Legacy data'
 run_operator adoption data-directory-transform.json data-directory-transform.result.json
 grep -q '"assessment":"ready"' "$rehearsal_root/results/data-directory-transform.result.json" || fail 'data-directory transformation is not ready'
 transformation_digest=$(extract_digest "$rehearsal_root/results/data-directory-transform.result.json" transformationDigest)
@@ -201,9 +207,10 @@ case "$legacy_id" in *[!0-9a-f]*) fail 'legacy container ID is invalid' ;; esac
 
 now_ms=$(($(date +%s) * 1000))
 cat >"$rehearsal_root/commands/legacy-stop.json" <<EOF
-{"schemaVersion":1,"operation":"local.deployment.cutover.legacy-stop","options":{"deploymentRoot":"$rehearsal_root","dockerExecutable":"/usr/bin/docker","dockerSocketPath":"$operator_docker_socket","allowRootService":$allow_root_service},"request":{"cutoverId":"alpha-upgrade-cutover","profile":"$profile","instanceId":"alpha-upgrade","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","targetDatabasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","expectedLegacyDatabasePath":"$legacy_root/db/database.sqlite","expectedActivationDigest":"$activation_digest","expectedLegacyContainerId":"$legacy_id","requestedAtMs":$now_ms}}
+{"schemaVersion":1,"operation":"local.deployment.cutover.legacy-stop","options":{"deploymentRoot":"$rehearsal_root","dockerExecutable":"/usr/bin/docker","dockerSocketPath":"$operator_docker_socket","allowRootService":$allow_root_service},"request":{"cutoverId":"alpha-upgrade-cutover","profile":"$profile","instanceId":"alpha-upgrade","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","expectedLegacyDatabasePath":"$legacy_root/db/database.sqlite","expectedActivationDigest":"$activation_digest","expectedLegacyContainerId":"$legacy_id","requestedAtMs":$now_ms}}
 EOF
 chmod 0600 "$rehearsal_root/commands/legacy-stop.json"
+phase 'stop exact Legacy container'
 run_deploy cutover-legacy-stop legacy-stop.json legacy-stop.result.json
 grep -q '"state":"legacy_stopped"' "$rehearsal_root/results/legacy-stop.result.json" || fail 'legacy container did not stop cleanly'
 commitment_digest=$(extract_digest "$rehearsal_root/results/legacy-stop.result.json" commitmentDigest)
@@ -212,6 +219,7 @@ cat >"$rehearsal_root/commands/data-directory-apply.json" <<EOF
 {"schemaVersion":1,"operation":"local-data-directory.adoption.apply","options":{"deploymentRoot":"$rehearsal_root","dataRoot":"$legacy_root","stagingRoot":"$rehearsal_root/data-directory/staged","transformationRoot":"$rehearsal_root/data-directory/transformation","projectId":"default","profile":"$profile","expectedManifestDigest":"$directory_manifest_digest","expectedTransformationDigest":"$transformation_digest","ownerPepperKeyringDirectory":"$rehearsal_root/owner-peppers","credentialFilePath":"$rehearsal_root/owner-credential.json","secretKeyringPath":"$rehearsal_root/local-secret-keyring.json","mutationId":"019f8680-143d-4000-8000-000000000131","failureAuditEventId":"019f8680-143d-4000-8000-000000000132","requestId":"alpha-upgrade-data-apply","sqlite":{"sourcePath":"$legacy_root/db/database.sqlite","targetPath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","expectedActivationDigest":"$activation_digest"}}}
 EOF
 chmod 0600 "$rehearsal_root/commands/data-directory-apply.json"
+phase 'apply transformed Legacy data'
 run_operator adoption data-directory-apply.json data-directory-apply.result.json
 grep -q '"status":"committed"' "$rehearsal_root/results/data-directory-apply.result.json" || fail 'authenticated data application did not commit'
 commit_digest=$(extract_digest "$rehearsal_root/results/data-directory-apply.result.json" commitDigest)
@@ -228,6 +236,7 @@ cat >"$rehearsal_root/commands/adopted-prepare.json" <<EOF
 {"schemaVersion":1,"operation":"local.deployment.adopted.prepare","options":{"deploymentRoot":"$rehearsal_root","profile":"$profile","instanceId":"alpha-upgrade","busyTimeoutMs":100,"service":{"kind":"docker-target","targetImage":{"authority":"local-image-id","reference":"$APPLICATION_IMAGE","imageId":"$APPLICATION_ID"},"allowRootService":$allow_root_service}},"request":{"bundleId":"019f8680-143d-4000-8000-000000000141","preparedAtMs":$prepared_ms,"cutoverId":"alpha-upgrade-cutover","storage":{"sourcePath":"$legacy_root/db/database.sqlite","targetPath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","expectedActivationDigest":"$activation_digest"},"cutover":{"commitmentPath":"$rehearsal_root/service/cutovers/alpha-upgrade-cutover/0002-legacy-stopped.json","expectedCommitmentDigest":"$commitment_digest"},"legacyDataApplication":{"commitPath":"$rehearsal_root/data-directory/transformation/commit.json","expectedCommitDigest":"$commit_digest","expectedReceiptDigest":"$receipt_digest"}}}
 EOF
 chmod 0600 "$rehearsal_root/commands/adopted-prepare.json"
+phase 'prepare adopted deployment bundle'
 run_deployment_offline adopted-prepare adopted-prepare.json adopted-prepare.result.json
 grep -q '"status":"prepared"' "$rehearsal_root/results/adopted-prepare.result.json" || fail 'adopted bundle was not prepared'
 sed 's/"operation":"local.deployment.adopted.prepare"/"operation":"local.deployment.adopted.verify"/' \
@@ -240,6 +249,7 @@ bundle_digest=$(extract_digest "$rehearsal_root/results/adopted-verify.result.js
 grep -Fq "\"reference\": \"$APPLICATION_IMAGE\"" "$rehearsal_root/service/docker-target.json" || fail 'target descriptor image reference drifted'
 grep -Fq "\"imageId\": \"$APPLICATION_ID\"" "$rehearsal_root/service/docker-target.json" || fail 'target descriptor image ID drifted'
 
+phase 'create exact target container'
 target_id=$(docker create --name "$target_name" --restart no \
   --read-only --user "$uid:$gid" --network none --cap-drop ALL \
   --security-opt no-new-privileges --memory "$memory" --memory-swap "$memory" \
@@ -256,6 +266,7 @@ cat >"$rehearsal_root/commands/target-start.json" <<EOF
 {"schemaVersion":1,"operation":"local.deployment.cutover.target-start","options":{"deploymentRoot":"$rehearsal_root","dockerExecutable":"/usr/bin/docker","dockerSocketPath":"$operator_docker_socket","allowRootService":$allow_root_service},"request":{"cutoverId":"alpha-upgrade-cutover","profile":"$profile","instanceId":"alpha-upgrade","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","targetDatabasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","expectedLegacyDatabasePath":"$legacy_root/db/database.sqlite","expectedActivationDigest":"$activation_digest","expectedLegacyCommitmentDigest":"$commitment_digest","expectedLegacyContainerId":"$legacy_id","expectedTargetContainerId":"$target_id","targetImage":{"authority":"local-image-id","reference":"$APPLICATION_IMAGE","imageId":"$APPLICATION_ID"},"applicationConfigPath":"$rehearsal_root/local-application.json","expectedTargetApplicationConfigPath":"$rehearsal_root/local-application.json","expectedTargetCommitmentPath":"$rehearsal_root/service/cutovers/alpha-upgrade-cutover/0002-legacy-stopped.json","generation":1,"requestedAtMs":$start_ms}}
 EOF
 chmod 0600 "$rehearsal_root/commands/target-start.json"
+phase 'start exact target container'
 run_deploy cutover-target-start target-start.json target-start.result.json
 grep -q '"state":"target_active"' "$rehearsal_root/results/target-start.result.json" || fail 'target did not become active'
 stop_ms=$((start_ms + 1))
@@ -263,6 +274,7 @@ sed "s/\"operation\":\"local.deployment.cutover.target-start\"/\"operation\":\"l
   "$rehearsal_root/commands/target-start.json" \
   >"$rehearsal_root/commands/target-stop.json"
 chmod 0600 "$rehearsal_root/commands/target-stop.json"
+phase 'stop target and prove rollback candidate'
 run_deploy cutover-target-stop target-stop.json target-stop.result.json
 grep -q '"reconciliation":"rollback_candidate"' "$rehearsal_root/results/target-stop.result.json" || fail 'target stop did not produce a clean rollback candidate'
 [ "$(sha256sum "$legacy_root/db/database.sqlite" | sed 's/ .*//')" = "$legacy_sha256" ] || fail 'legacy database changed during rehearsal'
