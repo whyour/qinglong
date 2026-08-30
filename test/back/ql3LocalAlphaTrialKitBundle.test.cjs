@@ -198,7 +198,16 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     encoding: 'utf8',
   });
   assert.equal(cutoverSyntax.status, 0, cutoverSyntax.stderr);
-  assert.match(fs.readFileSync(cutoverRehearsal, 'utf8'), /VARIANT='headless'/);
+  const cutoverRehearsalContents = fs.readFileSync(cutoverRehearsal, 'utf8');
+  assert.match(cutoverRehearsalContents, /VARIANT='headless'/);
+  assert.match(
+    cutoverRehearsalContents,
+    /"transformationRoot":"\$rehearsal_root\/data-directory\/transformation"/,
+  );
+  assert.doesNotMatch(
+    cutoverRehearsalContents,
+    /mkdir[^\n]*data-directory\/transformation|for directory in[^\n]*data-directory\/transformation/,
+  );
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);

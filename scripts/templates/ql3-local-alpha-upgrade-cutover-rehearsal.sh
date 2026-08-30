@@ -89,7 +89,7 @@ gid=$(id -g)
 socket_gid=$(stat -c %g /var/run/docker.sock)
 old_umask=$(umask)
 umask 077
-for directory in owner-peppers owner-pepper-backup owner-delivery receipts artifacts plugin-staging plugin-activation service service/cutovers service/cutovers/alpha-upgrade-cutover data-directory/transformation; do
+for directory in owner-peppers owner-pepper-backup owner-delivery receipts artifacts plugin-staging plugin-activation service service/cutovers service/cutovers/alpha-upgrade-cutover; do
   [ -d "$rehearsal_root/$directory" ] || mkdir -m 0700 "$rehearsal_root/$directory"
 done
 
