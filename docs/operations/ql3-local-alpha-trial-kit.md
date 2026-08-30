@@ -25,7 +25,7 @@ sha256sum --check SHA256SUMS
 
 `manifest.json` 必须满足：
 
-- `schema` 为 `qinglong/alpha-local-trial-kit@v5`；
+- `schema` 为 `qinglong/alpha-local-trial-kit@v6`；
 - `variant` 为 `headless` 或 `console`，并与 milestone、application SBOM 和 artifact 名一致；
 - `sourceRevision` 是你准备试用的完整 40 位 commit；
 - `architecture` 与主机相同；
@@ -45,7 +45,7 @@ node scripts/ql3-local-alpha-trial-kit-bundle.cjs \
 
 ## 一条命令完成 Fresh 试运行
 
-v5 bundle 内的 `quickstart.sh` 不依赖宿主 Node.js、jq 或 Compose，只需要 POSIX
+v6 bundle 内的 `quickstart.sh` 不依赖宿主 Node.js、jq 或 Compose，只需要 POSIX
 shell、`sha256sum` 和已启动的 Docker。必须选择一个尚不存在、与 2.x/生产数据完全
 隔离的绝对路径：
 
@@ -84,6 +84,36 @@ SecretRef 或 Trigger。D-420 后选择该 Run 还会经既有 `artifact.read` �
 Attempt 首个 32 KiB 日志；后续内容继续使用 API 分页，页面不会自动轮询或下载整份日志。
 headless 不创建示例 Task，因此低配默认档没有示例数据或稳态开销。
 
+## 只读检查现有 2.x 升级就绪度
+
+v6 bundle 还包含 canonical `upgrade-readiness.sh`。它让现有部署用户先回答“这份 2.x SQLite 和完整 data directory 是否能形成可审核
+计划”，不会把 inspect 成功冒充自动升级。建议停止 2.x、同步器和下载器，确认主库位于 `db/database.sqlite`，再选择一个尚不存在且不在
+2.x data root 内的 evidence 路径：
+
+```sh
+sh upgrade-readiness.sh \
+  edge \
+  /opt/qinglong/data \
+  /opt/qinglong3-alpha-upgrade-readiness
+```
+
+NAS/较大单机使用 `standalone`。脚本继续只依赖 POSIX shell、`sha256sum` 和 Docker；它先验证全包 checksum、exact Operator image ID、源码和
+架构，再把 2.x root 以 read-only bind mount 提供给当前 UID:GID 的短生命周期 Operator。Operator 固定无网络、只读 rootfs、128 MiB、
+0.5 CPU 和 32 PID，分别执行正式的 `local-sqlite.adoption.inspect` 与 `local-data-directory.adoption.inspect`。
+
+两个完整结果保存在 evidence root 的：
+
+- `results/sqlite-inspect.result.json`；
+- `results/data-directory-inspect.result.json`。
+
+不要只保存终端输出或手工抄写 digest。审核 SQLite catalog/task inventory、完整目录的 `assessment`、disposition、预算、unsafe/unknown 条目、主库
+计数和 active sidecar，并保存两个 exact `planDigest`。脚本不会运行 stage、activation、transform/apply、cutover、target stop 或 Legacy
+rollback，也不会修改 source、修权限或删除 sidecar。readiness 成功不授权下一阶段；需要继续演练时按仓库运维协议显式提交审核后的 digest。
+
+artifact job 必须在原生 amd64/arm64 上使用生产形态 2.x fixture 运行将要上传的 exact `upgrade-readiness.sh`，两个正式 Operator 结果都为
+`inspected` 后才能记录 `verification-evidence.json.gates.legacyUpgradeReadiness=passed` 并上传。该证明仍不是用户实际磁盘、停机窗口、I/O 峰值或
+生产数据内容兼容性承诺。
+
 ## 手工加载与最小 smoke
 
 从 `manifest.json.archive.file` 找到 archive 后加载：
@@ -111,7 +141,7 @@ docker run --rm --read-only --network none --cap-drop ALL \
 
 ## Fresh 试运行边界
 
-完整 fresh setup、首 Owner ceremony、Owner presentation 安装、Application active、SIGTERM drain、SQLite integrity 和原生 cancellation 必须在 `verification-evidence.json` 指向的同架构 milestone job 中验证。Console 还必须证明首页返回 200、未认证 API 返回 401，并用真实 Owner credential 完成 Task read、fenced start、`succeeded` 终态与 bounded log marker。v5 artifact job 必须从将要上传的目录实际执行 `quickstart.sh` 并完成 graceful stop。实际部署时仍必须使用独立目录，并让 operator 以最终数据文件 POSIX owner 的 UID/GID 运行；operator 默认无网络且每次只执行一个命令后退出，不应作为 sidecar 或 daemon 常驻。
+完整 fresh setup、首 Owner ceremony、Owner presentation 安装、Application active、SIGTERM drain、SQLite integrity 和原生 cancellation 必须在 `verification-evidence.json` 指向的同架构 milestone job 中验证。Console 还必须证明首页返回 200、未认证 API 返回 401，并用真实 Owner credential 完成 Task read、fenced start、`succeeded` 终态与 bounded log marker。v6 artifact job 必须从将要上传的目录实际执行 `quickstart.sh` 和 read-only `upgrade-readiness.sh`，并完成 graceful stop。实际部署时仍必须使用独立目录，并让 operator 以最终数据文件 POSIX owner 的 UID/GID 运行；operator 默认无网络且每次只执行一个命令后退出，不应作为 sidecar 或 daemon 常驻。
 
 Edge 的验证上限为 Application 128 MiB、0.5 CPU、64 PID；Standalone 为 256 MiB、0.5 CPU、256 PID；operator 为 128 MiB、0.5 CPU、32 PID。这里的数值是试运行门，不是所有 workload 的容量承诺。
 

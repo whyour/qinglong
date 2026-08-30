@@ -10,11 +10,15 @@ const { auditClusterImageSbom } = require('./ql3-cluster-image-sbom.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-trial-kit@v5';
-const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v3';
+const SCHEMA = 'qinglong/alpha-local-trial-kit@v6';
+const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v4';
 const QUICKSTART_TEMPLATE = path.join(
   DEFAULT_ROOT,
   'scripts/templates/ql3-local-alpha-quickstart.sh',
+);
+const UPGRADE_READINESS_TEMPLATE = path.join(
+  DEFAULT_ROOT,
+  'scripts/templates/ql3-local-alpha-upgrade-readiness.sh',
 );
 const ARCHITECTURES = Object.freeze(['amd64', 'arm64']);
 const VARIANTS = Object.freeze(['headless', 'console']);
@@ -22,6 +26,7 @@ const ARCHIVE_MIN_BYTES = 1024;
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const MAX_README_BYTES = 512 * 1024;
 const MAX_QUICKSTART_BYTES = 256 * 1024;
+const MAX_UPGRADE_READINESS_BYTES = 256 * 1024;
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const REVISION_PATTERN = /^[0-9a-f]{40}$/u;
 const FILES = Object.freeze({
@@ -29,6 +34,7 @@ const FILES = Object.freeze({
   operatorSbom: 'qinglong3-local-operator.cdx.json',
   verificationEvidence: 'verification-evidence.json',
   quickstart: 'quickstart.sh',
+  upgradeReadiness: 'upgrade-readiness.sh',
   readme: 'README.md',
   manifest: 'manifest.json',
   checksums: 'SHA256SUMS',
@@ -44,6 +50,7 @@ const VERIFICATION = Object.freeze({
   edgeFreshLifecycle: 'passed',
   standaloneFreshLifecycle: 'passed',
   localApiCancellation: 'passed',
+  legacyUpgradeReadiness: 'passed',
 });
 
 function verificationGates(variant) {
@@ -447,6 +454,32 @@ function renderQuickstart(identity) {
   return rendered;
 }
 
+function renderUpgradeReadiness(identity) {
+  const template = fs.readFileSync(
+    assertCanonicalFile(
+      UPGRADE_READINESS_TEMPLATE,
+      MAX_UPGRADE_READINESS_BYTES,
+      'upgrade readiness template',
+    ),
+    'utf8',
+  );
+  const replacements = Object.freeze({
+    '@@OPERATOR_IMAGE@@': identity.images.operator.reference,
+    '@@OPERATOR_ID@@': identity.images.operator.id,
+    '@@ARCHITECTURE@@': identity.architecture,
+    '@@SOURCE_REVISION@@': identity.sourceRevision,
+    '@@ARCHIVE@@': identity.archive.file,
+  });
+  let rendered = template;
+  for (const [token, value] of Object.entries(replacements)) {
+    rendered = rendered.replaceAll(token, value);
+  }
+  if (/@@[A-Z_]+@@/u.test(rendered)) {
+    fail('upgrade readiness template contains an unresolved token');
+  }
+  return rendered;
+}
+
 function fileRecord(bundleRoot, name) {
   const filePath = path.join(bundleRoot, name);
   const stat = fs.lstatSync(filePath);
@@ -622,8 +655,13 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       renderQuickstart(manifestIdentity),
       0o700,
     );
+    writeExclusive(
+      path.join(normalized.outputRoot, FILES.upgradeReadiness),
+      renderUpgradeReadiness(manifestIdentity),
+      0o700,
+    );
     const manifest = {
-      schemaVersion: 6,
+      schemaVersion: 7,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',
@@ -638,6 +676,10 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
         operator: fileRecord(normalized.outputRoot, FILES.operatorSbom),
       },
       quickstart: fileRecord(normalized.outputRoot, FILES.quickstart),
+      upgradeReadiness: fileRecord(
+        normalized.outputRoot,
+        FILES.upgradeReadiness,
+      ),
       readme: fileRecord(normalized.outputRoot, FILES.readme),
       verification: fileRecord(
         normalized.outputRoot,
@@ -654,6 +696,7 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       FILES.operatorSbom,
       FILES.verificationEvidence,
       FILES.quickstart,
+      FILES.upgradeReadiness,
       FILES.readme,
       FILES.manifest,
     ];
@@ -723,10 +766,11 @@ function auditLocalAlphaTrialKit(options) {
       'images',
       'sboms',
       'quickstart',
+      'upgradeReadiness',
       'readme',
       'verification',
     ]) ||
-    manifest.schemaVersion !== 6 ||
+    manifest.schemaVersion !== 7 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
@@ -773,6 +817,23 @@ function auditLocalAlphaTrialKit(options) {
   if (actualQuickstart !== expectedQuickstart) {
     fail('quickstart differs from the canonical deployment journey');
   }
+  validateFileRecord(
+    manifest.upgradeReadiness,
+    FILES.upgradeReadiness,
+    bundleRoot,
+  );
+  const expectedUpgradeReadiness = renderUpgradeReadiness(manifest);
+  const actualUpgradeReadiness = fs.readFileSync(
+    assertCanonicalFile(
+      path.join(bundleRoot, FILES.upgradeReadiness),
+      MAX_UPGRADE_READINESS_BYTES,
+      'upgrade readiness',
+    ),
+    'utf8',
+  );
+  if (actualUpgradeReadiness !== expectedUpgradeReadiness) {
+    fail('upgrade readiness differs from the canonical inspection journey');
+  }
   validateFileRecord(manifest.readme, FILES.readme, bundleRoot);
   validateOfflineSbom(
     readBoundedJson(
@@ -809,6 +870,7 @@ function auditLocalAlphaTrialKit(options) {
     FILES.operatorSbom,
     FILES.verificationEvidence,
     FILES.quickstart,
+    FILES.upgradeReadiness,
     expectedArchive,
   ].sort();
   const actualFiles = fs
@@ -829,6 +891,7 @@ function auditLocalAlphaTrialKit(options) {
     FILES.operatorSbom,
     FILES.verificationEvidence,
     FILES.quickstart,
+    FILES.upgradeReadiness,
     FILES.readme,
     FILES.manifest,
   ];
@@ -842,7 +905,7 @@ function auditLocalAlphaTrialKit(options) {
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-trial-kit-audit@v2',
+    schema: 'qinglong/alpha-local-trial-kit-audit@v3',
     sourceRevision: manifest.sourceRevision,
     version: manifest.version,
     architecture: manifest.architecture,
@@ -851,6 +914,7 @@ function auditLocalAlphaTrialKit(options) {
     applicationImageId: manifest.images.application.id,
     operatorImageId: manifest.images.operator.id,
     quickstartSha256: manifest.quickstart.sha256,
+    upgradeReadinessSha256: manifest.upgradeReadiness.sha256,
     verificationSha256: manifest.verification.sha256,
     workflowRunId: verificationEvidence.workflow.runId,
     workflowRunAttempt: verificationEvidence.workflow.runAttempt,

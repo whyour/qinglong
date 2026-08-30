@@ -80,8 +80,8 @@ function writeMilestone(directory, manifest) {
 
 function localManifest(attempt = runAttempt, variant = 'headless') {
   return {
-    schemaVersion: 2,
-    schema: 'qinglong/alpha-local-milestone@v2',
+    schemaVersion: 3,
+    schema: 'qinglong/alpha-local-milestone@v3',
     maturity: 'alpha_candidate_not_public_release',
     product: 'local',
     variant,
@@ -101,6 +101,7 @@ function localManifest(attempt = runAttempt, variant = 'headless') {
         applicationImageId: digest('3'),
         operatorImageId: digest('4'),
         verificationSha256: digest('5'),
+        upgradeReadinessSha256: digest('b'),
       },
       arm64: {
         artifactName: `ql3-alpha-${revision}-local-${variant}-arm64`,
@@ -114,6 +115,7 @@ function localManifest(attempt = runAttempt, variant = 'headless') {
         applicationImageId: digest('8'),
         operatorImageId: digest('9'),
         verificationSha256: digest('a'),
+        upgradeReadinessSha256: digest('c'),
       },
     },
     readme: null,

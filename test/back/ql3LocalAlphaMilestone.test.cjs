@@ -29,7 +29,12 @@ const revision = 'a'.repeat(40);
 const runId = '33047425710';
 const runAttempt = '2';
 
-function imageInspection(role, architecture, idCharacter, variant = 'headless') {
+function imageInspection(
+  role,
+  architecture,
+  idCharacter,
+  variant = 'headless',
+) {
   return {
     Id: `sha256:${idCharacter.repeat(64)}`,
     Os: 'linux',
@@ -201,7 +206,11 @@ function finalizeOptions(paths) {
 test('finalizes two exact native trial kits into one closed milestone index', (t) => {
   const paths = fixture(t);
   const manifest = finalizeLocalAlphaMilestone(finalizeOptions(paths));
-  assert.equal(manifest.schema, 'qinglong/alpha-local-milestone@v2');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-milestone@v3');
+  assert.match(
+    manifest.artifacts.amd64.upgradeReadinessSha256,
+    /^sha256:[0-9a-f]{64}$/,
+  );
   assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.deepEqual(Object.keys(manifest.artifacts), ['amd64', 'arm64']);

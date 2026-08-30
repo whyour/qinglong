@@ -30,6 +30,7 @@
 | D-422 Console Task 安全编辑切片 | 强认证完整定义读取、10 分钟一次性 authoring lease、第二份 exact save proof 与 revision/content/credential fence 已完成；Console 可无损编辑内建 argv command Task；同源双架构 Console v5 Trial Kit 与 milestone 已生成并验真 | Cluster 不复用 Local proof；尚无通用 workflow 编辑器、2.x 升级或生产远程管理；仍不是正式发布 |
 | D-423 Console cron Trigger 管理切片 | 已复用既有 immutable Trigger、Task pin、durable schedule 与原子 audit authority；Console/API 可 list/read/create/update/enable/disable `qinglong/cron@v1`，真实 SQLite/loopback 与同源双架构 Console milestone 已通过 | Cluster 不复用 Local proof；不提供删除或通用 Trigger schema 编辑；仍不是正式发布或生产升级 |
 | D-424 Console Secret-backed 自动化切片 | current-only metadata、强认证 AES-256-GCM create/rotate 与 Task pinned `SecretRef` 绑定已完成；真实 SQLite/loopback、本地与远端门、同源双架构 Console milestone 及离线 auditor 均通过 | Cluster 不复用 Local proof/custody；不提供明文读取、删除或历史浏览；仍不是正式发布或生产升级 |
+| D-425 2.x 升级就绪盘点 | v6 Trial Kit 源码候选新增 canonical `upgrade-readiness.sh`；2.x root 只读挂载，正式 Operator 在 128 MiB/无网络边界内生成 SQLite 与完整目录两个计划；bundle/milestone/stage 聚焦测试通过 | 双架构 artifact 尚未生成；只完成 inspect，不授权 stage、activation、cutover 或 rollback |
 
 D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，而且没有改名复用 run `33173769047` 的旧 archive。修复提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 的普通主 CI [run 33229592307](https://github.com/whyour/qinglong/actions/runs/33229592307) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33229592293](https://github.com/whyour/qinglong/actions/runs/33229592293) 成功；随后显式 Local Console milestone [run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006) 为 42 success/2 scope skip/0 fail。由此 Web 创建能力已进入新的阶段实物，而不再只是候选源码。
 
@@ -38,6 +39,8 @@ D-422 已从“源码候选”升级为阶段实物：本地真实 SQLite/loopba
 D-423 已从“源码候选”升级为阶段实物：18-package clean build/test `3,044 total / 3,022 pass / 22 conditional skip / 0 fail`，完整 backend `1,653 total / 1,651 pass / 2 Linux conditional skip / 0 fail`，Local API `70/70`；18-package boundary、122-module Edge import 与 Cluster dependency audit 均 compatible。默认 headless Edge 为 2,754,742 bytes/331 files/58 modules，opt-in Edge/Standalone Console 为 4,150,439/4,150,583 bytes、479 files/101 modules，三资产合计 84,401 bytes。提交 `b970e2aede516c350b1cdb409e0d0d3038a5deee` 的普通主 CI [run 33244982727](https://github.com/whyour/qinglong/actions/runs/33244982727) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33244982694](https://github.com/whyour/qinglong/actions/runs/33244982694) 成功；随后显式 Local Console milestone [run 33245745837](https://github.com/whyour/qinglong/actions/runs/33245745837) 为 42 success/2 scope skip/0 fail。阶段产物绑定新的 exact commit/run/artifact digest，没有沿用或改名复用 D-422 archive。
 
 D-424 已从“源码候选”升级为阶段实物：本地 18-package clean build/test 为 `3,052 total / 3,030 pass / 22 conditional skip / 0 fail`，Local SQLite `250/250`、Local API `76/76`，默认 Edge 与 opt-in Console 资源门、Edge benchmark、package/source boundary 和 Cluster dependency audit 均通过。它证明 Secret metadata 不泄漏 custody 字段、create/rotate 必须 exact local presence、SQLite 只保存密文、Task 只保存 pinned `SecretRef`。提交 `f46fb44ac9534315b6965865bb3e990715bb2417` 的普通主 CI [run 33250825989](https://github.com/whyour/qinglong/actions/runs/33250825989) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33250826046](https://github.com/whyour/qinglong/actions/runs/33250826046) 与三节点 Security Administration [run 33250825974](https://github.com/whyour/qinglong/actions/runs/33250825974) 成功；显式 Local Console milestone [run 33252179178](https://github.com/whyour/qinglong/actions/runs/33252179178) 为 42 success/2 scope skip/0 fail。首次 artifact run [33251389615](https://github.com/whyour/qinglong/actions/runs/33251389615) 触发 x64 router 绝对 RSS 门；同源码 ordinary run 的 peak process RSS 为 98,852,864 bytes，距 96 MiB 上限仅约 1.73 MiB，表现与 runner 基线波动一致。没有提高预算、改代码或复用 failed attempt，第二次全新 run 对同一 source 通过该门并闭合产物。
+
+D-425 当前是严格区分的源码候选：Trial Kit、Local milestone 与 stage index 聚焦回归 `30/30`，其中将要上传的 bundle 文件集新增由 manifest、checksum 和 auditor 共同绑定的 `upgrade-readiness.sh`。脚本只接受独立 evidence root，把实际 2.x data root 只读挂载给 exact Operator，运行 `local-sqlite.adoption.inspect` 和 `local-data-directory.adoption.inspect`，不运行任何写入或切换。`ql3-ci.yml` 已要求显式 artifact job 在每个原生架构上创建生产形态 fixture 并实跑 bundle 内 exact 脚本；在普通 CI、双架构 artifact run 和下载审计完成前，不能把 v6 源码候选宣传为已交付实物。
 
 默认低配 headless v5 也已从“可生成”升级为独立阶段实物。绑定提交 `d459c3b45c36e856f4a1cb3ce5147905977d939d` 的显式 Local headless milestone [run 33258604609](https://github.com/whyour/qinglong/actions/runs/33258604609) 为 42 success/2 scope skip/0 fail，完整矩阵继续覆盖双架构资源、Local/Cluster image、PostgreSQL HA、CloudNativePG、Secret/provider rotation 与 Local Profiles。该 run 没有复用 Console archive；下载后的两个 `headless` Trial Kit 与 milestone 均通过 `SHA256SUMS` 和仓库 auditor，返回 `compatible=true`。
 
@@ -86,7 +89,7 @@ D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完�
 
 该本地 archive 不是新的 v2 Local Alpha Trial Kit。它在 ADR-0506 前生成，manifest v1 会无条件写入 `passed`，且 macOS Docker Desktop 因 bind-mount UID 映射无法对 exact 本地 archive 完成 Owner pepper 旅程；原生 CI 证明同源码实现，不自动证明另一个 archive 的 exact image bytes。它因此保留为工程候选，不冒充已获 workflow evidence 的用户 Alpha。
 
-ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verification，ADR-0511 的 `@v3` 增加 canonical quickstart，ADR-0513 的 `@v4` 再把 `headless|console` 变体绑定到 image、SBOM、verification、milestone 和 stage index，ADR-0514 的 `@v5` 增加标准 Owner credential presentation 与首自动化旅程。旧 runtime-only、v1/v2/v3/v4 bundle 均为历史工程证据，不能通过 v5 auditor。当前 headless、Console v5、Cluster 双架构 milestone 与跨 Profile stage index 均已有真实实物；下一阶段不再补“有没有产物”，而是补长期分发、签名、不可变 registry digest、部署锁和升级/回退证据。Public Release Set 继续受更严格发布门禁约束。
+ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verification，ADR-0511 的 `@v3` 增加 canonical quickstart，ADR-0513 的 `@v4` 再把 `headless|console` 变体绑定到 image、SBOM、verification、milestone 和 stage index，ADR-0514 的 `@v5` 增加标准 Owner credential presentation 与首自动化旅程，ADR-0520 的 `@v6` 增加只读 2.x 升级就绪盘点。旧 runtime-only、v1/v2/v3/v4/v5 bundle 均为历史工程证据，不能通过 v6 auditor。当前真实可下载实物仍是 headless/Console v5、Cluster 双架构 milestone 与跨 Profile stage index；v6 必须经过新的普通 CI、显式 artifact run 和下载后审计才可替代它们。Public Release Set 继续受更严格发布门禁约束。
 
 ## 生成
 
@@ -103,15 +106,16 @@ ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verif
 Local artifact 含：
 
 - 一个包含所选 Application 与短生命周期 operator 的 archive；headless 为 `qinglong3-local-trial-kit-<arch>.docker.tar`，Console 为 `qinglong3-local-console-trial-kit-<arch>.docker.tar`，共享 Node 基础层在 archive 中去重；
-- schema 为 `qinglong/alpha-local-trial-kit@v5` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
+- schema 为 `qinglong/alpha-local-trial-kit@v6` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/upgradeReadiness/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
 - canonical `quickstart.sh`，在目标 Linux 设备上只依赖 POSIX shell、`sha256sum` 和 Docker，完成 checksum、load、identity、fresh Owner 与 Profile-bound Application active；
+- canonical `upgrade-readiness.sh`，把 2.x data root 只读挂载给 128 MiB/无网络 Operator，生成 SQLite 与完整目录两个私有 inspect 计划，不获得 stage/cutover authority；
 - `verification-evidence.json` 绑定 `workflow_dispatch` 的 workflow ref/SHA、run ID/attempt、同架构两个 exact image ID 和完整 gate 集；下载者仍须到 GitHub 交叉检查 run，它不替代正式签名；
 - 与实际只读镜像 inventory 对账过的 CycloneDX SBOM；
 - 面向 Local 用户的 README 与覆盖全部内容文件的 `SHA256SUMS`。
 
 Cluster artifact 是每角色/架构一个六文件闭包：native Docker archive、精确 CycloneDX SBOM、workflow-bound verification evidence、README、`qinglong/alpha-cluster-image@v1` manifest 和覆盖全部内容文件的 `SHA256SUMS`。完整 CI 成功后，八个 bundle 由 `qinglong/alpha-cluster-milestone@v1` 小型索引闭合；索引本身不重复存放大 archive。
 
-Local milestone 是 `qinglong/alpha-local-milestone@v2` 三文件闭包，绑定一个 variant 的双架构 Trial Kit。Stage index 是 `qinglong/alpha-stage-index@v2` 三文件闭包；它重新审计两个 milestone，要求 version/source/workflow SHA/ref/run/attempt 一致，并把 Local variant/Profile 与 Cluster 的 control/admin/worker 最小集、可选 control-ai 写为机器可读选择；它不重复存放任何镜像 archive。
+Local milestone 是 `qinglong/alpha-local-milestone@v3` 三文件闭包，绑定一个 variant 的双架构 Trial Kit，并直接记录两个架构的 `upgradeReadinessSha256`。Stage index 是 `qinglong/alpha-stage-index@v2` 三文件闭包；它重新审计两个 milestone，要求 version/source/workflow SHA/ref/run/attempt 一致，并把 Local variant/Profile 与 Cluster 的 control/admin/worker 最小集、可选 control-ai 写为机器可读选择；它不重复存放任何镜像 archive。
 
 任何 required job 失败时不上传对应产物。artifact 名和 archive 内的 `ci-*` tag 都表示 commit-bound candidate，不能改名后冒充 `v3.x` release。
 

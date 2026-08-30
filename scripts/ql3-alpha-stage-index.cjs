@@ -240,7 +240,7 @@ function validateMilestoneRecord(record, product, sourceRevision, variant) {
       : 'cluster_integration_candidate_not_public_release';
   const expectedSchema =
     product === 'local'
-      ? 'qinglong/alpha-local-milestone@v2'
+      ? 'qinglong/alpha-local-milestone@v3'
       : 'qinglong/alpha-cluster-milestone@v1';
   if (
     !exactKeys(record, ['artifactName', 'schema', 'maturity', 'manifest']) ||
@@ -382,10 +382,7 @@ function auditAlphaStageIndex(options) {
     sourceRevision: manifest.sourceRevision,
     workflowRunId: manifest.workflow.runId,
     workflowRunAttempt: manifest.workflow.runAttempt,
-    profiles: [
-      ...manifest.deploymentSelections.local.profiles,
-      'cluster',
-    ],
+    profiles: [...manifest.deploymentSelections.local.profiles, 'cluster'],
     artifactCount: 10,
     compatible: true,
   });

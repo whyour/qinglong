@@ -763,6 +763,18 @@ jobs:
           docker rm "${QUICKSTART_CONTAINER}"
           test -s "${QUICKSTART_ROOT}/qinglong3.sqlite"
           test -s "${QUICKSTART_ROOT}/owner-delivery/credential-019f8680-143d-4000-8000-000000000021.ready.json"
+          LEGACY_READINESS_ROOT="${RUNNER_TEMP}/ql3-alpha-legacy-readiness-${{ matrix.image_arch }}"
+          UPGRADE_EVIDENCE_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-evidence-${{ matrix.image_arch }}"
+          node scripts/ql3-local-alpha-upgrade-readiness-fixture.cjs \
+            --output="${LEGACY_READINESS_ROOT}"
+          sh "${BUNDLE_ROOT}/upgrade-readiness.sh" \
+            edge "${LEGACY_READINESS_ROOT}" "${UPGRADE_EVIDENCE_ROOT}"
+          grep -q '"status":"inspected"' \
+            "${UPGRADE_EVIDENCE_ROOT}/results/sqlite-inspect.result.json"
+          grep -q '"status":"inspected"' \
+            "${UPGRADE_EVIDENCE_ROOT}/results/data-directory-inspect.result.json"
+          test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-wal"
+          test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-journal"
           trap - EXIT
       - name: Upload the tested native Local Alpha trial kit
         if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'local' || inputs.alpha_artifact_scope == 'all')

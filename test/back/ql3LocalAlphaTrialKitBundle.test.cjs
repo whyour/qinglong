@@ -166,7 +166,7 @@ function adapters(overrides = {}, variant = 'headless') {
 test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const paths = fixture(t);
   const manifest = createLocalAlphaTrialKit(createOptions(paths), adapters());
-  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v5');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v6');
   assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.equal(manifest.architecture, 'arm64');
@@ -175,6 +175,7 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
   assert.notEqual(manifest.images.application.id, manifest.images.operator.id);
   assert.equal(manifest.verification.file, 'verification-evidence.json');
   assert.equal(manifest.quickstart.file, 'quickstart.sh');
+  assert.equal(manifest.upgradeReadiness.file, 'upgrade-readiness.sh');
   const quickstart = path.join(paths.outputRoot, 'quickstart.sh');
   const syntax = spawnSync('sh', ['-n', quickstart], { encoding: 'utf8' });
   assert.equal(syntax.status, 0, syntax.stderr);
@@ -197,6 +198,7 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     'qinglong3-local-operator.cdx.json',
     'qinglong3-local-trial-kit-arm64.docker.tar',
     'quickstart.sh',
+    'upgrade-readiness.sh',
     'verification-evidence.json',
   ]);
 });
@@ -229,6 +231,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
   assert.equal(verification.gates.consoleLiveJourney, 'passed');
   assert.equal(verification.gates.firstAutomationJourney, 'passed');
   assert.equal(verification.gates.ownerCredentialPresentation, 'passed');
+  assert.equal(verification.gates.legacyUpgradeReadiness, 'passed');
   const quickstartContents = fs.readFileSync(
     path.join(paths.outputRoot, 'quickstart.sh'),
     'utf8',
@@ -251,6 +254,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
     'qinglong3-local-console-trial-kit-arm64.docker.tar',
     'qinglong3-local-operator.cdx.json',
     'quickstart.sh',
+    'upgrade-readiness.sh',
     'verification-evidence.json',
   ]);
 });
@@ -283,6 +287,7 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
     'archive',
     'extra',
     'quickstart',
+    'upgrade-readiness',
     'sbom',
     'verification',
   ]) {
@@ -302,6 +307,11 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
     } else if (mutation === 'quickstart') {
       fs.appendFileSync(
         path.join(paths.outputRoot, 'quickstart.sh'),
+        '# drift\n',
+      );
+    } else if (mutation === 'upgrade-readiness') {
+      fs.appendFileSync(
+        path.join(paths.outputRoot, 'upgrade-readiness.sh'),
         '# drift\n',
       );
     } else if (mutation === 'sbom') {
@@ -342,6 +352,7 @@ test('offline audit rejects a rehashed non-canonical quickstart', (t) => {
     'qinglong3-local-operator.cdx.json',
     'verification-evidence.json',
     'quickstart.sh',
+    'upgrade-readiness.sh',
     'README.md',
     'manifest.json',
   ];
@@ -448,6 +459,79 @@ exit 1
   assert.match(calls, /--memory 128m --memory-swap 128m/);
   assert.match(calls, /--pids-limit 64/);
   assert.doesNotMatch(calls, /--network (?!none)/);
+});
+
+test('generated upgrade readiness drives two read-only legacy inspections', (t) => {
+  const paths = fixture(t);
+  createLocalAlphaTrialKit(createOptions(paths), adapters());
+  const fakeBin = path.join(paths.fixtureRoot, 'readiness-fake-bin');
+  fs.mkdirSync(fakeBin);
+  const dockerLog = path.join(paths.fixtureRoot, 'readiness-docker.log');
+  const fakeDocker = path.join(fakeBin, 'docker');
+  fs.writeFileSync(
+    fakeDocker,
+    `#!/bin/sh
+printf '%s\\n' "$*" >>"$FAKE_DOCKER_LOG"
+case "$1:$2" in
+  info:|load:*) exit 0 ;;
+  image:inspect)
+    printf '%s\\n' 'sha256:${'2'.repeat(
+      64,
+    )}|arm64|65532:65532|${revision}|short-lived|none-by-default'
+    exit 0
+    ;;
+esac
+case " $* " in
+  *'/sqlite-inspect.json'*) printf '%s\\n' '{"status":"inspected","evidence":{"planDigest":"${'a'.repeat(
+    64,
+  )}"}}'; exit 0 ;;
+  *'/data-directory-inspect.json'*) printf '%s\\n' '{"status":"inspected","evidence":{"planDigest":"${'b'.repeat(
+    64,
+  )}"}}'; exit 0 ;;
+esac
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  const legacyRoot = path.join(paths.fixtureRoot, 'legacy-data');
+  fs.mkdirSync(path.join(legacyRoot, 'db'), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(legacyRoot, 'db', 'database.sqlite'), 'legacy', {
+    mode: 0o600,
+  });
+  const evidenceRoot = path.join(paths.fixtureRoot, 'upgrade-readiness');
+  const run = spawnSync(
+    'sh',
+    [
+      path.join(paths.outputRoot, 'upgrade-readiness.sh'),
+      'edge',
+      legacyRoot,
+      evidenceRoot,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        FAKE_DOCKER_LOG: dockerLog,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+      },
+    },
+  );
+  assert.equal(run.status, 0, `${run.stderr}\n${run.stdout}`);
+  assert.match(run.stdout, /upgrade readiness inspection completed/);
+  assert.equal(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(evidenceRoot, 'results', 'sqlite-inspect.result.json'),
+        'utf8',
+      ),
+    ).status,
+    'inspected',
+  );
+  const calls = fs.readFileSync(dockerLog, 'utf8');
+  assert.match(calls, /dst=\/var\/lib\/qinglong2,readonly/);
+  assert.match(calls, /--network none/);
+  assert.match(calls, /--memory 128m --memory-swap 128m/);
+  assert.doesNotMatch(calls, /adoption\.stage|activation\.prepare|cutover/);
 });
 
 test('create rejects an image reference that could alter the shell journey', (t) => {
