@@ -15,7 +15,7 @@
 
 当维护者显式选择 `alpha_artifact_scope=all` 时，还会生成 `Alpha stage index`。它把同一次 run 的 Local/Cluster milestone 交叉绑定，并为 Edge、Standalone、Cluster 给出目标架构的最小 artifact 选择；这是阶段交付导航，不是正式 release catalog。只生成 Local 或 Cluster 时，各自 milestone 仍可独立成立，不制造一个不完整的总索引。
 
-## 当前阶段实物（2026-08-29）
+## 当前阶段实物（2026-08-30）
 
 在下面保留的历史 exact-image 证据之外，2026-08-28 的源码阶段已把 headless 用户旅程与 opt-in Console 合并为一条可选择的交付链：
 
@@ -30,7 +30,7 @@
 | D-422 Console Task 安全编辑切片 | 强认证完整定义读取、10 分钟一次性 authoring lease、第二份 exact save proof 与 revision/content/credential fence 已完成；Console 可无损编辑内建 argv command Task；同源双架构 Console v5 Trial Kit 与 milestone 已生成并验真 | Cluster 不复用 Local proof；尚无通用 workflow 编辑器、2.x 升级或生产远程管理；仍不是正式发布 |
 | D-423 Console cron Trigger 管理切片 | 已复用既有 immutable Trigger、Task pin、durable schedule 与原子 audit authority；Console/API 可 list/read/create/update/enable/disable `qinglong/cron@v1`，真实 SQLite/loopback 与同源双架构 Console milestone 已通过 | Cluster 不复用 Local proof；不提供删除或通用 Trigger schema 编辑；仍不是正式发布或生产升级 |
 | D-424 Console Secret-backed 自动化切片 | current-only metadata、强认证 AES-256-GCM create/rotate 与 Task pinned `SecretRef` 绑定已完成；真实 SQLite/loopback、本地与远端门、同源双架构 Console milestone 及离线 auditor 均通过 | Cluster 不复用 Local proof/custody；不提供明文读取、删除或历史浏览；仍不是正式发布或生产升级 |
-| D-425 2.x 升级就绪盘点 | v6 Trial Kit 源码候选新增 canonical `upgrade-readiness.sh`；2.x root 只读挂载，正式 Operator 在 128 MiB/无网络边界内生成 SQLite 与完整目录两个计划；bundle/milestone/stage 聚焦测试通过 | 双架构 artifact 尚未生成；只完成 inspect，不授权 stage、activation、cutover 或 rollback |
+| D-425 2.x 升级就绪盘点 | 同源 v6 Trial Kit 已交付 amd64/arm64 headless 阶段实物；canonical `upgrade-readiness.sh` 把 2.x root 只读挂载，在 128 MiB/无网络边界内由 exact Operator 生成 SQLite 与完整目录两个计划；artifact job 实跑、bundle auditor 与 milestone v3 均闭合 | 只完成 inspect，不授权 stage、activation、cutover 或 rollback；不是 Public Release |
 
 D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，而且没有改名复用 run `33173769047` 的旧 archive。修复提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 的普通主 CI [run 33229592307](https://github.com/whyour/qinglong/actions/runs/33229592307) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33229592293](https://github.com/whyour/qinglong/actions/runs/33229592293) 成功；随后显式 Local Console milestone [run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006) 为 42 success/2 scope skip/0 fail。由此 Web 创建能力已进入新的阶段实物，而不再只是候选源码。
 
@@ -40,7 +40,7 @@ D-423 已从“源码候选”升级为阶段实物：18-package clean build/tes
 
 D-424 已从“源码候选”升级为阶段实物：本地 18-package clean build/test 为 `3,052 total / 3,030 pass / 22 conditional skip / 0 fail`，Local SQLite `250/250`、Local API `76/76`，默认 Edge 与 opt-in Console 资源门、Edge benchmark、package/source boundary 和 Cluster dependency audit 均通过。它证明 Secret metadata 不泄漏 custody 字段、create/rotate 必须 exact local presence、SQLite 只保存密文、Task 只保存 pinned `SecretRef`。提交 `f46fb44ac9534315b6965865bb3e990715bb2417` 的普通主 CI [run 33250825989](https://github.com/whyour/qinglong/actions/runs/33250825989) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33250826046](https://github.com/whyour/qinglong/actions/runs/33250826046) 与三节点 Security Administration [run 33250825974](https://github.com/whyour/qinglong/actions/runs/33250825974) 成功；显式 Local Console milestone [run 33252179178](https://github.com/whyour/qinglong/actions/runs/33252179178) 为 42 success/2 scope skip/0 fail。首次 artifact run [33251389615](https://github.com/whyour/qinglong/actions/runs/33251389615) 触发 x64 router 绝对 RSS 门；同源码 ordinary run 的 peak process RSS 为 98,852,864 bytes，距 96 MiB 上限仅约 1.73 MiB，表现与 runner 基线波动一致。没有提高预算、改代码或复用 failed attempt，第二次全新 run 对同一 source 通过该门并闭合产物。
 
-D-425 当前是严格区分的源码候选：Trial Kit、Local milestone 与 stage index 聚焦回归 `30/30`，其中将要上传的 bundle 文件集新增由 manifest、checksum 和 auditor 共同绑定的 `upgrade-readiness.sh`。脚本只接受独立 evidence root，把实际 2.x data root 只读挂载给 exact Operator，运行 `local-sqlite.adoption.inspect` 和 `local-data-directory.adoption.inspect`，不运行任何写入或切换。`ql3-ci.yml` 已要求显式 artifact job 在每个原生架构上创建生产形态 fixture 并实跑 bundle 内 exact 脚本；在普通 CI、双架构 artifact run 和下载审计完成前，不能把 v6 源码候选宣传为已交付实物。
+D-425 已从“源码候选”升级为阶段实物：本地完整 backend 为 `1,656 total / 1,654 pass / 2 conditional skip / 0 fail`，Trial Kit/fixture/milestone/stage 聚焦回归 `30/30`，18-package clean build/test 与 3 个非沙箱 TLS/mTLS 回环补验均为 0 fail；package/source boundary、122-module Edge import、Cluster dependency、Local Operator image 和 backend build audit 全部 compatible。提交 `d6571e4b89eaf29ed6277dd08bbd7ffb57a3705d` 的普通主 CI [run 33295923855](https://github.com/whyour/qinglong/actions/runs/33295923855) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33295923822](https://github.com/whyour/qinglong/actions/runs/33295923822) 成功；显式 Local headless milestone [run 33300121149](https://github.com/whyour/qinglong/actions/runs/33300121149) 为 42 success/2 scope skip/0 fail。该 artifact run 在每个原生架构上创建生产形态 2.x fixture，实跑 bundle 内 exact `upgrade-readiness.sh`，要求 SQLite 与完整目录两个正式 inspect 均返回 `inspected`，再离线审计 bundle；下载后的 milestone v3 复核返回 `compatible=true`。amd64/arm64/milestone artifact ID 分别为 `9728717020`、`9728715774`、`9728851055`，保留至 2026-09-29；readiness digest 分别为 `sha256:c28bb9361eaadf27020d1ba247d6784f795585313cb7c5ead151a20712507be1` 与 `sha256:23f7f78934e66e307eab065e0dba00aeefb0f8135beba00c41606a4e6a09685b`。这仍只授权只读 inspect，不授权任何写入或切换。
 
 默认低配 headless v5 也已从“可生成”升级为独立阶段实物。绑定提交 `d459c3b45c36e856f4a1cb3ce5147905977d939d` 的显式 Local headless milestone [run 33258604609](https://github.com/whyour/qinglong/actions/runs/33258604609) 为 42 success/2 scope skip/0 fail，完整矩阵继续覆盖双架构资源、Local/Cluster image、PostgreSQL HA、CloudNativePG、Secret/provider rotation 与 Local Profiles。该 run 没有复用 Console archive；下载后的两个 `headless` Trial Kit 与 milestone 均通过 `SHA256SUMS` 和仓库 auditor，返回 `compatible=true`。
 
@@ -89,7 +89,7 @@ D-418 防止把“20 天代码和测试”冒充“用户已经能下载并完�
 
 该本地 archive 不是新的 v2 Local Alpha Trial Kit。它在 ADR-0506 前生成，manifest v1 会无条件写入 `passed`，且 macOS Docker Desktop 因 bind-mount UID 映射无法对 exact 本地 archive 完成 Owner pepper 旅程；原生 CI 证明同源码实现，不自动证明另一个 archive 的 exact image bytes。它因此保留为工程候选，不冒充已获 workflow evidence 的用户 Alpha。
 
-ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verification，ADR-0511 的 `@v3` 增加 canonical quickstart，ADR-0513 的 `@v4` 再把 `headless|console` 变体绑定到 image、SBOM、verification、milestone 和 stage index，ADR-0514 的 `@v5` 增加标准 Owner credential presentation 与首自动化旅程，ADR-0520 的 `@v6` 增加只读 2.x 升级就绪盘点。旧 runtime-only、v1/v2/v3/v4/v5 bundle 均为历史工程证据，不能通过 v6 auditor。当前真实可下载实物仍是 headless/Console v5、Cluster 双架构 milestone 与跨 Profile stage index；v6 必须经过新的普通 CI、显式 artifact run 和下载后审计才可替代它们。Public Release Set 继续受更严格发布门禁约束。
+ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verification，ADR-0511 的 `@v3` 增加 canonical quickstart，ADR-0513 的 `@v4` 再把 `headless|console` 变体绑定到 image、SBOM、verification、milestone 和 stage index，ADR-0514 的 `@v5` 增加标准 Owner credential presentation 与首自动化旅程，ADR-0520 的 `@v6` 增加只读 2.x 升级就绪盘点。旧 runtime-only、v1/v2/v3/v4/v5 bundle 均为历史工程证据，不能通过 v6 auditor。当前真实可下载实物包括新的 headless v6 双架构 Local milestone、历史 Console v5、Cluster 双架构 milestone 与跨 Profile stage index；v6 Console 与把本次 Local milestone 纳入新的跨 Profile stage index 仍需独立 artifact run。Public Release Set 继续受更严格发布门禁约束。
 
 ## 生成
 

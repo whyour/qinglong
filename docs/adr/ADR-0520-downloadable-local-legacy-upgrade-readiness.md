@@ -1,6 +1,6 @@
 # ADR-0520：可下载的 Local Legacy 升级就绪盘点
 
-- 状态：Accepted（D-425 源码候选，双架构 Alpha 实物待生成）
+- 状态：Accepted（D-425 已交付同源双架构 Alpha 阶段实物）
 - 日期：2026-08-30
 - 对应 RFC 切片：D-425
 - 关联 ADR：ADR-0476～ADR-0483、ADR-0503、ADR-0506、ADR-0511、ADR-0514
@@ -77,8 +77,15 @@ deployment-lock 协议。
 ## 验收与后续
 
 源码候选必须通过 bundle/fixture/milestone 聚焦测试、完整 backend、18-package clean build/test、package/Cluster/Edge boundary、双架构普通 CI 与
-显式 Local artifact run。只有 v6 amd64/arm64 bundle 被同 run Local milestone 收录并通过下载后 checksum/auditor，D-425 才能从源码候选升级为
-阶段实物。
+显式 Local artifact run。v6 amd64/arm64 bundle 必须被同 run Local milestone 收录并通过 checksum/auditor，D-425 才能从源码候选升级为阶段实物。
+
+该门已由提交 `d6571e4b89eaf29ed6277dd08bbd7ffb57a3705d` 关闭：普通 CI
+[run 33295923855](https://github.com/whyour/qinglong/actions/runs/33295923855) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源
+Kubernetes deployment [run 33295923822](https://github.com/whyour/qinglong/actions/runs/33295923822) 成功；显式 Local headless artifact
+[run 33300121149](https://github.com/whyour/qinglong/actions/runs/33300121149) 为 42 success/2 scope skip/0 fail。该 run 的两个原生架构 job 均实跑
+将要上传的 exact readiness 脚本并由 `qinglong/alpha-local-trial-kit-audit@v3` 返回 `compatible=true`；下载后的 Local milestone 再由
+`qinglong/alpha-local-milestone-audit@v3` 确认 source/run/attempt、amd64/arm64 和 v6 readiness digest 闭合。三个核心 artifact 保留至
+2026-09-29，仍是 `alpha_candidate_not_public_release`，不构成正式发布或生产 cutover 授权。
 
 D-425 是完整升级 rehearsal 的第一阶段，不重新定义最终目标。下一切片继续以两个已审核 plan digest 为显式输入，建立 side-by-side
 SQLite/data-directory stage、verify、activation、adopted start、clean `rollback_candidate` 与写后 `reconciliation_required` 证据；在该门完成前，
