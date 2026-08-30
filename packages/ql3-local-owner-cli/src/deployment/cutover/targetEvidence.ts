@@ -567,6 +567,7 @@ export function parseTargetContainerEvidence(
     container.Image !== command.request.targetImage.imageId ||
     JSON.stringify(config.Cmd) !==
       JSON.stringify([
+        '--cutover-probe',
         '--config',
         command.request.expectedTargetApplicationConfigPath,
       ]) ||

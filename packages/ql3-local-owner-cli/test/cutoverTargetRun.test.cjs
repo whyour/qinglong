@@ -104,7 +104,13 @@ function targetInspection(state, options = {}) {
       },
       Config: {
         Image: state.targetImage,
-        Cmd: ['--config', state.targetApplicationConfigPath],
+        Cmd: [
+          ...(options.normalApplicationCommand === true
+            ? []
+            : ['--cutover-probe']),
+          '--config',
+          state.targetApplicationConfigPath,
+        ],
       },
       HostConfig: {
         RestartPolicy: { Name: 'no' },
@@ -594,6 +600,27 @@ test('starts an exact target once and replays the active commitment without Dock
 test('requires the target container to keep the Legacy source read-only', async (t) => {
   const state = fixture(t);
   const controller = harness(state, { writableLegacySource: true });
+  const result = await runLocalDeploymentDockerTarget(
+    command(state),
+    controller,
+  );
+  assert.equal(result.state, 'manual_required');
+  assert.equal(
+    controller.calls.filter((args) => args[1] === 'start').length,
+    0,
+  );
+  const request = JSON.parse(
+    fs.readFileSync(
+      path.join(state.journal, '0003-target-start-decision.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(request.evidence.reason, 'target_preflight_unproved');
+});
+
+test('requires cutover target-start to use frozen-admission probe mode', async (t) => {
+  const state = fixture(t);
+  const controller = harness(state, { normalApplicationCommand: true });
   const result = await runLocalDeploymentDockerTarget(
     command(state),
     controller,

@@ -257,7 +257,7 @@ target_id=$(docker create --name "$target_name" --restart no \
   --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
   --mount "type=bind,src=$rehearsal_root,dst=$rehearsal_root" \
   --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly" \
-  "$APPLICATION_IMAGE" --config "$rehearsal_root/local-application.json")
+  "$APPLICATION_IMAGE" --cutover-probe --config "$rehearsal_root/local-application.json")
 [ "${#target_id}" -eq 64 ] || fail 'target container ID is invalid'
 case "$target_id" in *[!0-9a-f]*) fail 'target container ID is invalid' ;; esac
 

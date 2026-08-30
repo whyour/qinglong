@@ -6,9 +6,10 @@ import {
   type LocalApplicationProcessSignal,
   type LocalApplicationProcessSignalSource,
 } from './production-process/processApplication';
+import { runProductionLocalApplicationCutoverProbe } from './production-process/cutoverProbeProcess';
 
 const USAGE =
-  'Usage: ql3-local-application --config /absolute/private-config.json';
+  'Usage: ql3-local-application [--cutover-probe] --config /absolute/private-config.json';
 
 const nodeSignals: LocalApplicationProcessSignalSource = Object.freeze({
   subscribe(
@@ -53,9 +54,28 @@ function failureFact(error: unknown): Readonly<Record<string, unknown>> {
   });
 }
 
-function configFileArgument(argv: readonly string[]): string | null {
-  if (argv.length !== 2 || argv[0] !== '--config' || !argv[1]) return null;
-  return argv[1];
+function configFileArgument(argv: readonly string[]): Readonly<{
+  configFilePath: string;
+  mode: 'application' | 'cutover_probe';
+}> | null {
+  if (argv.length === 2 && argv[0] === '--config' && argv[1]) {
+    return Object.freeze({
+      configFilePath: argv[1],
+      mode: 'application' as const,
+    });
+  }
+  if (
+    argv.length === 3 &&
+    argv[0] === '--cutover-probe' &&
+    argv[1] === '--config' &&
+    argv[2]
+  ) {
+    return Object.freeze({
+      configFilePath: argv[2],
+      mode: 'cutover_probe' as const,
+    });
+  }
+  return null;
 }
 
 async function main(argv: readonly string[]): Promise<void> {
@@ -63,8 +83,8 @@ async function main(argv: readonly string[]): Promise<void> {
     process.stdout.write(`${USAGE}\n`);
     return;
   }
-  const configFilePath = configFileArgument(argv);
-  if (configFilePath === null) {
+  const command = configFileArgument(argv);
+  if (command === null) {
     process.stderr.write(
       `${JSON.stringify({
         code: 'QL3_LOCAL_APPLICATION_CLI_USAGE_INVALID',
@@ -75,11 +95,18 @@ async function main(argv: readonly string[]): Promise<void> {
     return;
   }
   try {
-    const stopResult = await runProductionLocalApplicationProcess({
-      configFilePath,
-      signals: nodeSignals,
-      emit,
-    });
+    const stopResult =
+      command.mode === 'cutover_probe'
+        ? await runProductionLocalApplicationCutoverProbe({
+            configFilePath: command.configFilePath,
+            signals: nodeSignals,
+            emit,
+          })
+        : await runProductionLocalApplicationProcess({
+            configFilePath: command.configFilePath,
+            signals: nodeSignals,
+            emit,
+          });
     if (stopResult !== 'stopped') process.exitCode = 1;
   } catch (error) {
     process.stderr.write(`${JSON.stringify(failureFact(error))}\n`);

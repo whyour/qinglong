@@ -274,6 +274,10 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
   );
   assert.match(
     cutoverRehearsalContents,
+    /\$APPLICATION_IMAGE" --cutover-probe --config/,
+  );
+  assert.match(
+    cutoverRehearsalContents,
     /QingLong Local Alpha target-stop evidence:/,
   );
   assert.match(cutoverRehearsalContents, /tr -d '\\n'/);

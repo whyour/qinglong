@@ -574,7 +574,7 @@ test('CLI exposes bounded usage and redacted configuration failures', (t) => {
   assert.equal(help.status, 0, help.stderr);
   assert.equal(
     help.stdout,
-    'Usage: ql3-local-application --config /absolute/private-config.json\n',
+    'Usage: ql3-local-application [--cutover-probe] --config /absolute/private-config.json\n',
   );
 
   const usage = spawnSync(process.execPath, [cli], { encoding: 'utf8' });
@@ -744,3 +744,71 @@ test('CLI boots the real headless runtime and releases it on SIGTERM', async (t)
     .run(2, 'echo released');
   writer.close();
 });
+
+test(
+  'CLI cutover probe proves adopted readiness without changing SQLite',
+  { skip: process.platform !== 'linux' },
+  async (t) => {
+    const { configFilePath, value } = await prepareCliFixture(t);
+    const before = crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(value.storage.targetPath))
+      .digest('hex');
+    const cli = path.resolve(__dirname, '../dist/cli.js');
+    const child = spawn(
+      process.execPath,
+      [cli, '--cutover-probe', '--config', configFilePath],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    const events = [];
+    let stdout = '';
+    let stderr = '';
+    let signalled = false;
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+      while (stdout.includes('\n')) {
+        const index = stdout.indexOf('\n');
+        const line = stdout.slice(0, index);
+        stdout = stdout.slice(index + 1);
+        if (!line) continue;
+        const record = JSON.parse(line);
+        events.push(record);
+        if (record.event === 'cutover_probe_active' && !signalled) {
+          signalled = true;
+          child.kill('SIGTERM');
+        }
+      }
+    });
+    const timeout = setTimeout(() => child.kill('SIGKILL'), 15_000);
+    timeout.unref();
+    const [code, signal] = await new Promise((resolve) => {
+      child.once('exit', (...args) => resolve(args));
+    });
+    clearTimeout(timeout);
+
+    assert.equal(code, 0, JSON.stringify({ stderr, signal, events }));
+    assert.equal(signal, null);
+    assert.equal(signalled, true);
+    assert.equal(
+      events.some(({ event }) => event === 'cutover_probe_storage_ready'),
+      true,
+    );
+    assert.equal(
+      events.some(({ event }) => event === 'cutover_probe_stopped'),
+      true,
+    );
+    const after = crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(value.storage.targetPath))
+      .digest('hex');
+    assert.equal(after, before);
+    for (const suffix of ['-wal', '-shm', '-journal']) {
+      assert.equal(fs.existsSync(`${value.storage.targetPath}${suffix}`), false);
+    }
+  },
+);
