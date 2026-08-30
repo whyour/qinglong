@@ -2821,6 +2821,14 @@ function auditSourceImports(root, packagePath, findings) {
       if (
         packagePath === 'packages/ql3-local-application' &&
         path.relative(packageDirectory, filePath) ===
+          'src/production-process/cutoverProbeProcess.ts' &&
+        specifier === '@qinglong/local-sqlite/readiness-inspection'
+      ) {
+        continue;
+      }
+      if (
+        packagePath === 'packages/ql3-local-application' &&
+        path.relative(packageDirectory, filePath) ===
           'src/production-process/legacyDataApplicationCommitment.ts' &&
         specifier === '@qinglong/local-sqlite/data-directory-application-commit'
       ) {

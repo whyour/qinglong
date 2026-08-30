@@ -3293,6 +3293,47 @@ test('local application Profile subpaths stay in exact composition owners', (t) 
   );
 });
 
+test('cutover probe receives only the read-only SQLite readiness inspector', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-local-cutover-probe-boundary-'),
+  );
+  const processDirectory = path.join(
+    root,
+    'packages/ql3-local-application/src/production-process',
+  );
+  fs.mkdirSync(processDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(processDirectory, 'cutoverProbeProcess.ts'),
+    [
+      "import { inspect } from '@qinglong/local-sqlite/readiness-inspection';",
+      "import { mutate } from '@qinglong/local-sqlite/runtime';",
+    ].join('\n'),
+  );
+  fs.writeFileSync(
+    path.join(processDirectory, 'neighbor.ts'),
+    "import { inspect } from '@qinglong/local-sqlite/readiness-inspection';",
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-application', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-application/src/production-process/cutoverProbeProcess.ts',
+        specifier: '@qinglong/local-sqlite/runtime',
+      },
+      {
+        code: 'FORBIDDEN_PACKAGE_SOURCE_IMPORT',
+        file: 'packages/ql3-local-application/src/production-process/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/readiness-inspection',
+      },
+    ],
+  );
+});
+
 test('local process package remains SQLite, ORM and profile neutral', (t) => {
   const root = fixture(
     t,
