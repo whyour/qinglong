@@ -259,10 +259,7 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     'start exact target container',
     'stop target and prove rollback candidate',
   ]) {
-    assert.match(
-      cutoverRehearsalContents,
-      new RegExp(`phase '${phase}'`),
-    );
+    assert.match(cutoverRehearsalContents, new RegExp(`phase '${phase}'`));
   }
   assert.match(
     cutoverRehearsalContents,
@@ -331,7 +328,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
   assert.equal(verification.gates.ownerCredentialPresentation, 'passed');
   assert.equal(verification.gates.legacyUpgradeReadiness, 'passed');
   assert.equal(verification.gates.legacyUpgradeStage, 'passed');
-  assert.equal(verification.gates.legacyUpgradeCutover, 'not_applicable');
+  assert.equal(verification.gates.legacyUpgradeCutover, 'passed');
   const quickstartContents = fs.readFileSync(
     path.join(paths.outputRoot, 'quickstart.sh'),
     'utf8',
@@ -348,7 +345,13 @@ test('materializes a distinct loopback Console trial kit without widening the he
     'utf8',
   );
   assert.match(cutoverContents, /VARIANT='console'/);
-  assert.match(cutoverContents, /available only in the headless Trial Kit/);
+  assert.doesNotMatch(
+    cutoverContents,
+    /available only in the headless Trial Kit/,
+  );
+  assert.match(cutoverContents, /"schema":"qinglong\/local-api-process@v1"/);
+  assert.match(cutoverContents, /"targetApi":\{"configPath":/);
+  assert.match(cutoverContents, /"targetEntrypoint":"\$target_entrypoint"/);
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.variant, 'console');

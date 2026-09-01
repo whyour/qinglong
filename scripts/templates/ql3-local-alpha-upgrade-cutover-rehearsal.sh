@@ -44,7 +44,10 @@ container_name() {
 }
 
 [ "$#" -ge 5 ] && [ "$#" -le 7 ] || usage
-[ "$VARIANT" = headless ] || fail 'cutover rehearsal is available only in the headless Trial Kit'
+case "$VARIANT" in
+  headless|console) ;;
+  *) fail 'embedded Trial Kit variant is invalid' ;;
+esac
 profile=$1
 legacy_root=$2
 rehearsal_root=$3
@@ -249,6 +252,19 @@ bundle_digest=$(extract_digest "$rehearsal_root/results/adopted-verify.result.js
 grep -Fq "\"reference\": \"$APPLICATION_IMAGE\"" "$rehearsal_root/service/docker-target.json" || fail 'target descriptor image reference drifted'
 grep -Fq "\"imageId\": \"$APPLICATION_ID\"" "$rehearsal_root/service/docker-target.json" || fail 'target descriptor image ID drifted'
 
+target_entry_config_path="$rehearsal_root/local-application.json"
+target_entrypoint=local_application
+target_api_request=
+if [ "$VARIANT" = console ]; then
+  target_entry_config_path="$rehearsal_root/local-api.json"
+  target_entrypoint=local_api
+  cat >"$target_entry_config_path" <<EOF
+{"schema":"qinglong/local-api-process@v1","deploymentRoot":"$rehearsal_root","applicationConfigFilePath":"$rehearsal_root/local-application.json","ownerPepperKeyringDirectory":"$rehearsal_root/owner-peppers","listener":{"host":"127.0.0.1","port":5700}}
+EOF
+  chmod 0600 "$target_entry_config_path"
+  target_api_request=',"targetApi":{"configPath":"'"$target_entry_config_path"'","expectedTargetConfigPath":"'"$target_entry_config_path"'"}'
+fi
+
 phase 'create exact target container'
 target_id=$(docker create --name "$target_name" --restart no \
   --read-only --user "$uid:$gid" --network none --cap-drop ALL \
@@ -257,13 +273,13 @@ target_id=$(docker create --name "$target_name" --restart no \
   --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
   --mount "type=bind,src=$rehearsal_root,dst=$rehearsal_root" \
   --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly" \
-  "$APPLICATION_IMAGE" --cutover-probe --config "$rehearsal_root/local-application.json")
+  "$APPLICATION_IMAGE" --cutover-probe --config "$target_entry_config_path")
 [ "${#target_id}" -eq 64 ] || fail 'target container ID is invalid'
 case "$target_id" in *[!0-9a-f]*) fail 'target container ID is invalid' ;; esac
 
 start_ms=$((prepared_ms + 1))
 cat >"$rehearsal_root/commands/target-start.json" <<EOF
-{"schemaVersion":1,"operation":"local.deployment.cutover.target-start","options":{"deploymentRoot":"$rehearsal_root","dockerExecutable":"/usr/bin/docker","dockerSocketPath":"$operator_docker_socket","allowRootService":$allow_root_service},"request":{"cutoverId":"alpha-upgrade-cutover","profile":"$profile","instanceId":"alpha-upgrade","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","targetDatabasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","expectedLegacyDatabasePath":"$legacy_root/db/database.sqlite","expectedActivationDigest":"$activation_digest","expectedLegacyCommitmentDigest":"$commitment_digest","expectedLegacyContainerId":"$legacy_id","expectedTargetContainerId":"$target_id","targetImage":{"authority":"local-image-id","reference":"$APPLICATION_IMAGE","imageId":"$APPLICATION_ID"},"applicationConfigPath":"$rehearsal_root/local-application.json","expectedTargetApplicationConfigPath":"$rehearsal_root/local-application.json","expectedTargetCommitmentPath":"$rehearsal_root/service/cutovers/alpha-upgrade-cutover/0002-legacy-stopped.json","generation":1,"requestedAtMs":$start_ms}}
+{"schemaVersion":1,"operation":"local.deployment.cutover.target-start","options":{"deploymentRoot":"$rehearsal_root","dockerExecutable":"/usr/bin/docker","dockerSocketPath":"$operator_docker_socket","allowRootService":$allow_root_service},"request":{"cutoverId":"alpha-upgrade-cutover","profile":"$profile","instanceId":"alpha-upgrade","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","targetDatabasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","manifestPath":"$rehearsal_root/sqlite/qinglong3-adoption.json","expectedLegacyDatabasePath":"$legacy_root/db/database.sqlite","expectedActivationDigest":"$activation_digest","expectedLegacyCommitmentDigest":"$commitment_digest","expectedLegacyContainerId":"$legacy_id","expectedTargetContainerId":"$target_id","targetImage":{"authority":"local-image-id","reference":"$APPLICATION_IMAGE","imageId":"$APPLICATION_ID"},"applicationConfigPath":"$rehearsal_root/local-application.json","expectedTargetApplicationConfigPath":"$rehearsal_root/local-application.json"$target_api_request,"expectedTargetCommitmentPath":"$rehearsal_root/service/cutovers/alpha-upgrade-cutover/0002-legacy-stopped.json","generation":1,"requestedAtMs":$start_ms}}
 EOF
 chmod 0600 "$rehearsal_root/commands/target-start.json"
 phase 'start exact target container'
@@ -287,7 +303,7 @@ grep -q '"reconciliation":"rollback_candidate"' "$rehearsal_root/results/target-
 [ "$(sha256sum "$legacy_root/db/database.sqlite" | sed 's/ .*//')" = "$legacy_sha256" ] || fail 'legacy database changed during rehearsal'
 
 cat >"$rehearsal_root/cutover-summary.json" <<EOF
-{"schemaVersion":1,"schema":"qinglong/local-alpha-upgrade-cutover-summary@v1","status":"rollback_candidate","profile":"$profile","sourceRevision":"$SOURCE_REVISION","architecture":"$ARCHITECTURE","reviewedPlans":{"sqlite":"$sqlite_plan_digest","dataDirectory":"$directory_plan_digest"},"activationDigest":"$activation_digest","transformationDigest":"$transformation_digest","application":{"commitDigest":"$commit_digest","receiptDigest":"$receipt_digest"},"cutover":{"commitmentDigest":"$commitment_digest","bundleDigest":"$bundle_digest","legacyContainerId":"$legacy_id","targetContainerId":"$target_id"},"legacySource":"unchanged","target":"stopped","rollback":"candidate_not_executed"}
+{"schemaVersion":1,"schema":"qinglong/local-alpha-upgrade-cutover-summary@v2","status":"rollback_candidate","profile":"$profile","variant":"$VARIANT","targetEntrypoint":"$target_entrypoint","sourceRevision":"$SOURCE_REVISION","architecture":"$ARCHITECTURE","reviewedPlans":{"sqlite":"$sqlite_plan_digest","dataDirectory":"$directory_plan_digest"},"activationDigest":"$activation_digest","transformationDigest":"$transformation_digest","application":{"commitDigest":"$commit_digest","receiptDigest":"$receipt_digest"},"cutover":{"commitmentDigest":"$commitment_digest","bundleDigest":"$bundle_digest","legacyContainerId":"$legacy_id","targetContainerId":"$target_id"},"legacySource":"unchanged","target":"stopped","rollback":"candidate_not_executed"}
 EOF
 chmod 0600 "$rehearsal_root/cutover-summary.json"
 umask "$old_umask"

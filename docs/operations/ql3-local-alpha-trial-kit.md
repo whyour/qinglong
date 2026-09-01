@@ -137,7 +137,7 @@ staging manifest。summary 必须是 `status=verified`、`legacySource=read_only
 
 ## 隔离的真实切换链演练
 
-v8 headless bundle 进一步提供 `upgrade-cutover-rehearsal.sh`。它只面向 Linux Docker 测试主机，在新的 rehearsal root 和两个专用合成容器上消费上一阶段已审核的两个 plan digest：
+v8 `headless|console` bundle 都提供 `upgrade-cutover-rehearsal.sh`。它只面向 Linux Docker 测试主机，在新的 rehearsal root 和两个专用合成容器上消费上一阶段已审核的两个 plan digest：
 
 ```sh
 sh upgrade-cutover-rehearsal.sh \
@@ -150,11 +150,11 @@ sh upgrade-cutover-rehearsal.sh \
   ql3-alpha-upgrade-target
 ```
 
-脚本先重跑 canonical stage/verify，再完成 fresh Owner 建立、data-directory transform/apply、真实 Docker socket 上的合成 Legacy 停机和 3.0 target 启停。Operator 镜像仅增加固定版本 Docker CLI，仍不携带 daemon、Compose，也不常驻。Legacy root 在所有容器中均以只读方式挂载；脚本对演练前后的 `db/database.sqlite` 做 SHA-256 闭合校验。
+脚本先重跑 canonical stage/verify，再完成 fresh Owner 建立、data-directory transform/apply、真实 Docker socket 上的合成 Legacy 停机和 3.0 target 启停。headless target 使用 Application `--cutover-probe`；Console target 使用生产 `ql3-local-api` 入口的 `--cutover-probe`，同时绑定外层 Local API 与内层 Application 配置。后者只验证 loopback 配置并委托 Application 只读 readiness，不启动 listener、不读取 credential/pepper，也不激活 recovery、scheduler、execution 或管理面。Operator 镜像仅增加固定版本 Docker CLI，仍不携带 daemon、Compose，也不常驻。Legacy root 在所有容器中均以只读方式挂载；脚本对演练前后的 `db/database.sqlite` 做 SHA-256 闭合校验。
 
-成功时 `cutover-summary.json` 必须同时为 `status=rollback_candidate`、`legacySource=unchanged`、`target=stopped`。两个合成容器会保持停止状态供审查，随后按脚本输出显式 `docker rm`；失败时脚本自动清理。该结果证明打包产物能够走通控制器链和 Docker 证据闭环，但不会停止用户真实 2.x 容器、执行 Legacy restart/rollback 或授权生产升级。
+成功时 `cutover-summary.json` 使用 `qinglong/local-alpha-upgrade-cutover-summary@v2`，必须同时绑定当前 `variant`、`targetEntrypoint=local-application|local-api`、`status=rollback_candidate`、`legacySource=unchanged` 与 `target=stopped`。两个合成容器会保持停止状态供审查，随后按脚本输出显式 `docker rm`；失败时脚本自动清理。该结果证明打包产物能够走通 controller 与 Docker 证据闭环，但不会停止用户真实 2.x 容器、执行 Legacy restart/rollback 或授权生产升级。
 
-原生 amd64/arm64 headless artifact job 必须从将要上传的目录执行 exact `upgrade-cutover-rehearsal.sh`，检查 summary 和旧 SQLite 未变，并删除合成容器后才能上传；对应 gate 为 `verification-evidence.json.gates.legacyUpgradeCutover=passed`。Console artifact 继续实跑 canonical stage，但该 gate 固定为 `not_applicable`；在 adopted target 证据正式支持 Local API 入口前，不得把 Console fresh journey 冒充升级切换验证。
+原生 amd64/arm64 的 headless 与 Console artifact job 都必须从将要上传的目录执行 exact `upgrade-cutover-rehearsal.sh`，检查 summary 和旧 SQLite 未变，并删除合成容器后才能上传；对应 gate 均为 `verification-evidence.json.gates.legacyUpgradeCutover=passed`。Console 的 fresh HTTP/credential/Task journey 仍是独立门：它证明真实 listener 和产品面可用，而无 listener 的 cutover probe 只证明 adopted entry 与 clean rollback，两者不能互相冒充。
 
 ## 手工加载与最小 smoke
 

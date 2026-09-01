@@ -70,7 +70,6 @@ const VERIFICATION = Object.freeze({
 function verificationGates(variant) {
   return Object.freeze({
     ...VERIFICATION,
-    legacyUpgradeCutover: variant === 'headless' ? 'passed' : 'not_applicable',
     consoleLiveJourney: variant === 'console' ? 'passed' : 'not_applicable',
     firstAutomationJourney: variant === 'console' ? 'passed' : 'not_applicable',
   });

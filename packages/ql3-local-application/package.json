@@ -34,6 +34,11 @@
       "types": "./dist/production-process/processApplication.d.ts",
       "require": "./dist/production-process/processApplication.js",
       "default": "./dist/production-process/processApplication.js"
+    },
+    "./cutover-probe": {
+      "types": "./dist/production-process/cutoverProbeProcess.d.ts",
+      "require": "./dist/production-process/cutoverProbeProcess.js",
+      "default": "./dist/production-process/cutoverProbeProcess.js"
     }
   },
   "files": [

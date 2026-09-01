@@ -23,6 +23,11 @@ export type LocalDeploymentTargetRunOperation =
   | 'local.deployment.cutover.target-start'
   | 'local.deployment.cutover.target-restart';
 
+export interface LocalDeploymentTargetApiEntry {
+  readonly configPath: string;
+  readonly expectedTargetConfigPath: string;
+}
+
 export interface LocalDeploymentTargetRunCommand {
   readonly schemaVersion: 1;
   readonly operation: LocalDeploymentTargetRunOperation;
@@ -49,6 +54,7 @@ export interface LocalDeploymentTargetRunCommand {
     targetImage: Readonly<LocalDeploymentTargetImage>;
     applicationConfigPath: string;
     expectedTargetApplicationConfigPath: string;
+    readonly targetApi?: Readonly<LocalDeploymentTargetApiEntry>;
     expectedTargetCommitmentPath: string;
     generation: number;
     requestedAtMs: number;
@@ -183,31 +189,49 @@ export function normalizeLocalDeploymentTargetRunCommand(
     );
   }
   const request = object(command.request, 'request');
+  const requestKeys = [
+    'activationPath',
+    'applicationConfigPath',
+    'cutoverId',
+    'expectedActivationDigest',
+    'expectedLegacyCommitmentDigest',
+    'expectedLegacyContainerId',
+    'expectedLegacyDatabasePath',
+    'expectedTargetApplicationConfigPath',
+    'expectedTargetCommitmentPath',
+    'expectedTargetContainerId',
+    'generation',
+    'instanceId',
+    'legacySourcePath',
+    'manifestPath',
+    'profile',
+    'recoveryPath',
+    'requestedAtMs',
+    'targetDatabasePath',
+    'targetImage',
+  ];
   exact(
     request,
-    [
-      'activationPath',
-      'applicationConfigPath',
-      'cutoverId',
-      'expectedActivationDigest',
-      'expectedLegacyCommitmentDigest',
-      'expectedLegacyContainerId',
-      'expectedLegacyDatabasePath',
-      'expectedTargetApplicationConfigPath',
-      'expectedTargetCommitmentPath',
-      'expectedTargetContainerId',
-      'generation',
-      'instanceId',
-      'legacySourcePath',
-      'manifestPath',
-      'profile',
-      'recoveryPath',
-      'requestedAtMs',
-      'targetDatabasePath',
-      'targetImage',
-    ],
+    request.targetApi === undefined
+      ? requestKeys
+      : [...requestKeys, 'targetApi'],
     'request',
   );
+  const targetApi =
+    request.targetApi === undefined
+      ? undefined
+      : object(request.targetApi, 'targetApi');
+  if (targetApi !== undefined) {
+    exact(targetApi, ['configPath', 'expectedTargetConfigPath'], 'targetApi');
+    if (
+      targetApi.expectedTargetConfigPath ===
+      request.expectedTargetApplicationConfigPath
+    ) {
+      throw new LocalDeploymentConfigurationError(
+        'target API and Application configuration paths must be distinct',
+      );
+    }
+  }
   const generation = integer(request.generation, 'generation', 1);
   if (
     typeof request.cutoverId !== 'string' ||
@@ -242,7 +266,8 @@ export function normalizeLocalDeploymentTargetRunCommand(
       request.recoveryPath,
       request.manifestPath,
       request.applicationConfigPath,
-    ]).size !== 6
+      ...(targetApi === undefined ? [] : [targetApi.configPath]),
+    ]).size !== (targetApi === undefined ? 6 : 7)
   ) {
     throw new LocalDeploymentConfigurationError(
       'target run authority paths must be distinct',
@@ -301,6 +326,20 @@ export function normalizeLocalDeploymentTargetRunCommand(
         request.expectedTargetApplicationConfigPath,
         'expectedTargetApplicationConfigPath',
       ),
+      ...(targetApi === undefined
+        ? {}
+        : {
+            targetApi: Object.freeze({
+              configPath: safeAbsolutePath(
+                targetApi.configPath,
+                'targetApi.configPath',
+              ),
+              expectedTargetConfigPath: safeAbsolutePath(
+                targetApi.expectedTargetConfigPath,
+                'targetApi.expectedTargetConfigPath',
+              ),
+            }),
+          }),
       expectedTargetCommitmentPath: safeAbsolutePath(
         request.expectedTargetCommitmentPath,
         'expectedTargetCommitmentPath',

@@ -15,7 +15,7 @@
 
 当维护者显式选择 `alpha_artifact_scope=all` 时，还会生成 `Alpha stage index`。它把同一次 run 的 Local/Cluster milestone 交叉绑定，并为 Edge、Standalone、Cluster 给出目标架构的最小 artifact 选择；这是阶段交付导航，不是正式 release catalog。只生成 Local 或 Cluster 时，各自 milestone 仍可独立成立，不制造一个不完整的总索引。
 
-## 当前阶段实物（2026-08-31）
+## 当前阶段实物（2026-09-01）
 
 在下面保留的历史 exact-image 证据之外，2026-08-28 的源码阶段已把 headless 用户旅程与 opt-in Console 合并为一条可选择的交付链：
 
@@ -33,6 +33,7 @@
 | D-425 2.x 升级就绪盘点 | 同源 v6 Trial Kit 已交付 amd64/arm64 headless 阶段实物；canonical `upgrade-readiness.sh` 把 2.x root 只读挂载，在 128 MiB/无网络边界内由 exact Operator 生成 SQLite 与完整目录两个计划；artifact job 实跑、bundle auditor 与 milestone v3 均闭合 | 只完成 inspect，不授权 stage、activation、cutover 或 rollback；不是 Public Release |
 | D-426a Side-by-side 暂存 | 同源 v7 Trial Kit 已交付 amd64/arm64 headless 阶段实物；reviewed-plan `upgrade-rehearsal.sh` 在新的私有 root 中执行 SQLite stage/verify/activation 与完整目录 stage/verify，legacy root 始终只读，summary 固定 `cutover=not_authorized`；exact artifact job 实跑且 milestone v4 离线审计闭合 | 不执行 transform/apply、目标启动、cutover 或回退；仍不是 Public Release |
 | D-426b2b Exact headless 切换链 | 同源 v8 Trial Kit 已交付 amd64/arm64 headless 阶段实物；exact 上传包完成 readiness、reviewed stage、Owner 强认证 transform/apply、真实 legacy stop、只读 target probe start/stop 与 clean `rollback_candidate`，milestone v5 和三个离线 auditor 均闭合 | 仅授权 fresh/隔离数据演练；不停止用户真实 2.x、不执行 Legacy restart、写后 reconciliation 或生产 cutover；仍不是 Public Release |
+| D-426b2c Console adopted entry | Local API 增加无 listener/credential/mutation 的显式 cutover probe；controller 同时绑定外层 API 与内层 Application 配置、exact command/mount；Console 原生 CI 改为执行完整 cutover rehearsal 并要求 gate passed | 源码与门禁已实现，但 exact Console 双架构 archive/milestone 尚未由成功终态 artifact workflow 闭合；本机镜像源 EOF 不能替代该证据 |
 
 D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，而且没有改名复用 run `33173769047` 的旧 archive。修复提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 的普通主 CI [run 33229592307](https://github.com/whyour/qinglong/actions/runs/33229592307) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33229592293](https://github.com/whyour/qinglong/actions/runs/33229592293) 成功；随后显式 Local Console milestone [run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006) 为 42 success/2 scope skip/0 fail。由此 Web 创建能力已进入新的阶段实物，而不再只是候选源码。
 

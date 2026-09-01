@@ -31,6 +31,16 @@ export interface TargetApplicationBinding {
   readonly targetManifestPath: string;
   readonly legacyDataApplicationCommitDigest: string | null;
   readonly legacyDataApplicationReceiptDigest: string | null;
+  readonly localApi?: Readonly<{
+    configDigest: string;
+    targetConfigPath: string;
+    targetDeploymentRoot: string;
+    targetOwnerPepperKeyringDirectory: string;
+    listener: Readonly<{
+      host: '127.0.0.1' | '::1';
+      port: number;
+    }>;
+  }>;
 }
 
 export interface TargetContainerEvidence {
@@ -68,6 +78,71 @@ export function cutoverDigest(value: unknown): string {
 
 function textDigest(value: string): string {
   return crypto.createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function normalizedAbsolutePath(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    path.isAbsolute(value) &&
+    path.normalize(value) === value &&
+    path.parse(value).root !== value
+  );
+}
+
+function readTargetLocalApiBinding(
+  command: Readonly<LocalDeploymentTargetRunCommand>,
+): TargetApplicationBinding['localApi'] {
+  const targetApi = command.request.targetApi;
+  if (targetApi === undefined) return undefined;
+  const config = object(
+    readPrivateLocalCommandFile(targetApi.configPath),
+    'target Local API configuration',
+  );
+  exact(
+    config,
+    [
+      'applicationConfigFilePath',
+      'deploymentRoot',
+      'listener',
+      'ownerPepperKeyringDirectory',
+      'schema',
+    ],
+    'target Local API configuration',
+  );
+  const listener = object(config.listener, 'target Local API listener');
+  exact(listener, ['host', 'port'], 'target Local API listener');
+  const ownerPepperRelative =
+    normalizedAbsolutePath(config.deploymentRoot) &&
+    normalizedAbsolutePath(config.ownerPepperKeyringDirectory)
+      ? path.relative(config.deploymentRoot, config.ownerPepperKeyringDirectory)
+      : null;
+  if (
+    config.schema !== 'qinglong/local-api-process@v1' ||
+    !normalizedAbsolutePath(config.deploymentRoot) ||
+    config.applicationConfigFilePath !==
+      command.request.expectedTargetApplicationConfigPath ||
+    !normalizedAbsolutePath(config.ownerPepperKeyringDirectory) ||
+    ownerPepperRelative === null ||
+    ownerPepperRelative.length === 0 ||
+    ownerPepperRelative.startsWith('..') ||
+    path.isAbsolute(ownerPepperRelative) ||
+    (listener.host !== '127.0.0.1' && listener.host !== '::1') ||
+    !Number.isSafeInteger(listener.port) ||
+    (listener.port as number) < 1_024 ||
+    (listener.port as number) > 65_535
+  ) {
+    configurationError('target Local API configuration binding is invalid');
+  }
+  return Object.freeze({
+    configDigest: cutoverDigest(config),
+    targetConfigPath: targetApi.expectedTargetConfigPath,
+    targetDeploymentRoot: config.deploymentRoot,
+    targetOwnerPepperKeyringDirectory: config.ownerPepperKeyringDirectory,
+    listener: Object.freeze({
+      host: listener.host as '127.0.0.1' | '::1',
+      port: listener.port as number,
+    }),
+  });
 }
 
 function object(value: unknown, label: string): Record<string, unknown> {
@@ -265,6 +340,7 @@ export function readTargetApplicationBinding(
         'target legacy data application configuration',
       )
     : undefined;
+  const localApi = readTargetLocalApiBinding(command);
   if (legacyDataApplication !== undefined) {
     exact(
       legacyDataApplication,
@@ -326,6 +402,7 @@ export function readTargetApplicationBinding(
       legacyDataApplication === undefined
         ? null
         : (legacyDataApplication.expectedReceiptDigest as string),
+    ...(localApi === undefined ? {} : { localApi }),
   });
 }
 
@@ -371,12 +448,11 @@ function mappedMount(
       path.join(mount.destination, relative) === targetPath
     );
   });
-  if (
-    matches.length !== 1 ||
-    matches[0]?.readWrite !== expectedReadWrite
-  ) {
+  if (matches.length !== 1 || matches[0]?.readWrite !== expectedReadWrite) {
     configurationError(
-      `${label} must have one ${expectedReadWrite ? 'read-write' : 'read-only'} bind mapping`,
+      `${label} must have one ${
+        expectedReadWrite ? 'read-write' : 'read-only'
+      } bind mapping`,
     );
   }
   return matches[0]!;
@@ -540,6 +616,9 @@ export function parseTargetContainerEvidence(
     'target container restart policy',
   );
   const config = object(container.Config, 'target container config');
+  const expectedEntryConfigPath =
+    application.localApi?.targetConfigPath ??
+    command.request.expectedTargetApplicationConfigPath;
   const stopped =
     state.Running === false &&
     state.Restarting === false &&
@@ -569,7 +648,7 @@ export function parseTargetContainerEvidence(
       JSON.stringify([
         '--cutover-probe',
         '--config',
-        command.request.expectedTargetApplicationConfigPath,
+        expectedEntryConfigPath,
       ]) ||
     typeof container.Created !== 'string' ||
     typeof container.Name !== 'string' ||
@@ -593,6 +672,28 @@ export function parseTargetContainerEvidence(
     command.request.expectedTargetApplicationConfigPath,
     'target application configuration',
   );
+  const localApiBinding =
+    application.localApi === undefined ||
+    command.request.targetApi === undefined
+      ? undefined
+      : Object.freeze({
+          configDigest: application.localApi.configDigest,
+          configMount: mappedMount(
+            mounts,
+            command.request.targetApi.configPath,
+            command.request.targetApi.expectedTargetConfigPath,
+            'target Local API configuration',
+          ),
+          deploymentMount: mappedMount(
+            mounts,
+            command.options.deploymentRoot,
+            application.localApi.targetDeploymentRoot,
+            'target Local API deployment root',
+          ),
+          listener: application.localApi.listener,
+          targetOwnerPepperKeyringDirectory:
+            application.localApi.targetOwnerPepperKeyringDirectory,
+        });
   const activationMount = mappedMount(
     mounts,
     command.request.activationPath,
@@ -642,6 +743,7 @@ export function parseTargetContainerEvidence(
       databaseMount,
       recoveryMount,
       manifestMount,
+      ...(localApiBinding === undefined ? {} : { localApi: localApiBinding }),
     }),
   });
 }

@@ -13,6 +13,6 @@ test('publishes bounded help without bootstrapping storage or a listener', () =>
   assert.equal(result.stderr, '');
   assert.equal(
     result.stdout,
-    'Usage: ql3-local-api --config /absolute/private-config.json\n',
+    'Usage: ql3-local-api [--cutover-probe] --config /absolute/private-config.json\n',
   );
 });

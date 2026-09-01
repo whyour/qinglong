@@ -787,31 +787,25 @@ jobs:
           LEGACY_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-upgrade-legacy-${{ matrix.image_arch }}"
           TARGET_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-upgrade-target-${{ matrix.image_arch }}"
           trap 'docker rm --force "${QUICKSTART_CONTAINER}" "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}" >/dev/null 2>&1 || true' EXIT
-          if [[ "${TRIAL_VARIANT}" == 'headless' ]]; then
-            sh "${BUNDLE_ROOT}/upgrade-cutover-rehearsal.sh" \
-              edge "${LEGACY_READINESS_ROOT}" "${UPGRADE_REHEARSAL_ROOT}" \
-              "${SQLITE_PLAN_DIGEST}" "${DIRECTORY_PLAN_DIGEST}" \
-              "${LEGACY_CONTAINER}" "${TARGET_CONTAINER}"
-          else
-            sh "${BUNDLE_ROOT}/upgrade-rehearsal.sh" \
-              edge "${LEGACY_READINESS_ROOT}" "${UPGRADE_REHEARSAL_ROOT}" \
-              "${SQLITE_PLAN_DIGEST}" "${DIRECTORY_PLAN_DIGEST}"
-          fi
+          sh "${BUNDLE_ROOT}/upgrade-cutover-rehearsal.sh" \
+            edge "${LEGACY_READINESS_ROOT}" "${UPGRADE_REHEARSAL_ROOT}" \
+            "${SQLITE_PLAN_DIGEST}" "${DIRECTORY_PLAN_DIGEST}" \
+            "${LEGACY_CONTAINER}" "${TARGET_CONTAINER}"
           grep -q '"status":"verified"' \
             "${UPGRADE_REHEARSAL_ROOT}/stage-summary.json"
           grep -q '"legacySource":"read_only"' \
             "${UPGRADE_REHEARSAL_ROOT}/stage-summary.json"
           grep -q '"cutover":"not_authorized"' \
             "${UPGRADE_REHEARSAL_ROOT}/stage-summary.json"
-          if [[ "${TRIAL_VARIANT}" == 'headless' ]]; then
-            grep -q '"status":"rollback_candidate"' \
-              "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
-            grep -q '"legacySource":"unchanged"' \
-              "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
-            grep -q '"target":"stopped"' \
-              "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
-            docker rm "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}"
-          fi
+          grep -q '"status":"rollback_candidate"' \
+            "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
+          grep -q '"variant":"'"${TRIAL_VARIANT}"'"' \
+            "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
+          grep -q '"legacySource":"unchanged"' \
+            "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
+          grep -q '"target":"stopped"' \
+            "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
+          docker rm "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}"
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-wal"
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-journal"
           trap - EXIT

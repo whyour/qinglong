@@ -5,9 +5,15 @@ import type {
   LocalApplicationProcessSignalSource,
 } from '@qinglong/local-application/process';
 
+import {
+  localApiCliFailureFact,
+  parseLocalApiCliCommand,
+} from './production-process/cliCommand';
+import { runProductionLocalApiCutoverProbe } from './production-process/cutoverProbeProcess';
 import { runProductionLocalApiProcess } from './production-process/processApplication';
 
-const USAGE = 'Usage: ql3-local-api --config /absolute/private-config.json';
+const USAGE =
+  'Usage: ql3-local-api [--cutover-probe] --config /absolute/private-config.json';
 
 const nodeSignals: LocalApplicationProcessSignalSource = Object.freeze({
   subscribe(
@@ -26,36 +32,13 @@ const nodeSignals: LocalApplicationProcessSignalSource = Object.freeze({
   },
 });
 
-function configFileArgument(argv: readonly string[]): string | null {
-  return argv.length === 2 && argv[0] === '--config' && argv[1]
-    ? argv[1]
-    : null;
-}
-
-function failureFact(error: unknown): Readonly<Record<string, unknown>> {
-  const candidate = error as { readonly name?: unknown; readonly code?: unknown };
-  return Object.freeze({
-    schemaVersion: 1,
-    component: 'qinglong3-local-api',
-    level: 'error',
-    event: 'process_failed',
-    name:
-      typeof candidate?.name === 'string' && candidate.name.length <= 128
-        ? candidate.name
-        : 'Error',
-    ...(typeof candidate?.code === 'string' && candidate.code.length <= 128
-      ? { code: candidate.code }
-      : {}),
-  });
-}
-
 async function main(argv: readonly string[]): Promise<void> {
   if (argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h')) {
     process.stdout.write(`${USAGE}\n`);
     return;
   }
-  const configFilePath = configFileArgument(argv);
-  if (!configFilePath) {
+  const command = parseLocalApiCliCommand(argv);
+  if (command === null) {
     process.stderr.write(
       `${JSON.stringify({
         code: 'QL3_LOCAL_API_CLI_USAGE_INVALID',
@@ -66,16 +49,20 @@ async function main(argv: readonly string[]): Promise<void> {
     return;
   }
   try {
-    const stopResult = await runProductionLocalApiProcess({
-      configFilePath,
+    const options = {
+      configFilePath: command.configFilePath,
       signals: nodeSignals,
-      emit(event) {
+      emit(event: Readonly<Record<string, unknown>>) {
         process.stdout.write(`${JSON.stringify(event)}\n`);
       },
-    });
+    };
+    const stopResult =
+      command.mode === 'cutover_probe'
+        ? await runProductionLocalApiCutoverProbe(options)
+        : await runProductionLocalApiProcess(options);
     if (stopResult !== 'stopped') process.exitCode = 1;
   } catch (error) {
-    process.stderr.write(`${JSON.stringify(failureFact(error))}\n`);
+    process.stderr.write(`${JSON.stringify(localApiCliFailureFact(error))}\n`);
     process.exitCode = 1;
   }
 }

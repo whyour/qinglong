@@ -109,7 +109,7 @@ function targetInspection(state, options = {}) {
             ? []
             : ['--cutover-probe']),
           '--config',
-          state.targetApplicationConfigPath,
+          state.targetApiConfigPath ?? state.targetApplicationConfigPath,
         ],
       },
       HostConfig: {
@@ -157,7 +157,12 @@ function fixture(t) {
   const serviceRoot = path.join(deploymentRoot, 'service');
   const cutoverId = 'cutover-edge-1';
   const journal = path.join(serviceRoot, 'cutovers', cutoverId);
-  for (const directory of [deploymentRoot, serviceRoot, path.dirname(journal), journal]) {
+  for (const directory of [
+    deploymentRoot,
+    serviceRoot,
+    path.dirname(journal),
+    journal,
+  ]) {
     fs.mkdirSync(directory, { mode: 0o700 });
   }
   const legacySourcePath = path.join(managementRoot, 'database.sqlite');
@@ -261,7 +266,10 @@ function fixture(t) {
   );
   state.legacyCommitmentDigest = legacy.commitmentDigest;
   state.legacyCommitmentPath = path.join(journal, '0002-legacy-stopped.json');
-  state.applicationConfigPath = path.join(deploymentRoot, 'local-application.json');
+  state.applicationConfigPath = path.join(
+    deploymentRoot,
+    'local-application.json',
+  );
   state.targetApplicationConfigPath = targetPath(
     state,
     state.applicationConfigPath,
@@ -359,6 +367,29 @@ function prepareAdoptedV4Baseline(state) {
   return baseline;
 }
 
+function prepareLocalApiTarget(state) {
+  state.apiConfigPath = path.join(state.deploymentRoot, 'local-api.json');
+  state.targetApiConfigPath = targetPath(state, state.apiConfigPath);
+  state.targetApi = {
+    configPath: state.apiConfigPath,
+    expectedTargetConfigPath: state.targetApiConfigPath,
+  };
+  fs.writeFileSync(
+    state.apiConfigPath,
+    `${JSON.stringify({
+      schema: 'qinglong/local-api-process@v1',
+      deploymentRoot: targetPath(state, state.deploymentRoot),
+      applicationConfigFilePath: state.targetApplicationConfigPath,
+      ownerPepperKeyringDirectory: targetPath(
+        state,
+        path.join(state.deploymentRoot, 'owner-peppers'),
+      ),
+      listener: { host: '127.0.0.1', port: 5700 },
+    })}\n`,
+    { mode: 0o600 },
+  );
+}
+
 function command(state, generation = 1) {
   return {
     schemaVersion: 1,
@@ -392,8 +423,8 @@ function command(state, generation = 1) {
         imageId: state.targetImageId,
       },
       applicationConfigPath: state.applicationConfigPath,
-      expectedTargetApplicationConfigPath:
-        state.targetApplicationConfigPath,
+      expectedTargetApplicationConfigPath: state.targetApplicationConfigPath,
+      ...(state.targetApi === undefined ? {} : { targetApi: state.targetApi }),
       expectedTargetCommitmentPath: state.targetCommitmentPath,
       generation,
       requestedAtMs: 2_000 + generation,
@@ -500,7 +531,8 @@ function harness(state, options = {}) {
       if (args[0] === 'container' && args[1] === 'start') {
         if (args[2] === state.legacyContainerId) {
           if (options.leaveLegacyStopped !== true) state.legacyRunning = true;
-          if (options.startTargetWithLegacy === true) state.targetRunning = true;
+          if (options.startTargetWithLegacy === true)
+            state.targetRunning = true;
           if (options.loseLegacyStartResponse === true) {
             throw new Error('simulated lost legacy start response');
           }
@@ -561,7 +593,10 @@ function harness(state, options = {}) {
 test('starts an exact target once and replays the active commitment without Docker', async (t) => {
   const state = fixture(t);
   const controller = harness(state);
-  const active = await runLocalDeploymentDockerTarget(command(state), controller);
+  const active = await runLocalDeploymentDockerTarget(
+    command(state),
+    controller,
+  );
   assert.equal(active.status, 'prepared');
   assert.equal(active.state, 'target_active');
   assert.equal(active.generation, 1);
@@ -650,6 +685,66 @@ test('starts an offline Trial Kit image only when its local reference and conten
   assert.equal(active.state, 'target_active');
 });
 
+test('starts an exact Local API cutover probe with both entry and Application configs bound', async (t) => {
+  const state = fixture(t);
+  prepareLocalApiTarget(state);
+  state.targetImageAuthority = 'local-image-id';
+  state.targetImage = 'qinglong3-local-console:ci-amd64';
+  const active = await runLocalDeploymentDockerTarget(
+    command(state),
+    harness(state),
+  );
+  assert.equal(active.state, 'target_active');
+  const request = JSON.parse(
+    fs.readFileSync(
+      path.join(state.journal, '0003-target-start-decision.json'),
+      'utf8',
+    ),
+  );
+  assert.match(
+    request.evidence.targetApplicationBindingDigest,
+    /^[0-9a-f]{64}$/,
+  );
+});
+
+test('fails closed before starting when a Local API entry points at another Application config', async (t) => {
+  const state = fixture(t);
+  prepareLocalApiTarget(state);
+  const config = JSON.parse(fs.readFileSync(state.apiConfigPath, 'utf8'));
+  config.applicationConfigFilePath = '/host/runtime/other-application.json';
+  fs.writeFileSync(state.apiConfigPath, `${JSON.stringify(config)}\n`, {
+    mode: 0o600,
+  });
+  await assert.rejects(
+    runLocalDeploymentDockerTarget(command(state), harness(state)),
+    /Local API configuration binding is invalid/,
+  );
+});
+
+test('rejects a Local API entry that aliases the Application target config path', async (t) => {
+  const state = fixture(t);
+  prepareLocalApiTarget(state);
+  state.targetApi.expectedTargetConfigPath = state.targetApplicationConfigPath;
+  await assert.rejects(
+    runLocalDeploymentDockerTarget(command(state), harness(state)),
+    /API and Application configuration paths must be distinct/,
+  );
+});
+
+test('rejects a Local API owner pepper directory equal to its deployment root', async (t) => {
+  const state = fixture(t);
+  prepareLocalApiTarget(state);
+  const config = JSON.parse(fs.readFileSync(state.apiConfigPath, 'utf8'));
+  config.ownerPepperKeyringDirectory = config.deploymentRoot;
+  fs.writeFileSync(state.apiConfigPath, `${JSON.stringify(config)}\n`, {
+    mode: 0o600,
+  });
+  await assert.rejects(
+    runLocalDeploymentDockerTarget(command(state), harness(state)),
+    /Local API configuration binding is invalid/,
+  );
+});
+
 test('makes an offline Trial Kit target manual-required when its inspected content ID drifted', async (t) => {
   const state = fixture(t);
   state.targetImageAuthority = 'local-image-id';
@@ -691,19 +786,14 @@ test('recovers a crash after the start barrier by inspection without repeating s
     /simulated supervisor crash/,
   );
   assert.equal(
-    fs.existsSync(
-      path.join(state.journal, '0003-target-start-decision.json'),
-    ),
+    fs.existsSync(path.join(state.journal, '0003-target-start-decision.json')),
     true,
   );
   assert.equal(
     fs.existsSync(path.join(state.journal, '0004-target-start-outcome.json')),
     false,
   );
-  assert.equal(
-    crashing.calls.filter((args) => args[1] === 'start').length,
-    1,
-  );
+  assert.equal(crashing.calls.filter((args) => args[1] === 'start').length, 1);
 
   state.targetRunning = true;
   startupReceipt(state, ++state.nextProcessId);
@@ -844,10 +934,7 @@ test('refuses target start when the writable target database mount is not bound'
   const detached = command(state);
   detached.request.targetDatabasePath = '/var/db/detached-qinglong3.sqlite';
   const controller = harness(state);
-  const unresolved = await runLocalDeploymentDockerTarget(
-    detached,
-    controller,
-  );
+  const unresolved = await runLocalDeploymentDockerTarget(detached, controller);
   assert.equal(unresolved.state, 'manual_required');
   assert.equal(
     controller.calls.filter((args) => args[1] === 'start').length,
@@ -904,12 +991,7 @@ test('prevents a new cutover id from bypassing a manual-required instance head',
   assert.equal(dockerCalls, 0);
   assert.equal(
     fs.existsSync(
-      path.join(
-        state.deploymentRoot,
-        'service',
-        'cutovers',
-        'cutover-edge-2',
-      ),
+      path.join(state.deploymentRoot, 'service', 'cutovers', 'cutover-edge-2'),
     ),
     false,
   );
@@ -932,10 +1014,7 @@ test('diagnoses and resolves manual-required through inspect-only prepare and CA
   assert.ok(controller.calls.every((args) => args[1] === 'inspect'));
 
   const prepared = runLocalDeploymentCutoverManualCommand(
-    manualCommand(
-      state,
-      'local.deployment.cutover.manual-resolution-prepare',
-    ),
+    manualCommand(state, 'local.deployment.cutover.manual-resolution-prepare'),
     harness(state, { leaveStopped: true }),
   );
   assert.equal(prepared.state, 'resolution_prepared');
@@ -968,17 +1047,14 @@ test('diagnoses and resolves manual-required through inspect-only prepare and CA
   assert.equal(head.state, 'resolution_authorized');
   assert.equal(head.previousHeadDigest, diagnosed.instanceHeadDigest);
 
-  const replay = runLocalDeploymentCutoverManualCommand(
-    commitCommand,
-    {
-      validateSocket() {
-        throw new Error('commit replay must not reopen Docker authority');
-      },
-      runDocker() {
-        throw new Error('commit replay must not inspect or mutate');
-      },
+  const replay = runLocalDeploymentCutoverManualCommand(commitCommand, {
+    validateSocket() {
+      throw new Error('commit replay must not reopen Docker authority');
     },
-  );
+    runDocker() {
+      throw new Error('commit replay must not inspect or mutate');
+    },
+  });
   assert.equal(replay.status, 'existing');
   assert.equal(replay.instanceHeadDigest, committed.instanceHeadDigest);
 
@@ -1041,10 +1117,7 @@ test('rejects manual resolution commit when stopped evidence drifts', async (t) 
     harness(state, { leaveStopped: true, expireImmediately: true }),
   );
   const prepared = runLocalDeploymentCutoverManualCommand(
-    manualCommand(
-      state,
-      'local.deployment.cutover.manual-resolution-prepare',
-    ),
+    manualCommand(state, 'local.deployment.cutover.manual-resolution-prepare'),
     harness(state, { leaveStopped: true }),
   );
   state.targetRunning = true;
@@ -1085,10 +1158,7 @@ test('stops an active target and proves an unchanged rollback candidate', async 
   );
   assert.equal(stopped.state, 'target_stopped');
   assert.equal(stopped.reconciliation, 'rollback_candidate');
-  assert.equal(
-    controller.calls.filter((args) => args[1] === 'stop').length,
-    1,
-  );
+  assert.equal(controller.calls.filter((args) => args[1] === 'stop').length, 1);
   const request = JSON.parse(
     fs.readFileSync(
       path.join(state.journal, '0005-target-stop-decision.json'),
@@ -1214,10 +1284,7 @@ test('prepares and commits an exact legacy rollback without mutating target data
   );
   assert.equal(prepared.state, 'rollback_prepared');
   assert.match(prepared.preparationDigest, /^[0-9a-f]{64}$/);
-  assert.equal(
-    preparing.calls.filter((args) => args[1] === 'start').length,
-    0,
-  );
+  assert.equal(preparing.calls.filter((args) => args[1] === 'start').length, 0);
   const targetBefore = fs.readFileSync(state.targetDatabasePath);
   const commitCommand = rollbackCommand(
     state,
@@ -1226,15 +1293,11 @@ test('prepares and commits an exact legacy rollback without mutating target data
     prepared.preparationDigest,
   );
   const committing = harness(state);
-  const committed = runLocalDeploymentLegacyRollback(
-    commitCommand,
-    committing,
-  );
+  const committed = runLocalDeploymentLegacyRollback(commitCommand, committing);
   assert.equal(committed.state, 'legacy_running');
   assert.equal(
     committing.calls.filter(
-      (args) =>
-        args[1] === 'start' && args[2] === state.legacyContainerId,
+      (args) => args[1] === 'start' && args[2] === state.legacyContainerId,
     ).length,
     1,
   );
@@ -1369,10 +1432,7 @@ test('does not blindly start legacy after a crash at the rollback barrier', asyn
     /simulated rollback supervisor crash/,
   );
   const recovering = harness(state);
-  const result = runLocalDeploymentLegacyRollback(
-    commitCommand,
-    recovering,
-  );
+  const result = runLocalDeploymentLegacyRollback(commitCommand, recovering);
   assert.equal(result.state, 'manual_required');
   assert.equal(
     recovering.calls.filter((args) => args[1] === 'start').length,
@@ -1410,8 +1470,7 @@ test('rechecks target stopped after the rollback barrier before starting legacy'
   assert.equal(result.state, 'manual_required');
   assert.equal(
     controller.calls.some(
-      (args) =>
-        args[1] === 'start' && args[2] === state.legacyContainerId,
+      (args) => args[1] === 'start' && args[2] === state.legacyContainerId,
     ),
     false,
   );
@@ -1447,10 +1506,7 @@ test('recovers a crash after legacy start by inspection without starting twice',
     /simulated crash after legacy start/,
   );
   const recovering = harness(state);
-  const result = runLocalDeploymentLegacyRollback(
-    commitCommand,
-    recovering,
-  );
+  const result = runLocalDeploymentLegacyRollback(commitCommand, recovering);
   assert.equal(result.state, 'legacy_running');
   assert.equal(
     recovering.calls.filter((args) => args[1] === 'start').length,

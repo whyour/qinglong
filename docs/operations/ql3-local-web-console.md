@@ -13,6 +13,8 @@ Local Web Console 是 `@qinglong/local-api` 的 opt-in 操作界面，用来创�
 
 D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一步安装可直接使用的 Owner credential presentation，并创建默认不自动运行的 `alpha-first-automation`。D-420 又把该 Run 的 latest Attempt 首个 32 KiB 日志带到 Console。D-421/D-422 依次增加 request-scoped strong-auth Task 创建与双 proof 无损编辑，D-423 继续开放既有 immutable Trigger/cron authority。D-424 再增加 Secret current metadata、强认证 create/rotate 与 Task pinned binding；绑定提交 `f46fb44ac9534315b6965865bb3e990715bb2417` 的最新双架构实物已由 [milestone run 33252179178](https://github.com/whyour/qinglong/actions/runs/33252179178) 生成并完成 milestone checksum/auditor 复核，没有借用或改名 D-423 archive。
 
+D-426b2c 又补齐了 Console 镜像的 adopted-target 入口证据：切换演练使用 `ql3-local-api --cutover-probe --config <local-api.json>`，同时绑定外层 API 配置、内层 Application 配置与 exact mounts，但该模式不会启动本页使用的 listener、credential、scheduler 或 mutation surface。正常启动仍使用下文不带 `--cutover-probe` 的命令；源码和 CI 门禁已实现，exact Console 双架构阶段实物仍待成功 artifact workflow 闭合。
+
 ## 前置条件
 
 - 已完成 Local fresh setup，并有受支持的 Application config；
@@ -79,4 +81,4 @@ D-424 阶段实物的可操作闭环是内建 argv command Task create/list/read
 
 D-424 的三项静态资产总计 102,182 bytes，不依赖 CDN、网络字体或前端框架，仍低于 192 KiB 总闭包和单文件 96 KiB 门。`edge-application-api|standalone-application-api` 为 4,210,024 / 4,210,168 bytes、482 files、12 packages、111 loaded modules，仍低于 6 MiB/640-file 门；本机 RSS delta 为 20,447,232 / 18,399,232 bytes，低于 28 MiB。默认 headless Edge 为 2,760,847 bytes、332 files、3 packages、59 modules，RSS delta 11,026,432 bytes；它不携带 Console/API 资产、listener 或 Secret mutation surface，只增加复用现有 SQLite connection 的有界 metadata 装配。
 
-停止 Local API 进程走与 Application 相同的 drain/shutdown 路径。Console 没有独立数据库、后台任务或需要额外清理的持久状态。
+停止正常 Local API 进程走与 Application 相同的 drain/shutdown 路径。Console 没有独立数据库、后台任务或需要额外清理的持久状态；一次性 cutover probe 不绑定端口，也不会进入这条常驻生命周期。
