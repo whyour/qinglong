@@ -86,7 +86,9 @@ function legacyDomain(name: string): LocalReconciliationPlanDomain {
   if (['Dependences', 'Dependencies', 'Apps'].includes(name)) {
     return 'plugin_package';
   }
-  if (['CrontabStats', 'Logs'].includes(name)) return 'run_history';
+  if (['CrontabStats', 'Logs', 'RunningInstances'].includes(name)) {
+    return 'run_history';
+  }
   return 'unknown';
 }
 
