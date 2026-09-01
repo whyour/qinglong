@@ -766,7 +766,7 @@ async function authorization(
       databasePath: command.options.targetDatabasePath,
       ownerPepperKeyringDirectory: command.options.ownerPepperKeyringDirectory,
       credentialFilePath: command.options.credentialFilePath,
-      authenticationNamespace: 'local_reconciliation_secret_config',
+      authenticationNamespace: 'reconcile_secret_config_decision',
       now: () => command.request.committedAtMs,
     });
     const reviewer = strongReviewer(

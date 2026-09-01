@@ -1887,9 +1887,13 @@ function secretConfigDecisionCommitFixture(
     },
     async authenticate(_database, authenticateOptions) {
       authentications += 1;
+      assert.match(
+        authenticateOptions.authenticationNamespace,
+        /^[a-z][a-z0-9_]{0,31}$/,
+      );
       assert.equal(
         authenticateOptions.authenticationNamespace,
-        'local_reconciliation_secret_config',
+        'reconcile_secret_config_decision',
       );
       return {
         principal: {
@@ -1897,7 +1901,7 @@ function secretConfigDecisionCommitFixture(
             type: 'user',
             id: options.reviewerId ?? 'review-owner',
           },
-          authenticationId: 'local_reconciliation_secret_config:test',
+          authenticationId: 'reconcile_secret_config_decision:test',
           authenticatedAtMs: committedAtMs,
           expiresAtMs: committedAtMs + authorizationLifetimeMs + 60_000,
           assurance: options.assurance ?? 'local_console',
@@ -2107,11 +2111,19 @@ async function appliedSecretConfigFixture(t, options = {}) {
       return { async close() {} };
     },
     async authenticate(_database, authenticationOptions) {
+      assert.match(
+        authenticationOptions.authenticationNamespace,
+        /^[a-z][a-z0-9_]{0,31}$/,
+      );
+      assert.equal(
+        authenticationOptions.authenticationNamespace,
+        'reconcile_secret_config_apply',
+      );
       const authenticatedAtMs = authenticationOptions.now();
       return {
         principal: {
           subject: { type: 'user', id: 'review-owner' },
-          authenticationId: 'local_reconciliation_secret_config_apply:test',
+          authenticationId: 'reconcile_secret_config_apply:test',
           authenticatedAtMs,
           expiresAtMs: authenticatedAtMs + 60 * 60 * 1_000,
           assurance: 'local_console',
@@ -4503,15 +4515,19 @@ test('Secret/Config apply publishes encrypted material atomically and recovers e
     },
     async authenticate(_database, options) {
       authentications += 1;
+      assert.match(
+        options.authenticationNamespace,
+        /^[a-z][a-z0-9_]{0,31}$/,
+      );
       assert.equal(
         options.authenticationNamespace,
-        'local_reconciliation_secret_config_apply',
+        'reconcile_secret_config_apply',
       );
       const authenticatedAtMs = options.now();
       return {
         principal: {
           subject: { type: 'user', id: 'review-owner' },
-          authenticationId: 'local_reconciliation_secret_config_apply:test',
+          authenticationId: 'reconcile_secret_config_apply:test',
           authenticatedAtMs,
           expiresAtMs: authenticatedAtMs + 60 * 60 * 1_000,
           assurance: 'local_console',
