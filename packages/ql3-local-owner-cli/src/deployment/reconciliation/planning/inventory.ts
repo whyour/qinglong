@@ -93,6 +93,8 @@ function legacyDomain(name: string): LocalReconciliationPlanDomain {
 }
 
 function targetDomain(name: string): LocalReconciliationPlanDomain {
+  const retainedLegacyDomain = legacyDomain(name);
+  if (retainedLegacyDomain !== 'unknown') return retainedLegacyDomain;
   if (name === 'QingLong3SchemaCapabilities' || name.includes('Migration')) {
     return 'schema_lineage';
   }
