@@ -348,7 +348,8 @@ function auditLocalApiExecutable(artifactDirectory) {
     artifactDirectory,
   );
   if (
-    output !== 'Usage: ql3-local-api --config /absolute/private-config.json'
+    output !==
+    'Usage: ql3-local-api [--cutover-probe] --config /absolute/private-config.json'
   ) {
     fail('local API executable help output is invalid');
   }
