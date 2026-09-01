@@ -2370,6 +2370,42 @@ test('confines reconciliation Secret and Config inspection to its exact row plan
   );
 });
 
+test('confines reconciliation Secret and Config live target snapshot authority to its coordinator', (t) => {
+  const root = fs.mkdtempSync(
+    path.join(
+      os.tmpdir(),
+      'ql3-reconciliation-secret-config-snapshot-boundary-',
+    ),
+  );
+  const secretConfigDirectory = path.join(
+    root,
+    'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config',
+  );
+  fs.mkdirSync(secretConfigDirectory, { recursive: true });
+  fs.writeFileSync(
+    path.join(secretConfigDirectory, 'coordinator.ts'),
+    "import { inspect } from '@qinglong/local-sqlite/rollout-safety';",
+  );
+  fs.writeFileSync(
+    path.join(secretConfigDirectory, 'neighbor.ts'),
+    "import { inspect } from '@qinglong/local-sqlite/rollout-safety';",
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const findings = [];
+  auditSourceImports(root, 'packages/ql3-local-owner-cli', findings);
+  assert.deepEqual(
+    findings.map(({ code, file, specifier }) => ({ code, file, specifier })),
+    [
+      {
+        code: 'FORBIDDEN_LOCAL_ADOPTION_CLI_AUTHORITY_IMPORT',
+        file: 'packages/ql3-local-owner-cli/src/deployment/reconciliation/application/secret-and-config/neighbor.ts',
+        specifier: '@qinglong/local-sqlite/rollout-safety',
+      },
+    ],
+  );
+});
+
 test('confines reconciliation Secret and Config decision authority to exact owners', (t) => {
   const root = fs.mkdtempSync(
     path.join(

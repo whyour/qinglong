@@ -2050,6 +2050,11 @@ function auditSourceImports(root, packagePath, findings) {
         ) &&
         !(
           path.relative(packageDirectory, filePath) ===
+            'src/deployment/reconciliation/application/secret-and-config/coordinator.ts' &&
+          specifier === '@qinglong/local-sqlite/rollout-safety'
+        ) &&
+        !(
+          path.relative(packageDirectory, filePath) ===
             'src/deployment/reconciliation/application/secret-and-config/application/coordinator.ts' &&
           [
             '@qinglong/local-admin/reconciliation-secret-and-config-application',
