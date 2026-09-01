@@ -784,9 +784,13 @@ jobs:
           DIRECTORY_PLAN_DIGEST="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).evidence.planDigest)' \
             "${UPGRADE_EVIDENCE_ROOT}/results/data-directory-inspect.result.json")"
           UPGRADE_REHEARSAL_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-cutover-rehearsal-${{ matrix.image_arch }}"
+          RECONCILIATION_REHEARSAL_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-reconciliation-rehearsal-${{ matrix.image_arch }}"
+          RECONCILIATION_CAPTURE_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-reconciliation-capture-${{ matrix.image_arch }}"
           LEGACY_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-upgrade-legacy-${{ matrix.image_arch }}"
           TARGET_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-upgrade-target-${{ matrix.image_arch }}"
-          trap 'docker rm --force "${QUICKSTART_CONTAINER}" "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}" >/dev/null 2>&1 || true' EXIT
+          RECONCILIATION_LEGACY_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-reconciliation-legacy-${{ matrix.image_arch }}"
+          RECONCILIATION_TARGET_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-reconciliation-target-${{ matrix.image_arch }}"
+          trap 'docker rm --force "${QUICKSTART_CONTAINER}" "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}" "${RECONCILIATION_TARGET_CONTAINER}" "${RECONCILIATION_LEGACY_CONTAINER}" >/dev/null 2>&1 || true' EXIT
           sh "${BUNDLE_ROOT}/upgrade-cutover-rehearsal.sh" \
             edge "${LEGACY_READINESS_ROOT}" "${UPGRADE_REHEARSAL_ROOT}" \
             "${SQLITE_PLAN_DIGEST}" "${DIRECTORY_PLAN_DIGEST}" \
@@ -806,6 +810,25 @@ jobs:
           grep -q '"target":"stopped"' \
             "${UPGRADE_REHEARSAL_ROOT}/cutover-summary.json"
           docker rm "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}"
+          sh "${BUNDLE_ROOT}/upgrade-cutover-rehearsal.sh" \
+            edge "${LEGACY_READINESS_ROOT}" "${RECONCILIATION_REHEARSAL_ROOT}" \
+            "${SQLITE_PLAN_DIGEST}" "${DIRECTORY_PLAN_DIGEST}" \
+            "${RECONCILIATION_LEGACY_CONTAINER}" "${RECONCILIATION_TARGET_CONTAINER}" \
+            --capture-after-write "${RECONCILIATION_CAPTURE_ROOT}"
+          grep -q '"status":"reconciliation_captured"' \
+            "${RECONCILIATION_REHEARSAL_ROOT}/reconciliation-capture-summary.json"
+          grep -q '"operation":"task.put"' \
+            "${RECONCILIATION_REHEARSAL_ROOT}/reconciliation-capture-summary.json"
+          grep -q '"rollback":"not_authorized"' \
+            "${RECONCILIATION_REHEARSAL_ROOT}/reconciliation-capture-summary.json"
+          grep -q '"next":"review_required"' \
+            "${RECONCILIATION_REHEARSAL_ROOT}/reconciliation-capture-summary.json"
+          grep -q '"status":"verified"' \
+            "${RECONCILIATION_REHEARSAL_ROOT}/results/reconciliation-capture-verify.result.json"
+          test -s "${RECONCILIATION_CAPTURE_ROOT}/019f8680-143d-4000-8000-000000000161/manifest.json"
+          test -s "${RECONCILIATION_CAPTURE_ROOT}/019f8680-143d-4000-8000-000000000161/receipt.json"
+          test -d "${RECONCILIATION_CAPTURE_ROOT}/019f8680-143d-4000-8000-000000000161/assets"
+          docker rm "${RECONCILIATION_TARGET_CONTAINER}" "${RECONCILIATION_LEGACY_CONTAINER}"
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-wal"
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-journal"
           trap - EXIT

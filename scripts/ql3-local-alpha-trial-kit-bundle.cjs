@@ -10,8 +10,8 @@ const { auditClusterImageSbom } = require('./ql3-cluster-image-sbom.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-trial-kit@v8';
-const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v6';
+const SCHEMA = 'qinglong/alpha-local-trial-kit@v9';
+const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v7';
 const QUICKSTART_TEMPLATE = path.join(
   DEFAULT_ROOT,
   'scripts/templates/ql3-local-alpha-quickstart.sh',
@@ -65,6 +65,7 @@ const VERIFICATION = Object.freeze({
   legacyUpgradeReadiness: 'passed',
   legacyUpgradeStage: 'passed',
   legacyUpgradeCutover: 'passed',
+  legacyUpgradeReconciliationCapture: 'passed',
 });
 
 function verificationGates(variant) {
@@ -740,7 +741,7 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       0o700,
     );
     const manifest = {
-      schemaVersion: 9,
+      schemaVersion: 10,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',
@@ -861,7 +862,7 @@ function auditLocalAlphaTrialKit(options) {
       'readme',
       'verification',
     ]) ||
-    manifest.schemaVersion !== 9 ||
+    manifest.schemaVersion !== 10 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
@@ -1037,7 +1038,7 @@ function auditLocalAlphaTrialKit(options) {
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-trial-kit-audit@v5',
+    schema: 'qinglong/alpha-local-trial-kit-audit@v6',
     sourceRevision: manifest.sourceRevision,
     version: manifest.version,
     architecture: manifest.architecture,

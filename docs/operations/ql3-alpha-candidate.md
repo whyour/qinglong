@@ -34,6 +34,7 @@
 | D-426a Side-by-side 暂存 | 同源 v7 Trial Kit 已交付 amd64/arm64 headless 阶段实物；reviewed-plan `upgrade-rehearsal.sh` 在新的私有 root 中执行 SQLite stage/verify/activation 与完整目录 stage/verify，legacy root 始终只读，summary 固定 `cutover=not_authorized`；exact artifact job 实跑且 milestone v4 离线审计闭合 | 不执行 transform/apply、目标启动、cutover 或回退；仍不是 Public Release |
 | D-426b2b Exact headless 切换链 | 同源 v8 Trial Kit 已交付 amd64/arm64 headless 阶段实物；exact 上传包完成 readiness、reviewed stage、Owner 强认证 transform/apply、真实 legacy stop、只读 target probe start/stop 与 clean `rollback_candidate`，milestone v5 和三个离线 auditor 均闭合 | 仅授权 fresh/隔离数据演练；不停止用户真实 2.x、不执行 Legacy restart、写后 reconciliation 或生产 cutover；仍不是 Public Release |
 | D-426b2c Console adopted entry | 同源 exact amd64/arm64 Console Trial Kit 与 milestone 已交付；Local API cutover probe 不启动 listener/credential/mutation，controller 绑定双层配置、exact command/mount，原生 CI 完整演练且三个下载产物离线审计通过 | 仅授权 fresh/隔离数据演练；正常 Console 启动与只读 cutover probe 是不同模式；不承诺 2.x 老面板 API 零改动兼容、真实生产停机或写后回退 |
+| D-426c1 写后 reconciliation capture | Trial Kit v9 源码与 exact artifact gate 已闭合：active target 数据权威经 Owner `task.put` 发生业务写入后必须分类为 `reconciliation_required`，并在独立私有 root 完成 capture prepare/commit/verify | 同源 amd64/arm64 milestone 尚待显式 artifact run；停在 `review_required`，不自动 plan/review/apply/rollback/restart；不证明普通 Local API 流量接管 |
 
 D-421 已关闭 D-420 记录的“Web Task mutation 必须独立设计”缺口，而且没有改名复用 run `33173769047` 的旧 archive。修复提交 `dc1686bd6fb3505174dd9a14098ae5c2c92a1a7f` 的普通主 CI [run 33229592307](https://github.com/whyour/qinglong/actions/runs/33229592307) 为 41 success/3 expected artifact-finalizer skip/0 fail，同源 Kubernetes deployment [run 33229592293](https://github.com/whyour/qinglong/actions/runs/33229592293) 成功；随后显式 Local Console milestone [run 33230227006](https://github.com/whyour/qinglong/actions/runs/33230227006) 为 42 success/2 scope skip/0 fail。由此 Web 创建能力已进入新的阶段实物，而不再只是候选源码。
 
@@ -115,7 +116,7 @@ ADR-0506 的 `qinglong/alpha-local-trial-kit@v2` 首次增加 source-bound verif
 Local artifact 含：
 
 - 一个包含所选 Application 与短生命周期 operator 的 archive；headless 为 `qinglong3-local-trial-kit-<arch>.docker.tar`，Console 为 `qinglong3-local-console-trial-kit-<arch>.docker.tar`，共享 Node 基础层在 archive 中去重；
-- schema 为 `qinglong/alpha-local-trial-kit@v8` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/upgradeReadiness/upgradeRehearsal/upgradeCutoverRehearsal/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
+- schema 为 `qinglong/alpha-local-trial-kit@v9`、`schemaVersion=10` 的 `manifest.json`，通过 `variant/archive/images/sboms/quickstart/upgradeReadiness/upgradeRehearsal/upgradeCutoverRehearsal/readme/verification` 绑定版本、完整 source commit、架构、两个 image tag/image ID 与文件长度/SHA-256；
 - canonical `quickstart.sh`，在目标 Linux 设备上只依赖 POSIX shell、`sha256sum` 和 Docker，完成 checksum、load、identity、fresh Owner 与 Profile-bound Application active；
 - canonical `upgrade-readiness.sh`，把 2.x data root 只读挂载给 128 MiB/无网络 Operator，生成 SQLite 与完整目录两个私有 inspect 计划，不获得 stage/cutover authority；
 - `verification-evidence.json` 绑定 `workflow_dispatch` 的 workflow ref/SHA、run ID/attempt、同架构两个 exact image ID 和完整 gate 集；下载者仍须到 GitHub 交叉检查 run，它不替代正式签名；

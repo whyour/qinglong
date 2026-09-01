@@ -22,8 +22,18 @@ phase() {
 
 usage() {
   printf '%s\n' \
-    'usage: sh upgrade-cutover-rehearsal.sh edge|standalone /absolute/legacy-data-root /absolute/new/rehearsal-root <reviewed-sqlite-plan-digest> <reviewed-data-directory-plan-digest> [legacy-container-name] [target-container-name]' >&2
+    'usage: sh upgrade-cutover-rehearsal.sh edge|standalone /absolute/legacy-data-root /absolute/new/rehearsal-root <reviewed-sqlite-plan-digest> <reviewed-data-directory-plan-digest> [legacy-container-name] [target-container-name] [--capture-after-write /absolute/new/capture-root]' >&2
   exit 2
+}
+
+safe_absolute_path() {
+  case "$1" in
+    /|*[!A-Za-z0-9_./@-]*|*'/../'*|*'/./'*|*'/..'|*'/.'|*'//'*|*/)
+      return 1
+      ;;
+    /*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 valid_digest() {
@@ -39,11 +49,30 @@ extract_digest() {
   printf '%s' "$value"
 }
 
+extract_unsigned() {
+  result_file=$1
+  field=$2
+  value=$(sed -n "s/^.*\"$field\":\([0-9][0-9]*\).*$/\1/p" "$result_file")
+  case "$value" in ''|*[!0-9]*) fail "$field is missing or invalid in $result_file" ;; esac
+  printf '%s' "$value"
+}
+
 container_name() {
   case "$1" in ''|[_.-]*|*[!A-Za-z0-9_.-]*) return 1 ;; *) return 0 ;; esac
 }
 
-[ "$#" -ge 5 ] && [ "$#" -le 7 ] || usage
+case "$#" in
+  5|6|7)
+    capture_after_write=false
+    capture_root=
+    ;;
+  9)
+    [ "$8" = '--capture-after-write' ] || usage
+    capture_after_write=true
+    capture_root=$9
+    ;;
+  *) usage ;;
+esac
 case "$VARIANT" in
   headless|console) ;;
   *) fail 'embedded Trial Kit variant is invalid' ;;
@@ -66,6 +95,22 @@ container_name "$target_name" || fail 'target container name is invalid'
 [ "$legacy_name" != "$target_name" ] || fail 'container names must be distinct'
 valid_digest "$sqlite_plan_digest" || fail 'reviewed SQLite plan digest is invalid'
 valid_digest "$directory_plan_digest" || fail 'reviewed data-directory plan digest is invalid'
+if [ "$capture_after_write" = true ]; then
+  safe_absolute_path "$capture_root" || fail 'capture root is not a safe canonical absolute path'
+  [ "$capture_root" != "$legacy_root" ] || fail 'capture and legacy roots must be distinct'
+  [ "$capture_root" != "$rehearsal_root" ] || fail 'capture and rehearsal roots must be distinct'
+  case "$capture_root/" in
+    "$legacy_root"/*|"$rehearsal_root"/*) fail 'capture root must not be inside a data root' ;;
+  esac
+  case "$legacy_root/" in "$capture_root"/*) fail 'legacy root must not be inside the capture root' ;; esac
+  case "$rehearsal_root/" in "$capture_root"/*) fail 'rehearsal root must not be inside the capture root' ;; esac
+  [ ! -e "$capture_root" ] || fail 'capture root must not already exist'
+  capture_parent=${capture_root%/*}
+  [ -n "$capture_parent" ] || capture_parent=/
+  [ -d "$capture_parent" ] || fail 'capture root parent does not exist'
+  capture_parent_real=$(CDPATH= cd -- "$capture_parent" && pwd -P)
+  [ "$capture_parent_real/${capture_root##*/}" = "$capture_root" ] || fail 'capture root parent is not canonical'
+fi
 [ "$(uname -s)" = Linux ] || fail 'cutover rehearsal requires a Linux Docker host'
 for tool in docker sha256sum grep sed stat date realpath tr; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is required"
@@ -101,6 +146,9 @@ umask 077
 for directory in owner-peppers owner-pepper-backup owner-delivery receipts artifacts plugin-staging plugin-activation service service/cutovers service/cutovers/alpha-upgrade-cutover; do
   [ -d "$rehearsal_root/$directory" ] || mkdir -m 0700 "$rehearsal_root/$directory"
 done
+if [ "$capture_after_write" = true ]; then
+  mkdir -m 0700 "$capture_root"
+fi
 
 run_operator() {
   command_name=$1
@@ -144,6 +192,22 @@ run_deployment_offline() {
     --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
     --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly" \
     --mount "type=bind,src=$rehearsal_root,dst=$rehearsal_root" \
+    "$OPERATOR_IMAGE" deploy "$subcommand" \
+    --command-file "$rehearsal_root/commands/$command_file" \
+    >"$rehearsal_root/results/$result_file"
+}
+
+run_reconciliation_offline() {
+  subcommand=$1
+  command_file=$2
+  result_file=$3
+  docker run --rm --read-only --user "$uid:$gid" --network none \
+    --cap-drop ALL --security-opt no-new-privileges \
+    --memory 128m --memory-swap 128m --cpus 0.5 --pids-limit 32 \
+    --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
+    --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly" \
+    --mount "type=bind,src=$rehearsal_root,dst=$rehearsal_root" \
+    --mount "type=bind,src=$capture_root,dst=$capture_root" \
     "$OPERATOR_IMAGE" deploy "$subcommand" \
     --command-file "$rehearsal_root/commands/$command_file" \
     >"$rehearsal_root/results/$result_file"
@@ -287,21 +351,87 @@ run_deploy cutover-target-start target-start.json target-start.result.json
 printf '%s' 'QingLong Local Alpha target-start result: ' >&2
 sed -n '1p' "$rehearsal_root/results/target-start.result.json" >&2
 grep -q '"state":"target_active"' "$rehearsal_root/results/target-start.result.json" || fail 'target did not become active'
+if [ "$capture_after_write" = true ]; then
+  write_ms=$((start_ms + 1))
+  cat >"$rehearsal_root/commands/post-cutover-task.json" <<EOF
+{"schemaVersion":1,"operation":"task.put","options":{"deploymentRoot":"$rehearsal_root","databasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","profile":"$profile","ownerPepperKeyringDirectory":"$rehearsal_root/owner-peppers","credentialFilePath":"$rehearsal_root/owner-credential.json","busyTimeoutMs":100},"request":{"projectId":"default","taskId":"alpha-post-cutover-write","expectedRevision":null,"mutationId":"019f8680-143d-4000-8000-000000000151","requestId":"alpha-upgrade-post-cutover-write","failureAuditEventId":"019f8680-143d-4000-8000-000000000152","name":"QingLong 3.0 post-cutover write proof","description":"A bounded offline Task proving the adopted target database changed after target activation","kind":"command","spec":{"schema":"qinglong/command@v1","config":{"command":{"kind":"argv","file":"/bin/echo","args":["qinglong3-alpha-post-cutover-write"]}}},"labels":{"qinglong.alpha.reconciliation":"true"},"enabled":true,"occurredAtMs":$write_ms}}
+EOF
+  chmod 0600 "$rehearsal_root/commands/post-cutover-task.json"
+  phase 'commit one Owner-authorized post-cutover business write'
+  run_operator task post-cutover-task.json post-cutover-task.result.json
+  grep -q '"status":"created"' "$rehearsal_root/results/post-cutover-task.result.json" || fail 'post-cutover Task write did not commit'
+fi
 stop_ms=$((start_ms + 1))
+[ "$capture_after_write" = false ] || stop_ms=$((write_ms + 1))
 sed "s/\"operation\":\"local.deployment.cutover.target-start\"/\"operation\":\"local.deployment.cutover.target-stop\"/;s/\"requestedAtMs\":$start_ms/\"requestedAtMs\":$stop_ms/" \
   "$rehearsal_root/commands/target-start.json" \
   >"$rehearsal_root/commands/target-stop.json"
 chmod 0600 "$rehearsal_root/commands/target-stop.json"
-phase 'stop target and prove rollback candidate'
+if [ "$capture_after_write" = true ]; then
+  phase 'stop written target and require reconciliation'
+else
+  phase 'stop target and prove rollback candidate'
+fi
 run_deploy cutover-target-stop target-stop.json target-stop.result.json
 printf '%s' 'QingLong Local Alpha target-stop result: ' >&2
 sed -n '1p' "$rehearsal_root/results/target-stop.result.json" >&2
 printf '%s' 'QingLong Local Alpha target-stop evidence: ' >&2
 tr -d '\n' <"$rehearsal_root/service/cutovers/alpha-upgrade-cutover/0006-target-stop-outcome.json" >&2
 printf '\n' >&2
-grep -q '"reconciliation":"rollback_candidate"' "$rehearsal_root/results/target-stop.result.json" || fail 'target stop did not produce a clean rollback candidate'
 [ "$(sha256sum "$legacy_root/db/database.sqlite" | sed 's/ .*//')" = "$legacy_sha256" ] || fail 'legacy database changed during rehearsal'
 
+if [ "$capture_after_write" = true ]; then
+  grep -q '"reconciliation":"reconciliation_required"' "$rehearsal_root/results/target-stop.result.json" || fail 'written target was not fenced for reconciliation'
+  stopped_head_digest=$(extract_digest "$rehearsal_root/results/target-stop.result.json" instanceHeadDigest)
+  stopped_record_digest=$(extract_digest "$rehearsal_root/results/target-stop.result.json" recordDigest)
+  capture_id='019f8680-143d-4000-8000-000000000161'
+  capture_prepare_ms=$((stop_ms + 1))
+  cat >"$rehearsal_root/commands/reconciliation-capture-prepare.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.capture.prepare","options":{"deploymentRoot":"$rehearsal_root","captureRoot":"$capture_root","allowRootService":$allow_root_service},"request":{"captureId":"$capture_id","stoppedAuthority":"docker","profile":"$profile","instanceId":"alpha-upgrade","cutoverId":"alpha-upgrade-cutover","generation":1,"applicationConfigPath":"$rehearsal_root/local-application.json","activationPath":"$rehearsal_root/sqlite/qinglong3-activation.json","legacySourcePath":"$legacy_root/db/database.sqlite","targetDatabasePath":"$rehearsal_root/sqlite/qinglong3.sqlite","recoveryPath":"$rehearsal_root/sqlite/database.pre-ql3.sqlite","expectedActivationDigest":"$activation_digest","expectedHeadDigest":"$stopped_head_digest","expectedStoppedRecordDigest":"$stopped_record_digest","preparedAtMs":$capture_prepare_ms}}
+EOF
+  chmod 0600 "$rehearsal_root/commands/reconciliation-capture-prepare.json"
+  phase 'prepare immutable post-write reconciliation capture'
+  run_reconciliation_offline reconciliation-capture-prepare reconciliation-capture-prepare.json reconciliation-capture-prepare.result.json
+  grep -q '"state":"reconciliation_capture_prepared"' "$rehearsal_root/results/reconciliation-capture-prepare.result.json" || fail 'reconciliation capture was not prepared'
+  preparation_digest=$(extract_digest "$rehearsal_root/results/reconciliation-capture-prepare.result.json" preparationDigest)
+  capture_commit_ms=$((capture_prepare_ms + 1))
+  cat >"$rehearsal_root/commands/reconciliation-capture-commit.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.capture.commit","options":{"deploymentRoot":"$rehearsal_root","captureRoot":"$capture_root","allowRootService":$allow_root_service},"request":{"captureId":"$capture_id","expectedPreparationDigest":"$preparation_digest","committedAtMs":$capture_commit_ms}}
+EOF
+  chmod 0600 "$rehearsal_root/commands/reconciliation-capture-commit.json"
+  phase 'commit immutable post-write reconciliation capture'
+  run_reconciliation_offline reconciliation-capture-commit reconciliation-capture-commit.json reconciliation-capture-commit.result.json
+  grep -q '"state":"reconciliation_captured"' "$rehearsal_root/results/reconciliation-capture-commit.result.json" || fail 'reconciliation capture did not commit'
+  capture_bundle_digest=$(extract_digest "$rehearsal_root/results/reconciliation-capture-commit.result.json" bundleDigest)
+  cat >"$rehearsal_root/commands/reconciliation-capture-verify.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.capture.verify","options":{"deploymentRoot":"$rehearsal_root","captureRoot":"$capture_root","allowRootService":$allow_root_service},"request":{"captureId":"$capture_id","expectedBundleDigest":"$capture_bundle_digest"}}
+EOF
+  chmod 0600 "$rehearsal_root/commands/reconciliation-capture-verify.json"
+  phase 'verify immutable post-write reconciliation capture'
+  run_reconciliation_offline reconciliation-capture-verify reconciliation-capture-verify.json reconciliation-capture-verify.result.json
+  grep -q '"status":"verified"' "$rehearsal_root/results/reconciliation-capture-verify.result.json" || fail 'reconciliation capture verification failed'
+  capture_head_digest=$(extract_digest "$rehearsal_root/results/reconciliation-capture-verify.result.json" instanceHeadDigest)
+  capture_asset_count=$(extract_unsigned "$rehearsal_root/results/reconciliation-capture-verify.result.json" assetCount)
+  capture_total_bytes=$(extract_unsigned "$rehearsal_root/results/reconciliation-capture-verify.result.json" totalBytes)
+  cat >"$rehearsal_root/reconciliation-capture-summary.json" <<EOF
+{"schemaVersion":1,"schema":"qinglong/local-alpha-upgrade-reconciliation-capture-summary@v1","status":"reconciliation_captured","profile":"$profile","variant":"$VARIANT","targetEntrypoint":"$target_entrypoint","sourceRevision":"$SOURCE_REVISION","architecture":"$ARCHITECTURE","reviewedPlans":{"sqlite":"$sqlite_plan_digest","dataDirectory":"$directory_plan_digest"},"activationDigest":"$activation_digest","write":{"operation":"task.put","taskId":"alpha-post-cutover-write","status":"created"},"cutover":{"commitmentDigest":"$commitment_digest","bundleDigest":"$bundle_digest","legacyContainerId":"$legacy_id","targetContainerId":"$target_id","stoppedRecordDigest":"$stopped_record_digest"},"capture":{"captureId":"$capture_id","bundleDigest":"$capture_bundle_digest","assetCount":$capture_asset_count,"totalBytes":$capture_total_bytes,"instanceHeadDigest":"$capture_head_digest"},"legacySource":"unchanged","target":"stopped","rollback":"not_authorized","next":"review_required"}
+EOF
+  chmod 0600 "$rehearsal_root/reconciliation-capture-summary.json"
+  umask "$old_umask"
+  cleanup_required=0
+  trap - EXIT HUP INT TERM
+  printf '%s\n' \
+    "QingLong 3.0 isolated post-write reconciliation capture completed ($profile, $ARCHITECTURE)." \
+    "Summary: $rehearsal_root/reconciliation-capture-summary.json" \
+    "Sealed capture: $capture_root/$capture_id" \
+    "Stopped legacy container: $legacy_name ($legacy_id)" \
+    "Stopped target container: $target_name ($target_id)" \
+    "Remove containers after review: docker rm $target_name $legacy_name" \
+    'The original legacy SQLite remained unchanged. Rollback and automatic reconciliation were not authorized.'
+  exit 0
+fi
+
+grep -q '"reconciliation":"rollback_candidate"' "$rehearsal_root/results/target-stop.result.json" || fail 'target stop did not produce a clean rollback candidate'
 cat >"$rehearsal_root/cutover-summary.json" <<EOF
 {"schemaVersion":1,"schema":"qinglong/local-alpha-upgrade-cutover-summary@v2","status":"rollback_candidate","profile":"$profile","variant":"$VARIANT","targetEntrypoint":"$target_entrypoint","sourceRevision":"$SOURCE_REVISION","architecture":"$ARCHITECTURE","reviewedPlans":{"sqlite":"$sqlite_plan_digest","dataDirectory":"$directory_plan_digest"},"activationDigest":"$activation_digest","transformationDigest":"$transformation_digest","application":{"commitDigest":"$commit_digest","receiptDigest":"$receipt_digest"},"cutover":{"commitmentDigest":"$commitment_digest","bundleDigest":"$bundle_digest","legacyContainerId":"$legacy_id","targetContainerId":"$target_id"},"legacySource":"unchanged","target":"stopped","rollback":"candidate_not_executed"}
 EOF

@@ -166,7 +166,8 @@ function adapters(overrides = {}, variant = 'headless') {
 test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const paths = fixture(t);
   const manifest = createLocalAlphaTrialKit(createOptions(paths), adapters());
-  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v8');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v9');
+  assert.equal(manifest.schemaVersion, 10);
   assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.equal(manifest.architecture, 'arm64');
@@ -278,6 +279,70 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     /QingLong Local Alpha target-stop evidence:/,
   );
   assert.match(cutoverRehearsalContents, /tr -d '\\n'/);
+  assert.match(cutoverRehearsalContents, /--capture-after-write/);
+  assert.match(cutoverRehearsalContents, /"operation":"task\.put"/);
+  assert.match(
+    cutoverRehearsalContents,
+    /local\.deployment\.reconciliation\.capture\.prepare/,
+  );
+  assert.match(
+    cutoverRehearsalContents,
+    /local\.deployment\.reconciliation\.capture\.commit/,
+  );
+  assert.match(
+    cutoverRehearsalContents,
+    /local\.deployment\.reconciliation\.capture\.verify/,
+  );
+  assert.match(
+    cutoverRehearsalContents,
+    /qinglong\/local-alpha-upgrade-reconciliation-capture-summary@v1/,
+  );
+  const postWriteTemplate = cutoverRehearsalContents.match(
+    /cat >"\$rehearsal_root\/commands\/post-cutover-task\.json" <<EOF\n([^\n]+)\nEOF/,
+  );
+  assert.ok(postWriteTemplate, 'post-cutover Task command template is missing');
+  const postWriteCommand = JSON.parse(
+    postWriteTemplate[1]
+      .replaceAll('$write_ms', '1')
+      .replace(/\$[A-Za-z_][A-Za-z0-9_]*/g, 'fixture'),
+  );
+  assert.equal(postWriteCommand.operation, 'task.put');
+  assert.equal(postWriteCommand.request.taskId, 'alpha-post-cutover-write');
+  assert.equal(postWriteCommand.request.expectedRevision, null);
+  const capturePrepareTemplate = cutoverRehearsalContents.match(
+    /cat >"\$rehearsal_root\/commands\/reconciliation-capture-prepare\.json" <<EOF\n([^\n]+)\nEOF/,
+  );
+  assert.ok(
+    capturePrepareTemplate,
+    'reconciliation capture prepare command template is missing',
+  );
+  const capturePrepareCommand = JSON.parse(
+    capturePrepareTemplate[1]
+      .replaceAll('$allow_root_service', 'false')
+      .replaceAll('$capture_prepare_ms', '1')
+      .replace(/\$[A-Za-z_][A-Za-z0-9_]*/g, 'fixture'),
+  );
+  assert.equal(
+    capturePrepareCommand.operation,
+    'local.deployment.reconciliation.capture.prepare',
+  );
+  assert.deepEqual(Object.keys(capturePrepareCommand.request).sort(), [
+    'activationPath',
+    'applicationConfigPath',
+    'captureId',
+    'cutoverId',
+    'expectedActivationDigest',
+    'expectedHeadDigest',
+    'expectedStoppedRecordDigest',
+    'generation',
+    'instanceId',
+    'legacySourcePath',
+    'preparedAtMs',
+    'profile',
+    'recoveryPath',
+    'stoppedAuthority',
+    'targetDatabasePath',
+  ]);
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);
@@ -329,6 +394,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
   assert.equal(verification.gates.legacyUpgradeReadiness, 'passed');
   assert.equal(verification.gates.legacyUpgradeStage, 'passed');
   assert.equal(verification.gates.legacyUpgradeCutover, 'passed');
+  assert.equal(verification.gates.legacyUpgradeReconciliationCapture, 'passed');
   const quickstartContents = fs.readFileSync(
     path.join(paths.outputRoot, 'quickstart.sh'),
     'utf8',
@@ -776,6 +842,20 @@ test('create rejects verification detached from the reviewed workflow', (t) => {
     fs.readFileSync(paths.verificationEvidence, 'utf8'),
   );
   evidence.workflow.job = 'unreviewed-job';
+  fs.writeFileSync(paths.verificationEvidence, `${JSON.stringify(evidence)}\n`);
+  assert.throws(
+    () => createLocalAlphaTrialKit(createOptions(paths), adapters()),
+    /verification evidence is incompatible/,
+  );
+  assert.equal(fs.existsSync(paths.outputRoot), false);
+});
+
+test('create rejects verification without the exact reconciliation capture gate', (t) => {
+  const paths = fixture(t);
+  const evidence = JSON.parse(
+    fs.readFileSync(paths.verificationEvidence, 'utf8'),
+  );
+  delete evidence.gates.legacyUpgradeReconciliationCapture;
   fs.writeFileSync(paths.verificationEvidence, `${JSON.stringify(evidence)}\n`);
   assert.throws(
     () => createLocalAlphaTrialKit(createOptions(paths), adapters()),

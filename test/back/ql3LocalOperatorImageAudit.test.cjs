@@ -165,3 +165,42 @@ test('rejects Alpha evidence recorded before all native gates', () => {
     fs.rmSync(temporaryRoot, { recursive: true, force: true });
   }
 });
+
+test('rejects removal of the exact post-write reconciliation capture gate', () => {
+  const temporaryRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql3-local-reconciliation-ci-audit-'),
+  );
+  try {
+    fs.mkdirSync(path.join(temporaryRoot, 'deploy/containers'), {
+      recursive: true,
+    });
+    fs.cpSync(
+      path.join(root, 'deploy/containers/ql3-local-operator'),
+      path.join(temporaryRoot, 'deploy/containers/ql3-local-operator'),
+      { recursive: true },
+    );
+    fs.mkdirSync(path.join(temporaryRoot, '.github/workflows'), {
+      recursive: true,
+    });
+    const workflow = fs
+      .readFileSync(path.join(root, '.github/workflows/ql3-ci.yml'), 'utf8')
+      .replace('--capture-after-write', '--capture-gate-removed');
+    fs.writeFileSync(
+      path.join(temporaryRoot, '.github/workflows/ql3-ci.yml'),
+      workflow,
+    );
+    fs.copyFileSync(
+      path.join(root, 'ql3-release.json'),
+      path.join(temporaryRoot, 'ql3-release.json'),
+    );
+    const report = auditLocalOperatorImageContract(temporaryRoot);
+    assert.equal(report.compatible, false);
+    assert.ok(
+      report.findings.some(
+        ({ code }) => code === 'LOCAL_OPERATOR_CI_CONTRACT_DRIFT',
+      ),
+    );
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+});

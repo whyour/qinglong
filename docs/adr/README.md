@@ -529,6 +529,7 @@
 | [ADR-0523](./ADR-0523-post-apply-adopted-target-baseline.md)                                      | Apply 后的 Adopted Target 启动前基线                                                                                                                                                                                                | Accepted（D-426b2a 基线已由 D-426b2b 双架构实物闭合） |
 | [ADR-0524](./ADR-0524-exact-headless-upgrade-cutover-rehearsal.md)                                | Exact Headless 升级切换链演练                                                                                                                                                                                                        | Accepted（D-426b2b 双架构阶段实物已交付） |
 | [ADR-0525](./ADR-0525-console-adopted-target-entry-evidence.md)                                   | Console Adopted Target 入口证据                                                                                                                                                                                                      | Accepted（exact Console 双架构阶段实物已交付并完成离线审计）          |
+| [ADR-0526](./ADR-0526-exact-post-write-reconciliation-capture.md)                                 | Exact 写后 Reconciliation Capture                                                                                                                                                                                                     | Accepted（源码与 artifact gate 已闭合；双架构实物待交付）             |
 
 ## 规则
 

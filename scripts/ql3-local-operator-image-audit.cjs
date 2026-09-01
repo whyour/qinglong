@@ -206,6 +206,10 @@ function auditWorkflow(contents, findings) {
     'test -s "${QUICKSTART_ROOT}/qinglong3.sqlite"',
     'sh "${BUNDLE_ROOT}/upgrade-cutover-rehearsal.sh"',
     '"status":"rollback_candidate"',
+    '--capture-after-write "${RECONCILIATION_CAPTURE_ROOT}"',
+    '"status":"reconciliation_captured"',
+    '"rollback":"not_authorized"',
+    'reconciliation-capture-verify.result.json',
     'docker rm "${TARGET_CONTAINER}" "${LEGACY_CONTAINER}"',
     '--application-sbom="${APPLICATION_SBOM}"',
     '--operator-sbom="${RUNNER_TEMP}/ql3-local-operator.cdx.json"',
@@ -234,6 +238,7 @@ function auditWorkflow(contents, findings) {
     '--mode=audit',
     '/quickstart.sh"',
     '/upgrade-cutover-rehearsal.sh"',
+    '--capture-after-write',
     'name: Upload the tested native Local Alpha trial kit',
   ]) {
     const index = contents.indexOf(value, cursor + 1);
