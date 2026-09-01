@@ -12,7 +12,7 @@ const {
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-milestone@v5';
+const SCHEMA = 'qinglong/alpha-local-milestone@v6';
 const ARCHITECTURES = Object.freeze(['amd64', 'arm64']);
 const FILES = Object.freeze({
   readme: 'README.md',
@@ -222,6 +222,8 @@ function bundleRecord(options, architecture) {
     upgradeReadinessSha256: report.upgradeReadinessSha256,
     upgradeRehearsalSha256: report.upgradeRehearsalSha256,
     upgradeCutoverRehearsalSha256: report.upgradeCutoverRehearsalSha256,
+    upgradeReconciliationRehearsalSha256:
+      report.upgradeReconciliationRehearsalSha256,
   });
 }
 
@@ -238,6 +240,7 @@ function validateArtifactRecord(record, architecture, manifest) {
       'upgradeReadinessSha256',
       'upgradeRehearsalSha256',
       'upgradeCutoverRehearsalSha256',
+      'upgradeReconciliationRehearsalSha256',
     ]) ||
     record.artifactName !==
       artifactName(manifest.sourceRevision, architecture, manifest.variant) ||
@@ -254,6 +257,7 @@ function validateArtifactRecord(record, architecture, manifest) {
     !SHA256_PATTERN.test(record.upgradeReadinessSha256 || '') ||
     !SHA256_PATTERN.test(record.upgradeRehearsalSha256 || '') ||
     !SHA256_PATTERN.test(record.upgradeCutoverRehearsalSha256 || '') ||
+    !SHA256_PATTERN.test(record.upgradeReconciliationRehearsalSha256 || '') ||
     record.applicationImageId === record.operatorImageId
   ) {
     fail(`${architecture} milestone artifact record is incompatible`);
@@ -322,7 +326,7 @@ function auditLocalAlphaMilestone(options) {
       'artifacts',
       'readme',
     ]) ||
-    manifest.schemaVersion !== 5 ||
+    manifest.schemaVersion !== 6 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
@@ -371,7 +375,10 @@ function auditLocalAlphaMilestone(options) {
     new Set(records.map((record) => record.upgradeRehearsalSha256)).size !==
       ARCHITECTURES.length ||
     new Set(records.map((record) => record.upgradeCutoverRehearsalSha256))
-      .size !== ARCHITECTURES.length
+      .size !== ARCHITECTURES.length ||
+    new Set(
+      records.map((record) => record.upgradeReconciliationRehearsalSha256),
+    ).size !== ARCHITECTURES.length
   ) {
     fail('milestone architecture subjects are not distinct');
   }
@@ -398,7 +405,7 @@ function auditLocalAlphaMilestone(options) {
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-milestone-audit@v5',
+    schema: 'qinglong/alpha-local-milestone-audit@v6',
     sourceRevision: manifest.sourceRevision,
     version: manifest.version,
     variant: manifest.variant,
@@ -441,7 +448,9 @@ function finalizeLocalAlphaMilestone(options) {
     artifacts.amd64.upgradeRehearsalSha256 ===
       artifacts.arm64.upgradeRehearsalSha256 ||
     artifacts.amd64.upgradeCutoverRehearsalSha256 ===
-      artifacts.arm64.upgradeCutoverRehearsalSha256
+      artifacts.arm64.upgradeCutoverRehearsalSha256 ||
+    artifacts.amd64.upgradeReconciliationRehearsalSha256 ===
+      artifacts.arm64.upgradeReconciliationRehearsalSha256
   ) {
     fail('milestone architecture subjects must be distinct');
   }
@@ -454,7 +463,7 @@ function finalizeLocalAlphaMilestone(options) {
       path.join(normalized.outputRoot, FILES.readme),
     );
     const manifest = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',

@@ -10,8 +10,8 @@ const { auditClusterImageSbom } = require('./ql3-cluster-image-sbom.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-trial-kit@v9';
-const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v7';
+const SCHEMA = 'qinglong/alpha-local-trial-kit@v10';
+const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v8';
 const QUICKSTART_TEMPLATE = path.join(
   DEFAULT_ROOT,
   'scripts/templates/ql3-local-alpha-quickstart.sh',
@@ -28,6 +28,10 @@ const UPGRADE_CUTOVER_REHEARSAL_TEMPLATE = path.join(
   DEFAULT_ROOT,
   'scripts/templates/ql3-local-alpha-upgrade-cutover-rehearsal.sh',
 );
+const UPGRADE_RECONCILIATION_REHEARSAL_TEMPLATE = path.join(
+  DEFAULT_ROOT,
+  'scripts/templates/ql3-local-alpha-reconciliation-rehearsal.sh',
+);
 const ARCHITECTURES = Object.freeze(['amd64', 'arm64']);
 const VARIANTS = Object.freeze(['headless', 'console']);
 const ARCHIVE_MIN_BYTES = 1024;
@@ -37,6 +41,7 @@ const MAX_QUICKSTART_BYTES = 256 * 1024;
 const MAX_UPGRADE_READINESS_BYTES = 256 * 1024;
 const MAX_UPGRADE_REHEARSAL_BYTES = 256 * 1024;
 const MAX_UPGRADE_CUTOVER_REHEARSAL_BYTES = 512 * 1024;
+const MAX_UPGRADE_RECONCILIATION_REHEARSAL_BYTES = 512 * 1024;
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const REVISION_PATTERN = /^[0-9a-f]{40}$/u;
 const FILES = Object.freeze({
@@ -47,6 +52,7 @@ const FILES = Object.freeze({
   upgradeReadiness: 'upgrade-readiness.sh',
   upgradeRehearsal: 'upgrade-rehearsal.sh',
   upgradeCutoverRehearsal: 'upgrade-cutover-rehearsal.sh',
+  upgradeReconciliationRehearsal: 'reconciliation-rehearsal.sh',
   readme: 'README.md',
   manifest: 'manifest.json',
   checksums: 'SHA256SUMS',
@@ -66,6 +72,7 @@ const VERIFICATION = Object.freeze({
   legacyUpgradeStage: 'passed',
   legacyUpgradeCutover: 'passed',
   legacyUpgradeReconciliationCapture: 'passed',
+  legacyUpgradeReconciliationAutomationRollback: 'passed',
 });
 
 function verificationGates(variant) {
@@ -550,6 +557,35 @@ function renderUpgradeCutoverRehearsal(identity) {
   return rendered;
 }
 
+function renderUpgradeReconciliationRehearsal(identity) {
+  const template = fs.readFileSync(
+    assertCanonicalFile(
+      UPGRADE_RECONCILIATION_REHEARSAL_TEMPLATE,
+      MAX_UPGRADE_RECONCILIATION_REHEARSAL_BYTES,
+      'upgrade reconciliation rehearsal template',
+    ),
+    'utf8',
+  );
+  const replacements = Object.freeze({
+    '@@OPERATOR_IMAGE@@': identity.images.operator.reference,
+    '@@OPERATOR_ID@@': identity.images.operator.id,
+    '@@ARCHITECTURE@@': identity.architecture,
+    '@@SOURCE_REVISION@@': identity.sourceRevision,
+    '@@ARCHIVE@@': identity.archive.file,
+    '@@VARIANT@@': identity.variant,
+  });
+  let rendered = template;
+  for (const [token, value] of Object.entries(replacements)) {
+    rendered = rendered.replaceAll(token, value);
+  }
+  if (/@@[A-Z_]+@@/u.test(rendered)) {
+    fail(
+      'upgrade reconciliation rehearsal template contains an unresolved token',
+    );
+  }
+  return rendered;
+}
+
 function fileRecord(bundleRoot, name) {
   const filePath = path.join(bundleRoot, name);
   const stat = fs.lstatSync(filePath);
@@ -740,8 +776,13 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       renderUpgradeCutoverRehearsal(manifestIdentity),
       0o700,
     );
+    writeExclusive(
+      path.join(normalized.outputRoot, FILES.upgradeReconciliationRehearsal),
+      renderUpgradeReconciliationRehearsal(manifestIdentity),
+      0o700,
+    );
     const manifest = {
-      schemaVersion: 10,
+      schemaVersion: 11,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',
@@ -768,6 +809,10 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
         normalized.outputRoot,
         FILES.upgradeCutoverRehearsal,
       ),
+      upgradeReconciliationRehearsal: fileRecord(
+        normalized.outputRoot,
+        FILES.upgradeReconciliationRehearsal,
+      ),
       readme: fileRecord(normalized.outputRoot, FILES.readme),
       verification: fileRecord(
         normalized.outputRoot,
@@ -787,6 +832,7 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       FILES.upgradeReadiness,
       FILES.upgradeRehearsal,
       FILES.upgradeCutoverRehearsal,
+      FILES.upgradeReconciliationRehearsal,
       FILES.readme,
       FILES.manifest,
     ];
@@ -859,10 +905,11 @@ function auditLocalAlphaTrialKit(options) {
       'upgradeReadiness',
       'upgradeRehearsal',
       'upgradeCutoverRehearsal',
+      'upgradeReconciliationRehearsal',
       'readme',
       'verification',
     ]) ||
-    manifest.schemaVersion !== 10 ||
+    manifest.schemaVersion !== 11 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
@@ -963,6 +1010,29 @@ function auditLocalAlphaTrialKit(options) {
       'upgrade cutover rehearsal differs from the canonical cutover journey',
     );
   }
+  validateFileRecord(
+    manifest.upgradeReconciliationRehearsal,
+    FILES.upgradeReconciliationRehearsal,
+    bundleRoot,
+  );
+  const expectedUpgradeReconciliationRehearsal =
+    renderUpgradeReconciliationRehearsal(manifest);
+  const actualUpgradeReconciliationRehearsal = fs.readFileSync(
+    assertCanonicalFile(
+      path.join(bundleRoot, FILES.upgradeReconciliationRehearsal),
+      MAX_UPGRADE_RECONCILIATION_REHEARSAL_BYTES,
+      'upgrade reconciliation rehearsal',
+    ),
+    'utf8',
+  );
+  if (
+    actualUpgradeReconciliationRehearsal !==
+    expectedUpgradeReconciliationRehearsal
+  ) {
+    fail(
+      'upgrade reconciliation rehearsal differs from the canonical reviewed application and rollback journey',
+    );
+  }
   validateFileRecord(manifest.readme, FILES.readme, bundleRoot);
   validateOfflineSbom(
     readBoundedJson(
@@ -1002,6 +1072,7 @@ function auditLocalAlphaTrialKit(options) {
     FILES.upgradeReadiness,
     FILES.upgradeRehearsal,
     FILES.upgradeCutoverRehearsal,
+    FILES.upgradeReconciliationRehearsal,
     expectedArchive,
   ].sort();
   const actualFiles = fs
@@ -1025,6 +1096,7 @@ function auditLocalAlphaTrialKit(options) {
     FILES.upgradeReadiness,
     FILES.upgradeRehearsal,
     FILES.upgradeCutoverRehearsal,
+    FILES.upgradeReconciliationRehearsal,
     FILES.readme,
     FILES.manifest,
   ];
@@ -1038,7 +1110,7 @@ function auditLocalAlphaTrialKit(options) {
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-trial-kit-audit@v6',
+    schema: 'qinglong/alpha-local-trial-kit-audit@v7',
     sourceRevision: manifest.sourceRevision,
     version: manifest.version,
     architecture: manifest.architecture,
@@ -1050,6 +1122,8 @@ function auditLocalAlphaTrialKit(options) {
     upgradeReadinessSha256: manifest.upgradeReadiness.sha256,
     upgradeRehearsalSha256: manifest.upgradeRehearsal.sha256,
     upgradeCutoverRehearsalSha256: manifest.upgradeCutoverRehearsal.sha256,
+    upgradeReconciliationRehearsalSha256:
+      manifest.upgradeReconciliationRehearsal.sha256,
     verificationSha256: manifest.verification.sha256,
     workflowRunId: verificationEvidence.workflow.runId,
     workflowRunAttempt: verificationEvidence.workflow.runAttempt,

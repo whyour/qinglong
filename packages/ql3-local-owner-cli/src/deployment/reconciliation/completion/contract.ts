@@ -321,13 +321,24 @@ function normalizeOptions(
   }
   if (
     automation !== null &&
-    roots.some(
-      (root) =>
-        overlaps(root, automation.targetDatabasePath) ||
-        overlaps(automation.targetDatabasePath, root),
-    )
+    roots
+      .slice(1)
+      .some(
+        (root) =>
+          overlaps(root, automation.targetDatabasePath) ||
+          overlaps(automation.targetDatabasePath, root),
+      )
   ) {
     fail('targetDatabasePath overlaps an authority root');
+  }
+  if (automation !== null) {
+    const relative = path.relative(
+      normalized.deploymentRoot,
+      automation.targetDatabasePath,
+    );
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+      fail('Automation targetDatabasePath must be below deploymentRoot');
+    }
   }
   if (
     secretConfig !== null &&

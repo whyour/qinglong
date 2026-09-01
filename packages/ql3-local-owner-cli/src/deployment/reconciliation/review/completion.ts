@@ -257,6 +257,7 @@ function maxAuthorizationBytes(profile: 'edge' | 'standalone'): number {
 function strongPrincipal(
   authenticated: Readonly<AuthenticatedLocalCommand>,
   committedAtMs: number,
+  authorizationExpiresAtMs: number,
 ): Readonly<LocalReconciliationReviewAuthorizationHeader['reviewer']> {
   const principal = authenticated.principal;
   if (
@@ -266,7 +267,9 @@ function strongPrincipal(
     ) ||
     principal.authenticatedAtMs > committedAtMs ||
     committedAtMs - principal.authenticatedAtMs > MAX_AUTHENTICATION_AGE_MS ||
-    principal.expiresAtMs <= committedAtMs
+    principal.expiresAtMs <= committedAtMs ||
+    !Number.isSafeInteger(authorizationExpiresAtMs) ||
+    principal.expiresAtMs < authorizationExpiresAtMs
   ) {
     configurationError(
       'review commit requires a recent strongly authenticated User',
@@ -615,9 +618,12 @@ async function publishAuthorization(
   dependencies: LocalReconciliationReviewCompletionDependencies,
   uid: number,
 ): Promise<Readonly<LocalReconciliationReviewAuthorizationEvidence>> {
+  const authorizationExpiresAtMs =
+    command.request.committedAtMs + command.request.authorizationLifetimeMs;
   const reviewer = strongPrincipal(
     authenticated,
     command.request.committedAtMs,
+    authorizationExpiresAtMs,
   );
   ensureLocalReconciliationReviewIssuerKeyring(
     command.options.issuerKeyringPath,
@@ -638,8 +644,7 @@ async function publishAuthorization(
       preparedHeadDigest: head.headDigest,
       reviewer,
       issuedAtMs: command.request.committedAtMs,
-      expiresAtMs:
-        command.request.committedAtMs + command.request.authorizationLifetimeMs,
+      expiresAtMs: authorizationExpiresAtMs,
     });
   return publishLocalReconciliationReviewAuthorization({
     targetPath: selected.authorization,

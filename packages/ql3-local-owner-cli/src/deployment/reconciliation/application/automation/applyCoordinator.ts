@@ -210,7 +210,7 @@ async function authenticate(
       databasePath: options.targetDatabasePath,
       ownerPepperKeyringDirectory: options.ownerPepperKeyringDirectory,
       credentialFilePath: options.credentialFilePath,
-      authenticationNamespace: 'local_reconciliation_automation_apply',
+      authenticationNamespace: 'reconcile_automation_apply',
       now: () => atMs,
     });
     assertReviewer(selected, reviewer, atMs);

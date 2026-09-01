@@ -691,7 +691,7 @@ async function authorization(
           selected.application.review.authorization.header.reviewer,
           command.request.committedAtMs,
         );
-        return issueReconciliationAutomationDecision({
+        return await issueReconciliationAutomationDecision({
           ...common,
           reviewFilePath: command.request.decisionFilePath,
           reviewer,

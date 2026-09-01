@@ -126,6 +126,7 @@ function fixture(
     profile = 'edge',
     createDefaultSidecars = true,
     useAdoptedTargetBaseline = false,
+    targetInsideDeploymentRoot = false,
     initializeDatabases,
     mutateTarget,
   } = {},
@@ -136,6 +137,7 @@ function fixture(
   fs.chmodSync(root, 0o700);
   t.after(() => removeFixtureRoot(root));
   const deploymentRoot = path.join(root, 'runtime');
+  const sqliteRoot = path.join(deploymentRoot, 'sqlite');
   const serviceRoot = path.join(deploymentRoot, 'service');
   const cutoverId = 'capture-cutover-1';
   const journal = path.join(serviceRoot, 'cutovers', cutoverId);
@@ -143,6 +145,7 @@ function fixture(
   const captureRoot = path.join(root, 'capture-root');
   for (const directory of [
     deploymentRoot,
+    sqliteRoot,
     serviceRoot,
     path.dirname(journal),
     journal,
@@ -152,7 +155,9 @@ function fixture(
     if (!fs.existsSync(directory)) fs.mkdirSync(directory, { mode: 0o700 });
   }
   const legacySourcePath = path.join(root, 'database.sqlite');
-  const targetDatabasePath = path.join(root, 'database.ql3.sqlite');
+  const targetDatabasePath = targetInsideDeploymentRoot
+    ? path.join(sqliteRoot, 'database.ql3.sqlite')
+    : path.join(root, 'database.ql3.sqlite');
   const recoveryPath = path.join(root, 'database.recovery.sqlite');
   const manifestPath = path.join(root, 'adoption-manifest.json');
   const activationPath = path.join(root, 'activation.json');
@@ -995,6 +1000,7 @@ function mutatePlanningTarget({ targetDatabasePath }) {
 function preparedPlan(t, options = {}) {
   const state = preparedCapture(t, {
     createDefaultSidecars: options.createDefaultSidecars ?? false,
+    targetInsideDeploymentRoot: options.targetInsideDeploymentRoot ?? false,
     initializeDatabases:
       options.initializeDatabases ?? planningDatabaseInitializer(options),
     mutateTarget: options.mutateTarget ?? mutatePlanningTarget,
@@ -1229,7 +1235,7 @@ function reviewCommitFixture(t, options = {}) {
       expectedHeadDigest: prepared.instanceHeadDigest,
       decisionFilePath: reviewFile.filePath,
       committedAtMs,
-      authorizationLifetimeMs: 30 * 60 * 1_000,
+      authorizationLifetimeMs: 60_000,
     },
   };
   let authentications = 0;
@@ -1408,6 +1414,7 @@ async function plannedAutomationFixture(t, options = {}) {
     applicationId: options.applicationId,
     reviewSuffix: `automation-decision-${suffix}`,
     createDefaultSidecars: false,
+    targetInsideDeploymentRoot: true,
     initializeDatabases:
       options.readyTarget === true
         ? automationReadyDatabaseInitializer()
@@ -1571,6 +1578,7 @@ function automationDecisionCommitFixture(
   let authentications = 0;
   let confirmations = 0;
   let databaseCloses = 0;
+  let databaseClosed = true;
   const command = {
     schemaVersion: 1,
     operation: 'local.deployment.reconciliation.automation.decision.commit',
@@ -1594,8 +1602,10 @@ function automationDecisionCommitFixture(
   const dependencies = {
     now: () => committedAtMs,
     async openAuthenticationDatabase() {
+      databaseClosed = false;
       return {
         async close() {
+          databaseClosed = true;
           databaseCloses += 1;
         },
       };
@@ -1624,6 +1634,7 @@ function automationDecisionCommitFixture(
           pepperVersion: 1,
         },
         async confirm() {
+          assert.equal(databaseClosed, false);
           confirmations += 1;
         },
       };
@@ -3374,6 +3385,17 @@ test('review commit rejects weak principals, oversized Edge streams and decision
         };
       },
     }),
+    /recent strongly authenticated User/,
+  );
+
+  const overlong = reviewCommitFixture(t, {
+    planId: '00000000-0000-4000-8000-000000000392',
+    reviewId: '00000000-0000-4000-8000-000000000393',
+    reviewSuffix: 'overlong',
+  });
+  overlong.command.request.authorizationLifetimeMs = 60_001;
+  await assert.rejects(
+    commitLocalReconciliationReview(overlong.command, overlong.dependencies),
     /recent strongly authenticated User/,
   );
 
@@ -5658,7 +5680,7 @@ test('automation decision reauthenticates the same reviewer, seals exact row dec
     async authenticate(_database, options) {
       assert.equal(
         options.authenticationNamespace,
-        'local_reconciliation_automation_apply',
+        'reconcile_automation_apply',
       );
       const authenticatedAtMs = options.now();
       return {

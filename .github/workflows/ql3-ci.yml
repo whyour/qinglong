@@ -786,6 +786,10 @@ jobs:
           UPGRADE_REHEARSAL_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-cutover-rehearsal-${{ matrix.image_arch }}"
           RECONCILIATION_REHEARSAL_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-reconciliation-rehearsal-${{ matrix.image_arch }}"
           RECONCILIATION_CAPTURE_ROOT="${RUNNER_TEMP}/ql3-alpha-upgrade-reconciliation-capture-${{ matrix.image_arch }}"
+          RECONCILIATION_FLOW_ROOT="${RUNNER_TEMP}/ql3-alpha-reconciliation-flow-${{ matrix.image_arch }}"
+          RECONCILIATION_DECISION_ROOT="${RUNNER_TEMP}/ql3-alpha-reconciliation-decisions-${{ matrix.image_arch }}"
+          RECONCILIATION_REVIEW_DECISION_ROOT="${RECONCILIATION_DECISION_ROOT}/review"
+          RECONCILIATION_AUTOMATION_DECISION_ROOT="${RECONCILIATION_DECISION_ROOT}/automation"
           LEGACY_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-upgrade-legacy-${{ matrix.image_arch }}"
           TARGET_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-upgrade-target-${{ matrix.image_arch }}"
           RECONCILIATION_LEGACY_CONTAINER="ql3-alpha-${TRIAL_VARIANT}-reconciliation-legacy-${{ matrix.image_arch }}"
@@ -828,6 +832,53 @@ jobs:
           test -s "${RECONCILIATION_CAPTURE_ROOT}/019f8680-143d-4000-8000-000000000161/manifest.json"
           test -s "${RECONCILIATION_CAPTURE_ROOT}/019f8680-143d-4000-8000-000000000161/receipt.json"
           test -d "${RECONCILIATION_CAPTURE_ROOT}/019f8680-143d-4000-8000-000000000161/assets"
+          install -d -m 0700 \
+            "${RECONCILIATION_DECISION_ROOT}" \
+            "${RECONCILIATION_REVIEW_DECISION_ROOT}" \
+            "${RECONCILIATION_AUTOMATION_DECISION_ROOT}"
+          sh "${BUNDLE_ROOT}/reconciliation-rehearsal.sh" \
+            prepare edge "${RECONCILIATION_REHEARSAL_ROOT}" \
+            "${RECONCILIATION_CAPTURE_ROOT}" "${RECONCILIATION_FLOW_ROOT}" \
+            Asia/Shanghai
+          grep -q '"status":"operator_decision_required"' \
+            "${RECONCILIATION_FLOW_ROOT}/summary.json"
+          grep -q '"automaticDecision":"not_authorized"' \
+            "${RECONCILIATION_FLOW_ROOT}/summary.json"
+          node scripts/ql3-local-alpha-reconciliation-decision-fixture.cjs \
+            --mode=review \
+            --reconciliation-root="${RECONCILIATION_FLOW_ROOT}" \
+            --output="${RECONCILIATION_REVIEW_DECISION_ROOT}/review.ndjson"
+          sh "${BUNDLE_ROOT}/reconciliation-rehearsal.sh" \
+            review edge "${RECONCILIATION_REHEARSAL_ROOT}" \
+            "${RECONCILIATION_CAPTURE_ROOT}" "${RECONCILIATION_FLOW_ROOT}" \
+            "${RECONCILIATION_REVIEW_DECISION_ROOT}/review.ndjson"
+          grep -q '"status":"automation_decision_required"' \
+            "${RECONCILIATION_FLOW_ROOT}/summary.json"
+          grep -q '"decisionAuthority":"authenticated_user"' \
+            "${RECONCILIATION_FLOW_ROOT}/summary.json"
+          grep -q '"automaticRowDecision":"not_authorized"' \
+            "${RECONCILIATION_FLOW_ROOT}/summary.json"
+          node scripts/ql3-local-alpha-reconciliation-decision-fixture.cjs \
+            --mode=automation \
+            --reconciliation-root="${RECONCILIATION_FLOW_ROOT}" \
+            --output="${RECONCILIATION_AUTOMATION_DECISION_ROOT}/automation.ndjson"
+          sh "${BUNDLE_ROOT}/reconciliation-rehearsal.sh" \
+            apply-rollback edge "${RECONCILIATION_REHEARSAL_ROOT}" \
+            "${RECONCILIATION_CAPTURE_ROOT}" "${RECONCILIATION_FLOW_ROOT}" \
+            "${RECONCILIATION_AUTOMATION_DECISION_ROOT}/automation.ndjson" \
+            "${LEGACY_READINESS_ROOT}"
+          grep -q '"status":"reconciliation_automation_rolled_back"' \
+            "${RECONCILIATION_FLOW_ROOT}/summary.json"
+          grep -q '"completion":"not_attempted"' \
+            "${RECONCILIATION_FLOW_ROOT}/summary.json"
+          grep -q '"targetRestart":"not_attempted"' \
+            "${RECONCILIATION_FLOW_ROOT}/summary.json"
+          grep -q '"legacyRestart":"not_attempted"' \
+            "${RECONCILIATION_FLOW_ROOT}/summary.json"
+          grep -q '"state":"reconciliation_automation_applied"' \
+            "${RECONCILIATION_FLOW_ROOT}/results/automation-apply-verify.result.json"
+          grep -q '"state":"reconciliation_automation_rolled_back"' \
+            "${RECONCILIATION_FLOW_ROOT}/results/automation-rollback-verify.result.json"
           docker rm "${RECONCILIATION_TARGET_CONTAINER}" "${RECONCILIATION_LEGACY_CONTAINER}"
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-wal"
           test ! -e "${LEGACY_READINESS_ROOT}/db/database.sqlite-journal"

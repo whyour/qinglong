@@ -82,15 +82,26 @@ gid=$(id -g)
 run_inspect() {
   command_file=$1
   result_file=$2
-  docker run --rm --read-only --user "$uid:$gid" --network none \
-    --cap-drop ALL --security-opt no-new-privileges \
-    --memory 128m --memory-swap 128m --cpus 0.5 --pids-limit 32 \
-    --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
-    --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly" \
-    --mount "type=bind,src=$evidence_root,dst=/var/lib/qinglong3" \
-    "$OPERATOR_IMAGE" adoption run \
-    --command-file "/var/lib/qinglong3/$command_file" \
-    >"$evidence_root/results/$result_file"
+  result_stage="$evidence_root/results/.$result_file.$$"
+  attempt=1
+  while [ "$attempt" -le 2 ]; do
+    if docker run --rm --read-only --user "$uid:$gid" --network none \
+      --cap-drop ALL --security-opt no-new-privileges \
+      --memory 128m --memory-swap 128m --cpus 0.5 --pids-limit 32 \
+      --tmpfs /tmp:rw,nosuid,nodev,noexec,size=8m \
+      --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly" \
+      --mount "type=bind,src=$evidence_root,dst=/var/lib/qinglong3" \
+      "$OPERATOR_IMAGE" adoption run \
+      --command-file "/var/lib/qinglong3/$command_file" \
+      >"$result_stage"
+    then
+      chmod 0600 "$result_stage"
+      mv "$result_stage" "$evidence_root/results/$result_file"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+  done
+  return 1
 }
 
 run_inspect sqlite-inspect.json sqlite-inspect.result.json

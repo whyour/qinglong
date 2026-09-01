@@ -166,8 +166,8 @@ function adapters(overrides = {}, variant = 'headless') {
 test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const paths = fixture(t);
   const manifest = createLocalAlphaTrialKit(createOptions(paths), adapters());
-  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v9');
-  assert.equal(manifest.schemaVersion, 10);
+  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v10');
+  assert.equal(manifest.schemaVersion, 11);
   assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.equal(manifest.architecture, 'arm64');
@@ -181,6 +181,10 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
   assert.equal(
     manifest.upgradeCutoverRehearsal.file,
     'upgrade-cutover-rehearsal.sh',
+  );
+  assert.equal(
+    manifest.upgradeReconciliationRehearsal.file,
+    'reconciliation-rehearsal.sh',
   );
   const quickstart = path.join(paths.outputRoot, 'quickstart.sh');
   const syntax = spawnSync('sh', ['-n', quickstart], { encoding: 'utf8' });
@@ -343,6 +347,78 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     'stoppedAuthority',
     'targetDatabasePath',
   ]);
+  const reconciliationRehearsal = path.join(
+    paths.outputRoot,
+    'reconciliation-rehearsal.sh',
+  );
+  const reconciliationSyntax = spawnSync(
+    'sh',
+    ['-n', reconciliationRehearsal],
+    {
+      encoding: 'utf8',
+    },
+  );
+  assert.equal(reconciliationSyntax.status, 0, reconciliationSyntax.stderr);
+  const reconciliationContents = fs.readFileSync(
+    reconciliationRehearsal,
+    'utf8',
+  );
+  assert.match(reconciliationContents, /VARIANT='headless'/);
+  for (const operation of [
+    'reconciliation.plan.prepare',
+    'reconciliation.review.diagnostics',
+    'reconciliation.review.commit',
+    'reconciliation.application.commit',
+    'reconciliation.automation.decision.commit',
+    'reconciliation.automation.apply',
+    'reconciliation.automation.apply.rollback',
+  ]) {
+    assert.match(reconciliationContents, new RegExp(operation));
+  }
+  assert.match(reconciliationContents, /--memory 128m --memory-swap 128m/);
+  assert.match(reconciliationContents, /--network none/);
+  assert.match(
+    reconciliationContents,
+    /\[ "\$\(stat -c %a "\$decision_parent"\)" = 700 \]/,
+  );
+  assert.match(
+    reconciliationContents,
+    /type=bind,src=\$decision_parent,dst=\$decision_parent,readonly/,
+  );
+  assert.match(
+    reconciliationContents,
+    /type=bind,src=\$legacy_root,dst=\$legacy_root,readonly/,
+  );
+  assert.match(
+    reconciliationContents,
+    /apply-rollback edge\|standalone .* \/absolute\/legacy-root/,
+  );
+  assert.match(reconciliationContents, /result_stage=.*\.\$result_file\.\$\$/);
+  assert.match(
+    reconciliationContents,
+    /\[ -e "\$command_root\/automation-apply\.json" \]/,
+  );
+  assert.doesNotMatch(
+    reconciliationContents,
+    /type=bind,src=\$input_file,dst=\$input_file,readonly/,
+  );
+  assert.match(
+    reconciliationContents,
+    /\$decision_label parent must contain only the selected decision file/,
+  );
+  assert.equal(
+    (reconciliationContents.match(/"authorizationLifetimeMs":60000/g) || [])
+      .length,
+    2,
+  );
+  assert.doesNotMatch(
+    reconciliationContents,
+    /"authorizationLifetimeMs":1800000/,
+  );
+  assert.match(reconciliationContents, /! -path "\$decision_file"/);
+  assert.match(reconciliationContents, /automaticDecision":"not_authorized/);
+  assert.match(reconciliationContents, /automaticRowDecision":"not_authorized/);
+  assert.match(reconciliationContents, /"completion":"not_attempted"/);
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
   assert.equal(report.sourceRevision, revision);
@@ -356,6 +432,7 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     'qinglong3-local-operator.cdx.json',
     'qinglong3-local-trial-kit-arm64.docker.tar',
     'quickstart.sh',
+    'reconciliation-rehearsal.sh',
     'upgrade-cutover-rehearsal.sh',
     'upgrade-readiness.sh',
     'upgrade-rehearsal.sh',
@@ -395,6 +472,10 @@ test('materializes a distinct loopback Console trial kit without widening the he
   assert.equal(verification.gates.legacyUpgradeStage, 'passed');
   assert.equal(verification.gates.legacyUpgradeCutover, 'passed');
   assert.equal(verification.gates.legacyUpgradeReconciliationCapture, 'passed');
+  assert.equal(
+    verification.gates.legacyUpgradeReconciliationAutomationRollback,
+    'passed',
+  );
   const quickstartContents = fs.readFileSync(
     path.join(paths.outputRoot, 'quickstart.sh'),
     'utf8',
@@ -429,6 +510,7 @@ test('materializes a distinct loopback Console trial kit without widening the he
     'qinglong3-local-console-trial-kit-arm64.docker.tar',
     'qinglong3-local-operator.cdx.json',
     'quickstart.sh',
+    'reconciliation-rehearsal.sh',
     'upgrade-cutover-rehearsal.sh',
     'upgrade-readiness.sh',
     'upgrade-rehearsal.sh',
@@ -467,6 +549,7 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
     'upgrade-readiness',
     'upgrade-rehearsal',
     'upgrade-cutover-rehearsal',
+    'upgrade-reconciliation-rehearsal',
     'sbom',
     'verification',
   ]) {
@@ -501,6 +584,11 @@ test('offline audit rejects archive, file-set, SBOM and verification mutation', 
     } else if (mutation === 'upgrade-cutover-rehearsal') {
       fs.appendFileSync(
         path.join(paths.outputRoot, 'upgrade-cutover-rehearsal.sh'),
+        '# drift\n',
+      );
+    } else if (mutation === 'upgrade-reconciliation-rehearsal') {
+      fs.appendFileSync(
+        path.join(paths.outputRoot, 'reconciliation-rehearsal.sh'),
         '# drift\n',
       );
     } else if (mutation === 'sbom') {
@@ -544,6 +632,7 @@ test('offline audit rejects a rehashed non-canonical quickstart', (t) => {
     'upgrade-readiness.sh',
     'upgrade-rehearsal.sh',
     'upgrade-cutover-rehearsal.sh',
+    'reconciliation-rehearsal.sh',
     'README.md',
     'manifest.json',
   ];
@@ -652,7 +741,7 @@ exit 1
   assert.doesNotMatch(calls, /--network (?!none)/);
 });
 
-test('generated upgrade readiness drives two read-only legacy inspections', (t) => {
+test('generated upgrade readiness retries one transient read-only inspection', (t) => {
   const paths = fixture(t);
   createLocalAlphaTrialKit(createOptions(paths), adapters());
   const fakeBin = path.join(paths.fixtureRoot, 'readiness-fake-bin');
@@ -676,9 +765,16 @@ case " $* " in
   *'/sqlite-inspect.json'*) printf '%s\\n' '{"status":"inspected","evidence":{"planDigest":"${'a'.repeat(
     64,
   )}"}}'; exit 0 ;;
-  *'/data-directory-inspect.json'*) printf '%s\\n' '{"status":"inspected","evidence":{"planDigest":"${'b'.repeat(
-    64,
-  )}"}}'; exit 0 ;;
+  *'/data-directory-inspect.json'*)
+    if [ ! -e "$FAKE_DOCKER_DATA_ATTEMPT" ]; then
+      : >"$FAKE_DOCKER_DATA_ATTEMPT"
+      exit 1
+    fi
+    printf '%s\\n' '{"status":"inspected","evidence":{"planDigest":"${'b'.repeat(
+      64,
+    )}"}}'
+    exit 0
+    ;;
 esac
 exit 1
 `,
@@ -702,6 +798,10 @@ exit 1
       encoding: 'utf8',
       env: {
         ...process.env,
+        FAKE_DOCKER_DATA_ATTEMPT: path.join(
+          paths.fixtureRoot,
+          'readiness-data-attempt',
+        ),
         FAKE_DOCKER_LOG: dockerLog,
         PATH: `${fakeBin}:${process.env.PATH}`,
       },
@@ -740,6 +840,19 @@ exit 1
   );
   assert.match(calls, /--network none/);
   assert.match(calls, /--memory 128m --memory-swap 128m/);
+  assert.equal((calls.match(/\/sqlite-inspect\.json/g) ?? []).length, 1);
+  assert.equal(
+    (calls.match(/\/data-directory-inspect\.json/g) ?? []).length,
+    2,
+  );
+  assert.equal(
+    fs
+      .readdirSync(path.join(evidenceRoot, 'results'))
+      .some((entry) =>
+        entry.startsWith('.data-directory-inspect.result.json.'),
+      ),
+    false,
+  );
   assert.doesNotMatch(calls, /adoption\.stage|activation\.prepare|cutover/);
 });
 
@@ -856,6 +969,20 @@ test('create rejects verification without the exact reconciliation capture gate'
     fs.readFileSync(paths.verificationEvidence, 'utf8'),
   );
   delete evidence.gates.legacyUpgradeReconciliationCapture;
+  fs.writeFileSync(paths.verificationEvidence, `${JSON.stringify(evidence)}\n`);
+  assert.throws(
+    () => createLocalAlphaTrialKit(createOptions(paths), adapters()),
+    /verification evidence is incompatible/,
+  );
+  assert.equal(fs.existsSync(paths.outputRoot), false);
+});
+
+test('create rejects verification without the reviewed Automation rollback gate', (t) => {
+  const paths = fixture(t);
+  const evidence = JSON.parse(
+    fs.readFileSync(paths.verificationEvidence, 'utf8'),
+  );
+  delete evidence.gates.legacyUpgradeReconciliationAutomationRollback;
   fs.writeFileSync(paths.verificationEvidence, `${JSON.stringify(evidence)}\n`);
   assert.throws(
     () => createLocalAlphaTrialKit(createOptions(paths), adapters()),
