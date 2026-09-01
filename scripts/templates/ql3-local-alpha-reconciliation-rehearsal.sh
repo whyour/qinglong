@@ -599,6 +599,7 @@ EOF
   chmod 0600 "$command_root/secret-config-plan.json"
   phase 'materialize reviewed Secret/Config candidate plan'
   run_deploy reconciliation-secret-config-plan secret-config-plan.json secret-config-plan.result.json "$secondary_input"
+  sed -n '1p' "$result_root/secret-config-plan.result.json" >&2
   grep -q '"state":"reconciliation_secret_config_planned"' "$result_root/secret-config-plan.result.json" || fail 'Secret/Config plan did not materialize'
   grep -q '"outcome":"ready"' "$result_root/secret-config-plan.result.json" || fail 'Secret/Config plan is manual-required or has no applicable candidates'
   secret_config_plan_digest=$(extract_digest "$result_root/secret-config-plan.result.json" secretConfigPlanDigest)
