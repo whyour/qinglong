@@ -182,6 +182,8 @@ sh upgrade-cutover-rehearsal.sh \
 
 该写入由短生命周期 Owner Operator 提交到 active target 的数据权威，不经过普通 Local API listener，因此只证明写后分类与 capture，不证明浏览器/生产流量接管。原生 artifact job 会先执行默认 clean rollback，再用同一 unchanged fixture 独立实跑本模式；`verification-evidence.json.gates.legacyUpgradeReconciliationCapture` 必须为 `passed`。
 
+当前已闭合的 exact Console v9 阶段实物绑定源码 `0235973c9b54a2f22de09b6487ea9f184f0b8bfd` 与 [workflow run 33469435652](https://github.com/whyour/qinglong/actions/runs/33469435652)：amd64 artifact `9786301280`、arm64 artifact `9786374284`、双架构 milestone `9786520389`，均保留至 2026-10-01。两个原生架构在上传前分别完成 clean rollback、写后 capture 和 bundle offline audit；milestone finalizer 下载并再次审计两个 exact bundle。本机重新下载的 milestone v5 通过 `SHA256SUMS`，auditor 返回 `compatible=true`。这是 `3.0.0-alpha.2` 的隔离 Alpha 候选，不是 Public Release 或用户真实 2.x 数据的自动升级授权。
+
 ## 手工加载与最小 smoke
 
 从 `manifest.json.archive.file` 找到 archive 后加载：

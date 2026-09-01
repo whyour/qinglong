@@ -1,6 +1,6 @@
 # ADR-0526：Exact 写后 Reconciliation Capture
 
-- 状态：Accepted（源码与 artifact gate 已闭合；同源双架构阶段实物待独立 workflow 交付）
+- 状态：Accepted（同源 exact Console 双架构阶段实物已交付）
 - 日期：2026-09-01
 - 决策：D-426c1
 - 关联：ADR-0476、ADR-0482、ADR-0483、ADR-0523、ADR-0524、ADR-0525
@@ -41,8 +41,9 @@ ADR-0524/0525 已让 downloadable Trial Kit 在 headless 与 Console 两种变�
 
 - 编辑前 GitNexus：Trial Kit verification/create 为 LOW，offline auditor 为 MEDIUM（5 direct、12 total、0 process），Operator workflow auditor 为 LOW；没有 HIGH/CRITICAL 编辑目标。Shell 模板未被索引，使用 backward-compatible 参数、`sh -n`、静态 contract 与原生 Docker artifact gate 约束。
 - 聚焦 bundle/operator 静态回归为 18/18，证明 v9/v7/v6 schema、canonical script、required gate、exact `task.put`/capture command 与 workflow order 闭合。全部 18 个 `packages/ql3-*` 已重新编译并通过自身契约测试；后端脚本层全量回归为 1661 total / 1659 pass / 2 conditional skip / 0 fail。Package boundary（18 个 package、无 single/shallow source package）、Edge import、Cluster dependency 与 Local Operator image audit 全部 `compatible=true`。
-- 首次 exact Console artifact run `33467541901` 在 arm64 上已真实证明写入与 `reconciliation_required`，随后于 capture prepare 因 v4 adopted baseline 重算缺口失败，且未上传 Trial Kit，因而不计为交付。修复后 reconciliation 聚焦回归为 72 total / 70 pass / 2 conditional Docker skip / 0 fail，新增 adopted-baseline 正向与篡改失败关闭用例；Owner CLI 全量为 316 total / 309 pass / 7 conditional skip / 0 fail。仍必须以新 source commit 重跑原生双架构 workflow。
-- exact Docker 正向证据必须来自新的 workflow source commit；在该 run 与双架构 milestone 实际成功、重新下载并离线复核前，本 ADR 不宣称 D-426c1 已形成可下载阶段实物。
+- 首次 exact Console artifact run `33467541901` 在 arm64 上真实证明写入与 `reconciliation_required`，随后于 capture prepare 因 v4 adopted baseline 重算缺口失败，且未上传 Trial Kit，因而不计为交付。修复后 reconciliation 聚焦回归为 72 total / 70 pass / 2 conditional Docker skip / 0 fail，新增 adopted-baseline 正向与篡改失败关闭用例；Owner CLI 全量为 316 total / 309 pass / 7 conditional skip / 0 fail。
+- 修复提交 `0235973c9b54a2f22de09b6487ea9f184f0b8bfd` 的普通主 CI [run 33469372499](https://github.com/whyour/qinglong/actions/runs/33469372499) 为 41 success / 3 expected artifact-finalizer skip / 0 fail，同源 Kubernetes [run 33469372500](https://github.com/whyour/qinglong/actions/runs/33469372500) 成功。显式 Local Console [run 33469435652](https://github.com/whyour/qinglong/actions/runs/33469435652) 为 42 success / 2 scope skip / 0 fail；amd64、arm64 的 `Materialize and offline-audit the native Local Alpha trial kit`、上传步骤和最终 `Finalize the Local Alpha milestone` 全部成功。
+- 该 run 交付 artifact `9786301280`（amd64，226683392 bytes，GitHub ZIP `sha256:49e921cb251da8cec3dcee5308174dd8aca89ffa18a3df6e6c7d0f43095c6f70`）、`9786374284`（arm64，222083072 bytes，`sha256:4ff7d3fff5af16ca55350d0dbf14c35d8ddcdeecb7d395ba017a14081949e0e8`）与 `9786520389`（milestone，6489 bytes，`sha256:d69c769117268fe8559043bb62999549d215c12f353e34c51d32d22ce319dd4c`），均保留至 2026-10-01。finalizer 下载并重新审计两个 exact bundle 后才生成 milestone；本机重新下载的 milestone 通过 `SHA256SUMS`，v5 auditor 返回 `compatible=true`，绑定 `3.0.0-alpha.2`、`variant=console`、同一 source/workflow SHA/ref/run/attempt。milestone 记录的内部 Docker archive digest 为 amd64 `sha256:3c9f7dac623bacd4b88b933a3668cfe74526a9fc4fe73823f821535a11aba3f4`、arm64 `sha256:68ee76d6f0a20f876da4ccfef96bb58f08aa965969d44ed587f3df37536529db`。D-426c1 因此已形成可下载、可验真的 Alpha 阶段实物；它仍不是 Public Release，也不授权自动 reconciliation application、Legacy restart 或生产切换。
 
 ## 后续
 
