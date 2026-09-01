@@ -119,9 +119,9 @@ function createLegacyDatabase(databasePath, shape) {
         '0 0 * * *', 1, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       );
       INSERT INTO "Envs" (
-        id, name, value, status, position, createdAt, updatedAt
+        id, name, value, status, position, isPinned, createdAt, updatedAt
       ) VALUES (
-        1, 'ALPHA_READINESS_VALUE', 'synthetic-only', 0, 100,
+        1, 'ALPHA_READINESS_VALUE', 'synthetic-only', 0, 100, 0,
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       );
     `);

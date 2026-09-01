@@ -43,6 +43,22 @@ test('creates one private production-shaped QingLong 2.x readiness fixture', (t)
       'Subscriptions',
       'sqlite_sequence',
     ]);
+    assert.deepEqual(
+      database
+        .prepare(
+          'SELECT name, status, position, isPinned FROM Envs ORDER BY id',
+        )
+        .all()
+        .map((row) => ({ ...row })),
+      [
+        {
+          name: 'ALPHA_READINESS_VALUE',
+          status: 0,
+          position: 100,
+          isPinned: 0,
+        },
+      ],
+    );
   } finally {
     database.close();
   }
