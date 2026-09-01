@@ -13,14 +13,32 @@ function fail(message) {
 }
 
 function parseArguments(argv) {
-  if (argv.length !== 1) fail('usage: --output=/absolute/new/data-root');
-  const match = /^--output=(\/.+)$/u.exec(argv[0]);
+  const values = {};
+  for (const argument of argv) {
+    const match = /^--([a-z-]+)=(.+)$/u.exec(argument);
+    if (!match || Object.hasOwn(values, match[1])) {
+      fail(
+        'usage: --output=/absolute/new/data-root [--shape=production|completion-ready]',
+      );
+    }
+    values[match[1]] = match[2];
+  }
+  if (
+    !values.output ||
+    Object.keys(values).some((key) => !['output', 'shape'].includes(key)) ||
+    (values.shape && !['production', 'completion-ready'].includes(values.shape))
+  ) {
+    fail(
+      'usage: --output=/absolute/new/data-root [--shape=production|completion-ready]',
+    );
+  }
+  const match = /^(\/.+)$/u.exec(values.output);
   if (!match) fail('output must be an absolute path');
   const output = path.resolve(match[1]);
   if (output !== match[1] || path.parse(output).root === output) {
     fail('output must be a normalized absolute non-root path');
   }
-  return output;
+  return Object.freeze({ output, shape: values.shape || 'production' });
 }
 
 function writePrivate(filePath, contents) {
@@ -31,7 +49,7 @@ function writePrivate(filePath, contents) {
   });
 }
 
-function createLegacyDatabase(databasePath) {
+function createLegacyDatabase(databasePath, shape) {
   const database = new DatabaseSync(databasePath);
   try {
     database.exec(`
@@ -94,7 +112,6 @@ function createLegacyDatabase(databasePath) {
         status DECIMAL NOT NULL, exit_code DECIMAL,
         createdAt DATETIME NOT NULL, updatedAt DATETIME NOT NULL
       );
-      CREATE TABLE "PluginOwnedState" (id INTEGER PRIMARY KEY, payload TEXT NOT NULL);
       INSERT INTO "Crontabs" (
         id, name, command, schedule, status, isDisabled, isPinned, createdAt, updatedAt
       ) VALUES (
@@ -107,22 +124,32 @@ function createLegacyDatabase(databasePath) {
         1, 'ALPHA_READINESS_VALUE', 'synthetic-only', 0, 100,
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       );
-      INSERT INTO "PluginOwnedState" (id, payload)
-        VALUES (1, '{"synthetic":true}');
     `);
+    if (shape === 'production') {
+      database.exec(`
+        CREATE TABLE "PluginOwnedState" (
+          id INTEGER PRIMARY KEY, payload TEXT NOT NULL
+        );
+        INSERT INTO "PluginOwnedState" (id, payload)
+          VALUES (1, '{"synthetic":true}');
+      `);
+    }
   } finally {
     database.close();
   }
   fs.chmodSync(databasePath, 0o600);
 }
 
-function createFixture(output) {
+function createFixture(output, shape = 'production') {
+  if (!['production', 'completion-ready'].includes(shape)) {
+    fail('fixture shape is invalid');
+  }
   if (fs.existsSync(output)) fail('output must not already exist');
   fs.mkdirSync(output, { mode: 0o700 });
   for (const directory of ['config', 'scripts', 'db', 'upload', 'ssh.d']) {
     fs.mkdirSync(path.join(output, directory), { mode: 0o700 });
   }
-  createLegacyDatabase(path.join(output, 'db', 'database.sqlite'));
+  createLegacyDatabase(path.join(output, 'db', 'database.sqlite'), shape);
   writePrivate(
     path.join(output, 'config', 'config.sh'),
     "export ALPHA_READINESS_CONFIG='synthetic-only'\n",
@@ -138,11 +165,13 @@ function createFixture(output) {
   return Object.freeze({
     output,
     database: path.join(output, 'db', 'database.sqlite'),
+    shape,
   });
 }
 
 function runCli(argv) {
-  const result = createFixture(parseArguments(argv));
+  const options = parseArguments(argv);
+  const result = createFixture(options.output, options.shape);
   process.stdout.write(`${JSON.stringify({ status: 'created', ...result })}\n`);
 }
 

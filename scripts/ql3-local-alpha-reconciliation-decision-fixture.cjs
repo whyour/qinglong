@@ -187,6 +187,19 @@ function diagnosticFacts(root, summary) {
   return facts;
 }
 
+function readNdjson(filePath, maximumBytes, label) {
+  const resolved = canonicalFile(filePath, maximumBytes, label);
+  try {
+    return fs
+      .readFileSync(resolved, 'utf8')
+      .trimEnd()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+  } catch {
+    return fail(`${label} must be canonical NDJSON`);
+  }
+}
+
 function reviewFixture(root, output) {
   const summary = validateSummary(root, 'operator_decision_required');
   if (
@@ -256,6 +269,101 @@ function reviewFixture(root, output) {
     filePath,
     decisionCount: decisions.length,
     adoptedAutomationTables,
+  });
+}
+
+function completionReviewFixture(root, output) {
+  const summary = validateSummary(root, 'operator_decision_required');
+  if (
+    !UUID_V4.test(summary.review?.reviewId || '') ||
+    !DIGEST.test(summary.plan?.planDigest || '') ||
+    !DIGEST.test(summary.review?.preparationDigest || '')
+  ) {
+    fail('completion review fixture identity is invalid');
+  }
+  const facts = diagnosticFacts(root, summary);
+  let adoptedAutomationTables = 0;
+  let legacyRunHistoryFacts = 0;
+  let targetRunHistoryFacts = 0;
+  let secretConfigFacts = 0;
+  const decisions = [];
+  for (const fact of facts) {
+    if (fact.decisionRequirement === 'informational') continue;
+    if (fact.decisionRequirement === 'blocked') {
+      fail('completion review fixture refuses blocked diagnostic facts');
+    }
+    const automationTable =
+      fact.database === 'legacy' &&
+      fact.domain === 'automation' &&
+      fact.factKind === 'table' &&
+      fact.tableName === 'Crontabs' &&
+      fact.decisionRequirement === 'required';
+    const runHistory = fact.domain === 'run_history';
+    const secretConfig = fact.domain === 'secret_and_config';
+    if (automationTable) adoptedAutomationTables += 1;
+    if (runHistory && fact.database === 'legacy') legacyRunHistoryFacts += 1;
+    if (runHistory && fact.database === 'target') targetRunHistoryFacts += 1;
+    if (secretConfig) secretConfigFacts += 1;
+    const legacy = fact.database === 'legacy';
+    decisions.push({
+      schemaVersion: 1,
+      kind: 'qinglong3-local-reconciliation-review-decision',
+      database: fact.database,
+      domain: fact.domain,
+      factKind: fact.factKind,
+      ordinal: fact.ordinal,
+      factDigest: fact.factDigest,
+      disposition: automationTable
+        ? 'adopt_legacy'
+        : secretConfig
+        ? 'manual_external'
+        : runHistory && legacy
+        ? 'retain_both'
+        : legacy
+        ? 'exclude_legacy'
+        : 'retain_target',
+      reason: automationTable
+        ? 'prefer_legacy'
+        : secretConfig
+        ? 'external_recovery_required'
+        : runHistory && legacy
+        ? 'preserve_both'
+        : legacy
+        ? 'legacy_excluded'
+        : 'preserve_target',
+    });
+  }
+  if (
+    adoptedAutomationTables !== 1 ||
+    legacyRunHistoryFacts < 1 ||
+    targetRunHistoryFacts < 1 ||
+    secretConfigFacts < 1
+  ) {
+    fail(
+      'completion fixture requires Automation, Secret/Config, and dual Run History authority',
+    );
+  }
+  const records = [
+    {
+      schemaVersion: 1,
+      kind: 'qinglong3-local-reconciliation-review-decision-header',
+      diagnosticsContractVersion: 1,
+      reviewId: summary.review.reviewId,
+      profile: summary.profile,
+      planDigest: summary.plan.planDigest,
+      preparationDigest: summary.review.preparationDigest,
+    },
+    ...decisions,
+  ];
+  const filePath = writeExclusive(output, records);
+  return Object.freeze({
+    mode: 'completion-review',
+    filePath,
+    decisionCount: decisions.length,
+    adoptedAutomationTables,
+    legacyRunHistoryFacts,
+    targetRunHistoryFacts,
+    secretConfigFacts,
   });
 }
 
@@ -351,6 +459,111 @@ function automationFixture(root, output) {
   });
 }
 
+function secretConfigFixture(root, output) {
+  const summary = validateSummary(root, 'secret_config_decision_required');
+  const secretConfig = summary.secretConfig;
+  const decision = summary.secretConfigDecision;
+  if (
+    !UUID_V4.test(secretConfig?.secretConfigId || '') ||
+    !UUID_V7.test(decision?.decisionId || '') ||
+    !DIGEST.test(secretConfig?.secretConfigPlanDigest || '') ||
+    !DIGEST.test(decision?.preparationDigest || '') ||
+    !Number.isSafeInteger(secretConfig?.eligibleBindingCount) ||
+    !Number.isSafeInteger(secretConfig?.eligiblePreservationCount) ||
+    secretConfig.eligibleBindingCount + secretConfig.eligiblePreservationCount <
+      1 ||
+    secretConfig.targetConflictCount !== 0 ||
+    secretConfig.unadaptedLegacyConfigCount !== 0
+  ) {
+    fail('fixture requires one ready conflict-free Secret/Config plan');
+  }
+  const directory = path.join(
+    root,
+    'secret-config',
+    secretConfig.secretConfigId,
+  );
+  const receipt = readJson(
+    path.join(directory, 'receipt.json'),
+    'Secret/Config plan receipt',
+  );
+  if (
+    receipt?.schemaVersion !== 1 ||
+    receipt?.schema !==
+      'qinglong3-local-reconciliation-secret-config-plan-receipt' ||
+    receipt?.state !== 'reconciliation_secret_config_planned' ||
+    receipt?.secretConfigId !== secretConfig.secretConfigId ||
+    receipt?.secretConfigPlanDigest !== secretConfig.secretConfigPlanDigest ||
+    receipt?.outcome !== 'ready' ||
+    receipt?.eligibleBindingCount !== secretConfig.eligibleBindingCount ||
+    receipt?.eligiblePreservationCount !==
+      secretConfig.eligiblePreservationCount ||
+    receipt?.targetConflictCount !== 0 ||
+    receipt?.unadaptedLegacyConfigCount !== 0
+  ) {
+    fail('Secret/Config plan receipt is not fixture-eligible');
+  }
+  const records = readNdjson(
+    path.join(directory, 'plan.ndjson'),
+    8 * 1024 * 1024,
+    'Secret/Config row plan',
+  );
+  const candidates = records.filter(
+    (record) =>
+      record?.kind ===
+      'qinglong3-local-reconciliation-secret-config-plan-candidate',
+  );
+  if (
+    candidates.length !==
+    secretConfig.eligibleBindingCount + secretConfig.eligiblePreservationCount
+  ) {
+    fail('Secret/Config row plan candidate count is incompatible');
+  }
+  const decisions = candidates.map((candidate) => {
+    if (
+      candidate?.schemaVersion !== 1 ||
+      !Number.isSafeInteger(candidate.candidateOrdinal) ||
+      candidate.candidateOrdinal < 1 ||
+      !DIGEST.test(candidate.candidateDigest || '') ||
+      !['review_apply_binding', 'review_preserve_disabled'].includes(
+        candidate.requirement,
+      ) ||
+      candidate.target?.state !== 'absent'
+    ) {
+      fail('Secret/Config row plan contains a conflicting candidate');
+    }
+    const active = candidate.requirement === 'review_apply_binding';
+    return {
+      schemaVersion: 1,
+      kind: 'qinglong3-local-reconciliation-secret-config-decision',
+      candidateOrdinal: candidate.candidateOrdinal,
+      candidateDigest: candidate.candidateDigest,
+      disposition: active ? 'apply_active_binding' : 'preserve_disabled',
+      reason: active
+        ? 'reviewed_active_binding'
+        : 'reviewed_disabled_preservation',
+    };
+  });
+  const outputRecords = [
+    {
+      schemaVersion: 1,
+      kind: 'qinglong3-local-reconciliation-secret-config-decision-header',
+      decisionContractVersion: 1,
+      decisionId: decision.decisionId,
+      profile: summary.profile,
+      secretConfigPlanDigest: secretConfig.secretConfigPlanDigest,
+      preparationDigest: decision.preparationDigest,
+    },
+    ...decisions,
+  ];
+  const filePath = writeExclusive(output, outputRecords);
+  return Object.freeze({
+    mode: 'secret-config',
+    filePath,
+    decisionCount: decisions.length,
+    secretConfigPlanDigest: secretConfig.secretConfigPlanDigest,
+  });
+}
+
 function parseArguments(argv) {
   const values = {};
   for (const argument of argv) {
@@ -360,7 +573,9 @@ function parseArguments(argv) {
     values[match[1]] = match[2];
   }
   if (
-    !['review', 'automation'].includes(values.mode) ||
+    !['review', 'completion-review', 'automation', 'secret-config'].includes(
+      values.mode,
+    ) ||
     JSON.stringify(Object.keys(values).sort()) !==
       JSON.stringify(['mode', 'output', 'reconciliation-root'])
   ) {
@@ -375,10 +590,16 @@ function parseArguments(argv) {
 
 function runCli(argv) {
   const options = parseArguments(argv);
-  const report =
-    options.mode === 'review'
-      ? reviewFixture(options.reconciliationRoot, options.output)
-      : automationFixture(options.reconciliationRoot, options.output);
+  const fixtures = {
+    review: reviewFixture,
+    'completion-review': completionReviewFixture,
+    automation: automationFixture,
+    'secret-config': secretConfigFixture,
+  };
+  const report = fixtures[options.mode](
+    options.reconciliationRoot,
+    options.output,
+  );
   process.stdout.write(`${JSON.stringify(report)}\n`);
   return report;
 }
@@ -396,8 +617,10 @@ if (require.main === module) {
 
 module.exports = Object.freeze({
   automationFixture,
+  completionReviewFixture,
   diagnosticFacts,
   parseArguments,
   reviewFixture,
   runCli,
+  secretConfigFixture,
 });

@@ -3053,7 +3053,7 @@ test('review diagnostics keep secret and unknown facts blocked and row-free', (t
   );
 });
 
-test('review diagnostics preserve target-native identity but keep legacy identity fail-closed', (t) => {
+test('review diagnostics treat empty Legacy identity catalogs as no-effect evidence', (t) => {
   const initializeDatabases = (paths) => {
     planningDatabaseInitializer()(paths);
     const legacy = new DatabaseSync(paths.legacySourcePath);
@@ -3085,8 +3085,8 @@ test('review diagnostics preserve target-native identity but keep legacy identit
     fs.readFileSync(legacyCommand.request.outputPath, 'utf8'),
   );
   assert.equal(legacy.records[0].name, 'Auths');
-  assert.equal(legacy.records[0].decisionRequirement, 'blocked');
-  assert.equal(legacy.records[0].reason, 'identity_custody_required');
+  assert.equal(legacy.records[0].decisionRequirement, 'informational');
+  assert.equal(legacy.records[0].reason, 'catalog_evidence');
 
   const targetCommand = diagnosticCommand(state, prepared, {
     database: 'target',
@@ -3100,6 +3100,36 @@ test('review diagnostics preserve target-native identity but keep legacy identit
   assert.equal(target.records[0].name, 'QingLong3IdentityRecords');
   assert.equal(target.records[0].decisionRequirement, 'required');
   assert.equal(target.records[0].reason, 'reviewable_fact');
+});
+
+test('review diagnostics keep nonempty Legacy identity custody fail-closed', (t) => {
+  const initializeDatabases = (paths) => {
+    planningDatabaseInitializer()(paths);
+    const legacy = new DatabaseSync(paths.legacySourcePath);
+    legacy.exec(`
+      CREATE TABLE "Auths" (id INTEGER PRIMARY KEY);
+      INSERT INTO "Auths" (id) VALUES (1);
+    `);
+    legacy.close();
+    fs.copyFileSync(paths.legacySourcePath, paths.recoveryPath);
+    fs.chmodSync(paths.recoveryPath, 0o600);
+  };
+  const state = preparedReview(t, {
+    initializeDatabases,
+    planId: '00000000-0000-4000-8000-000000000335',
+    reviewId: '00000000-0000-4000-8000-000000000336',
+    reviewSuffix: 'nonempty-identity-custody',
+  });
+  const prepared = prepareLocalReconciliationReview(state.reviewCommand);
+  const command = diagnosticCommand(state, prepared, {
+    database: 'legacy',
+    domain: 'identity_policy_audit',
+    outputName: 'legacy-nonempty-identity.json',
+  });
+  writeLocalReconciliationReviewDiagnostics(command);
+  const page = JSON.parse(fs.readFileSync(command.request.outputPath, 'utf8'));
+  assert.equal(page.records[0].decisionRequirement, 'blocked');
+  assert.equal(page.records[0].reason, 'identity_custody_required');
 });
 
 test('review diagnostics page at sixty-four and CLI output stays content-free', (t) => {

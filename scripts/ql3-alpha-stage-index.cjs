@@ -240,7 +240,7 @@ function validateMilestoneRecord(record, product, sourceRevision, variant) {
       : 'cluster_integration_candidate_not_public_release';
   const expectedSchema =
     product === 'local'
-      ? 'qinglong/alpha-local-milestone@v6'
+      ? 'qinglong/alpha-local-milestone@v7'
       : 'qinglong/alpha-cluster-milestone@v1';
   if (
     !exactKeys(record, ['artifactName', 'schema', 'maturity', 'manifest']) ||

@@ -206,7 +206,7 @@ function finalizeOptions(paths) {
 test('finalizes two exact native trial kits into one closed milestone index', (t) => {
   const paths = fixture(t);
   const manifest = finalizeLocalAlphaMilestone(finalizeOptions(paths));
-  assert.equal(manifest.schema, 'qinglong/alpha-local-milestone@v6');
+  assert.equal(manifest.schema, 'qinglong/alpha-local-milestone@v7');
   assert.match(
     manifest.artifacts.amd64.upgradeReadinessSha256,
     /^sha256:[0-9a-f]{64}$/,
@@ -251,7 +251,7 @@ test('finalizes two exact native trial kits into one closed milestone index', (t
   assert.equal(report.workflowRunId, runId);
   assert.equal(report.workflowRunAttempt, runAttempt);
   assert.equal(report.variant, 'headless');
-  assert.equal(report.schema, 'qinglong/alpha-local-milestone-audit@v6');
+  assert.equal(report.schema, 'qinglong/alpha-local-milestone-audit@v7');
 });
 
 test('finalizes Console trial kits as a separately named milestone', (t) => {

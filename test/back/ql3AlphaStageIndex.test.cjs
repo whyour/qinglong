@@ -80,8 +80,8 @@ function writeMilestone(directory, manifest) {
 
 function localManifest(attempt = runAttempt, variant = 'headless') {
   return {
-    schemaVersion: 6,
-    schema: 'qinglong/alpha-local-milestone@v6',
+    schemaVersion: 7,
+    schema: 'qinglong/alpha-local-milestone@v7',
     maturity: 'alpha_candidate_not_public_release',
     product: 'local',
     variant,

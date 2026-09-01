@@ -50,11 +50,61 @@ test('creates one private production-shaped QingLong 2.x readiness fixture', (t)
 });
 
 test('requires one normalized absolute output path', () => {
-  assert.equal(parseArguments(['--output=/tmp/ql3-legacy']), '/tmp/ql3-legacy');
+  assert.deepEqual(parseArguments(['--output=/tmp/ql3-legacy']), {
+    output: '/tmp/ql3-legacy',
+    shape: 'production',
+  });
+  assert.deepEqual(
+    parseArguments([
+      '--shape=completion-ready',
+      '--output=/tmp/ql3-completion',
+    ]),
+    {
+      output: '/tmp/ql3-completion',
+      shape: 'completion-ready',
+    },
+  );
   assert.throws(() => parseArguments([]), /usage/);
   assert.throws(() => parseArguments(['--output=relative']), /absolute path/);
+  assert.throws(
+    () => parseArguments(['--output=/tmp/ql3-completion', '--shape=unsafe']),
+    /usage/,
+  );
   assert.throws(
     () => parseArguments(['--output=/tmp/../tmp/legacy']),
     /normalized absolute non-root path/,
   );
+});
+
+test('creates a completion-ready fixture without unadapted domains', (t) => {
+  const root = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-alpha-completion-ready-')),
+  );
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const output = path.join(root, 'legacy-data');
+  const result = createFixture(output, 'completion-ready');
+  assert.equal(result.shape, 'completion-ready');
+  const database = new DatabaseSync(result.database, { readOnly: true });
+  try {
+    const tables = database
+      .prepare(
+        "SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name",
+      )
+      .all()
+      .map(({ name }) => name);
+    assert.deepEqual(tables, [
+      'Apps',
+      'Auths',
+      'CrontabStats',
+      'CrontabViews',
+      'Crontabs',
+      'Dependences',
+      'Envs',
+      'RunningInstances',
+      'Subscriptions',
+      'sqlite_sequence',
+    ]);
+  } finally {
+    database.close();
+  }
 });

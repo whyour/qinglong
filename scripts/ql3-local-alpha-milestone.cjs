@@ -12,7 +12,7 @@ const {
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-milestone@v6';
+const SCHEMA = 'qinglong/alpha-local-milestone@v7';
 const ARCHITECTURES = Object.freeze(['amd64', 'arm64']);
 const FILES = Object.freeze({
   readme: 'README.md',
@@ -326,7 +326,7 @@ function auditLocalAlphaMilestone(options) {
       'artifacts',
       'readme',
     ]) ||
-    manifest.schemaVersion !== 6 ||
+    manifest.schemaVersion !== 7 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
@@ -405,7 +405,7 @@ function auditLocalAlphaMilestone(options) {
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-milestone-audit@v6',
+    schema: 'qinglong/alpha-local-milestone-audit@v7',
     sourceRevision: manifest.sourceRevision,
     version: manifest.version,
     variant: manifest.variant,
@@ -463,7 +463,7 @@ function finalizeLocalAlphaMilestone(options) {
       path.join(normalized.outputRoot, FILES.readme),
     );
     const manifest = {
-      schemaVersion: 6,
+      schemaVersion: 7,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',

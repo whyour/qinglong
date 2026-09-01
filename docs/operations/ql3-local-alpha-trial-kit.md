@@ -25,7 +25,7 @@ sha256sum --check SHA256SUMS
 
 `manifest.json` 必须满足：
 
-- `schema` 为 `qinglong/alpha-local-trial-kit@v10`，`schemaVersion=11`；
+- `schema` 为 `qinglong/alpha-local-trial-kit@v11`，`schemaVersion=12`；
 - `variant` 为 `headless` 或 `console`，并与 milestone、application SBOM 和 artifact 名一致；
 - `sourceRevision` 是你准备试用的完整 40 位 commit；
 - `architecture` 与主机相同；
@@ -45,7 +45,7 @@ node scripts/ql3-local-alpha-trial-kit-bundle.cjs \
 
 ## 一条命令完成 Fresh 试运行
 
-v10 bundle 内的 `quickstart.sh` 不依赖宿主 Node.js、jq 或 Compose，只需要 POSIX
+v11 bundle 内的 `quickstart.sh` 不依赖宿主 Node.js、jq 或 Compose，只需要 POSIX
 shell、`sha256sum` 和已启动的 Docker。必须选择一个尚不存在、与 2.x/生产数据完全
 隔离的绝对路径：
 
@@ -86,7 +86,7 @@ headless 不创建示例 Task，因此低配默认档没有示例数据或稳态
 
 ## 只读检查现有 2.x 升级就绪度
 
-v10 bundle 还包含 canonical `upgrade-readiness.sh`。它让现有部署用户先回答“这份 2.x SQLite 和完整 data directory 是否能形成可审核
+v11 bundle 还包含 canonical `upgrade-readiness.sh`。它让现有部署用户先回答“这份 2.x SQLite 和完整 data directory 是否能形成可审核
 计划”，不会把 inspect 成功冒充自动升级。建议停止 2.x、同步器和下载器，确认主库位于 `db/database.sqlite`，再选择一个尚不存在且不在
 2.x data root 内的 evidence 路径：
 
@@ -118,7 +118,7 @@ artifact job 必须在原生 amd64/arm64 上使用生产形态 2.x fixture 运�
 
 ## 受审核计划的 Side-by-side 暂存
 
-审核上一节两个完整结果后，把其中 exact `evidence.planDigest` 作为显式参数交给 v10 bundle 的 canonical `upgrade-rehearsal.sh`：
+审核上一节两个完整结果后，把其中 exact `evidence.planDigest` 作为显式参数交给 v11 bundle 的 canonical `upgrade-rehearsal.sh`：
 
 ```sh
 sh upgrade-rehearsal.sh \
@@ -186,9 +186,9 @@ sh upgrade-cutover-rehearsal.sh \
 
 当前已闭合的 exact Console v9 阶段实物绑定源码 `0235973c9b54a2f22de09b6487ea9f184f0b8bfd` 与 [workflow run 33469435652](https://github.com/whyour/qinglong/actions/runs/33469435652)：amd64 artifact `9786301280`、arm64 artifact `9786374284`、双架构 milestone `9786520389`，均保留至 2026-10-01。两个原生架构在上传前分别完成 clean rollback、写后 capture 和 bundle offline audit；milestone finalizer 下载并再次审计两个 exact bundle。本机重新下载的 milestone v5 通过 `SHA256SUMS`，auditor 返回 `compatible=true`。这是 `3.0.0-alpha.2` 的隔离 Alpha 候选，不是 Public Release 或用户真实 2.x 数据的自动升级授权。
 
-### 受审核 Automation 应用与显式回滚
+### 受审核的跨域应用、回滚与 completion
 
-v10 bundle 在写后 capture 之外增加 `reconciliation-rehearsal.sh`。它故意拆成三个命令，不能一条命令自动跨越人工决策：
+v11 bundle 在写后 capture 之外提供 `reconciliation-rehearsal.sh`。回滚链仍是三个命令；完成链在同一 `prepare`/`review` 之后增加两个独立决策点，不能一条命令自动跨越：
 
 ```sh
 sh reconciliation-rehearsal.sh \
@@ -212,15 +212,40 @@ sh reconciliation-rehearsal.sh \
   /opt/qinglong3-alpha-reconciliation-work \
   /opt/qinglong3-alpha-decisions/automation/automation.ndjson \
   /opt/qinglong/data
+
+# 完成链使用另一套全新 capture/reconciliation root：
+sh reconciliation-rehearsal.sh \
+  apply-plan edge \
+  /opt/qinglong3-alpha-upgrade-reconciliation-completion \
+  /opt/qinglong3-alpha-reconciliation-completion-capture \
+  /opt/qinglong3-alpha-reconciliation-completion-work \
+  /opt/qinglong3-alpha-completion-decisions/automation/automation.ndjson \
+  /opt/qinglong3-alpha-completion-decisions/review/review.ndjson \
+  /opt/qinglong/data
+
+sh reconciliation-rehearsal.sh \
+  complete edge \
+  /opt/qinglong3-alpha-upgrade-reconciliation-completion \
+  /opt/qinglong3-alpha-reconciliation-completion-capture \
+  /opt/qinglong3-alpha-reconciliation-completion-work \
+  /opt/qinglong3-alpha-completion-decisions/secret-config/secret-config.ndjson \
+  /opt/qinglong3-alpha-completion-decisions/review/review.ndjson \
+  /opt/qinglong/data
 ```
 
 `prepare` 成功只会生成 bounded plan、私有诊断与 review prepare，并把 `summary.json.status` 置为 `operator_decision_required`。操作者必须审核完整事实集，在独立 `0700` 目录中自行生成唯一的 `0400|0600` canonical NDJSON；交付包不含决定生成器。`review` 消费该文件，以 60 秒 strong Owner authorization 提交并验证裁决，生成跨域 application plan 和 Automation row plan，然后停在 `automation_decision_required`。review 文件与 Automation 文件必须位于不同私有目录，目录中不得有其他文件。
 
 `apply-rollback` 只消费外部 Automation row decision，并额外只读挂载原始 Legacy root。它在无网络、只读 rootfs、128 MiB、0.5 CPU、32 PID 的短生命周期 Operator 中应用已审核行、验证 Task/Trigger 投影、生成应用前 backup，再显式 rollback/verify。成功 summary 必须是 `reconciliation_automation_rolled_back`、`target=restored_to_pre_automation_snapshot`，并固定 `completion/targetRestart/legacyRestart=not_attempted`。本阶段不应用 Secret/Config、不修改 Run History、不完成 reconciliation，也不启动 target 或 Legacy。
 
+`apply-plan` 必须同时重新提供原始 review decision；脚本不会从 reconciliation root 中复制或推断外部权限。它先保留 Automation apply，再以相同 review authority 对 Legacy/Target 的终态 Run History 做 append-only preservation/verify，随后生成 Secret/Config candidate plan 和 decision prepare，停在 `secret_config_decision_required`。该顺序是状态机约束：Run History preservation 不推进 head，而 Secret/Config plan 会推进 head，不能倒置。
+
+操作者审核 Secret/Config plan 后，在第三个独立 `0700` 父目录中提供唯一 decision 文件。`complete` 才会提交并验证这些决定、加密应用 active binding/disabled preservation，再以 completion v3 同时绑定 Automation apply、Secret/Config apply 和 Run History preservation。成功 summary 必须是 `reconciliation_completed`、`adapterCount=3`，且 target/Legacy 仍为 stopped，`targetRestart/legacyRestart=not_authorized`。重启需要后续独立 authority ceremony。
+
+每个 decision 父目录必须由当前 UID 控制、mode `0700`、恰好包含一个 `0400|0600` canonical regular file，并与 rehearsal/capture/reconciliation/Legacy roots 全部不重叠。review、Automation、Secret/Config decision 不得放在同一个父目录。交付包只消费决定，不生成决定；仓库内合成 fixture/generator 不进入 Trial Kit。
+
 命令文件和成功结果支持中断后的 exact replay：脚本只在首次创建带时间 command，输出先写临时文件，成功后原子发布。不要编辑或删除 reconciliation root 中的 authorization、intent、plan、decision、backup、receipt 或 result；任何 digest、权限、路径或 lineage 漂移都应失败关闭。
 
-仓库 CI 会用合成 fixture 在原生 amd64/arm64 上为 exact capture 生成冻结的 review/Automation 决定，实跑 apply→verify→rollback→verify，并要求 `verification-evidence.json.gates.legacyUpgradeReconciliationAutomationRollback=passed`。该 fixture 脚本不会被打入 Trial Kit。Local milestone v6 还必须绑定两个架构各自的 `upgradeReconciliationRehearsalSha256`；只有同 run finalizer 重新下载、审计并闭合两个 bundle 后才是 D-426c2 阶段实物。
+仓库 CI 会保留两条互相独立的合成链：第一条实跑 apply→verify→rollback→verify；第二条保持完整 2.x schema、空 Apps/Auths 且无未知插件表，实跑 Automation→Run History→Secret/Config→completion。两个 required gate 分别是 `legacyUpgradeReconciliationAutomationRollback=passed` 与 `legacyUpgradeReconciliationCompletion=passed`。空 Legacy Apps/Auths 只作为无数据 catalog evidence；任一真实 identity 行仍阻塞 completion。Local milestone v7 绑定两个架构各自的 `upgradeReconciliationRehearsalSha256`；只有同 run finalizer 重新下载、审计并闭合两个 bundle 后才是 D-426c3 阶段实物。
 
 ## 手工加载与最小 smoke
 
@@ -249,7 +274,7 @@ docker run --rm --read-only --network none --cap-drop ALL \
 
 ## Fresh 试运行边界
 
-完整 fresh setup、首 Owner ceremony、Owner presentation 安装、Application active、SIGTERM drain、SQLite integrity 和原生 cancellation 必须在 `verification-evidence.json` 指向的同架构 milestone job 中验证。Console 还必须证明首页返回 200、未认证 API 返回 401，并用真实 Owner credential 完成 Task read、fenced start、`succeeded` 终态与 bounded log marker。v10 artifact job 必须从将要上传的目录实际执行 `quickstart.sh`、read-only `upgrade-readiness.sh`、isolated `upgrade-cutover-rehearsal.sh` 的 clean/write-after 两条路径和三阶段 `reconciliation-rehearsal.sh`，并完成 graceful stop、rollback-candidate、reconciliation capture、review/Automation external decision、apply/rollback、旧 SQLite 未变与合成容器清理。实际部署时仍必须使用独立目录，并让 operator 以最终数据文件 POSIX owner 的 UID/GID 运行；operator 默认无网络且每次只执行一个命令后退出，不应作为 sidecar 或 daemon 常驻。
+完整 fresh setup、首 Owner ceremony、Owner presentation 安装、Application active、SIGTERM drain、SQLite integrity 和原生 cancellation 必须在 `verification-evidence.json` 指向的同架构 milestone job 中验证。Console 还必须证明首页返回 200、未认证 API 返回 401，并用真实 Owner credential 完成 Task read、fenced start、`succeeded` 终态与 bounded log marker。v11 artifact job 必须从将要上传的目录实际执行 `quickstart.sh`、read-only `upgrade-readiness.sh`、isolated `upgrade-cutover-rehearsal.sh` 的 clean/write-after 路径，以及独立的 Automation rollback 和三 adapter completion 两条 reconciliation 流；并完成 graceful stop、rollback-candidate、capture、全部外部 decision、旧 SQLite 未变与合成容器清理。实际部署时仍必须使用独立目录，并让 operator 以最终数据文件 POSIX owner 的 UID/GID 运行；operator 默认无网络且每次只执行一个命令后退出，不应作为 sidecar 或 daemon 常驻。
 
 Edge 的验证上限为 Application 128 MiB、0.5 CPU、64 PID；Standalone 为 256 MiB、0.5 CPU、256 PID；operator 为 128 MiB、0.5 CPU、32 PID。这里的数值是试运行门，不是所有 workload 的容量承诺。
 

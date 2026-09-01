@@ -166,8 +166,8 @@ function adapters(overrides = {}, variant = 'headless') {
 test('materializes and offline-audits one closed two-image trial kit', (t) => {
   const paths = fixture(t);
   const manifest = createLocalAlphaTrialKit(createOptions(paths), adapters());
-  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v10');
-  assert.equal(manifest.schemaVersion, 11);
+  assert.equal(manifest.schema, 'qinglong/alpha-local-trial-kit@v11');
+  assert.equal(manifest.schemaVersion, 12);
   assert.equal(manifest.variant, 'headless');
   assert.equal(manifest.sourceRevision, revision);
   assert.equal(manifest.architecture, 'arm64');
@@ -372,6 +372,10 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     'reconciliation.automation.decision.commit',
     'reconciliation.automation.apply',
     'reconciliation.automation.apply.rollback',
+    'reconciliation.run-history.preserve',
+    'reconciliation.secret-config.decision.commit',
+    'reconciliation.secret-config.apply',
+    'reconciliation.complete',
   ]) {
     assert.match(reconciliationContents, new RegExp(operation));
   }
@@ -393,6 +397,14 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
     reconciliationContents,
     /apply-rollback edge\|standalone .* \/absolute\/legacy-root/,
   );
+  assert.match(
+    reconciliationContents,
+    /apply-plan edge\|standalone .* \/absolute\/review-decisions\.ndjson \/absolute\/legacy-root/,
+  );
+  assert.match(
+    reconciliationContents,
+    /complete edge\|standalone .* \/absolute\/review-decisions\.ndjson \/absolute\/legacy-root/,
+  );
   assert.match(reconciliationContents, /result_stage=.*\.\$result_file\.\$\$/);
   assert.match(
     reconciliationContents,
@@ -409,7 +421,7 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
   assert.equal(
     (reconciliationContents.match(/"authorizationLifetimeMs":60000/g) || [])
       .length,
-    2,
+    3,
   );
   assert.doesNotMatch(
     reconciliationContents,
@@ -418,6 +430,12 @@ test('materializes and offline-audits one closed two-image trial kit', (t) => {
   assert.match(reconciliationContents, /! -path "\$decision_file"/);
   assert.match(reconciliationContents, /automaticDecision":"not_authorized/);
   assert.match(reconciliationContents, /automaticRowDecision":"not_authorized/);
+  assert.match(
+    reconciliationContents,
+    /automaticCandidateDecision":"not_authorized/,
+  );
+  assert.match(reconciliationContents, /"status":"reconciliation_completed"/);
+  assert.match(reconciliationContents, /"adapterCount":\$adapter_count/);
   assert.match(reconciliationContents, /"completion":"not_attempted"/);
   const report = auditLocalAlphaTrialKit({ bundleRoot: paths.outputRoot });
   assert.equal(report.compatible, true);
@@ -474,6 +492,10 @@ test('materializes a distinct loopback Console trial kit without widening the he
   assert.equal(verification.gates.legacyUpgradeReconciliationCapture, 'passed');
   assert.equal(
     verification.gates.legacyUpgradeReconciliationAutomationRollback,
+    'passed',
+  );
+  assert.equal(
+    verification.gates.legacyUpgradeReconciliationCompletion,
     'passed',
   );
   const quickstartContents = fs.readFileSync(
@@ -983,6 +1005,20 @@ test('create rejects verification without the reviewed Automation rollback gate'
     fs.readFileSync(paths.verificationEvidence, 'utf8'),
   );
   delete evidence.gates.legacyUpgradeReconciliationAutomationRollback;
+  fs.writeFileSync(paths.verificationEvidence, `${JSON.stringify(evidence)}\n`);
+  assert.throws(
+    () => createLocalAlphaTrialKit(createOptions(paths), adapters()),
+    /verification evidence is incompatible/,
+  );
+  assert.equal(fs.existsSync(paths.outputRoot), false);
+});
+
+test('create rejects verification without cross-domain completion evidence', (t) => {
+  const paths = fixture(t);
+  const evidence = JSON.parse(
+    fs.readFileSync(paths.verificationEvidence, 'utf8'),
+  );
+  delete evidence.gates.legacyUpgradeReconciliationCompletion;
   fs.writeFileSync(paths.verificationEvidence, `${JSON.stringify(evidence)}\n`);
   assert.throws(
     () => createLocalAlphaTrialKit(createOptions(paths), adapters()),

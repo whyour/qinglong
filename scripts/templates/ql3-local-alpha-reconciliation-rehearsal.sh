@@ -15,6 +15,11 @@ APPLICATION_ID='019f8680-143d-4000-8000-000000000401'
 AUTOMATION_ID='019f8680-143d-4000-8000-000000000461'
 AUTOMATION_DECISION_ID='019f8680-143d-7000-8000-000000000471'
 AUTOMATION_MUTATION_ID='019f8680-143d-4000-8000-000000000481'
+SECRET_CONFIG_ID='019f8680-143d-4000-8000-000000000491'
+SECRET_CONFIG_DECISION_ID='019f8680-143d-7000-8000-0000000004a1'
+SECRET_CONFIG_MUTATION_ID='019f8680-143d-4000-8000-0000000004b1'
+RUN_HISTORY_PRESERVATION_ID='019f8680-143d-4000-8000-0000000004c1'
+COMPLETION_ID='019f8680-143d-4000-8000-0000000004d1'
 
 fail() {
   printf '%s\n' "QingLong Local Alpha reconciliation rehearsal failed: $*" >&2
@@ -29,7 +34,9 @@ usage() {
   printf '%s\n' \
     'usage: sh reconciliation-rehearsal.sh prepare edge|standalone /absolute/rehearsal-root /absolute/capture-root /absolute/new/reconciliation-root <legacy-timezone|none>' \
     '       sh reconciliation-rehearsal.sh review edge|standalone /absolute/rehearsal-root /absolute/capture-root /absolute/reconciliation-root /absolute/review-decisions.ndjson' \
-    '       sh reconciliation-rehearsal.sh apply-rollback edge|standalone /absolute/rehearsal-root /absolute/capture-root /absolute/reconciliation-root /absolute/automation-decisions.ndjson /absolute/legacy-root' >&2
+    '       sh reconciliation-rehearsal.sh apply-rollback edge|standalone /absolute/rehearsal-root /absolute/capture-root /absolute/reconciliation-root /absolute/automation-decisions.ndjson /absolute/legacy-root' \
+    '       sh reconciliation-rehearsal.sh apply-plan edge|standalone /absolute/rehearsal-root /absolute/capture-root /absolute/reconciliation-root /absolute/automation-decisions.ndjson /absolute/review-decisions.ndjson /absolute/legacy-root' \
+    '       sh reconciliation-rehearsal.sh complete edge|standalone /absolute/rehearsal-root /absolute/capture-root /absolute/reconciliation-root /absolute/secret-config-decisions.ndjson /absolute/review-decisions.ndjson /absolute/legacy-root' >&2
   exit 2
 }
 
@@ -116,17 +123,24 @@ private_decision_file() {
 
 [ "$#" -ge 1 ] || usage
 mode=$1
-[ "$mode" = apply-rollback ] && [ "$#" -eq 7 ] || {
-  [ "$mode" != apply-rollback ] && [ "$#" -eq 6 ] || usage
-}
+case "$mode" in
+  prepare|review) [ "$#" -eq 6 ] || usage ;;
+  apply-rollback) [ "$#" -eq 7 ] || usage ;;
+  apply-plan|complete) [ "$#" -eq 8 ] || usage ;;
+  *) usage ;;
+esac
 profile=$2
 rehearsal_root=$3
 capture_root=$4
 reconciliation_root=$5
 phase_input=$6
-legacy_root=${7:-}
+secondary_input=
+legacy_root=
+case "$mode" in
+  apply-rollback) legacy_root=$7 ;;
+  apply-plan|complete) secondary_input=$7; legacy_root=$8 ;;
+esac
 
-case "$mode" in prepare|review|apply-rollback) ;; *) usage ;; esac
 case "$profile" in edge|standalone) ;; *) usage ;; esac
 case "$VARIANT" in headless|console) ;; *) fail 'embedded Trial Kit variant is invalid' ;; esac
 [ "$(uname -s)" = Linux ] || fail 'reconciliation rehearsal requires a Linux Docker host'
@@ -163,12 +177,20 @@ application_root="$reconciliation_root/application"
 automation_root="$reconciliation_root/automation"
 automation_decision_root="$reconciliation_root/automation-decision"
 automation_apply_root="$reconciliation_root/automation-apply"
+secret_config_root="$reconciliation_root/secret-config"
+secret_config_decision_root="$reconciliation_root/secret-config-decision"
+secret_config_apply_root="$reconciliation_root/secret-config-apply"
+run_history_root="$reconciliation_root/run-history"
+completion_root="$reconciliation_root/completion"
 command_root="$reconciliation_root/commands"
 result_root="$reconciliation_root/results"
 target_database="$rehearsal_root/sqlite/qinglong3.sqlite"
 issuer_keyring="$rehearsal_root/reconciliation-review-issuer.keyring"
 owner_peppers="$rehearsal_root/owner-peppers"
 owner_credential="$rehearsal_root/owner-credential.json"
+secret_keyring="$rehearsal_root/local-secret-keyring.json"
+decision_parent=
+secondary_decision_parent=
 
 run_deploy() {
   subcommand=$1
@@ -184,8 +206,10 @@ run_deploy() {
     --mount "type=bind,src=$reconciliation_root,dst=$reconciliation_root"
   [ -z "$legacy_root" ] || set -- "$@" \
     --mount "type=bind,src=$legacy_root,dst=$legacy_root,readonly"
-  [ -z "$input_file" ] || set -- "$@" \
+  [ -z "$decision_parent" ] || set -- "$@" \
     --mount "type=bind,src=$decision_parent,dst=$decision_parent,readonly"
+  [ -z "$secondary_decision_parent" ] || set -- "$@" \
+    --mount "type=bind,src=$secondary_decision_parent,dst=$secondary_decision_parent,readonly"
   set -- "$@" "$OPERATOR_IMAGE" deploy "$subcommand" \
     --command-file "$command_root/$command_file"
   result_stage="$result_root/.$result_file.$$"
@@ -213,7 +237,7 @@ if [ "$mode" = prepare ]; then
   old_umask=$(umask)
   umask 077
   mkdir -m 0700 "$reconciliation_root"
-  for directory in plan review diagnostics application automation automation-decision automation-apply commands results; do
+  for directory in plan review diagnostics application automation automation-decision automation-apply secret-config secret-config-decision secret-config-apply run-history completion commands results; do
     mkdir -m 0700 "$reconciliation_root/$directory"
   done
   umask "$old_umask"
@@ -299,12 +323,19 @@ EOF
 fi
 
 canonical_directory "$reconciliation_root" 'reconciliation root'
-for directory in "$plan_root" "$review_root" "$diagnostic_root" "$application_root" "$automation_root" "$automation_decision_root" "$automation_apply_root" "$command_root" "$result_root"; do
+for directory in "$plan_root" "$review_root" "$diagnostic_root" "$application_root" "$automation_root" "$automation_decision_root" "$automation_apply_root" "$secret_config_root" "$secret_config_decision_root" "$secret_config_apply_root" "$run_history_root" "$completion_root" "$command_root" "$result_root"; do
   canonical_directory "$directory" 'reconciliation authority directory'
 done
 private_decision_file "$phase_input" 'external decision file'
+if [ -n "$secondary_input" ]; then
+  primary_decision_parent=$decision_parent
+  private_decision_file "$secondary_input" 'external review decision file'
+  secondary_decision_parent=$decision_parent
+  decision_parent=$primary_decision_parent
+fi
 if [ -n "$legacy_root" ]; then
   non_overlapping "$decision_parent" "$legacy_root" || fail 'external decision file parent must be outside legacy root'
+  [ -z "$secondary_decision_parent" ] || non_overlapping "$secondary_decision_parent" "$legacy_root" || fail 'external review decision file parent must be outside legacy root'
 fi
 
 if [ "$mode" = review ]; then
@@ -400,11 +431,101 @@ EOF
     'Authenticated review and Automation plan are ready.' \
     "Summary: $reconciliation_root/summary.json" \
     "Automation plan: $automation_root/$AUTOMATION_ID/plan.ndjson" \
-    'No Automation row decision was generated or applied. Supply an external owner-private NDJSON decision file to the apply-rollback phase.'
+    'No Automation row decision was generated or applied. Supply an external owner-private NDJSON decision file to apply-rollback, or pair it with the original review decision for apply-plan.'
   exit 0
 fi
 
-grep -q '"status":"automation_decision_required"' "$reconciliation_root/summary.json" || fail 'apply-rollback phase is detached from Automation decision state'
+if [ "$mode" = complete ]; then
+  grep -q '"status":"secret_config_decision_required"' "$reconciliation_root/summary.json" || fail 'completion phase is detached from Secret/Config decision state'
+  application_plan_digest=$(extract_digest "$result_root/application-commit.result.json" applicationPlanDigest)
+  automation_decision_digest=$(extract_digest "$result_root/automation-decision-commit.result.json" decisionDigest)
+  automation_apply_digest=$(extract_digest "$result_root/automation-apply.result.json" applyDigest)
+  preservation_digest=$(extract_digest "$result_root/run-history-preserve.result.json" preservationDigest)
+  secret_decision_preparation_digest=$(extract_digest "$result_root/secret-config-decision-prepare.result.json" preparationDigest)
+  secret_decision_head_digest=$(extract_digest "$result_root/secret-config-decision-prepare.result.json" instanceHeadDigest)
+  if [ -e "$command_root/secret-config-decision-commit.json" ]; then
+    committed_ms=$(extract_unsigned "$command_root/secret-config-decision-commit.json" committedAtMs)
+  else
+    committed_ms=$(($(date +%s) * 1000))
+    cat >"$command_root/secret-config-decision-commit.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.secret-config.decision.commit","options":{"deploymentRoot":"$rehearsal_root","applicationRoot":"$application_root","secretConfigRoot":"$secret_config_root","secretConfigDecisionRoot":"$secret_config_decision_root","targetDatabasePath":"$target_database","ownerPepperKeyringDirectory":"$owner_peppers","credentialFilePath":"$owner_credential","busyTimeoutMs":100,"allowRootService":$allow_root_service},"request":{"decisionId":"$SECRET_CONFIG_DECISION_ID","secretConfigId":"$SECRET_CONFIG_ID","expectedPreparationDigest":"$secret_decision_preparation_digest","expectedHeadDigest":"$secret_decision_head_digest","decisionFilePath":"$phase_input","committedAtMs":$committed_ms,"authorizationLifetimeMs":60000}}
+EOF
+    chmod 0600 "$command_root/secret-config-decision-commit.json"
+  fi
+  phase 'commit explicit Secret/Config decisions with real Owner authentication'
+  run_deploy reconciliation-secret-config-decision-commit secret-config-decision-commit.json secret-config-decision-commit.result.json "$phase_input"
+  grep -q '"state":"reconciliation_secret_config_reviewed"' "$result_root/secret-config-decision-commit.result.json" || fail 'Secret/Config decisions did not commit'
+  grep -q '"outcome":"ready"' "$result_root/secret-config-decision-commit.result.json" || fail 'Secret/Config decisions did not authorize a ready application'
+  secret_decision_digest=$(extract_digest "$result_root/secret-config-decision-commit.result.json" decisionDigest)
+  cat >"$command_root/secret-config-decision-verify.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.secret-config.decision.verify","options":{"deploymentRoot":"$rehearsal_root","applicationRoot":"$application_root","secretConfigRoot":"$secret_config_root","secretConfigDecisionRoot":"$secret_config_decision_root","allowRootService":$allow_root_service},"request":{"decisionId":"$SECRET_CONFIG_DECISION_ID","secretConfigId":"$SECRET_CONFIG_ID","expectedDecisionDigest":"$secret_decision_digest"}}
+EOF
+  chmod 0600 "$command_root/secret-config-decision-verify.json"
+  run_deploy reconciliation-secret-config-decision-verify secret-config-decision-verify.json secret-config-decision-verify.result.json
+  grep -q '"status":"verified"' "$result_root/secret-config-decision-verify.result.json" || fail 'Secret/Config decision verification failed'
+  secret_decision_head_digest=$(extract_digest "$result_root/secret-config-decision-verify.result.json" instanceHeadDigest)
+
+  secret_apply_options="\"deploymentRoot\":\"$rehearsal_root\",\"applicationRoot\":\"$application_root\",\"secretConfigRoot\":\"$secret_config_root\",\"secretConfigDecisionRoot\":\"$secret_config_decision_root\",\"secretConfigApplyRoot\":\"$secret_config_apply_root\",\"targetDatabasePath\":\"$target_database\",\"secretKeyringPath\":\"$secret_keyring\",\"ownerPepperKeyringDirectory\":\"$owner_peppers\",\"credentialFilePath\":\"$owner_credential\",\"busyTimeoutMs\":100,\"allowRootService\":$allow_root_service"
+  if [ -e "$command_root/secret-config-apply.json" ]; then
+    applied_ms=$(extract_unsigned "$command_root/secret-config-apply.json" appliedAtMs)
+  else
+    applied_ms=$((committed_ms + 1))
+    cat >"$command_root/secret-config-apply.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.secret-config.apply","options":{$secret_apply_options},"request":{"decisionId":"$SECRET_CONFIG_DECISION_ID","secretConfigId":"$SECRET_CONFIG_ID","expectedDecisionDigest":"$secret_decision_digest","expectedHeadDigest":"$secret_decision_head_digest","mutationId":"$SECRET_CONFIG_MUTATION_ID","requestId":"alpha-reconciliation-secret-config-apply","appliedAtMs":$applied_ms}}
+EOF
+    chmod 0600 "$command_root/secret-config-apply.json"
+  fi
+  phase 'apply reviewed Secret/Config candidates under the bounded operator envelope'
+  run_deploy reconciliation-secret-config-apply secret-config-apply.json secret-config-apply.result.json
+  grep -q '"state":"reconciliation_secret_config_applied"' "$result_root/secret-config-apply.result.json" || fail 'Secret/Config candidates did not apply'
+  secret_apply_digest=$(extract_digest "$result_root/secret-config-apply.result.json" applyDigest)
+  secret_applied_head_digest=$(extract_digest "$result_root/secret-config-apply.result.json" instanceHeadDigest)
+  cat >"$command_root/secret-config-apply-verify.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.secret-config.apply.verify","options":{$secret_apply_options},"request":{"decisionId":"$SECRET_CONFIG_DECISION_ID","secretConfigId":"$SECRET_CONFIG_ID","expectedApplyDigest":"$secret_apply_digest"}}
+EOF
+  chmod 0600 "$command_root/secret-config-apply-verify.json"
+  run_deploy reconciliation-secret-config-apply-verify secret-config-apply-verify.json secret-config-apply-verify.result.json
+  grep -q '"state":"reconciliation_secret_config_applied"' "$result_root/secret-config-apply-verify.result.json" || fail 'applied Secret/Config verification failed'
+
+  completion_options="\"deploymentRoot\":\"$rehearsal_root\",\"applicationRoot\":\"$application_root\",\"completionRoot\":\"$completion_root\",\"automation\":{\"automationRoot\":\"$automation_root\",\"automationDecisionRoot\":\"$automation_decision_root\",\"automationApplyRoot\":\"$automation_apply_root\",\"targetDatabasePath\":\"$target_database\"},\"secretConfig\":{\"secretConfigRoot\":\"$secret_config_root\",\"secretConfigDecisionRoot\":\"$secret_config_decision_root\",\"secretConfigApplyRoot\":\"$secret_config_apply_root\",\"targetDatabasePath\":\"$target_database\"},\"runHistory\":{\"runHistoryRoot\":\"$run_history_root\",\"decisionFilePath\":\"$secondary_input\"},\"allowRootService\":$allow_root_service"
+  completion_automation="{\"automationId\":\"$AUTOMATION_ID\",\"decisionId\":\"$AUTOMATION_DECISION_ID\",\"expectedApplyDigest\":\"$automation_apply_digest\"}"
+  completion_secret_config="{\"secretConfigId\":\"$SECRET_CONFIG_ID\",\"decisionId\":\"$SECRET_CONFIG_DECISION_ID\",\"expectedApplyDigest\":\"$secret_apply_digest\"}"
+  completion_run_history="{\"preservationId\":\"$RUN_HISTORY_PRESERVATION_ID\",\"expectedPreservationDigest\":\"$preservation_digest\"}"
+  if [ -e "$command_root/completion.json" ]; then
+    completed_ms=$(extract_unsigned "$command_root/completion.json" completedAtMs)
+  else
+    completed_ms=$((applied_ms + 1))
+    cat >"$command_root/completion.json" <<EOF
+{"schemaVersion":3,"operation":"local.deployment.reconciliation.complete","options":{$completion_options},"request":{"completionId":"$COMPLETION_ID","applicationId":"$APPLICATION_ID","expectedApplicationPlanDigest":"$application_plan_digest","expectedHeadDigest":"$secret_applied_head_digest","automation":$completion_automation,"secretConfig":$completion_secret_config,"runHistory":$completion_run_history,"completedAtMs":$completed_ms}}
+EOF
+    chmod 0600 "$command_root/completion.json"
+  fi
+  phase 'seal cross-domain reconciliation completion while both services remain stopped'
+  run_deploy reconciliation-complete completion.json completion.result.json "$secondary_input"
+  grep -q '"state":"reconciliation_completed"' "$result_root/completion.result.json" || fail 'cross-domain reconciliation did not complete'
+  completion_digest=$(extract_digest "$result_root/completion.result.json" completionDigest)
+  completion_head_digest=$(extract_digest "$result_root/completion.result.json" instanceHeadDigest)
+  cat >"$command_root/completion-verify.json" <<EOF
+{"schemaVersion":3,"operation":"local.deployment.reconciliation.complete.verify","options":{$completion_options},"request":{"completionId":"$COMPLETION_ID","applicationId":"$APPLICATION_ID","expectedCompletionDigest":"$completion_digest","automation":$completion_automation,"secretConfig":$completion_secret_config,"runHistory":$completion_run_history}}
+EOF
+  chmod 0600 "$command_root/completion-verify.json"
+  run_deploy reconciliation-complete-verify completion-verify.json completion-verify.result.json "$secondary_input"
+  grep -q '"status":"verified"' "$result_root/completion-verify.result.json" || fail 'cross-domain completion verification failed'
+  adapter_count=$(extract_unsigned "$result_root/completion.result.json" adapterCount)
+  [ "$adapter_count" -eq 3 ] || fail 'completion did not bind all three reconciliation adapters'
+  cat >"$reconciliation_root/summary.json" <<EOF
+{"schemaVersion":1,"schema":"qinglong/local-alpha-reconciliation-rehearsal-summary@v1","status":"reconciliation_completed","profile":"$profile","variant":"$VARIANT","sourceRevision":"$SOURCE_REVISION","architecture":"$ARCHITECTURE","review":{"reviewId":"$REVIEW_ID","authority":"authenticated_user"},"automation":{"automationId":"$AUTOMATION_ID","decisionId":"$AUTOMATION_DECISION_ID","decisionDigest":"$automation_decision_digest","applyDigest":"$automation_apply_digest"},"secretConfig":{"secretConfigId":"$SECRET_CONFIG_ID","decisionId":"$SECRET_CONFIG_DECISION_ID","decisionDigest":"$secret_decision_digest","applyDigest":"$secret_apply_digest"},"runHistory":{"preservationId":"$RUN_HISTORY_PRESERVATION_ID","preservationDigest":"$preservation_digest"},"completion":{"completionId":"$COMPLETION_ID","completionDigest":"$completion_digest","adapterCount":$adapter_count,"instanceHeadDigest":"$completion_head_digest"},"target":"stopped","legacy":"stopped","targetRestart":"not_authorized","legacyRestart":"not_authorized","next":"independent_restart_authority_required"}
+EOF
+  chmod 0600 "$reconciliation_root/summary.json"
+  printf '%s\n' \
+    'Automation, Secret/Config, and Run History evidence reached verified reconciliation completion.' \
+    "Summary: $reconciliation_root/summary.json" \
+    "Completion evidence: $result_root/completion-verify.result.json" \
+    'Target and Legacy remain stopped. Restart requires a separate authority ceremony.'
+  exit 0
+fi
+
+grep -q '"status":"automation_decision_required"' "$reconciliation_root/summary.json" || fail 'Automation application phase is detached from Automation decision state'
 decision_preparation_digest=$(extract_digest "$result_root/automation-decision-prepare.result.json" preparationDigest)
 decision_head_digest=$(extract_digest "$result_root/automation-decision-prepare.result.json" instanceHeadDigest)
 if [ -e "$command_root/automation-decision-commit.json" ]; then
@@ -449,6 +570,71 @@ EOF
 chmod 0600 "$command_root/automation-apply-verify.json"
 run_deploy reconciliation-automation-apply-verify automation-apply-verify.json automation-apply-verify.result.json
 grep -q '"state":"reconciliation_automation_applied"' "$result_root/automation-apply-verify.result.json" || fail 'applied Automation verification failed'
+
+if [ "$mode" = apply-plan ]; then
+  application_plan_digest=$(extract_digest "$result_root/application-commit.result.json" applicationPlanDigest)
+  preserved_ms=$((applied_ms + 1))
+  cat >"$command_root/run-history-preserve.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.run-history.preserve","options":{"deploymentRoot":"$rehearsal_root","applicationRoot":"$application_root","runHistoryRoot":"$run_history_root","allowRootService":$allow_root_service},"request":{"preservationId":"$RUN_HISTORY_PRESERVATION_ID","applicationId":"$APPLICATION_ID","expectedApplicationPlanDigest":"$application_plan_digest","expectedHeadDigest":"$applied_head_digest","decisionFilePath":"$secondary_input","preservedAtMs":$preserved_ms}}
+EOF
+  chmod 0600 "$command_root/run-history-preserve.json"
+  phase 'preserve dual-sided terminal Run History before Secret/Config advances the head'
+  run_deploy reconciliation-run-history-preserve run-history-preserve.json run-history-preserve.result.json "$secondary_input"
+  grep -q '"state":"reconciliation_run_history_preserved"' "$result_root/run-history-preserve.result.json" || fail 'Run History preservation failed'
+  preservation_digest=$(extract_digest "$result_root/run-history-preserve.result.json" preservationDigest)
+  cat >"$command_root/run-history-verify.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.run-history.verify","options":{"deploymentRoot":"$rehearsal_root","applicationRoot":"$application_root","runHistoryRoot":"$run_history_root","allowRootService":$allow_root_service},"request":{"preservationId":"$RUN_HISTORY_PRESERVATION_ID","applicationId":"$APPLICATION_ID","expectedPreservationDigest":"$preservation_digest","decisionFilePath":"$secondary_input"}}
+EOF
+  chmod 0600 "$command_root/run-history-verify.json"
+  run_deploy reconciliation-run-history-verify run-history-verify.json run-history-verify.result.json "$secondary_input"
+  grep -q '"status":"verified"' "$result_root/run-history-verify.result.json" || fail 'Run History preservation verification failed'
+  legacy_history_facts=$(extract_unsigned "$result_root/run-history-preserve.result.json" legacyFactCount)
+  target_history_facts=$(extract_unsigned "$result_root/run-history-preserve.result.json" targetFactCount)
+  [ "$legacy_history_facts" -gt 0 ] && [ "$target_history_facts" -gt 0 ] || fail 'Run History evidence is not dual-sided'
+
+  secret_prepared_ms=$((preserved_ms + 1))
+  cat >"$command_root/secret-config-plan.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.secret-config.plan","options":{"deploymentRoot":"$rehearsal_root","applicationRoot":"$application_root","secretConfigRoot":"$secret_config_root","allowRootService":$allow_root_service},"request":{"secretConfigId":"$SECRET_CONFIG_ID","applicationId":"$APPLICATION_ID","expectedApplicationPlanDigest":"$application_plan_digest","expectedHeadDigest":"$applied_head_digest","decisionFilePath":"$secondary_input","projectId":"default","preparedAtMs":$secret_prepared_ms}}
+EOF
+  chmod 0600 "$command_root/secret-config-plan.json"
+  phase 'materialize reviewed Secret/Config candidate plan'
+  run_deploy reconciliation-secret-config-plan secret-config-plan.json secret-config-plan.result.json "$secondary_input"
+  grep -q '"state":"reconciliation_secret_config_planned"' "$result_root/secret-config-plan.result.json" || fail 'Secret/Config plan did not materialize'
+  grep -q '"outcome":"ready"' "$result_root/secret-config-plan.result.json" || fail 'Secret/Config plan is manual-required or has no applicable candidates'
+  secret_config_plan_digest=$(extract_digest "$result_root/secret-config-plan.result.json" secretConfigPlanDigest)
+  cat >"$command_root/secret-config-verify.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.secret-config.verify","options":{"deploymentRoot":"$rehearsal_root","applicationRoot":"$application_root","secretConfigRoot":"$secret_config_root","allowRootService":$allow_root_service},"request":{"secretConfigId":"$SECRET_CONFIG_ID","expectedSecretConfigPlanDigest":"$secret_config_plan_digest"}}
+EOF
+  chmod 0600 "$command_root/secret-config-verify.json"
+  run_deploy reconciliation-secret-config-verify secret-config-verify.json secret-config-verify.result.json
+  grep -q '"status":"verified"' "$result_root/secret-config-verify.result.json" || fail 'Secret/Config plan verification failed'
+  secret_config_head_digest=$(extract_digest "$result_root/secret-config-verify.result.json" instanceHeadDigest)
+
+  secret_decision_prepared_ms=$((secret_prepared_ms + 1))
+  cat >"$command_root/secret-config-decision-prepare.json" <<EOF
+{"schemaVersion":1,"operation":"local.deployment.reconciliation.secret-config.decision.prepare","options":{"deploymentRoot":"$rehearsal_root","applicationRoot":"$application_root","secretConfigRoot":"$secret_config_root","secretConfigDecisionRoot":"$secret_config_decision_root","allowRootService":$allow_root_service},"request":{"decisionId":"$SECRET_CONFIG_DECISION_ID","secretConfigId":"$SECRET_CONFIG_ID","expectedSecretConfigPlanDigest":"$secret_config_plan_digest","expectedHeadDigest":"$secret_config_head_digest","preparedAtMs":$secret_decision_prepared_ms}}
+EOF
+  chmod 0600 "$command_root/secret-config-decision-prepare.json"
+  run_deploy reconciliation-secret-config-decision-prepare secret-config-decision-prepare.json secret-config-decision-prepare.result.json
+  grep -q '"state":"reconciliation_secret_config_decision_prepared"' "$result_root/secret-config-decision-prepare.result.json" || fail 'Secret/Config decision authority was not prepared'
+  secret_decision_preparation_digest=$(extract_digest "$result_root/secret-config-decision-prepare.result.json" preparationDigest)
+  secret_rows=$(extract_unsigned "$result_root/secret-config-plan.result.json" rowCount)
+  eligible_bindings=$(extract_unsigned "$result_root/secret-config-plan.result.json" eligibleBindingCount)
+  eligible_preservations=$(extract_unsigned "$result_root/secret-config-plan.result.json" eligiblePreservationCount)
+  target_conflicts=$(extract_unsigned "$result_root/secret-config-plan.result.json" targetConflictCount)
+  unadapted_configs=$(extract_unsigned "$result_root/secret-config-plan.result.json" unadaptedLegacyConfigCount)
+  [ $((eligible_bindings + eligible_preservations)) -gt 0 ] && [ "$target_conflicts" -eq 0 ] && [ "$unadapted_configs" -eq 0 ] || fail 'Secret/Config plan is not eligible for reviewed completion'
+  cat >"$reconciliation_root/summary.json" <<EOF
+{"schemaVersion":1,"schema":"qinglong/local-alpha-reconciliation-rehearsal-summary@v1","status":"secret_config_decision_required","profile":"$profile","variant":"$VARIANT","sourceRevision":"$SOURCE_REVISION","architecture":"$ARCHITECTURE","review":{"reviewId":"$REVIEW_ID","authority":"authenticated_user"},"application":{"applicationId":"$APPLICATION_ID","applicationPlanDigest":"$application_plan_digest"},"automation":{"automationId":"$AUTOMATION_ID","decisionId":"$AUTOMATION_DECISION_ID","decisionDigest":"$decision_digest","applyDigest":"$apply_digest"},"runHistory":{"preservationId":"$RUN_HISTORY_PRESERVATION_ID","preservationDigest":"$preservation_digest","legacyFactCount":$legacy_history_facts,"targetFactCount":$target_history_facts},"secretConfig":{"secretConfigId":"$SECRET_CONFIG_ID","secretConfigPlanDigest":"$secret_config_plan_digest","rowCount":$secret_rows,"eligibleBindingCount":$eligible_bindings,"eligiblePreservationCount":$eligible_preservations,"targetConflictCount":$target_conflicts,"unadaptedLegacyConfigCount":$unadapted_configs},"secretConfigDecision":{"decisionId":"$SECRET_CONFIG_DECISION_ID","preparationDigest":"$secret_decision_preparation_digest"},"target":"stopped","legacy":"stopped","automaticCandidateDecision":"not_authorized","next":"supply_external_secret_config_decisions"}
+EOF
+  chmod 0600 "$reconciliation_root/summary.json"
+  printf '%s\n' \
+    'Automation application, dual Run History preservation, and Secret/Config plan are ready.' \
+    "Summary: $reconciliation_root/summary.json" \
+    "Secret/Config plan: $secret_config_root/$SECRET_CONFIG_ID/plan.ndjson" \
+    'No Secret/Config candidate decision was generated or applied. Supply an external owner-private NDJSON decision file to the complete phase.'
+  exit 0
+fi
 
 if [ -e "$command_root/automation-rollback.json" ]; then
   rolled_back_ms=$(extract_unsigned "$command_root/automation-rollback.json" rolledBackAtMs)

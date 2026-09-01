@@ -162,6 +162,40 @@ function targetRunHistoryIsTerminal(client: DatabaseSync): boolean {
   return true;
 }
 
+function legacyIdentityPolicyAuditIsEmpty(client: DatabaseSync): boolean {
+  const rows = client
+    .prepare(
+      `SELECT name
+       FROM sqlite_schema
+       WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+       ORDER BY name
+       LIMIT 513`,
+    )
+    .iterate() as IterableIterator<{ readonly name?: unknown }>;
+  let catalog = 0;
+  for (const row of rows) {
+    catalog += 1;
+    if (
+      catalog > 512 ||
+      typeof row.name !== 'string' ||
+      Buffer.byteLength(row.name, 'utf8') > MAX_NAME_BYTES
+    ) {
+      return false;
+    }
+    if (
+      classifyLocalReconciliationFact('legacy', row.name) !==
+      'identity_policy_audit'
+    ) {
+      continue;
+    }
+    const present = client
+      .prepare(`SELECT 1 AS present FROM ${quotedIdentifier(row.name)} LIMIT 1`)
+      .get() as { readonly present?: unknown } | undefined;
+    if (present?.present === 1) return false;
+  }
+  return true;
+}
+
 function requirement(
   client: DatabaseSync,
   database: LocalReconciliationSealedDatabaseKind,
@@ -199,6 +233,12 @@ function requirement(
       return Object.freeze({
         decisionRequirement: 'required' as const,
         reason: 'reviewable_fact' as const,
+      });
+    }
+    if (legacyIdentityPolicyAuditIsEmpty(client)) {
+      return Object.freeze({
+        decisionRequirement: 'informational' as const,
+        reason: 'catalog_evidence' as const,
       });
     }
     return Object.freeze({

@@ -10,8 +10,8 @@ const { auditClusterImageSbom } = require('./ql3-cluster-image-sbom.cjs');
 const { readReleaseIdentity } = require('./lib/ql3-release-identity.cjs');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCHEMA = 'qinglong/alpha-local-trial-kit@v10';
-const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v8';
+const SCHEMA = 'qinglong/alpha-local-trial-kit@v11';
+const VERIFICATION_SCHEMA = 'qinglong/alpha-local-trial-kit-verification@v9';
 const QUICKSTART_TEMPLATE = path.join(
   DEFAULT_ROOT,
   'scripts/templates/ql3-local-alpha-quickstart.sh',
@@ -73,6 +73,7 @@ const VERIFICATION = Object.freeze({
   legacyUpgradeCutover: 'passed',
   legacyUpgradeReconciliationCapture: 'passed',
   legacyUpgradeReconciliationAutomationRollback: 'passed',
+  legacyUpgradeReconciliationCompletion: 'passed',
 });
 
 function verificationGates(variant) {
@@ -782,7 +783,7 @@ function createLocalAlphaTrialKit(options, adapters = {}) {
       0o700,
     );
     const manifest = {
-      schemaVersion: 11,
+      schemaVersion: 12,
       schema: SCHEMA,
       maturity: 'alpha_candidate_not_public_release',
       product: 'local',
@@ -909,7 +910,7 @@ function auditLocalAlphaTrialKit(options) {
       'readme',
       'verification',
     ]) ||
-    manifest.schemaVersion !== 11 ||
+    manifest.schemaVersion !== 12 ||
     manifest.schema !== SCHEMA ||
     manifest.maturity !== 'alpha_candidate_not_public_release' ||
     manifest.product !== 'local' ||
@@ -1030,7 +1031,7 @@ function auditLocalAlphaTrialKit(options) {
     expectedUpgradeReconciliationRehearsal
   ) {
     fail(
-      'upgrade reconciliation rehearsal differs from the canonical reviewed application and rollback journey',
+      'upgrade reconciliation rehearsal differs from the canonical reviewed rollback and completion journey',
     );
   }
   validateFileRecord(manifest.readme, FILES.readme, bundleRoot);
@@ -1110,7 +1111,7 @@ function auditLocalAlphaTrialKit(options) {
   }
   return Object.freeze({
     schemaVersion: 1,
-    schema: 'qinglong/alpha-local-trial-kit-audit@v7',
+    schema: 'qinglong/alpha-local-trial-kit-audit@v8',
     sourceRevision: manifest.sourceRevision,
     version: manifest.version,
     architecture: manifest.architecture,
