@@ -532,6 +532,7 @@
 | [ADR-0526](./ADR-0526-exact-post-write-reconciliation-capture.md)                                 | Exact 写后 Reconciliation Capture                                                                                                                                                                                                     | Accepted（同源 exact Console 双架构阶段实物已交付）             |
 | [ADR-0527](./ADR-0527-reviewed-automation-reconciliation-application-and-rollback.md)             | 受审核 Automation Reconciliation 应用与显式回滚                                                                                                                                                                                        | Accepted（exact headless 双架构阶段实物已交付） |
 | [ADR-0528](./ADR-0528-cross-domain-reconciliation-completion-rehearsal.md)                        | 跨域 Reconciliation Completion 演练                                                                                                                                                                                                     | Accepted（D-426c3 源码候选；双架构阶段实物待 gate） |
+| [ADR-0529](./ADR-0529-bounded-read-only-local-panel-cron-adapter.md)                              | 有界只读 Local 旧面板 Cron Adapter                                                                                                                                                                                                      | Proposed（D-427 源码候选；双架构阶段实物待 gate） |
 
 ## 规则
 

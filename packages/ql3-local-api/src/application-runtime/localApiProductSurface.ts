@@ -31,6 +31,7 @@ import {
   createLocalApiSecretListRoute,
   createLocalApiSecretPutRoute,
 } from '../secret/secretRoutes';
+import { createPanelCronListRoute } from '../panel-compatibility/panelCronListRoute';
 import { startLocalApiHttpSurface } from '../transport/httpSurface';
 
 export interface LocalApiProductSurfaceEvent {
@@ -221,6 +222,10 @@ export function createLocalApiProductSurface(
           ? {}
           : { randomUuid: options.randomUuid }),
       });
+      const panelCronListRoute = createPanelCronListRoute({
+        tasks: authority.taskDefinitions,
+        triggers: authority.triggers,
+      });
       const admission = createLocalApiAdmission({
         authenticator,
         policy,
@@ -241,6 +246,7 @@ export function createLocalApiProductSurface(
         triggerPutRoute,
         secretListRoute,
         secretPutRoute,
+        panelCronListRoute,
         ...(options.now === undefined ? {} : { now: options.now }),
         ...(options.randomUuid === undefined
           ? {}

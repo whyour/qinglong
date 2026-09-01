@@ -37,6 +37,7 @@ import type {
   LocalApiSecretListRoute,
   LocalApiSecretPutRoute,
 } from '../secret/secretRoutes';
+import type { PanelCronListRoute } from '../panel-compatibility/panelCronListRoute';
 import type { LocalApiResponse } from '../transport/contract';
 
 export type LocalApiAdmissionOperation =
@@ -125,6 +126,13 @@ export type LocalApiAdmissionOperation =
   | Readonly<{
       operationId: 'secret.put';
       projectId: string;
+    }>
+  | Readonly<{
+      operationId: 'panel.cron.list';
+      projectId: string;
+      page: number;
+      size: number;
+      maximumRows: number;
     }>;
 
 export interface LocalApiAdmissionRequest {
@@ -168,6 +176,7 @@ export interface LocalApiAdmissionOptions {
   readonly triggerPutRoute: LocalApiTriggerPutRoute;
   readonly secretListRoute: LocalApiSecretListRoute;
   readonly secretPutRoute: LocalApiSecretPutRoute;
+  readonly panelCronListRoute: PanelCronListRoute;
   readonly now?: () => number;
   readonly randomUuid?: () => string;
 }
@@ -253,6 +262,7 @@ export function createLocalApiAdmission(
     typeof options.triggerPutRoute?.handle !== 'function' ||
     typeof options.secretListRoute?.handle !== 'function' ||
     typeof options.secretPutRoute?.handle !== 'function' ||
+    typeof options.panelCronListRoute?.handle !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function') ||
     (options.randomUuid !== undefined &&
       typeof options.randomUuid !== 'function')
@@ -393,7 +403,8 @@ export function createLocalApiAdmission(
               : request.operation.operationId === 'task.list' ||
                 request.operation.operationId === 'task.get' ||
                 request.operation.operationId === 'trigger.list' ||
-                request.operation.operationId === 'trigger.get'
+                request.operation.operationId === 'trigger.get' ||
+                request.operation.operationId === 'panel.cron.list'
               ? 'task.read'
               : request.operation.operationId === 'secret.list'
               ? 'secret.manage'
@@ -552,6 +563,14 @@ export function createLocalApiAdmission(
                 ...(request.operation.after
                   ? { after: request.operation.after }
                   : {}),
+              });
+            case 'panel.cron.list':
+              if (body !== null) return response(400, 'invalid_request_body');
+              return options.panelCronListRoute.handle({
+                projectId: request.operation.projectId,
+                page: request.operation.page,
+                size: request.operation.size,
+                maximumRows: request.operation.maximumRows,
               });
             case 'task.put':
             case 'task.authoring':

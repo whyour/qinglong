@@ -836,6 +836,46 @@ test('serves an authenticated Run through one real SQLite authority and durable 
   assert.equal(triggerList.body.triggers[0].triggerId, 'cron:task-1');
   assert.equal(triggerList.body.triggers[0].spec, undefined);
 
+  const panelCrons = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    '/api/crons?searchValue=&page=1&size=20&filters=%7B%7D',
+  );
+  assert.equal(panelCrons.statusCode, 200, JSON.stringify(panelCrons));
+  assert.equal(panelCrons.body.code, 200);
+  assert.equal(panelCrons.body.data.total, 1);
+  assert.equal(panelCrons.body.data.data.length, 1);
+  assert.deepEqual(
+    {
+      id: panelCrons.body.data.data[0].id,
+      name: panelCrons.body.data.data[0].name,
+      command: panelCrons.body.data.data[0].command,
+      schedule: panelCrons.body.data.data[0].schedule,
+      status: panelCrons.body.data.data[0].status,
+      isDisabled: panelCrons.body.data.data[0].isDisabled,
+      ql3: panelCrons.body.data.data[0].ql3,
+    },
+    {
+      id: 'cron:task-1',
+      name: 'Local API Task updated',
+      command: 'ql3:command:task-1@2',
+      schedule: '0 * * * *',
+      status: 1,
+      isDisabled: 0,
+      ql3: {
+        projectId: 'default',
+        taskId: 'task-1',
+        taskRevision: 2,
+        triggerId: 'cron:task-1',
+        triggerRevision: 1,
+        timezone: 'UTC',
+        misfirePolicy: 'skip',
+        readOnly: true,
+      },
+    },
+  );
+  assert.equal(JSON.stringify(panelCrons).includes('/bin/echo'), false);
+
   const triggerRead = await request(port, `Bearer ${TOKEN}`, triggerPath);
   assert.equal(triggerRead.statusCode, 200);
   assert.deepEqual(triggerRead.body.trigger.spec, {

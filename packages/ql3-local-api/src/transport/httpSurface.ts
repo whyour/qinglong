@@ -64,7 +64,8 @@ type LocalApiRouteResolution =
         | 'invalid_run_log_read_query'
         | 'invalid_task_list_query'
         | 'invalid_trigger_list_query'
-        | 'invalid_secret_list_query';
+        | 'invalid_secret_list_query'
+        | 'invalid_panel_cron_list_query';
     }>;
 
 export interface LocalApiHttpSurfaceOptions {
@@ -549,6 +550,62 @@ function parseRunAttemptLogReadQuery(
   return Object.freeze({ offset, length });
 }
 
+function parsePanelCronListRoute(
+  rawUrl: string,
+  profile: LocalApplicationProfile,
+): LocalApiRouteResolution | null {
+  const separator = rawUrl.indexOf('?');
+  if (
+    separator !== rawUrl.lastIndexOf('?') ||
+    (separator < 0 ? rawUrl : rawUrl.slice(0, separator)) !== '/api/crons'
+  ) {
+    return null;
+  }
+  try {
+    const query = new URLSearchParams(
+      separator < 0 ? '' : rawUrl.slice(separator + 1),
+    );
+    const allowed = new Set(['filters', 'page', 'searchValue', 'size', 't']);
+    for (const key of query.keys()) {
+      if (!allowed.has(key) || query.getAll(key).length !== 1) {
+        throw new TypeError();
+      }
+    }
+    const searchValue = query.get('searchValue') ?? '';
+    const filters = query.get('filters') ?? '{}';
+    const rawPage = query.get('page') ?? '1';
+    const rawSize = query.get('size') ?? '20';
+    const timestamp = query.get('t');
+    const page = Number(rawPage);
+    const size = Number(rawSize);
+    const maximumRows = profile === 'edge' ? 64 : 256;
+    if (
+      searchValue !== '' ||
+      filters !== '{}' ||
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      String(page) !== rawPage ||
+      !Number.isSafeInteger(size) ||
+      size < 1 ||
+      size > 64 ||
+      String(size) !== rawSize ||
+      page * size > maximumRows ||
+      (timestamp !== null && !/^\d{1,20}$/u.test(timestamp))
+    ) {
+      throw new TypeError();
+    }
+    return Object.freeze({
+      operationId: 'panel.cron.list',
+      projectId: 'default',
+      page,
+      size,
+      maximumRows,
+    });
+  } catch {
+    return Object.freeze({ errorCode: 'invalid_panel_cron_list_query' });
+  }
+}
+
 function route(
   request: IncomingMessage,
   profile: LocalApplicationProfile,
@@ -558,11 +615,15 @@ function route(
     typeof rawUrl !== 'string' ||
     rawUrl.length < 1 ||
     Buffer.byteLength(rawUrl, 'utf8') > MAX_URL_BYTES ||
-    rawUrl.includes('%') ||
     rawUrl.includes('#')
   ) {
     return null;
   }
+  if (request.method === 'GET') {
+    const panelCronList = parsePanelCronListRoute(rawUrl, profile);
+    if (panelCronList) return panelCronList;
+  }
+  if (rawUrl.includes('%')) return null;
   const separator = rawUrl.indexOf('?');
   if (separator !== rawUrl.lastIndexOf('?')) return null;
   const path = separator < 0 ? rawUrl : rawUrl.slice(0, separator);

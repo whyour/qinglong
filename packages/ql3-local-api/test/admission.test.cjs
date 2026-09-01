@@ -303,6 +303,17 @@ function fixture(overrides = {}) {
         return { statusCode: 201, body: { status: 'inserted' } };
       },
     },
+    panelCronListRoute: {
+      async handle(value) {
+        events.push(
+          `panel-crons:${value.projectId}:${value.page}:${value.size}:${value.maximumRows}`,
+        );
+        return {
+          statusCode: 200,
+          body: { code: 200, data: { data: [], total: 0 } },
+        };
+      },
+    },
     now: () => 10_000,
     randomUuid: () => '019f70c0-0000-4000-8000-000000000002',
     ...overrides,
@@ -505,6 +516,35 @@ test('uses task.read with a route-owned task.get audit identity', async () => {
     'audit:allowed:task.get',
     'confirm',
     'task:prj_default:task-a',
+  ]);
+});
+
+test('uses task.read and the exact panel Cron audit identity for the compatibility projection', async () => {
+  const { admission, events } = fixture();
+  assert.deepEqual(
+    await execute(
+      admission,
+      request({
+        operation: Object.freeze({
+          operationId: 'panel.cron.list',
+          projectId: 'default',
+          page: 1,
+          size: 20,
+          maximumRows: 64,
+        }),
+      }),
+    ),
+    {
+      statusCode: 200,
+      body: { code: 200, data: { data: [], total: 0 } },
+    },
+  );
+  assert.deepEqual(events, [
+    'authenticate',
+    'authorize:task.read:default',
+    'audit:allowed:panel.cron.list',
+    'confirm',
+    'panel-crons:default:1:20:64',
   ]);
 });
 
