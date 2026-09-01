@@ -64,6 +64,22 @@ require.cache[sharedStoreModulePath] = {
   paths: [],
 };
 
+const taskLimitModulePath = require.resolve('../../back/shared/pLimit');
+require.cache[taskLimitModulePath] = {
+  id: taskLimitModulePath,
+  filename: taskLimitModulePath,
+  loaded: true,
+  exports: {
+    __esModule: true,
+    default: {
+      removeQueuedCron() {},
+      async setCustomLimit() {},
+    },
+  },
+  children: [],
+  paths: [],
+};
+
 const config = require('../../back/config').default;
 const OpenService = require('../../back/services/open').default;
 const ScriptService = require('../../back/services/script').default;
@@ -309,6 +325,7 @@ after(() => {
     Container.remove(token);
   }
   delete require.cache[apiIndexModulePath];
+  delete require.cache[taskLimitModulePath];
   delete require.cache[sharedStoreModulePath];
   fs.rmSync(testRoot, { recursive: true, force: true });
 });
