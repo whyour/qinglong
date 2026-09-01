@@ -1,6 +1,6 @@
 # ADR-0525：Console Adopted Target 入口证据
 
-- 状态：Accepted（源码与 CI 门禁已实现；exact Console 双架构阶段实物待生成）
+- 状态：Accepted（exact Console 双架构阶段实物已交付并完成离线审计）
 - 日期：2026-09-01
 - 决策：D-426b2c
 - 关联：ADR-0512、ADR-0513、ADR-0522、ADR-0523、ADR-0524
@@ -44,7 +44,9 @@ ADR-0524 已用 headless Trial Kit 的只读 Application cutover probe 闭合 cl
 - Local Application：56 total / 51 pass / 5 conditional skip / 0 fail；
 - package boundary、Cluster dependency、Edge import 与 Local image/operator image audit 均为 compatible；workspace package 仍为 18 个，未新增依赖、package 或常驻进程。
 
-本机 exact Console image build 尚未形成阶段实物：Docker 配置的镜像镜像源 `register.liberx.info` 在解析固定 Node base image 时连续 EOF，构建未进入源码层。因此本 ADR 当前只声明“源码与 CI 门禁已实现”；只有同源原生 amd64/arm64 Console artifact、milestone 与离线 auditor 在成功终态 workflow 中闭合后，才能升级为“阶段实物已交付”。
+提交 `229c3cb4e826866a0c7c4d81cb5e52cdc3975eec` 的普通主 CI [run 33462165722](https://github.com/whyour/qinglong/actions/runs/33462165722) 已完整成功；同源 Kubernetes live run [33462165834](https://github.com/whyour/qinglong/actions/runs/33462165834) 也成功。随后显式 Local Console artifact [run 33463415938](https://github.com/whyour/qinglong/actions/runs/33463415938) 完成全部门禁及 Local Alpha finalizer，产出 amd64、arm64 与 milestone 三份新实物，artifact ID 分别为 `9784212784`、`9784111987`、`9784288018`，压缩大小分别为 `226669830`、`222069510`、`6489` bytes，GitHub ZIP digest 分别为 `sha256:d967f89d901837fbfc7b3d0d7be0ceb0ae4c36d44fc3ec707da539c34edfe76b`、`sha256:20cc976303a2c1219c91a1d620a8900ae9dfc3e28aa130f5609cb1a2bd9a1a0e`、`sha256:62c955fb376aba978a56f02abb8df611f888f44a4ee58196cd61e07e9f7912ff`，保留至 2026-10-01。
+
+三份产物从 GitHub 重新下载后通过独立离线 auditor，均返回 `compatible=true`。两个 Trial Kit 都绑定 `3.0.0-alpha.2`、`variant=console`、run `33463415938`/attempt `1` 与 exact source revision；内部 Docker archive digest 分别为 amd64 `sha256:2b60885d19ec6b3f62671cc9370ee5cef4f1be41150797c36610dbdeb0a6514b`、arm64 `sha256:19c2e24d16ece348672ec4cd2a1ac4374cf6338da7e6113e2c056f7c085c4c53`。milestone v5 同时闭合两个架构。由此 D-426b2c 已从“源码与门禁”升级为可下载、可复核的 Console 阶段实物；此前本机镜像源 EOF 仅是本地构建环境问题，不再构成交付缺口。
 
 ## 后续
 

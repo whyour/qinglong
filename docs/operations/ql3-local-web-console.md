@@ -13,7 +13,7 @@ Local Web Console 是 `@qinglong/local-api` 的 opt-in 操作界面，用来创�
 
 D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一步安装可直接使用的 Owner credential presentation，并创建默认不自动运行的 `alpha-first-automation`。D-420 又把该 Run 的 latest Attempt 首个 32 KiB 日志带到 Console。D-421/D-422 依次增加 request-scoped strong-auth Task 创建与双 proof 无损编辑，D-423 继续开放既有 immutable Trigger/cron authority。D-424 再增加 Secret current metadata、强认证 create/rotate 与 Task pinned binding；绑定提交 `f46fb44ac9534315b6965865bb3e990715bb2417` 的最新双架构实物已由 [milestone run 33252179178](https://github.com/whyour/qinglong/actions/runs/33252179178) 生成并完成 milestone checksum/auditor 复核，没有借用或改名 D-423 archive。
 
-D-426b2c 又补齐了 Console 镜像的 adopted-target 入口证据：切换演练使用 `ql3-local-api --cutover-probe --config <local-api.json>`，同时绑定外层 API 配置、内层 Application 配置与 exact mounts，但该模式不会启动本页使用的 listener、credential、scheduler 或 mutation surface。正常启动仍使用下文不带 `--cutover-probe` 的命令；源码和 CI 门禁已实现，exact Console 双架构阶段实物仍待成功 artifact workflow 闭合。
+D-426b2c 又补齐了 Console 镜像的 adopted-target 入口证据：切换演练使用 `ql3-local-api --cutover-probe --config <local-api.json>`，同时绑定外层 API 配置、内层 Application 配置与 exact mounts，但该模式不会启动本页使用的 listener、credential、scheduler 或 mutation surface。正常启动仍使用下文不带 `--cutover-probe` 的命令；提交 `229c3cb4e826866a0c7c4d81cb5e52cdc3975eec` 的 [artifact run 33463415938](https://github.com/whyour/qinglong/actions/runs/33463415938) 已交付 exact amd64/arm64 Console Trial Kit 与 milestone，三份下载产物的离线 auditor 均为 `compatible=true`。
 
 ## 前置条件
 

@@ -48,4 +48,4 @@ ADR-0523 已修正 Apply 后 Adopted Target 的回退基线，但仓库内单元
 
 ## 后续
 
-D-426b2c 已由 ADR-0525 实现为 Console Local API 外层入口与 Application 内层配置的双重证据，且保持 headless 既有 command/journal shape；exact Console 双架构 artifact 闭合仍待成功终态 CI。D-426c 继续处理 target 写入后的 capture、review、reconciliation 与恢复，不得削弱 headless 已闭合的离线镜像和回退基线。
+D-426b2c 已由 ADR-0525 实现为 Console Local API 外层入口与 Application 内层配置的双重证据，且保持 headless 既有 command/journal shape；同源 exact Console 双架构 artifact 与 milestone 已由成功终态 CI 交付并完成下载后离线审计。D-426c 继续处理 target 写入后的 capture、review、reconciliation 与恢复，不得削弱 headless 已闭合的离线镜像和回退基线。
