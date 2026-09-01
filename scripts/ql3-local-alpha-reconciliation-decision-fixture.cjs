@@ -289,7 +289,14 @@ function completionReviewFixture(root, output) {
   const decisions = [];
   for (const fact of facts) {
     if (fact.decisionRequirement === 'informational') continue;
-    if (fact.decisionRequirement === 'blocked') {
+    const externallyRecoverableSecretConfig =
+      fact.decisionRequirement === 'blocked' &&
+      fact.domain === 'secret_and_config' &&
+      fact.reason === 'secret_custody_required';
+    if (
+      fact.decisionRequirement === 'blocked' &&
+      !externallyRecoverableSecretConfig
+    ) {
       fail('completion review fixture refuses blocked diagnostic facts');
     }
     const automationTable =

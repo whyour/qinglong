@@ -298,7 +298,8 @@ function completionReviewState(t) {
               : 'QingLong3Secrets'
             : 'QingLong3Runs',
         rowCount: '1',
-        decisionRequirement: 'required',
+        decisionRequirement:
+          domain === 'secret_and_config' ? 'blocked' : 'required',
         reason:
           domain === 'run_history'
             ? 'historical_preservation_required'
