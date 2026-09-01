@@ -16,10 +16,24 @@ export interface LocalReconciliationSecretConfigOptions {
   readonly allowRootService: boolean;
 }
 
+export interface LocalReconciliationSecretConfigAutomationOptions
+  extends LocalReconciliationSecretConfigOptions {
+  readonly automationApplyRoot: string;
+}
+
+export interface LocalReconciliationSecretConfigAutomationBinding {
+  readonly automationId: string;
+  readonly decisionId: string;
+  readonly expectedApplyDigest: string;
+}
+
 export interface LocalReconciliationSecretConfigPlanCommand {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly operation: 'local.deployment.reconciliation.secret-config.plan';
-  readonly options: Readonly<LocalReconciliationSecretConfigOptions>;
+  readonly options: Readonly<
+    | LocalReconciliationSecretConfigOptions
+    | LocalReconciliationSecretConfigAutomationOptions
+  >;
   readonly request: Readonly<{
     secretConfigId: string;
     applicationId: string;
@@ -28,6 +42,7 @@ export interface LocalReconciliationSecretConfigPlanCommand {
     decisionFilePath: string;
     projectId: string;
     preparedAtMs: number;
+    automation?: Readonly<LocalReconciliationSecretConfigAutomationBinding>;
   }>;
 }
 
@@ -146,13 +161,18 @@ function projectId(value: unknown): string {
 
 function normalizeOptions(
   value: unknown,
-): Readonly<LocalReconciliationSecretConfigOptions> {
+  schemaVersion: 1 | 2,
+): Readonly<
+  | LocalReconciliationSecretConfigOptions
+  | LocalReconciliationSecretConfigAutomationOptions
+> {
   const options = object(value, 'options');
   exact(
     options,
     [
       'allowRootService',
       'applicationRoot',
+      ...(schemaVersion === 2 ? ['automationApplyRoot'] : []),
       'deploymentRoot',
       'secretConfigRoot',
     ],
@@ -169,6 +189,9 @@ function normalizeOptions(
     safePath(options.deploymentRoot, 'deploymentRoot'),
     safePath(options.applicationRoot, 'applicationRoot'),
     safePath(options.secretConfigRoot, 'secretConfigRoot'),
+    ...(schemaVersion === 2
+      ? [safePath(options.automationApplyRoot, 'automationApplyRoot')]
+      : []),
   ];
   for (let left = 0; left < roots.length; left += 1) {
     for (let right = left + 1; right < roots.length; right += 1) {
@@ -184,6 +207,7 @@ function normalizeOptions(
     deploymentRoot: roots[0]!,
     applicationRoot: roots[1]!,
     secretConfigRoot: roots[2]!,
+    ...(schemaVersion === 2 ? { automationApplyRoot: roots[3]! } : {}),
     allowRootService: options.allowRootService,
   });
 }
@@ -194,7 +218,11 @@ function command(
     | LocalReconciliationSecretConfigPlanCommand['operation']
     | LocalReconciliationSecretConfigVerifyCommand['operation'],
 ): Readonly<{
-  options: Readonly<LocalReconciliationSecretConfigOptions>;
+  schemaVersion: 1 | 2;
+  options: Readonly<
+    | LocalReconciliationSecretConfigOptions
+    | LocalReconciliationSecretConfigAutomationOptions
+  >;
   request: Record<string, unknown>;
 }> {
   const selected = object(value, 'command');
@@ -203,12 +231,44 @@ function command(
     ['operation', 'options', 'request', 'schemaVersion'],
     'command',
   );
-  if (selected.schemaVersion !== 1 || selected.operation !== operation) {
+  const schemaVersion = selected.schemaVersion;
+  if (
+    (schemaVersion !== 1 &&
+      (schemaVersion !== 2 ||
+        operation !== 'local.deployment.reconciliation.secret-config.plan')) ||
+    selected.operation !== operation
+  ) {
     configurationError('command version or operation is invalid');
   }
   return Object.freeze({
-    options: normalizeOptions(selected.options),
+    schemaVersion,
+    options: normalizeOptions(selected.options, schemaVersion),
     request: object(selected.request, 'request'),
+  });
+}
+
+function automationBinding(
+  value: unknown,
+): Readonly<LocalReconciliationSecretConfigAutomationBinding> {
+  const selected = object(value, 'automation binding');
+  exact(
+    selected,
+    ['automationId', 'decisionId', 'expectedApplyDigest'],
+    'automation binding',
+  );
+  return Object.freeze({
+    automationId: identifier(selected.automationId, 'automationId'),
+    decisionId:
+      typeof selected.decisionId === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+        selected.decisionId,
+      )
+        ? selected.decisionId
+        : configurationError('decisionId is invalid'),
+    expectedApplyDigest: digest(
+      selected.expectedApplyDigest,
+      'expectedApplyDigest',
+    ),
   });
 }
 
@@ -223,6 +283,7 @@ export function normalizeLocalReconciliationSecretConfigPlanCommand(
     selected.request,
     [
       'applicationId',
+      ...(selected.schemaVersion === 2 ? ['automation'] : []),
       'decisionFilePath',
       'expectedApplicationPlanDigest',
       'expectedHeadDigest',
@@ -255,7 +316,7 @@ export function normalizeLocalReconciliationSecretConfigPlanCommand(
     configurationError('preparedAtMs is invalid');
   }
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: selected.schemaVersion,
     operation: 'local.deployment.reconciliation.secret-config.plan',
     options: selected.options,
     request: Object.freeze({
@@ -278,6 +339,9 @@ export function normalizeLocalReconciliationSecretConfigPlanCommand(
       decisionFilePath,
       projectId: projectId(selected.request.projectId),
       preparedAtMs: selected.request.preparedAtMs as number,
+      ...(selected.schemaVersion === 2
+        ? { automation: automationBinding(selected.request.automation) }
+        : {}),
     }),
   });
 }
@@ -297,7 +361,12 @@ export function normalizeLocalReconciliationSecretConfigVerifyCommand(
   return Object.freeze({
     schemaVersion: 1,
     operation: 'local.deployment.reconciliation.secret-config.verify',
-    options: selected.options,
+    options: Object.freeze({
+      deploymentRoot: selected.options.deploymentRoot,
+      applicationRoot: selected.options.applicationRoot,
+      secretConfigRoot: selected.options.secretConfigRoot,
+      allowRootService: selected.options.allowRootService,
+    }),
     request: Object.freeze({
       secretConfigId: identifier(
         selected.request.secretConfigId,

@@ -594,7 +594,7 @@ EOF
 
   secret_prepared_ms=$((preserved_ms + 1))
   cat >"$command_root/secret-config-plan.json" <<EOF
-{"schemaVersion":1,"operation":"local.deployment.reconciliation.secret-config.plan","options":{"deploymentRoot":"$rehearsal_root","applicationRoot":"$application_root","secretConfigRoot":"$secret_config_root","allowRootService":$allow_root_service},"request":{"secretConfigId":"$SECRET_CONFIG_ID","applicationId":"$APPLICATION_ID","expectedApplicationPlanDigest":"$application_plan_digest","expectedHeadDigest":"$applied_head_digest","decisionFilePath":"$secondary_input","projectId":"default","preparedAtMs":$secret_prepared_ms}}
+{"schemaVersion":2,"operation":"local.deployment.reconciliation.secret-config.plan","options":{"deploymentRoot":"$rehearsal_root","applicationRoot":"$application_root","secretConfigRoot":"$secret_config_root","automationApplyRoot":"$automation_apply_root","allowRootService":$allow_root_service},"request":{"secretConfigId":"$SECRET_CONFIG_ID","applicationId":"$APPLICATION_ID","expectedApplicationPlanDigest":"$application_plan_digest","expectedHeadDigest":"$applied_head_digest","decisionFilePath":"$secondary_input","projectId":"default","preparedAtMs":$secret_prepared_ms,"automation":{"automationId":"$AUTOMATION_ID","decisionId":"$AUTOMATION_DECISION_ID","expectedApplyDigest":"$apply_digest"}}}
 EOF
   chmod 0600 "$command_root/secret-config-plan.json"
   phase 'materialize reviewed Secret/Config candidate plan'

@@ -887,6 +887,97 @@ function automationReadyDatabaseInitializer() {
   };
 }
 
+function crossDomainReconciliationDatabaseInitializer() {
+  return ({ legacySourcePath, recoveryPath, targetDatabasePath }) => {
+    const legacy = new DatabaseSync(legacySourcePath);
+    legacy.exec(`
+      CREATE TABLE "Crontabs" (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        command TEXT,
+        schedule TEXT,
+        saved INTEGER,
+        isSystem INTEGER,
+        isDisabled INTEGER,
+        isPinned INTEGER,
+        labels TEXT,
+        sub_id INTEGER,
+        extra_schedules TEXT,
+        task_before TEXT,
+        task_after TEXT,
+        log_name TEXT,
+        allow_multiple_instances INTEGER,
+        work_dir TEXT
+      );
+      CREATE TABLE "Envs" (
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        value TEXT,
+        status INTEGER,
+        position REAL,
+        "isPinned" INTEGER,
+        "createdAt" TEXT
+      );
+      CREATE TABLE "CrontabStats" (
+        id INTEGER PRIMARY KEY,
+        ref_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        run_count INTEGER,
+        success_count INTEGER,
+        fail_count INTEGER,
+        total_time INTEGER,
+        max_time INTEGER,
+        "createdAt" TEXT NOT NULL,
+        "updatedAt" TEXT NOT NULL
+      );
+      CREATE TABLE "RunningInstances" (
+        id INTEGER PRIMARY KEY,
+        cron_id INTEGER NOT NULL,
+        run_id TEXT,
+        attempt_id TEXT,
+        pid INTEGER,
+        log_path TEXT,
+        started_at INTEGER NOT NULL,
+        finished_at INTEGER,
+        status INTEGER NOT NULL,
+        exit_code INTEGER,
+        "createdAt" TEXT NOT NULL,
+        "updatedAt" TEXT NOT NULL
+      );
+      INSERT INTO "Crontabs" (
+        id, name, command, schedule, saved, isSystem, isDisabled, isPinned
+      ) VALUES (1, 'nightly', 'task nightly.js', '0 0 * * *', 1, 0, 0, 0);
+      INSERT INTO "Envs" (
+        id, name, value, status, position, "isPinned", "createdAt"
+      ) VALUES (1, 'ACTIVE_TOKEN', 'private-secret-value', 0, 1, 0, '2026-01-01');
+      INSERT INTO "CrontabStats" (
+        id, ref_id, date, run_count, success_count, fail_count,
+        total_time, max_time, "createdAt", "updatedAt"
+      ) VALUES (1, 1, '2026-01-01', 1, 1, 0, 100, 100, '2026-01-01', '2026-01-01');
+    `);
+    legacy.close();
+    fs.chmodSync(legacySourcePath, 0o600);
+    fs.copyFileSync(legacySourcePath, recoveryPath);
+    fs.chmodSync(recoveryPath, 0o600);
+    fs.copyFileSync(legacySourcePath, targetDatabasePath);
+    fs.chmodSync(targetDatabasePath, 0o600);
+
+    const migration = spawnSync(
+      process.execPath,
+      [
+        '-e',
+        `require('@qinglong/local-sqlite/migration')
+          .migrateLocalSqlitePath({ databasePath: process.argv[1], profile: 'edge' })
+          .catch((error) => { console.error(error); process.exitCode = 1; });`,
+        targetDatabasePath,
+      ],
+      { encoding: 'utf8', cwd: path.join(__dirname, '..') },
+    );
+    assert.equal(migration.status, 0, migration.stderr);
+    insertSecretConfigOwnerBinding(targetDatabasePath);
+  };
+}
+
 function insertSecretConfigOwnerBinding(targetDatabasePath) {
   const target = new DatabaseSync(targetDatabasePath);
   target.exec(`
@@ -1416,10 +1507,12 @@ async function plannedAutomationFixture(t, options = {}) {
     createDefaultSidecars: false,
     targetInsideDeploymentRoot: true,
     initializeDatabases:
-      options.readyTarget === true
+      options.initializeDatabases ??
+      (options.readyTarget === true
         ? automationReadyDatabaseInitializer()
-        : automationDatabaseInitializer(),
+        : automationDatabaseInitializer()),
     mutateTarget(paths) {
+      if (options.mutateTarget) return options.mutateTarget(paths);
       return options.readyTarget === true
         ? mutateReadyAutomationTarget(paths)
         : mutateAutomationTarget(paths, options.occupied === true);
@@ -1438,6 +1531,7 @@ async function plannedAutomationFixture(t, options = {}) {
         options.occupied === true ? 'retain_both' : 'adopt_legacy';
       selected.reason =
         options.occupied === true ? 'preserve_both' : 'prefer_legacy';
+      options.mutateDecisions?.(records);
     },
   });
   const preparedApplication = await prepareLocalReconciliationApplication(
@@ -1839,6 +1933,9 @@ async function appliedAutomationFixture(t, options = {}) {
     automationId:
       options.automationId ?? '00000000-0000-4000-8000-000000000484',
     readyTarget: true,
+    initializeDatabases: options.initializeDatabases,
+    mutateTarget: options.mutateTarget,
+    mutateDecisions: options.mutateDecisions,
   });
   assert.equal(state.application.outcome, 'adapter_and_manual_required');
   const decisionId =
@@ -4006,6 +4103,169 @@ test('Secret/Config plan keeps active Env and unknown Configs manual', async (t)
     );
     assert.equal(serialized.includes('private-config-value'), false);
   });
+});
+
+test('Secret/Config plan follows applied Automation and preserved Run History on an adopted legacy target', async (t) => {
+  const state = await appliedAutomationFixture(t, {
+    suffix: 'cross-domain-secret-config-plan',
+    planId: '00000000-0000-4000-8000-000000000425',
+    reviewId: '00000000-0000-4000-8000-000000000426',
+    applicationId: '00000000-0000-4000-8000-000000000427',
+    automationId: '00000000-0000-4000-8000-000000000428',
+    decisionId: '019b0000-0000-7000-8000-000000000425',
+    mutationId: '00000000-0000-4000-8000-000000000429',
+    initializeDatabases: crossDomainReconciliationDatabaseInitializer(),
+    mutateDecisions(records) {
+      let secretConfigCount = 0;
+      let runHistoryCount = 0;
+      for (const record of records) {
+        if (record.kind !== 'qinglong3-local-reconciliation-review-decision') {
+          continue;
+        }
+        if (record.domain === 'secret_and_config') {
+          record.disposition = 'manual_external';
+          record.reason = 'external_recovery_required';
+          secretConfigCount += 1;
+        } else if (
+          record.database === 'legacy' &&
+          record.domain === 'run_history'
+        ) {
+          record.disposition = 'retain_both';
+          record.reason = 'preserve_both';
+          runHistoryCount += 1;
+        }
+      }
+      assert.ok(secretConfigCount > 0);
+      assert.ok(runHistoryCount > 0);
+    },
+  });
+  assert.equal(state.application.outcome, 'adapter_and_manual_required');
+
+  const runHistoryRoot = path.join(
+    path.dirname(state.captureRoot),
+    'cross-domain-run-history',
+  );
+  fs.mkdirSync(runHistoryRoot, { mode: 0o700 });
+  const preservationCommand = {
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.run-history.preserve',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      runHistoryRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      preservationId: '00000000-0000-4000-8000-000000000430',
+      applicationId: state.application.applicationId,
+      expectedApplicationPlanDigest: state.application.applicationPlanDigest,
+      expectedHeadDigest: state.applied.instanceHeadDigest,
+      decisionFilePath: state.reviewFile.filePath,
+      preservedAtMs: state.applyCommand.request.appliedAtMs + 1,
+    },
+  };
+  const preserved = await preserveLocalReconciliationRunHistory(
+    preservationCommand,
+  );
+  assert.ok(preserved.legacyFactCount > 0);
+  assert.ok(preserved.targetFactCount > 0);
+  const preservationVerified = await verifyLocalReconciliationRunHistory({
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.run-history.verify',
+    options: preservationCommand.options,
+    request: {
+      preservationId: preservationCommand.request.preservationId,
+      applicationId: preservationCommand.request.applicationId,
+      expectedPreservationDigest: preserved.preservationDigest,
+      decisionFilePath: state.reviewFile.filePath,
+    },
+  });
+  assert.equal(preservationVerified.status, 'verified');
+
+  const secretConfigRoot = path.join(
+    path.dirname(state.captureRoot),
+    'cross-domain-secret-config-plan',
+  );
+  fs.mkdirSync(secretConfigRoot, { mode: 0o700 });
+  const secretConfigId = '00000000-0000-4000-8000-000000000431';
+  const secretConfigCommand = {
+    schemaVersion: 2,
+    operation: 'local.deployment.reconciliation.secret-config.plan',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      secretConfigRoot,
+      automationApplyRoot: state.automationApplyRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      secretConfigId,
+      applicationId: state.application.applicationId,
+      expectedApplicationPlanDigest: state.application.applicationPlanDigest,
+      expectedHeadDigest: state.applied.instanceHeadDigest,
+      decisionFilePath: state.reviewFile.filePath,
+      projectId: 'default',
+      preparedAtMs: preservationCommand.request.preservedAtMs + 1,
+      automation: {
+        automationId: state.automationCommand.request.automationId,
+        decisionId: state.decisionId,
+        expectedApplyDigest: state.applied.applyDigest,
+      },
+    },
+  };
+  const legacyPlanCommand = {
+    ...secretConfigCommand,
+    schemaVersion: 1,
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      secretConfigRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      ...secretConfigCommand.request,
+      automation: undefined,
+    },
+  };
+  delete legacyPlanCommand.request.automation;
+  await assert.rejects(
+    planLocalReconciliationSecretConfig(legacyPlanCommand),
+    /Automation target authority is required/,
+  );
+  await assert.rejects(
+    planLocalReconciliationSecretConfig({
+      ...secretConfigCommand,
+      request: {
+        ...secretConfigCommand.request,
+        automation: {
+          ...secretConfigCommand.request.automation,
+          expectedApplyDigest: 'f'.repeat(64),
+        },
+      },
+    }),
+    /Automation target authority is detached/,
+  );
+  const planned = await planLocalReconciliationSecretConfig(
+    secretConfigCommand,
+  );
+  assert.equal(planned.outcome, 'ready');
+  assert.equal(planned.eligibleBindingCount, 1);
+  assert.equal(planned.adoptedLegacyTaskCount, 1);
+  const verified = await verifyLocalReconciliationSecretConfigPlan({
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.secret-config.verify',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      secretConfigRoot,
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      secretConfigId,
+      expectedSecretConfigPlanDigest: planned.secretConfigPlanDigest,
+    },
+  });
+  assert.equal(verified.status, 'verified');
 });
 
 test('Secret/Config decision reauthenticates the same reviewer, seals exact candidates and verifies content-free', async (t) => {

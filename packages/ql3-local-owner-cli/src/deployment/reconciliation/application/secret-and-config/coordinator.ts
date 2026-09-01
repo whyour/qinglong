@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
 import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
+import { inspectLocalSqliteSnapshot } from '@qinglong/local-sqlite/rollout-safety';
 
 import { currentIdentity } from '../../../foundation/contract';
 import { LocalDeploymentConfigurationError } from '../../../foundation/error';
@@ -27,6 +29,12 @@ import {
   readLocalReconciliationApplicationTerminal,
   type LocalReconciliationApplicationTerminal,
 } from '../coordinator';
+import { verifyLocalReconciliationAutomationApply } from '../automation/applyCoordinator';
+import {
+  localReconciliationAutomationApplyPaths,
+  readLocalReconciliationAutomationApplyIntent,
+  readLocalReconciliationAutomationApplyReceipt,
+} from '../automation/applyStorage';
 import {
   normalizeLocalReconciliationSecretConfigPlanCommand,
   normalizeLocalReconciliationSecretConfigVerifyCommand,
@@ -73,6 +81,12 @@ interface SecretConfigReviewAuthority {
   readonly decisionFileDigest: string;
   readonly confirmDecisionFileIdentity: () => void;
   readonly planTerminal: ReturnType<typeof readLocalReconciliationPlanTerminal>;
+}
+
+interface AutomationTargetAuthority {
+  readonly databasePath: string;
+  readonly profile: 'edge' | 'standalone';
+  readonly snapshotSha256: string;
 }
 
 function configurationError(message: string, cause?: unknown): never {
@@ -304,19 +318,191 @@ function validateApplicationBinding(
     terminal.plan.applicationId !== command.request.applicationId ||
     terminal.plan.applicationPlanDigest !==
       command.request.expectedApplicationPlanDigest ||
-    terminal.head.state !== 'reconciliation_application_planned' ||
-    terminal.head.sourceRecordDigest !== terminal.plan.applicationPlanDigest ||
     !secretConfig ||
     secretConfig.action !== 'manual_external' ||
+    terminal.head.state !== priorState ||
+    terminal.head.headDigest !== command.request.expectedHeadDigest ||
     head.state !== priorState ||
     head.headDigest !== command.request.expectedHeadDigest ||
     (priorState === 'reconciliation_application_planned' &&
-      head.sourceRecordDigest !== terminal.plan.applicationPlanDigest) ||
+      (terminal.head.sourceRecordDigest !==
+        terminal.plan.applicationPlanDigest ||
+        head.sourceRecordDigest !== terminal.plan.applicationPlanDigest)) ||
     command.request.preparedAtMs < terminal.plan.committedAtMs ||
     command.request.preparedAtMs < head.updatedAtMs
   ) {
     configurationError('plan is detached from its ordered application head');
   }
+}
+
+async function automationTargetAuthority(
+  command: Readonly<LocalReconciliationSecretConfigPlanCommand>,
+  terminal: Readonly<LocalReconciliationApplicationTerminal>,
+  head: Readonly<LocalCutoverInstanceHead>,
+  uid: number,
+): Promise<Readonly<AutomationTargetAuthority> | null> {
+  if (expectedPriorState(terminal) === 'reconciliation_application_planned') {
+    if (
+      command.schemaVersion !== 1 ||
+      command.request.automation !== undefined
+    ) {
+      configurationError('Automation target authority is unexpected');
+    }
+    return null;
+  }
+  if (
+    command.schemaVersion !== 2 ||
+    !('automationApplyRoot' in command.options) ||
+    command.request.automation === undefined
+  ) {
+    configurationError('Automation target authority is required');
+  }
+  const automation = command.request.automation;
+  const automationApplyRoot = command.options.automationApplyRoot;
+  validatePrivateDirectory(automationApplyRoot, uid, 'automationApplyRoot');
+  const selected = localReconciliationAutomationApplyPaths(
+    automationApplyRoot,
+    automation.automationId,
+  );
+  const intent = readLocalReconciliationAutomationApplyIntent(selected, uid);
+  const receipt = readLocalReconciliationAutomationApplyReceipt(selected, uid);
+  if (
+    intent.command.options.automationApplyRoot !== automationApplyRoot ||
+    intent.command.options.deploymentRoot !== command.options.deploymentRoot ||
+    intent.command.options.applicationRoot !==
+      command.options.applicationRoot ||
+    intent.command.request.automationId !== automation.automationId ||
+    intent.command.request.decisionId !== automation.decisionId ||
+    intent.projectId !== command.request.projectId ||
+    receipt.automationId !== automation.automationId ||
+    receipt.decisionId !== automation.decisionId ||
+    receipt.applyDigest !== automation.expectedApplyDigest ||
+    receipt.applyDigest !== head.sourceRecordDigest ||
+    receipt.appliedAtMs > command.request.preparedAtMs
+  ) {
+    configurationError('Automation target authority is detached');
+  }
+  const verified = await verifyLocalReconciliationAutomationApply({
+    schemaVersion: 1,
+    operation: 'local.deployment.reconciliation.automation.apply.verify',
+    options: intent.command.options,
+    request: {
+      decisionId: automation.decisionId,
+      automationId: automation.automationId,
+      expectedApplyDigest: automation.expectedApplyDigest,
+    },
+  });
+  if (
+    verified.state !== 'reconciliation_automation_applied' ||
+    verified.applyDigest !== automation.expectedApplyDigest ||
+    verified.instanceHeadDigest !== head.headDigest
+  ) {
+    configurationError('Automation target authority did not verify');
+  }
+  return Object.freeze({
+    databasePath: intent.command.options.targetDatabasePath,
+    profile: intent.profile,
+    snapshotSha256: receipt.targetAfter.sha256,
+  });
+}
+
+function configureReadOnlyTarget(
+  client: DatabaseSync,
+  profile: 'edge' | 'standalone',
+): void {
+  const cacheKiB = profile === 'edge' ? 2_048 : 8_192;
+  client.enableDefensive(true);
+  client.exec(
+    `PRAGMA trusted_schema = OFF; PRAGMA query_only = ON; PRAGMA temp_store = MEMORY; PRAGMA mmap_size = 0; PRAGMA cache_size = -${cacheKiB}`,
+  );
+  const trustedSchema = client.prepare('PRAGMA trusted_schema').get() as
+    | { readonly trusted_schema?: unknown }
+    | undefined;
+  const queryOnly = client.prepare('PRAGMA query_only').get() as
+    | { readonly query_only?: unknown }
+    | undefined;
+  const tempStore = client.prepare('PRAGMA temp_store').get() as
+    | { readonly temp_store?: unknown }
+    | undefined;
+  const mmapSize = client.prepare('PRAGMA mmap_size').get() as
+    | { readonly mmap_size?: unknown }
+    | undefined;
+  const cacheSize = client.prepare('PRAGMA cache_size').get() as
+    | { readonly cache_size?: unknown }
+    | undefined;
+  if (
+    trustedSchema?.trusted_schema !== 0 ||
+    queryOnly?.query_only !== 1 ||
+    tempStore?.temp_store !== 2 ||
+    mmapSize?.mmap_size !== 0 ||
+    cacheSize?.cache_size !== -cacheKiB
+  ) {
+    configurationError('Automation target read-only configuration drifted');
+  }
+}
+
+async function withAutomationTargetDatabase<T>(
+  authority: Readonly<AutomationTargetAuthority>,
+  uid: number,
+  dependencies: LocalReconciliationSecretConfigPlanDependencies,
+  read: (database: DatabaseSync) => T,
+): Promise<T> {
+  const beforeStat = fs.lstatSync(authority.databasePath, { bigint: true });
+  if (
+    !beforeStat.isFile() ||
+    beforeStat.isSymbolicLink() ||
+    Number(beforeStat.uid) !== uid ||
+    ![0o600, 0o400].includes(Number(beforeStat.mode) & 0o777) ||
+    beforeStat.nlink !== 1n ||
+    fs.realpathSync(authority.databasePath) !== authority.databasePath
+  ) {
+    configurationError('Automation target database identity is invalid');
+  }
+  const before = await inspectLocalSqliteSnapshot({
+    databasePath: authority.databasePath,
+    profile: authority.profile,
+  });
+  if (before.sha256 !== authority.snapshotSha256) {
+    configurationError('Automation target database snapshot drifted');
+  }
+  const cacheKiB = authority.profile === 'edge' ? 2_048 : 8_192;
+  dependencies.beforeDatabaseOpen?.('target', 'wal_shm_readonly', cacheKiB);
+  let client: DatabaseSync | undefined;
+  let output: T;
+  try {
+    client = new DatabaseSync(authority.databasePath, {
+      allowExtension: false,
+      defensive: true,
+      enableDoubleQuotedStringLiterals: false,
+      enableForeignKeyConstraints: true,
+      readOnly: true,
+      timeout: 0,
+    });
+    configureReadOnlyTarget(client, authority.profile);
+    output = read(client);
+  } catch (error) {
+    if (error instanceof LocalDeploymentConfigurationError) throw error;
+    return configurationError('Automation target database read failed', error);
+  } finally {
+    client?.close();
+    dependencies.afterDatabaseClose?.('target');
+  }
+  const afterStat = fs.lstatSync(authority.databasePath, { bigint: true });
+  const after = await inspectLocalSqliteSnapshot({
+    databasePath: authority.databasePath,
+    profile: authority.profile,
+  });
+  if (
+    afterStat.dev !== beforeStat.dev ||
+    afterStat.ino !== beforeStat.ino ||
+    afterStat.mtimeNs !== beforeStat.mtimeNs ||
+    afterStat.ctimeNs !== beforeStat.ctimeNs ||
+    after.sha256 !== before.sha256 ||
+    after.sha256 !== authority.snapshotSha256
+  ) {
+    configurationError('Automation target database changed while reading');
+  }
+  return output;
 }
 
 function reviewAuthority(
@@ -390,7 +576,9 @@ function reviewAuthority(
             ),
         );
         if (opened === null) {
-          configurationError('manual-required SQLite topology cannot be adapted');
+          configurationError(
+            'manual-required SQLite topology cannot be adapted',
+          );
         }
       }
     },
@@ -426,6 +614,7 @@ function publishPlan(
   authority: Readonly<SecretConfigReviewAuthority>,
   dependencies: LocalReconciliationSecretConfigPlanDependencies,
   uid: number,
+  automationTarget?: DatabaseSync,
 ): Readonly<LocalReconciliationSecretConfigPlanReceipt> {
   let descriptor: number | undefined;
   let createdStage = false;
@@ -463,27 +652,31 @@ function publishPlan(
       preparedHeadDigest: head.headDigest,
       preparedAtMs: command.request.preparedAtMs,
     });
-    const generated = withLocalReconciliationSealedDatabase(
-      authority.planTerminal.bundle,
-      'target',
-      uid,
-      dependencies,
-      (target) =>
-        withLocalReconciliationSealedDatabase(
-          authority.planTerminal.bundle,
-          'legacy',
-          uid,
-          dependencies,
-          (legacy) =>
-            writeLocalReconciliationSecretConfigPlan({
-              descriptor: descriptor!,
-              maxBytes: maxPlanBytes(terminal.plan.profile),
-              header,
-              legacy,
-              target,
-            }),
-        ),
-    );
+    const generate = (target: DatabaseSync) =>
+      withLocalReconciliationSealedDatabase(
+        authority.planTerminal.bundle,
+        'legacy',
+        uid,
+        dependencies,
+        (legacy) =>
+          writeLocalReconciliationSecretConfigPlan({
+            descriptor: descriptor!,
+            maxBytes: maxPlanBytes(terminal.plan.profile),
+            header,
+            legacy,
+            target,
+          }),
+      );
+    const generated =
+      automationTarget === undefined
+        ? withLocalReconciliationSealedDatabase(
+            authority.planTerminal.bundle,
+            'target',
+            uid,
+            dependencies,
+            generate,
+          )
+        : generate(automationTarget);
     if (generated === null || generated === undefined) {
       configurationError('manual-required SQLite topology cannot be planned');
     }
@@ -577,7 +770,10 @@ function sealDirectory(directory: string, uid: number): void {
   }
 }
 
-function sealTerminal(selected: Readonly<SecretConfigPaths>, uid: number): void {
+function sealTerminal(
+  selected: Readonly<SecretConfigPaths>,
+  uid: number,
+): void {
   if (fs.readdirSync(selected.staging).length !== 0) {
     configurationError('staging must be empty before terminal seal');
   }
@@ -679,11 +875,17 @@ export async function planLocalReconciliationSecretConfig(
 ): Promise<Readonly<LocalReconciliationSecretConfigPlanResult>> {
   const command = normalizeLocalReconciliationSecretConfigPlanCommand(value);
   const identity = currentIdentity();
-  for (const [directory, label] of [
+  const authorityDirectories: readonly (readonly [string, string])[] = [
     [command.options.deploymentRoot, 'deploymentRoot'],
     [command.options.applicationRoot, 'applicationRoot'],
     [command.options.secretConfigRoot, 'secretConfigRoot'],
-  ] as const) {
+    ...(command.schemaVersion === 2 && 'automationApplyRoot' in command.options
+      ? ([
+          [command.options.automationApplyRoot, 'automationApplyRoot'],
+        ] as const)
+      : []),
+  ];
+  for (const [directory, label] of authorityDirectories) {
     validatePrivateDirectory(directory, identity.uid, label);
   }
   const terminal = await readLocalReconciliationApplicationTerminal(
@@ -710,11 +912,7 @@ export async function planLocalReconciliationSecretConfig(
     );
     validateCatalog(selected, false);
     const receipt = readReceipt(selected.receipt, identity.uid, [0o600, 0o400]);
-    validateTerminalBinding(
-      receipt,
-      terminal,
-      command.request.secretConfigId,
-    );
+    validateTerminalBinding(receipt, terminal, command.request.secretConfigId);
     if (
       receipt.applicationPlanDigest !==
         command.request.expectedApplicationPlanDigest ||
@@ -730,7 +928,10 @@ export async function planLocalReconciliationSecretConfig(
       identity.uid,
     );
     const existing = head.state === 'reconciliation_secret_config_planned';
-    if (!existing) validateApplicationBinding(command, terminal, head);
+    if (!existing) {
+      validateApplicationBinding(command, terminal, head);
+      await automationTargetAuthority(command, terminal, head, identity.uid);
+    }
     if (
       existing &&
       head.sourceRecordDigest !== receipt.secretConfigPlanDigest
@@ -754,6 +955,12 @@ export async function planLocalReconciliationSecretConfig(
     identity.uid,
   );
   validateApplicationBinding(command, terminal, head);
+  const automationTarget = await automationTargetAuthority(
+    command,
+    terminal,
+    head,
+    identity.uid,
+  );
   const authority = reviewAuthority(
     command,
     terminal,
@@ -771,15 +978,26 @@ export async function planLocalReconciliationSecretConfig(
     'secretConfigPlanStaging',
   );
   validateCatalog(selected, false);
-  const receipt = publishPlan(
-    selected,
-    command,
-    terminal,
-    head,
-    authority,
-    dependencies,
-    identity.uid,
-  );
+  const publish = (target?: DatabaseSync) =>
+    publishPlan(
+      selected,
+      command,
+      terminal,
+      head,
+      authority,
+      dependencies,
+      identity.uid,
+      target,
+    );
+  const receipt =
+    automationTarget === null
+      ? publish()
+      : await withAutomationTargetDatabase(
+          automationTarget,
+          identity.uid,
+          dependencies,
+          publish,
+        );
   dependencies.afterPlanPublished?.();
   authority.confirmDecisionFileIdentity();
   publishExactFile(
@@ -813,8 +1031,18 @@ export async function verifyLocalReconciliationSecretConfigPlan(
     command.options.secretConfigRoot,
     command.request.secretConfigId,
   );
-  validateDirectory(selected.root, identity.uid, [0o500], 'Secret/Config plan root');
-  validateDirectory(selected.staging, identity.uid, [0o500], 'Secret/Config staging');
+  validateDirectory(
+    selected.root,
+    identity.uid,
+    [0o500],
+    'Secret/Config plan root',
+  );
+  validateDirectory(
+    selected.staging,
+    identity.uid,
+    [0o500],
+    'Secret/Config staging',
+  );
   validateCatalog(selected, true);
   const receipt = readReceipt(selected.receipt, identity.uid, [0o400]);
   if (
