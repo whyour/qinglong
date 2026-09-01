@@ -1,9 +1,14 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { readPrivateLocalCommandFile } from '@qinglong/local-command-file';
 
 import { LocalDeploymentConfigurationError } from '../foundation/error';
+import {
+  adoptedTargetBaselinePath,
+  readAdoptedTargetBaseline,
+} from '../cutover/targetBaseline';
 import { cutoverDigest } from '../cutover/targetEvidence';
 import {
   readTargetDataReconciliationEvidenceForPaths,
@@ -177,6 +182,11 @@ export function proveLocalReconciliationStoppedState(
     command.request.stoppedAuthority === 'docker'
       ? dockerStoppedEvidence(command)
       : (serviceManagerStoppedRecord(command), undefined);
+  const adoptedTargetBaseline =
+    persisted?.baselineKind === 'adopted_target' &&
+    persisted.baselineDigest !== undefined
+      ? readAdoptedTargetBaselineProjection(command, persisted.baselineDigest)
+      : undefined;
   const current = readTargetDataReconciliationEvidenceForPaths(
     {
       profile: command.request.profile,
@@ -184,6 +194,7 @@ export function proveLocalReconciliationStoppedState(
       legacySourcePath: command.request.legacySourcePath,
       targetDatabasePath: command.request.targetDatabasePath,
       expectedActivationDigest: command.request.expectedActivationDigest,
+      ...(adoptedTargetBaseline === undefined ? {} : { adoptedTargetBaseline }),
     },
     uid,
   );
@@ -202,4 +213,40 @@ export function proveLocalReconciliationStoppedState(
     reconciliationEvidenceDigest: current.evidenceDigest,
   });
   return Object.freeze({ ...payload, proofDigest: cutoverDigest(payload) });
+}
+
+function readAdoptedTargetBaselineProjection(
+  command: Readonly<LocalReconciliationCapturePrepareCommand>,
+  expectedBaselineDigest: string,
+): Readonly<{
+  baselineDigest: string;
+  targetDevice: string;
+  targetInode: string;
+  targetSha256: string;
+}> {
+  const baseline = readAdoptedTargetBaseline(
+    adoptedTargetBaselinePath(command.options.deploymentRoot),
+  );
+  const targetPathDigest = crypto
+    .createHash('sha256')
+    .update(command.request.targetDatabasePath, 'utf8')
+    .digest('hex');
+  if (
+    baseline.profile !== command.request.profile ||
+    baseline.instanceId !== command.request.instanceId ||
+    baseline.cutoverId !== command.request.cutoverId ||
+    baseline.activationDigest !== command.request.expectedActivationDigest ||
+    baseline.targetPathDigest !== targetPathDigest ||
+    baseline.baselineDigest !== expectedBaselineDigest
+  ) {
+    configurationError(
+      'adopted target baseline is detached from stopped evidence',
+    );
+  }
+  return Object.freeze({
+    baselineDigest: baseline.baselineDigest,
+    targetDevice: baseline.targetDevice,
+    targetInode: baseline.targetInode,
+    targetSha256: baseline.targetSha256,
+  });
 }

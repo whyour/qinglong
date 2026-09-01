@@ -67,6 +67,10 @@ const {
   readTargetDataReconciliationEvidenceForPaths,
 } = require('../dist/deployment/cutover/targetDataEvidence.js');
 const {
+  adoptedTargetBaselinePath,
+  createAdoptedTargetBaseline,
+} = require('../dist/deployment/cutover/targetBaseline.js');
+const {
   targetRunJournalRecord,
   targetStopPhasePath,
   targetStopSequence,
@@ -121,6 +125,7 @@ function fixture(
     stoppedAuthority = 'docker',
     profile = 'edge',
     createDefaultSidecars = true,
+    useAdoptedTargetBaseline = false,
     initializeDatabases,
     mutateTarget,
   } = {},
@@ -323,6 +328,32 @@ function fixture(
   };
   const applicationContents = `${JSON.stringify(application, null, 2)}\n`;
   fs.writeFileSync(applicationConfigPath, applicationContents, { mode: 0o600 });
+  let adoptedTargetBaseline;
+  if (useAdoptedTargetBaseline) {
+    adoptedTargetBaseline = createAdoptedTargetBaseline({
+      preparedAtMs: 1_350,
+      profile,
+      instanceId: 'edge-router-1',
+      cutoverId,
+      activationDigest,
+      commitmentDigest,
+      applicationConfigDigest: crypto
+        .createHash('sha256')
+        .update(applicationContents, 'utf8')
+        .digest('hex'),
+      legacyDataApplicationCommitDigest: dataCommit.commitDigest,
+      legacyDataApplicationReceiptDigest: dataCommit.receiptDigest,
+      targetPathDigest: activationPayload.targetPathDigest,
+      targetDevice: activationPayload.targetDevice,
+      targetInode: activationPayload.targetInode,
+      targetSha256: activationPayload.targetSha256,
+    });
+    fs.writeFileSync(
+      adoptedTargetBaselinePath(deploymentRoot),
+      `${JSON.stringify(adoptedTargetBaseline)}\n`,
+      { mode: 0o600 },
+    );
+  }
   const adoptedBundlePayload = {
     schemaVersion: 1,
     kind: 'qinglong3-local-adopted-deployment-bundle',
@@ -397,6 +428,16 @@ function fixture(
       legacySourcePath,
       targetDatabasePath,
       expectedActivationDigest: activationDigest,
+      ...(adoptedTargetBaseline === undefined
+        ? {}
+        : {
+            adoptedTargetBaseline: {
+              baselineDigest: adoptedTargetBaseline.baselineDigest,
+              targetDevice: adoptedTargetBaseline.targetDevice,
+              targetInode: adoptedTargetBaseline.targetInode,
+              targetSha256: adoptedTargetBaseline.targetSha256,
+            },
+          }),
     },
     uid,
   );
@@ -514,6 +555,8 @@ function fixture(
     legacySourcePath,
     targetDatabasePath,
     recoveryPath,
+    adoptedTargetBaseline,
+    reconciliation,
   };
 }
 
@@ -584,6 +627,42 @@ test('capture prepare rejects rollback-candidate stopped data', (t) => {
       ),
     ),
     false,
+  );
+});
+
+test('capture prepare preserves exact adopted-target baseline evidence', (t) => {
+  const state = fixture(t, {
+    createDefaultSidecars: false,
+    useAdoptedTargetBaseline: true,
+  });
+  assert.ok(state.adoptedTargetBaseline);
+  assert.equal(state.reconciliation.baselineKind, 'adopted_target');
+  assert.equal(
+    state.reconciliation.baselineDigest,
+    state.adoptedTargetBaseline.baselineDigest,
+  );
+  assert.equal(state.reconciliation.targetMatchesBaseline, false);
+  const prepared = prepareLocalReconciliationCapture(state.command);
+  assert.equal(prepared.status, 'prepared');
+  assert.equal(prepared.state, 'reconciliation_capture_prepared');
+});
+
+test('capture prepare rejects a valid but detached adopted-target baseline', (t) => {
+  const state = fixture(t, {
+    createDefaultSidecars: false,
+    useAdoptedTargetBaseline: true,
+  });
+  const baselinePath = adoptedTargetBaselinePath(state.deploymentRoot);
+  const detachedBaseline = createAdoptedTargetBaseline({
+    ...state.adoptedTargetBaseline,
+    targetSha256: 'f'.repeat(64),
+  });
+  fs.writeFileSync(baselinePath, `${JSON.stringify(detachedBaseline)}\n`, {
+    mode: 0o600,
+  });
+  assert.throws(
+    () => prepareLocalReconciliationCapture(state.command),
+    /adopted target baseline is detached from stopped evidence/,
   );
 });
 

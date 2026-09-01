@@ -20,6 +20,7 @@ ADR-0524/0525 已让 downloadable Trial Kit 在 headless 与 Console 两种变�
 5. 成功后生成 `qinglong/local-alpha-upgrade-reconciliation-capture-summary@v1`，只记录 source/architecture/Profile/variant、固定 synthetic Task identity、cutover/capture digest、asset count/bytes 与 `legacySource=unchanged`、`target=stopped`、`rollback=not_authorized`、`next=review_required`。真实 capture 可能包含数据库、配置和 Secret 密文，必须继续保存在操作者指定的 owner-private root，不能上传为普通低敏 CI summary。
 6. Trial Kit、verification 与 offline auditor 分别升级为 `qinglong/alpha-local-trial-kit@v9`、verification `@v7` 与 audit `@v6`；manifest schemaVersion 升为 10，并增加 required gate `legacyUpgradeReconciliationCapture=passed`。旧 v8/v6/v5 bundle 不会被新 auditor 静默接受。
 7. 原生 amd64/arm64 artifact job 在上传前先保留既有 clean rollback 演练，再从同一 unchanged Legacy fixture、同一 exact bundle 用独立 rehearsal/capture root 与容器名实跑写后 capture。workflow 必须验证 summary、terminal verify、manifest/receipt/assets、legacy 无 WAL/journal，并删除四个 synthetic 容器；任一步失败都不得形成 Local milestone。
+8. exact arm64 首次演练证明 `task.put` 与 `reconciliation_required` 已成功，但暴露原有 capture proof 重算 v4 adopted target 时未带入 target-stop 已验证的 post-apply baseline，因而把同一次 stopped evidence 误报为漂移。修复仅在 persisted stopped evidence 明确携带 `baselineKind=adopted_target` 时加载 durable baseline，并严格核对 Profile、instance/cutover、activation、target path 与 exact baseline digest 后才重算；缺失、篡改、换路径或换 lineage 仍失败关闭，legacy 与 service-manager 路径不变。
 
 ## Profile 与资源边界
 
@@ -40,6 +41,7 @@ ADR-0524/0525 已让 downloadable Trial Kit 在 headless 与 Console 两种变�
 
 - 编辑前 GitNexus：Trial Kit verification/create 为 LOW，offline auditor 为 MEDIUM（5 direct、12 total、0 process），Operator workflow auditor 为 LOW；没有 HIGH/CRITICAL 编辑目标。Shell 模板未被索引，使用 backward-compatible 参数、`sh -n`、静态 contract 与原生 Docker artifact gate 约束。
 - 聚焦 bundle/operator 静态回归为 18/18，证明 v9/v7/v6 schema、canonical script、required gate、exact `task.put`/capture command 与 workflow order 闭合。全部 18 个 `packages/ql3-*` 已重新编译并通过自身契约测试；后端脚本层全量回归为 1661 total / 1659 pass / 2 conditional skip / 0 fail。Package boundary（18 个 package、无 single/shallow source package）、Edge import、Cluster dependency 与 Local Operator image audit 全部 `compatible=true`。
+- 首次 exact Console artifact run `33467541901` 在 arm64 上已真实证明写入与 `reconciliation_required`，随后于 capture prepare 因 v4 adopted baseline 重算缺口失败，且未上传 Trial Kit，因而不计为交付。修复后 reconciliation 聚焦回归为 72 total / 70 pass / 2 conditional Docker skip / 0 fail，新增 adopted-baseline 正向与篡改失败关闭用例；Owner CLI 全量为 316 total / 309 pass / 7 conditional skip / 0 fail。仍必须以新 source commit 重跑原生双架构 workflow。
 - exact Docker 正向证据必须来自新的 workflow source commit；在该 run 与双架构 milestone 实际成功、重新下载并离线复核前，本 ADR 不宣称 D-426c1 已形成可下载阶段实物。
 
 ## 后续
