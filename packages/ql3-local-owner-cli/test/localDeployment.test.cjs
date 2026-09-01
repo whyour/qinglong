@@ -1000,6 +1000,42 @@ test('status CLI is private-command-only and emits no deployment authority', asy
   assert.equal(rejected.stderr.includes(state.deploymentRoot), false);
 });
 
+test('deployment CLI exposes configuration detail only under explicit diagnostics', (t) => {
+  const state = fixture(t, 'compose');
+  const commandPath = path.join(state.managementRoot, 'invalid-command.json');
+  fs.writeFileSync(commandPath, '{}\n', { mode: 0o600 });
+  const cli = path.resolve(
+    __dirname,
+    '../dist/deployment/localDeploymentCli.js',
+  );
+  const normal = spawnSync(
+    process.execPath,
+    [cli, 'prepare', '--command-file', commandPath],
+    { encoding: 'utf8' },
+  );
+  assert.equal(normal.status, 1);
+  assert.deepEqual(JSON.parse(normal.stderr), {
+    code: 'QL3_LOCAL_DEPLOYMENT_CONFIGURATION_INVALID',
+    name: 'LocalDeploymentConfigurationError',
+  });
+
+  const diagnostic = spawnSync(
+    process.execPath,
+    [cli, 'prepare', '--command-file', commandPath],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, QL3_LOCAL_DEPLOYMENT_DIAGNOSTICS: '1' },
+    },
+  );
+  assert.equal(diagnostic.status, 1);
+  assert.deepEqual(JSON.parse(diagnostic.stderr), {
+    code: 'QL3_LOCAL_DEPLOYMENT_CONFIGURATION_INVALID',
+    name: 'LocalDeploymentConfigurationError',
+    message:
+      'Local deployment configuration is invalid: command shape is invalid',
+  });
+});
+
 test('durable status keeps live supervisor and database authority out of its module', () => {
   const source = fs.readFileSync(
     path.resolve(__dirname, '../src/deployment/localDeploymentStatus.ts'),

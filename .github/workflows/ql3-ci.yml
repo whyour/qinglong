@@ -715,6 +715,7 @@ jobs:
           HEADLESS_IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
           CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
           OPERATOR_IMAGE: qinglong3-local-operator:ci-${{ matrix.image_arch }}
+          QL3_LOCAL_DEPLOYMENT_DIAGNOSTICS: '1'
           TRIAL_VARIANT: ${{ inputs.local_alpha_variant }}
         run: |
           set -euo pipefail

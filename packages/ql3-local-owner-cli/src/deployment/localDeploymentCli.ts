@@ -10,6 +10,7 @@ import {
   consumeLocalServiceManagerCutoverOutcomeCommandFile,
   consumeLocalServiceManagerLegacyRollbackCommandFile,
   inspectLocalDeploymentStatusCommandFile,
+  LocalDeploymentConfigurationError,
   preflightLocalDeploymentComposeCommandFile,
   prepareLocalServiceManagerIntentCommandFile,
   prepareLocalServiceManagerLegacyRollbackCommandFile,
@@ -282,8 +283,15 @@ async function main(argv: readonly string[]): Promise<void> {
   } catch (error) {
     const candidate = error as {
       readonly code?: unknown;
+      readonly message?: unknown;
       readonly name?: unknown;
     };
+    const diagnosticMessage =
+      process.env.QL3_LOCAL_DEPLOYMENT_DIAGNOSTICS === '1' &&
+      error instanceof LocalDeploymentConfigurationError &&
+      typeof candidate.message === 'string'
+        ? { message: candidate.message }
+        : {};
     process.stderr.write(
       `${JSON.stringify({
         code:
@@ -291,6 +299,7 @@ async function main(argv: readonly string[]): Promise<void> {
             ? candidate.code
             : 'QL3_LOCAL_DEPLOYMENT_FAILED',
         name: typeof candidate.name === 'string' ? candidate.name : 'Error',
+        ...diagnosticMessage,
       })}\n`,
     );
     process.exitCode = 1;

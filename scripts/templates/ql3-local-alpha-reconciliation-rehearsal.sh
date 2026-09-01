@@ -210,6 +210,8 @@ run_deploy() {
     --mount "type=bind,src=$decision_parent,dst=$decision_parent,readonly"
   [ -z "$secondary_decision_parent" ] || set -- "$@" \
     --mount "type=bind,src=$secondary_decision_parent,dst=$secondary_decision_parent,readonly"
+  [ "${QL3_LOCAL_DEPLOYMENT_DIAGNOSTICS:-0}" != 1 ] || set -- "$@" \
+    --env QL3_LOCAL_DEPLOYMENT_DIAGNOSTICS=1
   set -- "$@" "$OPERATOR_IMAGE" deploy "$subcommand" \
     --command-file "$command_root/$command_file"
   result_stage="$result_root/.$result_file.$$"
