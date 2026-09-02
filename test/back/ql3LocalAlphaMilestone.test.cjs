@@ -272,6 +272,16 @@ test('finalizes Console trial kits as a separately named milestone', (t) => {
   );
 });
 
+test('keeps the shipped milestone README aligned with the current schema', () => {
+  const readme = fs.readFileSync(
+    path.join(root, 'docs/operations/ql3-local-alpha-milestone.md'),
+    'utf8',
+  );
+  assert.match(readme, /qinglong\/alpha-local-milestone@v7/u);
+  assert.doesNotMatch(readme, /qinglong\/alpha-local-milestone@v5/u);
+  assert.match(readme, /upgradeReconciliationRehearsalSha256/u);
+});
+
 test('rejects a trial kit from another run attempt before publishing', (t) => {
   const paths = fixture(t, { arm64: { runAttempt: '1' } });
   assert.throws(
