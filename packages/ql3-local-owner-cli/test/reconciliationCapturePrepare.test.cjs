@@ -1444,6 +1444,7 @@ async function secretConfigPlanFixture(t, options = {}) {
       options.applicationId ?? '00000000-0000-4000-8000-000000000423',
     reviewSuffix: `secret-config-${suffix}`,
     createDefaultSidecars: false,
+    targetInsideDeploymentRoot: true,
     initializeDatabases: secretConfigDatabaseInitializer({
       active: options.active === true,
       configs: options.configs === true,
@@ -4278,6 +4279,129 @@ test('Secret/Config plan follows applied Automation and preserved Run History on
     },
   });
   assert.equal(verified.status, 'verified');
+
+  const secretConfigDecisionRoot = path.join(
+    path.dirname(state.captureRoot),
+    'cross-domain-secret-config-decision',
+  );
+  fs.mkdirSync(secretConfigDecisionRoot, { mode: 0o700 });
+  const candidates = fs
+    .readFileSync(
+      path.join(secretConfigRoot, secretConfigId, 'plan.ndjson'),
+      'utf8',
+    )
+    .trimEnd()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+    .filter(
+      (record) =>
+        record.kind ===
+        'qinglong3-local-reconciliation-secret-config-plan-candidate',
+    );
+  const decisionState = {
+    ...state,
+    planned,
+    secretConfigRoot,
+    secretConfigId,
+    secretConfigCommand,
+    secretConfigDecisionRoot,
+    candidates,
+  };
+  const secretConfigDecisionId = '019b0000-0000-7000-8000-000000000432';
+  const decisionPrepareCommand = secretConfigDecisionPrepareCommand(
+    decisionState,
+    secretConfigDecisionId,
+  );
+  const decisionPrepared = await prepareLocalReconciliationSecretConfigDecision(
+    decisionPrepareCommand,
+  );
+  const decisionFile = secretConfigDecisionFile(
+    decisionState,
+    { result: decisionPrepared },
+    [
+      {
+        disposition: 'apply_active_binding',
+        reason: 'reviewed_active_binding',
+      },
+    ],
+    'cross-domain-active-binding',
+  );
+  const decisionCommit = secretConfigDecisionCommitFixture(
+    decisionState,
+    {
+      result: decisionPrepared,
+      commandOptions: decisionPrepareCommand.options,
+    },
+    decisionFile.filePath,
+  );
+  const decision = await commitLocalReconciliationSecretConfigDecision(
+    decisionCommit.command,
+    decisionCommit.dependencies,
+  );
+  assert.equal(decision.outcome, 'ready');
+  assert.equal(decision.applyBindingCount, 1);
+
+  const secretKeyringPath = path.join(
+    state.deploymentRoot,
+    'cross-domain-local-secret-keyring.json',
+  );
+  await provisionLocalSecretKeyring(secretKeyringPath);
+  const secretConfigApplyRoot = path.join(
+    path.dirname(state.captureRoot),
+    'cross-domain-secret-config-apply',
+  );
+  fs.mkdirSync(secretConfigApplyRoot, { mode: 0o700 });
+  const appliedAtMs = decisionCommit.command.request.committedAtMs + 1;
+  const applied = await applyLocalReconciliationSecretConfig(
+    {
+      schemaVersion: 1,
+      operation: 'local.deployment.reconciliation.secret-config.apply',
+      options: {
+        ...decisionPrepareCommand.options,
+        secretConfigApplyRoot,
+        targetDatabasePath: state.targetDatabasePath,
+        secretKeyringPath,
+        ownerPepperKeyringDirectory:
+          state.command.options.ownerPepperKeyringDirectory,
+        credentialFilePath: state.command.options.credentialFilePath,
+      },
+      request: {
+        decisionId: secretConfigDecisionId,
+        secretConfigId,
+        expectedDecisionDigest: decision.decisionDigest,
+        expectedHeadDigest: decision.instanceHeadDigest,
+        mutationId: '00000000-0000-4000-8000-000000000433',
+        requestId: 'cross-domain-secret-config-apply',
+        appliedAtMs,
+      },
+    },
+    {
+      async openAuthenticationDatabase() {
+        return { async close() {} };
+      },
+      async authenticate(_database, authenticationOptions) {
+        const authenticatedAtMs = authenticationOptions.now();
+        return {
+          principal: {
+            subject: { type: 'user', id: 'review-owner' },
+            authenticationId: 'reconcile_secret_config_apply:test',
+            authenticatedAtMs,
+            expiresAtMs: authenticatedAtMs + 60 * 60 * 1_000,
+            assurance: 'local_console',
+          },
+          databaseFence: {
+            credentialId: 'review-owner',
+            credentialVersion: 1,
+            pepperKeyId: 'review-owner-v1',
+            pepperVersion: 1,
+          },
+          async confirm() {},
+        };
+      },
+    },
+  );
+  assert.equal(applied.state, 'reconciliation_secret_config_applied');
+  assert.equal(applied.activeBindingCount, 1);
 });
 
 test('Secret/Config decision reauthenticates the same reviewer, seals exact candidates and verifies content-free', async (t) => {
@@ -4515,10 +4639,7 @@ test('Secret/Config apply publishes encrypted material atomically and recovers e
     },
     async authenticate(_database, options) {
       authentications += 1;
-      assert.match(
-        options.authenticationNamespace,
-        /^[a-z][a-z0-9_]{0,31}$/,
-      );
+      assert.match(options.authenticationNamespace, /^[a-z][a-z0-9_]{0,31}$/);
       assert.equal(
         options.authenticationNamespace,
         'reconcile_secret_config_apply',
@@ -4560,6 +4681,22 @@ test('Secret/Config apply publishes encrypted material atomically and recovers e
       applyDependencies,
     ),
     /authentication or Secret material must be below deploymentRoot/,
+  );
+  await assert.rejects(
+    applyLocalReconciliationSecretConfig(
+      {
+        ...applyCommand,
+        options: {
+          ...applyOptions,
+          targetDatabasePath: path.join(
+            path.dirname(state.deploymentRoot),
+            'outside-target.sqlite',
+          ),
+        },
+      },
+      applyDependencies,
+    ),
+    /targetDatabasePath must be below deploymentRoot/,
   );
   for (const boundary of ['afterMaterialPublished']) {
     await assert.rejects(

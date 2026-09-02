@@ -54,6 +54,7 @@ export interface LocalReconciliationSecretConfigPlanHeader {
   readonly projectId: string;
   readonly tableDisposition: 'absent' | 'manual_external';
   readonly unadaptedLegacyConfigCount: number;
+  readonly targetSnapshotSha256: string | null;
   readonly preparedHeadDigest: string;
   readonly preparedAtMs: number;
   readonly headerDigest: string;
@@ -350,11 +351,7 @@ function targetAutomationAdoptionProjection(
           /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
         ),
         planDigest: adoptionText(row, 'planDigest', DIGEST_PATTERN),
-        inventoryDigest: adoptionText(
-          row,
-          'inventoryDigest',
-          DIGEST_PATTERN,
-        ),
+        inventoryDigest: adoptionText(row, 'inventoryDigest', DIGEST_PATTERN),
         decisionDigest: adoptionText(row, 'decisionDigest', DIGEST_PATTERN),
         receiptDigest: adoptionText(row, 'receiptDigest', DIGEST_PATTERN),
         authorizationFileDigest: adoptionText(
@@ -372,11 +369,7 @@ function targetAutomationAdoptionProjection(
         adoptedTriggerCount: selectedAdoptedTriggerCount,
         skippedCount,
         auditEventId: adoptionText(row, 'auditEventId', UUID_V4_PATTERN),
-        createdAtMs: adoptionCount(
-          row,
-          'createdAtMs',
-          Number.MAX_SAFE_INTEGER,
-        ),
+        createdAtMs: adoptionCount(row, 'createdAtMs', Number.MAX_SAFE_INTEGER),
       });
       if (payload.auditEventId !== payload.mutationId) {
         fail('target Automation adoption audit binding drifted');
@@ -1048,8 +1041,7 @@ export function buildLocalReconciliationSecretConfigPlanReceipt(
     adoptedLegacyTriggerCount: footer.adoptedLegacyTriggerCount,
     adoptionProvenanceTaskCount: footer.adoptionProvenanceTaskCount,
     adoptionProvenanceTriggerCount: footer.adoptionProvenanceTriggerCount,
-    automationAdoptionProvenanceState:
-      footer.automationAdoptionProvenanceState,
+    automationAdoptionProvenanceState: footer.automationAdoptionProvenanceState,
     unadaptedLegacyConfigCount: footer.unadaptedLegacyConfigCount,
     outcome: footer.outcome,
     preparedAtMs: header.preparedAtMs,

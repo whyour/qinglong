@@ -614,6 +614,7 @@ function publishPlan(
   authority: Readonly<SecretConfigReviewAuthority>,
   dependencies: LocalReconciliationSecretConfigPlanDependencies,
   uid: number,
+  targetSnapshotSha256: string | null,
   automationTarget?: DatabaseSync,
 ): Readonly<LocalReconciliationSecretConfigPlanReceipt> {
   let descriptor: number | undefined;
@@ -649,6 +650,7 @@ function publishPlan(
       projectId: command.request.projectId,
       tableDisposition: authority.tableDisposition,
       unadaptedLegacyConfigCount: authority.unadaptedLegacyConfigCount,
+      targetSnapshotSha256,
       preparedHeadDigest: head.headDigest,
       preparedAtMs: command.request.preparedAtMs,
     });
@@ -987,6 +989,7 @@ export async function planLocalReconciliationSecretConfig(
       authority,
       dependencies,
       identity.uid,
+      automationTarget?.snapshotSha256 ?? null,
       target,
     );
   const receipt =

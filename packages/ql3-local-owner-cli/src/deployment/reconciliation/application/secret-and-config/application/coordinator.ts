@@ -338,6 +338,14 @@ export async function applyLocalReconciliationSecretConfig(
   ) {
     fail('apply command is detached from a ready signed decision');
   }
+  const targetSnapshotSha256 = terminal.context.planHeader.targetSnapshotSha256;
+  if (terminal.receipt.applyBindingCount > 0 && targetSnapshotSha256 === null) {
+    fail('active binding plan is missing evolved target authority');
+  }
+  const stoppedProofOptions =
+    targetSnapshotSha256 === null
+      ? {}
+      : { expectedEvolvedTargetSha256: targetSnapshotSha256 };
   const planTerminal = terminal.context.planTerminal;
   const capture = readLocalReconciliationCaptureIntent(
     planTerminal.intent.command.options.captureRoot,
@@ -375,7 +383,11 @@ export async function applyLocalReconciliationSecretConfig(
       fail('apply lost reviewed head compare-and-swap');
     }
     discardUnpreparedLocalReconciliationSecretConfigMaterials(selected);
-    const before = proveLocalReconciliationStoppedState(capture.command, uid);
+    const before = proveLocalReconciliationStoppedState(
+      capture.command,
+      uid,
+      stoppedProofOptions,
+    );
     const materials: Readonly<PreparedReconciliationSecretConfigMaterial>[] =
       [];
     const openRequirements =
@@ -441,7 +453,11 @@ export async function applyLocalReconciliationSecretConfig(
         ? {}
         : { busyTimeoutMs: command.options.busyTimeoutMs }),
     });
-    const after = proveLocalReconciliationStoppedState(capture.command, uid);
+    const after = proveLocalReconciliationStoppedState(
+      capture.command,
+      uid,
+      stoppedProofOptions,
+    );
     if (after.proofDigest !== before.proofDigest) {
       fail('stopped target drifted across preparation');
     }
@@ -522,7 +538,11 @@ export async function applyLocalReconciliationSecretConfig(
     fail('apply lost prepared head compare-and-swap');
   }
   if (!recoveringPreparedIntent) {
-    const stopped = proveLocalReconciliationStoppedState(capture.command, uid);
+    const stopped = proveLocalReconciliationStoppedState(
+      capture.command,
+      uid,
+      stoppedProofOptions,
+    );
     if (stopped.proofDigest !== intent.stoppedProofDigest) {
       fail('stopped proof drifted before write');
     }

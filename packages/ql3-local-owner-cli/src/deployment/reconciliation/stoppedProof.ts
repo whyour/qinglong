@@ -28,7 +28,12 @@ const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 export interface LocalReconciliationStoppedProof {
   readonly stoppedRecordDigest: string;
   readonly reconciliationEvidenceDigest: string;
+  readonly evolvedTargetSha256?: string;
   readonly proofDigest: string;
+}
+
+export interface LocalReconciliationStoppedProofOptions {
+  readonly expectedEvolvedTargetSha256?: string;
 }
 
 function configurationError(message: string): never {
@@ -60,6 +65,61 @@ function exact(
     actual.some((key, index) => key !== expected[index])
   ) {
     configurationError(`${label} shape is invalid`);
+  }
+}
+
+function sameFileStat(left: fs.BigIntStats, right: fs.BigIntStats): boolean {
+  return (
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.mode === right.mode &&
+    left.nlink === right.nlink &&
+    left.uid === right.uid &&
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs &&
+    left.ctimeNs === right.ctimeNs
+  );
+}
+
+function stableTargetSha256(filePath: string, uid: number): string {
+  let descriptor: number | undefined;
+  const buffer = Buffer.allocUnsafe(64 * 1024);
+  try {
+    const pathStat = fs.lstatSync(filePath, { bigint: true });
+    descriptor = fs.openSync(
+      filePath,
+      fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW,
+    );
+    const before = fs.fstatSync(descriptor, { bigint: true });
+    if (
+      !pathStat.isFile() ||
+      pathStat.isSymbolicLink() ||
+      !sameFileStat(pathStat, before) ||
+      before.uid !== BigInt(uid) ||
+      before.nlink !== 1n ||
+      (before.mode & 0o077n) !== 0n ||
+      fs.realpathSync(filePath) !== filePath ||
+      before.size < 1n
+    ) {
+      configurationError('evolved target database identity is invalid');
+    }
+    const hash = crypto.createHash('sha256');
+    for (;;) {
+      const count = fs.readSync(descriptor, buffer, 0, buffer.byteLength, null);
+      if (count === 0) break;
+      hash.update(buffer.subarray(0, count));
+    }
+    const after = fs.fstatSync(descriptor, { bigint: true });
+    if (!sameFileStat(before, after)) {
+      configurationError('evolved target database changed while hashing');
+    }
+    return hash.digest('hex');
+  } catch (error) {
+    if (error instanceof LocalDeploymentConfigurationError) throw error;
+    return configurationError('evolved target database is unavailable');
+  } finally {
+    buffer.fill(0);
+    if (descriptor !== undefined) fs.closeSync(descriptor);
   }
 }
 
@@ -177,7 +237,15 @@ function serviceManagerStoppedRecord(
 export function proveLocalReconciliationStoppedState(
   command: Readonly<LocalReconciliationCapturePrepareCommand>,
   uid: number,
+  options: Readonly<LocalReconciliationStoppedProofOptions> = {},
 ): Readonly<LocalReconciliationStoppedProof> {
+  const expectedEvolvedTargetSha256 = options.expectedEvolvedTargetSha256;
+  if (
+    expectedEvolvedTargetSha256 !== undefined &&
+    !DIGEST_PATTERN.test(expectedEvolvedTargetSha256)
+  ) {
+    configurationError('evolved target snapshot digest is invalid');
+  }
   const persisted =
     command.request.stoppedAuthority === 'docker'
       ? dockerStoppedEvidence(command)
@@ -198,11 +266,42 @@ export function proveLocalReconciliationStoppedState(
     },
     uid,
   );
-  if (
-    current.disposition !== 'reconciliation_required' ||
-    (persisted !== undefined &&
-      persisted.evidenceDigest !== current.evidenceDigest)
-  ) {
+  const exactStoppedData =
+    expectedEvolvedTargetSha256 === undefined &&
+    current.disposition === 'reconciliation_required' &&
+    (persisted === undefined ||
+      persisted.evidenceDigest === current.evidenceDigest);
+  let evolvedStoppedData = false;
+  if (expectedEvolvedTargetSha256 !== undefined) {
+    const currentSha256 = stableTargetSha256(
+      command.request.targetDatabasePath,
+      uid,
+    );
+    const confirmed = readTargetDataReconciliationEvidenceForPaths(
+      {
+        profile: command.request.profile,
+        activationPath: command.request.activationPath,
+        legacySourcePath: command.request.legacySourcePath,
+        targetDatabasePath: command.request.targetDatabasePath,
+        expectedActivationDigest: command.request.expectedActivationDigest,
+        ...(adoptedTargetBaseline === undefined
+          ? {}
+          : { adoptedTargetBaseline }),
+      },
+      uid,
+    );
+    evolvedStoppedData =
+      current.disposition === 'reconciliation_required' &&
+      current.sourceMatchesActivation === true &&
+      current.sourceSidecarsClear === true &&
+      current.targetSidecarsClear === true &&
+      current.targetMatchesActivation === false &&
+      (current.baselineKind !== 'adopted_target' ||
+        current.targetMatchesBaseline === false) &&
+      currentSha256 === expectedEvolvedTargetSha256 &&
+      confirmed.evidenceDigest === current.evidenceDigest;
+  }
+  if (!exactStoppedData && !evolvedStoppedData) {
     configurationError(
       'stopped data does not have exact reconciliation-required evidence',
     );
@@ -211,6 +310,9 @@ export function proveLocalReconciliationStoppedState(
     stoppedAuthority: command.request.stoppedAuthority,
     stoppedRecordDigest: command.request.expectedStoppedRecordDigest,
     reconciliationEvidenceDigest: current.evidenceDigest,
+    ...(expectedEvolvedTargetSha256 === undefined
+      ? {}
+      : { evolvedTargetSha256: expectedEvolvedTargetSha256 }),
   });
   return Object.freeze({ ...payload, proofDigest: cutoverDigest(payload) });
 }

@@ -226,6 +226,7 @@ function header(
       'schemaVersion',
       'secretConfigId',
       'tableDisposition',
+      'targetSnapshotSha256',
       'unadaptedLegacyConfigCount',
     ],
     'header',
@@ -244,6 +245,9 @@ function header(
     record.projectId.length < 1 ||
     (record.tableDisposition !== 'absent' &&
       record.tableDisposition !== 'manual_external') ||
+    (record.targetSnapshotSha256 !== null &&
+      (typeof record.targetSnapshotSha256 !== 'string' ||
+        !DIGEST_PATTERN.test(record.targetSnapshotSha256))) ||
     !Number.isSafeInteger(record.unadaptedLegacyConfigCount) ||
     (record.unadaptedLegacyConfigCount as number) < 0 ||
     ![

@@ -223,12 +223,25 @@ function normalizeOptions(
       fail('authentication or Secret material must be below deploymentRoot');
     }
   }
+  const targetRelative = path.relative(
+    normalized.deploymentRoot,
+    normalized.targetDatabasePath,
+  );
   if (
-    roots.some(
-      (root) =>
-        overlaps(root, normalized.targetDatabasePath) ||
-        overlaps(normalized.targetDatabasePath, root),
-    )
+    !targetRelative ||
+    targetRelative.startsWith('..') ||
+    path.isAbsolute(targetRelative)
+  ) {
+    fail('targetDatabasePath must be below deploymentRoot');
+  }
+  if (
+    roots
+      .slice(1)
+      .some(
+        (root) =>
+          overlaps(root, normalized.targetDatabasePath) ||
+          overlaps(normalized.targetDatabasePath, root),
+      )
   ) {
     fail('targetDatabasePath overlaps an authority root');
   }
