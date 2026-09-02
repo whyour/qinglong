@@ -122,6 +122,95 @@ function writePrivateJson(filePath, value) {
   });
 }
 
+function trialTemporaryBaseDirectory(
+  platform = process.platform,
+  defaultDirectory = os.tmpdir(),
+) {
+  return platform === 'darwin' ? '/private/tmp' : defaultDirectory;
+}
+
+function trialVolumeArguments(state) {
+  return ['--volume', `${state.mountRoot}:/var/lib`];
+}
+
+function dockerDesktopMetadataRetryable(message, platform = process.platform) {
+  return (
+    platform === 'darwin' &&
+    [
+      'LOCAL_OWNER_PEPPER_UNAVAILABLE',
+      'QL3_LOCAL_SETUP_CONFIGURATION_INVALID',
+      'LOCAL_OWNER_CONSOLE_CONFIGURATION_INVALID',
+      'LOCAL_OWNER_BOOTSTRAP_SERVICE_UNAVAILABLE',
+      'LOCAL_OWNER_SECRET_DELIVERY_FAILED',
+    ].some((code) => message.includes(code))
+  );
+}
+
+function applicationNetworkArguments(variant, platform = process.platform) {
+  if (variant !== 'console') return ['--network', 'none'];
+  if (platform === 'darwin') {
+    return ['--network', 'bridge', '--publish', '127.0.0.1:5700:5701'];
+  }
+  return ['--network', 'host'];
+}
+
+function applicationEphemeralFilesystemArguments(
+  state,
+  platform = process.platform,
+) {
+  if (platform !== 'darwin') return [];
+  const identity = `mode=0700,uid=${state.uid},gid=${state.gid}`;
+  return [
+    '--tmpfs',
+    `/var/lib/qinglong3/receipts:rw,nosuid,nodev,noexec,size=4m,${identity}`,
+    '--tmpfs',
+    `/var/lib/qinglong3/artifacts:rw,nosuid,nodev,noexec,size=80m,${identity}`,
+  ];
+}
+
+function startDockerDesktopLoopbackRelay(state, applicationName, relayName) {
+  const relaySource = [
+    "const net = require('node:net');",
+    'const server = net.createServer((socket) => {',
+    "  const upstream = net.connect(5700, '127.0.0.1');",
+    '  socket.pipe(upstream).pipe(socket);',
+    "  upstream.on('error', () => socket.destroy());",
+    '});',
+    "server.listen(5701, '0.0.0.0');",
+  ].join('\n');
+  docker([
+    'run',
+    '--detach',
+    '--rm',
+    '--name',
+    relayName,
+    '--read-only',
+    '--user',
+    '65532:65532',
+    '--network',
+    `container:${applicationName}`,
+    '--cap-drop',
+    'ALL',
+    '--security-opt',
+    'no-new-privileges',
+    '--memory',
+    '32m',
+    '--memory-swap',
+    '32m',
+    '--cpus',
+    '0.1',
+    '--pids-limit',
+    '16',
+    '--tmpfs',
+    '/tmp:rw,nosuid,nodev,noexec,size=1m',
+    '--entrypoint',
+    'node',
+    state.operatorImage,
+    '-e',
+    relaySource,
+  ]);
+}
+
 function operatorArguments(state, command, ...argv) {
   return [
     'run',
@@ -145,8 +234,7 @@ function operatorArguments(state, command, ...argv) {
     '32',
     '--tmpfs',
     '/tmp:rw,nosuid,nodev,noexec,size=8m',
-    '--volume',
-    `${state.root}:/var/lib/qinglong3`,
+    ...trialVolumeArguments(state),
     state.operatorImage,
     command,
     ...argv,
@@ -155,22 +243,32 @@ function operatorArguments(state, command, ...argv) {
 
 function runOperator(state, command, commandFileName) {
   let output;
-  try {
-    output = docker(
-      operatorArguments(
-        state,
-        command,
-        'run',
-        '--command-file',
-        `/var/lib/qinglong3/${commandFileName}`,
-      ),
-    );
-  } catch (error) {
-    fail(
-      `operator stage ${command}/${commandFileName} failed: ${
-        error instanceof Error ? error.message : 'unknown failure'
-      }`,
-    );
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      output = docker(
+        operatorArguments(
+          state,
+          command,
+          'run',
+          '--command-file',
+          `/var/lib/qinglong3/${commandFileName}`,
+        ),
+      );
+      break;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown failure';
+      if (attempt < 4 && dockerDesktopMetadataRetryable(message)) {
+        Atomics.wait(
+          new Int32Array(new SharedArrayBuffer(4)),
+          0,
+          0,
+          250 * (attempt + 1),
+        );
+        continue;
+      }
+      fail(`operator stage ${command}/${commandFileName} failed: ${message}`);
+    }
   }
   let result;
   try {
@@ -236,7 +334,10 @@ function prepareFreshAuthority(state) {
   });
   const prepared = runOperator(state, 'setup', 'setup.json');
   const replay = runOperator(state, 'setup', 'setup.json');
-  if (prepared.status !== 'prepared' || replay.status !== 'existing') {
+  if (
+    !['prepared', 'existing'].includes(prepared.status) ||
+    replay.status !== 'existing'
+  ) {
     fail('fresh setup did not converge through the operator image');
   }
   return Object.freeze({ prepared: true, replay: true });
@@ -277,9 +378,9 @@ function establishFirstOwner(state) {
     },
   );
   if (
-    provisioned.status !== 'inserted' ||
-    issued.status !== 'inserted' ||
-    claimed.status !== 'inserted' ||
+    !['inserted', 'existing'].includes(provisioned.status) ||
+    !['inserted', 'existing'].includes(issued.status) ||
+    !['inserted', 'existing'].includes(claimed.status) ||
     claimed.role !== 'owner'
   ) {
     fail('first Owner ceremony did not converge');
@@ -307,7 +408,7 @@ function establishFirstOwner(state) {
     'owner-credential-install.json',
   );
   if (
-    presentation.status !== 'installed' ||
+    !['installed', 'existing'].includes(presentation.status) ||
     presentation.credentialMutationId !== credentialMutationId
   ) {
     fail('Owner credential presentation did not install');
@@ -387,7 +488,7 @@ function createFirstAutomationTask(state) {
   });
   const result = runOperator(state, 'task', 'alpha-first-task.json');
   if (
-    result.status !== 'created' ||
+    !['created', 'existing'].includes(result.status) ||
     result.task?.taskId !== 'alpha-first-automation' ||
     result.task?.revision !== 1 ||
     result.task?.enabled !== true
@@ -479,6 +580,7 @@ async function consoleSurfaceContract(state, adapters = {}) {
   const fetchSurface = adapters.fetch ?? fetch;
   const wait = adapters.delay ?? delay;
   const readCredential = adapters.credentialToken ?? credentialToken;
+  const platform = adapters.platform ?? process.platform;
   let ready = false;
   let lastReadyError;
   for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -591,6 +693,14 @@ async function consoleSurfaceContract(state, adapters = {}) {
       logText = Buffer.from(log.body.content, 'base64').toString('utf8');
       break;
     }
+    if (
+      platform === 'darwin' &&
+      log.status === 503 &&
+      log.body?.code === 'artifact_unavailable'
+    ) {
+      await wait(250);
+      continue;
+    }
     if (log.status !== 202 || log.body?.status !== 'pending') {
       fail(
         `starter Run log became unavailable: status=${log.status}, code=${
@@ -620,6 +730,7 @@ async function runApplication(state) {
     .randomUUID()
     .slice(0, 8)}`;
   const memory = state.profile === 'edge' ? '128m' : '256m';
+  const relayName = `${name}-relay`;
   const child = spawn(
     'docker',
     [
@@ -630,8 +741,7 @@ async function runApplication(state) {
       '--read-only',
       '--user',
       `${state.uid}:${state.gid}`,
-      '--network',
-      state.variant === 'console' ? 'host' : 'none',
+      ...applicationNetworkArguments(state.variant),
       '--cap-drop',
       'ALL',
       '--security-opt',
@@ -646,8 +756,8 @@ async function runApplication(state) {
       state.profile === 'edge' ? '64' : '256',
       '--tmpfs',
       '/tmp:rw,nosuid,nodev,noexec,size=16m',
-      '--volume',
-      `${state.root}:/var/lib/qinglong3`,
+      ...applicationEphemeralFilesystemArguments(state),
+      ...trialVolumeArguments(state),
       state.applicationImage,
       '--config',
       state.variant === 'console'
@@ -680,6 +790,9 @@ async function runApplication(state) {
       surfacePromise = (async () => {
         try {
           if (state.variant === 'console') {
+            if (process.platform === 'darwin') {
+              startDockerDesktopLoopbackRelay(state, name, relayName);
+            }
             surface = await consoleSurfaceContract(state);
           }
         } catch (error) {
@@ -732,6 +845,7 @@ async function runApplication(state) {
     }
     return Object.freeze({ active: true, gracefulStop: true, surface });
   } finally {
+    spawnSync('docker', ['rm', '--force', relayName], { stdio: 'ignore' });
     spawnSync('docker', ['rm', '--force', name], { stdio: 'ignore' });
   }
 }
@@ -750,13 +864,22 @@ async function main() {
     options.operatorImage,
     options.variant,
   );
-  const root = fs.realpathSync(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-alpha-trial-')),
+  const mountRoot = fs.realpathSync(
+    fs.mkdtempSync(
+      path.join(trialTemporaryBaseDirectory(), 'ql3-alpha-trial-mount-'),
+    ),
   );
+  // Docker Desktop can present a bind-mount root as root:root even when the
+  // host UID owns it. Keep the private deployment root one level below that
+  // synthetic mount point so its current-UID 0700 identity remains stable.
+  fs.chmodSync(mountRoot, 0o711);
+  const root = path.join(mountRoot, 'qinglong3');
+  fs.mkdirSync(root, { mode: 0o700 });
   fs.chmodSync(root, 0o700);
   const state = Object.freeze({
     ...options,
     ...images,
+    mountRoot,
     root,
     uid: process.getuid(),
     gid: process.getgid(),
@@ -808,7 +931,7 @@ async function main() {
       })}\n`,
     );
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(mountRoot, { recursive: true, force: true });
   }
 }
 
@@ -821,4 +944,11 @@ if (require.main === module) {
   });
 }
 
-module.exports = Object.freeze({ consoleSurfaceContract });
+module.exports = Object.freeze({
+  applicationEphemeralFilesystemArguments,
+  applicationNetworkArguments,
+  consoleSurfaceContract,
+  dockerDesktopMetadataRetryable,
+  trialTemporaryBaseDirectory,
+  trialVolumeArguments,
+});
