@@ -60,6 +60,8 @@ test('accepts the exact bounded Local Console package closure', (t) => {
   assert.equal(report.packageCount, 12);
   assert.equal(report.ai, 'excluded');
   assert.equal(report.listener, 'loopback-only');
+  assert.equal(report.maxFiles, 768);
+  assert.equal(report.maxBytes, 20 * 1024 * 1024);
   assert.equal(report.compatible, true);
 });
 

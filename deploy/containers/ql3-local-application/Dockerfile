@@ -215,6 +215,8 @@ RUN rm -rf node_modules/.bin \
     --retain-js=local-api/assets/console/console.js \
   && rm /tmp/ql3-prune-runtime-artifact.cjs
 
+COPY .ql3-panel-dist node_modules/@qinglong/local-api/assets/panel
+
 FROM node:24.18.0-alpine3.23@sha256:595398b0081eacda8e1c4c5b97b76cd1020e4d58a8ebcb4843b9bca1e79e7436 AS runtime-platform
 
 RUN apk add --no-cache --upgrade \
@@ -262,6 +264,9 @@ LABEL org.opencontainers.image.title="QingLong 3.0 Local Console Application" \
   io.qinglong.profile="edge-application-api,standalone-application-api" \
   io.qinglong.ai="excluded" \
   io.qinglong.local.console="offline-loopback" \
+  io.qinglong.local.panel="legacy-capability-gated@v1" \
+  io.qinglong.local.panel-max-files="256" \
+  io.qinglong.local.panel-max-bytes="13631488" \
   io.qinglong.local.application-config="2,3,4" \
   io.qinglong.local.sqlite-contract-min="51" \
   io.qinglong.local.sqlite-contract-max="52" \

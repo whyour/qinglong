@@ -11,7 +11,7 @@
 - fresh、隔离的测试数据目录；
 - 离线导入、设备兼容验证和 3.0 Alpha 用户旅程验证。
 
-`headless` 是默认且最小的低配设备变体，不打开端口。`console` 是显式选择的 Linux-only 变体，携带离线 Web Console，并仅通过宿主 `127.0.0.1:5700` 提供操作面。二者是独立 archive，不应同时下载；远程 Console 只允许经 SSH tunnel 访问，不得暴露到 LAN 或公网。
+`headless` 是默认且最小的低配设备变体，不打开端口。`console` 是显式选择的 Linux-only 变体，携带离线 3.0 原生 Web Console 和现有面板的有界只读兼容层，并仅通过宿主 `127.0.0.1:5700` 提供操作面。二者是独立 archive，不应同时下载；远程 Console 只允许经 SSH tunnel 访问，不得暴露到 LAN 或公网。
 
 不要把它直接用于生产数据、2.x 唯一数据目录或生产 Secret。Cluster/Kubernetes 节点应使用 Cluster Integration Candidate；本套件不包含 PostgreSQL HA、Worker 或 Cluster Admin。
 
@@ -73,8 +73,8 @@ Owner delivery 保留在新数据目录的 `owner-delivery/`，operator command 
 Headless Application 是无外部 listener、AI-excluded 的最小 Alpha runtime。Console 变体同样
 AI-excluded，但 quickstart 会在 Linux 上使用 host network，让容器内仍严格绑定
 `127.0.0.1:5700` 的 Local API 可由宿主浏览器访问。成功后打开
-`http://127.0.0.1:5700/`；远程主机必须建立 SSH tunnel。两种变体都只用于 fresh Alpha，
-不是 2.x Web UI 的生产替代版本。Console 能力和凭据边界见
+`http://127.0.0.1:5700/console` 使用 3.0 原生管理台，或打开 `/login` 使用现有面板的只读 Crontab 兼容入口；远程主机必须建立 SSH tunnel。两种变体都只用于 fresh Alpha，
+不是完整 2.x Web UI 的生产替代版本。Console 能力和凭据边界见
 [Local Web Console](./ql3-local-web-console.md)。
 
 Console quickstart 还会通过 strong local operator 创建一个默认不自动运行的

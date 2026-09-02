@@ -1,14 +1,56 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
+const os = require('node:os');
+const path = require('node:path');
 const { test } = require('node:test');
 
 const {
   loadLocalConsoleAssets,
+  loadLocalConsolePanelAssets,
 } = require('../dist/console/localConsoleAssets.js');
 const {
   startLocalApiHttpSurface,
 } = require('../dist/transport/httpSurface.js');
+const {
+  bundleLegacyPanel,
+} = require('../../../scripts/ql3-legacy-panel-bundle.cjs');
+
+function panelFixture() {
+  const root = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'ql3-local-api-panel-')),
+  );
+  const source = path.join(root, 'source');
+  const output = path.join(root, 'output');
+  fs.mkdirSync(source);
+  fs.writeFileSync(
+    path.join(source, 'index.html'),
+    '<!DOCTYPE html>\n' +
+      '<html><head>\n' +
+      '<link rel="shortcut icon" href="https://qn.whyour.cn/favicon.svg">\n' +
+      '<link rel="stylesheet" href="./umi.1234abcd.css">\n' +
+      '<script src="./api/env.js"></script>\n' +
+      '</head><body><div id="root"></div>\n' +
+      '<script src="./umi.1234abcd.js"></script></body></html>\n',
+  );
+  fs.writeFileSync(
+    path.join(source, 'umi.1234abcd.css'),
+    'body { color: #123; }\n',
+  );
+  fs.writeFileSync(
+    path.join(source, 'umi.1234abcd.js'),
+    'globalThis.__panel = true;\n',
+  );
+  bundleLegacyPanel(source, output);
+  return {
+    root,
+    output,
+    close() {
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
 
 function reservePort() {
   return new Promise((resolve, reject) => {
@@ -117,6 +159,63 @@ test('loads one bounded offline Console asset closure', () => {
   assert.ok(totalBytes <= 192 * 1024);
 });
 
+test('keeps the native Console route beside a manifested legacy panel', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../dist/console/localConsoleAssets.js'),
+    'utf8',
+  );
+  assert.match(source, /assets\.set\('\/console', liteAssets\.get\('\/'\)\)/u);
+  assert.match(source, /panel conflicts with native Console asset/u);
+});
+
+test('loads the manifested legacy panel as a streamed bounded closure', (t) => {
+  const current = panelFixture();
+  t.after(() => current.close());
+  const assets = loadLocalConsolePanelAssets(current.output);
+  assert.deepEqual(
+    [...assets.keys()],
+    [
+      '/',
+      '/api/env.js',
+      '/umi.1234abcd.css',
+      '/umi.1234abcd.js',
+      '/login',
+      '/crontab',
+      '/error',
+    ],
+  );
+  const index = assets.get('/');
+  assert.equal(index, assets.get('/login'));
+  assert.equal(index, assets.get('/crontab'));
+  assert.equal(index, assets.get('/error'));
+  assert.equal(index.body, undefined);
+  assert.equal(path.isAbsolute(index.filePath), true);
+  assert.equal(index.cacheControl, 'no-store');
+  assert.match(
+    index.contentSecurityPolicy,
+    /style-src 'self' 'unsafe-inline'/u,
+  );
+  assert.match(index.contentSecurityPolicy, /connect-src 'self'/u);
+  const script = assets.get('/umi.1234abcd.js');
+  assert.equal(script.body, undefined);
+  assert.equal(script.cacheControl, 'public, max-age=31536000, immutable');
+  assert.equal(script.byteLength, 27);
+  assert.match(script.etag, /^"[0-9a-f]{64}"$/u);
+  assert.equal(assets.get('/api/env.js').cacheControl, 'no-store');
+});
+
+test('rejects a manifested panel whose immutable asset changed', (t) => {
+  const current = panelFixture();
+  t.after(() => current.close());
+  const scriptPath = path.join(current.output, 'umi.1234abcd.js');
+  fs.chmodSync(scriptPath, 0o600);
+  fs.appendFileSync(scriptPath, 'drift');
+  assert.throws(
+    () => loadLocalConsolePanelAssets(current.output),
+    /panel asset /u,
+  );
+});
+
 test('serves the Console without authentication and preserves API admission', async (t) => {
   const calls = [];
   const port = await reservePort();
@@ -175,6 +274,31 @@ test('serves the Console without authentication and preserves API admission', as
     code: 'authentication_required',
   });
   assert.deepEqual(calls, ['task.list']);
+});
+
+test('serves an Edge browser asset burst without consuming API admission slots', async (t) => {
+  const port = await reservePort();
+  const active = await startLocalApiHttpSurface({
+    profile: 'edge',
+    host: '127.0.0.1',
+    port,
+    admission: {
+      async prepare() {
+        throw new Error('static assets must not reach admission');
+      },
+    },
+  });
+  t.after(() => active.stopAndDrain());
+
+  const responses = await Promise.all(
+    Array.from({ length: 12 }, (_, index) =>
+      request(port, index % 2 === 0 ? '/console.js' : '/console.css'),
+    ),
+  );
+  assert.deepEqual(
+    responses.map(({ statusCode }) => statusCode),
+    Array.from({ length: 12 }, () => 200),
+  );
 });
 
 test('rejects request bodies and query aliases on Console assets', async (t) => {

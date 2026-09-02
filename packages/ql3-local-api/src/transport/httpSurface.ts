@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import type { Socket } from 'node:net';
+import { pipeline } from 'node:stream/promises';
 
 import type { LocalApplicationProfile } from '@qinglong/local-application';
 
@@ -52,9 +54,6 @@ const SECRET_ROUTE_PATTERN =
   /^\/api\/v3\/projects\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/secrets$/;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const LOCAL_CONSOLE_CONTENT_SECURITY_POLICY =
-  "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-
 type LocalApiRouteResolution =
   | LocalApiAdmissionOperation
   | Readonly<{
@@ -895,19 +894,22 @@ function send(
   response.end(body);
 }
 
-function sendConsoleAsset(
+async function sendConsoleAsset(
+  request: IncomingMessage,
   response: ServerResponse,
   requestId: string,
   asset: Readonly<LocalConsoleAsset>,
-): void {
+): Promise<void> {
   if (response.destroyed || response.headersSent) return;
-  response.statusCode = 200;
+  const ifNoneMatch = rawHeaderValues(request, 'if-none-match');
+  const notModified =
+    asset.cacheControl !== 'no-store' &&
+    ifNoneMatch.length === 1 &&
+    ifNoneMatch[0] === asset.etag;
+  response.statusCode = notModified ? 304 : 200;
   response.setHeader('content-type', asset.contentType);
-  response.setHeader('cache-control', 'no-store');
-  response.setHeader(
-    'content-security-policy',
-    LOCAL_CONSOLE_CONTENT_SECURITY_POLICY,
-  );
+  response.setHeader('cache-control', asset.cacheControl);
+  response.setHeader('content-security-policy', asset.contentSecurityPolicy);
   response.setHeader('cross-origin-opener-policy', 'same-origin');
   response.setHeader('cross-origin-resource-policy', 'same-origin');
   response.setHeader(
@@ -919,8 +921,28 @@ function sendConsoleAsset(
   response.setHeader('x-frame-options', 'DENY');
   response.setHeader('x-request-id', requestId);
   response.setHeader('etag', asset.etag);
-  response.setHeader('content-length', asset.body.byteLength);
-  response.end(asset.body);
+  if (notModified) {
+    response.end();
+    return;
+  }
+  response.setHeader('content-length', asset.byteLength);
+  if ('body' in asset) {
+    await new Promise<void>((resolve, reject) => {
+      const finish = () => {
+        response.off('error', reject);
+        response.off('close', finish);
+        resolve();
+      };
+      response.once('error', reject);
+      response.once('close', finish);
+      response.end(asset.body, finish);
+    });
+    return;
+  }
+  await pipeline(
+    createReadStream(asset.filePath, { highWaterMark: 64 * 1_024 }),
+    response,
+  );
 }
 
 function sendConsoleFavicon(response: ServerResponse, requestId: string): void {
@@ -965,10 +987,13 @@ export async function startLocalApiHttpSurface(
   validateOptions(options);
   const consoleAssets = loadLocalConsoleAssets();
   const uuid = options.randomUuid ?? randomUUID;
-  const maxConcurrentRequests = options.profile === 'edge' ? 4 : 32;
+  const maxConcurrentApiRequests = options.profile === 'edge' ? 4 : 32;
+  const maxConcurrentAssetRequests = options.profile === 'edge' ? 16 : 64;
   const drainTimeoutMs = options.profile === 'edge' ? 5_000 : 10_000;
   let accepting = true;
   const inFlight = new Set<Promise<void>>();
+  const apiInFlight = new Set<Promise<void>>();
+  const assetInFlight = new Set<Promise<void>>();
   const sockets = new Set<Socket>();
 
   const server = http.createServer(
@@ -983,21 +1008,39 @@ export async function startLocalApiHttpSurface(
         send(response, requestId, errorResponse(503, 'server_draining'));
         return;
       }
-      if (inFlight.size >= maxConcurrentRequests) {
-        send(response, requestId, errorResponse(503, 'server_overloaded'));
-        return;
-      }
       const consoleAsset =
         request.method === 'GET' && typeof request.url === 'string'
           ? consoleAssets.get(request.url)
           : undefined;
       if (consoleAsset) {
+        if (assetInFlight.size >= maxConcurrentAssetRequests) {
+          send(response, requestId, errorResponse(503, 'server_overloaded'));
+          return;
+        }
         if (hasRequestBody(request)) {
           send(response, requestId, errorResponse(400, 'invalid_request_body'));
           request.resume();
           return;
         }
-        sendConsoleAsset(response, requestId, consoleAsset);
+        let operation: Promise<void>;
+        operation = sendConsoleAsset(request, response, requestId, consoleAsset)
+          .catch(() => {
+            if (!response.headersSent) {
+              send(
+                response,
+                requestId,
+                errorResponse(503, 'response_unavailable'),
+              );
+            } else if (!response.destroyed) {
+              response.destroy();
+            }
+          })
+          .finally(() => {
+            assetInFlight.delete(operation);
+            inFlight.delete(operation);
+          });
+        assetInFlight.add(operation);
+        inFlight.add(operation);
         return;
       }
       if (request.method === 'GET' && request.url === '/favicon.ico') {
@@ -1023,6 +1066,10 @@ export async function startLocalApiHttpSurface(
             ? errorResponse(400, 'invalid_panel_bootstrap_query')
             : panelPublicResponse(publicOperation, options.profile),
         );
+        return;
+      }
+      if (apiInFlight.size >= maxConcurrentApiRequests) {
+        send(response, requestId, errorResponse(503, 'server_overloaded'));
         return;
       }
       const resolvedRoute = route(request, options.profile);
@@ -1126,15 +1173,17 @@ export async function startLocalApiHttpSurface(
           send(response, requestId, errorResponse(503, 'request_unavailable')),
         )
         .finally(() => {
+          apiInFlight.delete(operation);
           inFlight.delete(operation);
         });
+      apiInFlight.add(operation);
       inFlight.add(operation);
     },
   );
   server.headersTimeout = 5_000;
   server.keepAliveTimeout = 5_000;
   server.maxRequestsPerSocket = 100;
-  server.maxConnections = maxConcurrentRequests * 2;
+  server.maxConnections = maxConcurrentApiRequests + maxConcurrentAssetRequests;
   server.on('connection', (socket) => {
     sockets.add(socket);
     socket.once('close', () => sockets.delete(socket));

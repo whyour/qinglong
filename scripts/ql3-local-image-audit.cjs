@@ -299,6 +299,9 @@ function auditDockerfile(contents, findings) {
         '  node_modules/@qinglong/local-process/assets',
     ) ||
     !consoleAssembledStage.includes(
+      'COPY .ql3-panel-dist node_modules/@qinglong/local-api/assets/panel',
+    ) ||
+    !consoleAssembledStage.includes(
       'RUN chmod 0555 node_modules/@qinglong/local-process/assets/ql3-launcher.sh',
     )
   ) {
@@ -365,6 +368,13 @@ function auditDockerfile(contents, findings) {
     !consoleRuntimeStage.includes(
       'io.qinglong.local.console="offline-loopback"',
     ) ||
+    !consoleRuntimeStage.includes(
+      'io.qinglong.local.panel="legacy-capability-gated@v1"',
+    ) ||
+    !consoleRuntimeStage.includes('io.qinglong.local.panel-max-files="256"') ||
+    !consoleRuntimeStage.includes(
+      'io.qinglong.local.panel-max-bytes="13631488"',
+    ) ||
     !consoleRuntimeStage.includes('io.qinglong.ai="excluded"')
   ) {
     addFinding(findings, 'CONSOLE_RUNTIME_IDENTITY_OR_LABEL_DRIFT');
@@ -372,6 +382,28 @@ function auditDockerfile(contents, findings) {
 }
 
 function auditWorkflow(contents, findings) {
+  const panelMatch =
+    /\n  legacy-panel-compatibility:\n([\s\S]*?)(?=\n  [a-z0-9-]+:\n)/.exec(
+      contents,
+    );
+  if (!panelMatch) {
+    addFinding(findings, 'LEGACY_PANEL_ARTIFACT_CI_JOB_MISSING');
+  } else {
+    const panelJob = panelMatch[1];
+    for (const value of [
+      "node-version: '20.20.2'",
+      'pnpm build:front',
+      'scripts/ql3-legacy-panel-bundle.cjs',
+      '--source="${GITHUB_WORKSPACE}/static/dist"',
+      '--output="${RUNNER_TEMP}/ql3-legacy-panel"',
+      'name: ql3-legacy-panel-${{ github.run_id }}-${{ github.run_attempt }}',
+      'compression-level: 0',
+    ]) {
+      if (!panelJob.includes(value)) {
+        addFinding(findings, 'LEGACY_PANEL_ARTIFACT_CI_CONTRACT_DRIFT', value);
+      }
+    }
+  }
   const match = /\n  local-image:\n([\s\S]*?)(?=\n  [a-z0-9-]+:\n)/.exec(
     contents,
   );
@@ -383,11 +415,19 @@ function auditWorkflow(contents, findings) {
   const required = [
     'runner: ubuntu-24.04\n            node_arch: x64\n            image_arch: amd64',
     'runner: ubuntu-24.04-arm\n            node_arch: arm64\n            image_arch: arm64',
+    'needs: legacy-panel-compatibility',
+    'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
+    'name: ql3-legacy-panel-${{ github.run_id }}-${{ github.run_attempt }}',
+    'path: .ql3-panel-dist',
+    'scripts/ql3-legacy-panel-bundle.cjs --audit="${GITHUB_WORKSPACE}/.ql3-panel-dist"',
     'pnpm audit:local-image:ql3',
     'docker build',
     '--file deploy/containers/ql3-local-application/Dockerfile',
     '--target runtime',
     '--target runtime-console',
+    'io.qinglong.local.panel',
+    'io.qinglong.local.panel-max-files',
+    'io.qinglong.local.panel-max-bytes',
     'qinglong3-local-console:ci-${{ matrix.image_arch }}',
     'EXPECTED: ${{ matrix.image_arch }} 65532:65532 2,3,4 51 52 52 1',
     'actual="$(docker image inspect --format \'{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.local.application-config"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-min"}} {{index .Config.Labels "io.qinglong.local.sqlite-contract-max"}} {{index .Config.Labels "io.qinglong.local.sqlite-write-contract"}} {{index .Config.Labels "io.qinglong.local.compose-selection"}}\' "${IMAGE}")"',

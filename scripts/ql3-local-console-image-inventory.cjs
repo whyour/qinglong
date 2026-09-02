@@ -5,8 +5,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const MAX_FILES = 640;
-const MAX_BYTES = 6 * 1024 * 1024;
+const MAX_FILES = 768;
+const MAX_BYTES = 20 * 1024 * 1024;
 const EXPECTED_PACKAGES = Object.freeze([
   '@qinglong/local-admin',
   '@qinglong/local-api',
@@ -109,10 +109,7 @@ function main() {
     const manifest = JSON.parse(
       fs.readFileSync(path.join(root, packageName, 'package.json'), 'utf8'),
     );
-    if (
-      manifest.name !== packageName ||
-      typeof manifest.version !== 'string'
-    ) {
+    if (manifest.name !== packageName || typeof manifest.version !== 'string') {
       fail(`package identity drifted: ${packageName}`);
     }
   }

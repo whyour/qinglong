@@ -132,6 +132,21 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build the capability-gated legacy panel source
         run: pnpm build:front
+      - name: Materialize and audit the bounded legacy panel artifact
+        run: >-
+          node scripts/ql3-legacy-panel-bundle.cjs
+          --source="${GITHUB_WORKSPACE}/static/dist"
+          --output="${RUNNER_TEMP}/ql3-legacy-panel"
+      - name: Upload the bounded legacy panel artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ql3-legacy-panel-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ql3-legacy-panel
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
 
   service-manager-bridge:
     name: systemd/OpenRC dual-authority bridge
@@ -373,6 +388,7 @@ jobs:
 
   local-image:
     name: Local application image (${{ matrix.image_arch }})
+    needs: legacy-panel-compatibility
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -386,6 +402,11 @@ jobs:
             image_arch: arm64
     steps:
       - uses: actions/checkout@v6
+      - name: Download the bounded legacy panel artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ql3-legacy-panel-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .ql3-panel-dist
       - uses: pnpm/action-setup@v6
         with:
           version: '8.3.1'
@@ -396,6 +417,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Verify native runner architecture
         run: node -e "if (process.arch !== '${{ matrix.node_arch }}') throw new Error('unexpected architecture ' + process.arch)"
+      - name: Audit the downloaded legacy panel closure
+        run: node scripts/ql3-legacy-panel-bundle.cjs --audit="${GITHUB_WORKSPACE}/.ql3-panel-dist"
       - name: Install workspace dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Audit immutable local image inputs
@@ -515,10 +538,10 @@ jobs:
       - name: Verify the opt-in Local Console identity
         env:
           CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
-          EXPECTED: ${{ matrix.image_arch }} 65532:65532 edge-application-api,standalone-application-api offline-loopback
+          EXPECTED: ${{ matrix.image_arch }} 65532:65532 edge-application-api,standalone-application-api offline-loopback legacy-capability-gated@v1 256 13631488
         run: |
           set -euo pipefail
-          actual="$(docker image inspect --format '{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.profile"}} {{index .Config.Labels "io.qinglong.local.console"}}' "${CONSOLE_IMAGE}")"
+          actual="$(docker image inspect --format '{{.Architecture}} {{.Config.User}} {{index .Config.Labels "io.qinglong.profile"}} {{index .Config.Labels "io.qinglong.local.console"}} {{index .Config.Labels "io.qinglong.local.panel"}} {{index .Config.Labels "io.qinglong.local.panel-max-files"}} {{index .Config.Labels "io.qinglong.local.panel-max-bytes"}}' "${CONSOLE_IMAGE}")"
           if [[ "${actual}" != "${EXPECTED}" ]]; then
             echo "unexpected Local Console image contract: ${actual}" >&2
             exit 1
@@ -565,6 +588,20 @@ jobs:
           "${CONSOLE_IMAGE}"
           scripts/ql3-local-console-image-inventory.cjs
           --inventory-root=/opt/qinglong/node_modules
+      - name: Audit the installed legacy panel closure
+        env:
+          CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
+        run: >-
+          docker run --rm --read-only
+          --network none
+          --cap-drop ALL
+          --security-opt no-new-privileges
+          --volume "${{ github.workspace }}:/audit:ro"
+          --workdir /audit
+          --entrypoint node
+          "${CONSOLE_IMAGE}"
+          scripts/ql3-legacy-panel-bundle.cjs
+          --audit=/opt/qinglong/node_modules/@qinglong/local-api/assets/panel
       - name: Generate and reconcile the reviewed CycloneDX SBOM
         env:
           IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}

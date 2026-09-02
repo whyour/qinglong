@@ -11,6 +11,7 @@
 
 # production
 /static
+/.ql3-panel-dist
 /data
 
 # misc

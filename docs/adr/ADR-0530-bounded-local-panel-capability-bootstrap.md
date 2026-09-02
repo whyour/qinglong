@@ -1,6 +1,6 @@
 # ADR-0530：有界 Local 面板能力发现与启动适配
 
-- 状态：Proposed（D-428 源码候选，等待可下载同源装配与双架构实物门）
+- 状态：Accepted（D-428 本地同源装配候选已闭合，等待远端 CI 与双架构可下载实物门）
 - 日期：2026-09-02
 - 关联 RFC：QL-RFC-0001 D-428、D-427、D-423、D-424
 
@@ -30,20 +30,23 @@ ADR-0529 已交付认证后的只读 `/api/crons` Adapter，但现有 2.x 面板
 ## 部署与资源边界
 
 - 默认 headless 产物不包含 `@qinglong/local-api` 或旧面板，不新增端口、连接、timer、watcher、后台进程或稳态内存。
-- 当前约 33 MiB 的旧面板源码构建结果不自动塞入 headless/Console Alpha；同源静态资源装配与体积预算必须作为独立门完成。
+- 旧面板仍不进入 headless 产物。Console opt-in 镜像只装配经过闭包裁剪与哈希锁定的静态资源：240 files、11,947,127 bytes，上限为 256 files / 13 MiB / 单文件 3 MiB；`.gz` 副本与 Monaco Editor 不进入产物。
+- 装配后的 `/`、`/login`、`/crontab` 与 `/error` 服务受限旧面板，原生 3.0 管理 Console 固定保留在 `/console`，二者共享同一个 loopback Local API，不启动第二个 Web 服务。
+- 静态资源使用 64 KiB stream；Edge 的 API admission 为 4、静态资源 admission 为 16，Standalone 分别为 32/64。两类请求共享 drain 生命周期但不互相挤占预算，避免旧 Umi 并行加载 chunk 时饿死 API 或收到 503。
 - 旧 Umi 前端暂用 Node 20 构建只是 legacy migration toolchain，不改变 QingLong 3.0 Node 24 runtime、双架构镜像或支持等级。该过渡门必须在 CI 中独立命名，不能让 Node 20 定义新 package 的运行时兼容性。
 - Edge 与 Standalone 使用同一代码、不同预算；Cluster 节点不加载 Local SQLite/POSIX authority，也不通过本 Adapter 访问控制面。
 
 ## 验证与剩余门禁
 
-源码候选已通过 Local API 12-package closure build、89/89 测试、真实 SQLite/credential/Policy/audit HTTP 集成、Node 20 的旧面板 production build、18-package 完整测试与 package/import/dependency audit。Playwright 同源源码旅程也已验证 capability 登录页、内存 credential、只读 Crontab、隐藏写入口与排序/过滤，以及刷新后回到登录页；最终页为 0 console error，仅保留既有国际化 warning。远端 CI 和可下载实物仍待闭合。
+本地装配候选已经通过 12-package Console closure、719 files / 16,162,123 bytes（上限 768 files / 20 MiB）镜像审计，以及面板 240-file 哈希/磁盘闭包复核。最终 arm64 Edge 镜像 `sha256:27472cf1bdd66d9fa4e937622ef69d4e36f74918a759de62818b4e59d265714c` 已完成 fresh setup/replay、Owner provision/challenge/claim/presentation/ack、首个 Task 执行与日志标记、graceful stop、SQLite integrity 和 HTTP 200/401 边界，结果为 `compatible=true`。
+
+真实浏览器已验证现有页面使用内存中的 `ql3c_` credential 完成 `/login` → `/crontab`，53 个同源静态请求全部为 200，`/api/health`、`/api/system`、`/api/v3/capabilities`、`/api/user`、`/api/system/config` 和 `/api/crons` 均为 200；最终镜像同时验证 `/console` 原生管理台与 `/login` 旧页面共存。旧页面仍引用的外部图标/装饰图片被严格 CSP 阻止，页面功能可用但这些装饰会缺失；本阶段不为消除装饰错误而放宽网络或 CSP。远端 CI 和可下载双架构实物仍待闭合。
 
 仍未完成：
 
-1. 在一个可下载 Console 产物中同源装配改造后的面板静态资源，并证明 CSP、缓存和 API 路由优先级；
-2. 在装配后的 exact Console + Local API + SQLite 上使用真实 `ql3c_` credential 重跑登录 → `/crontab` → 分页 → 401/刷新清凭据的浏览器 journey；
+1. 推送后通过远端完整 CI，并生成、下载和离线复核 exact amd64/arm64 Console Trial Kit 与 milestone；
+2. 把旧面板引用的外部图标和装饰图片转为受审本地资产，做到严格 CSP 下无外部请求；
 3. 为旧页面增加 Run/Log 只读 adapter 后再开放日志入口；
-4. 双架构资源与 artifact gate，以及对面板体积的可解释预算；
-5. 写操作必须逐项映射到 3.0 revision、Policy、presence/approval、audit 和 mutation fence，不能用通配兼容路由一次性开放。
+4. 写操作必须逐项映射到 3.0 revision、Policy、presence/approval、audit 和 mutation fence，不能用通配兼容路由一次性开放。
 
-在上述门禁完成前，本 ADR 只说明“现有面板源码能受控接入”，不声明当前已发布 Console artifact 包含该页面，也不声明 2.x 面板可以零修改直连。
+在远端实物门完成前，本 ADR 声明的是“当前提交可装配并实跑现有面板的受控子集”，不是 Public Release，也不声明完整 2.x 面板可以零修改直连。
