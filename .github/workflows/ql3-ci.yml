@@ -114,6 +114,25 @@ jobs:
           node:${{ matrix.node }}-bookworm-slim
           node --test test/back/completionReceiptOrphanAuditor.test.cjs
 
+  legacy-panel-compatibility:
+    name: Legacy panel compatibility build (Node 20 migration toolchain)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20.20.2'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build the capability-gated legacy panel source
+        run: pnpm build:front
+
   service-manager-bridge:
     name: systemd/OpenRC dual-authority bridge
     runs-on: ubuntu-24.04
@@ -2082,6 +2101,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.produce_alpha_artifacts && (inputs.alpha_artifact_scope == 'local' || inputs.alpha_artifact_scope == 'all')
     needs:
       - backend
+      - legacy-panel-compatibility
       - service-manager-bridge
       - linux-resource-envelopes
       - linux-resource-release-evidence

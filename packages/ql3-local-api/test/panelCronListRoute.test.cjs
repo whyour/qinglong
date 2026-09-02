@@ -230,6 +230,18 @@ test('fails closed for detached pins, unsupported triggers, invalid budgets and 
       },
     },
   });
+  assert.deepEqual(
+    await route.handle({
+      projectId: 'default',
+      page: 4,
+      size: 20,
+      maximumRows: 64,
+    }),
+    {
+      statusCode: 200,
+      body: { code: 200, data: { data: [], total: 0 } },
+    },
+  );
   assert.equal(
     (
       await route.handle({

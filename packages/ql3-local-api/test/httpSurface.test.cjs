@@ -277,6 +277,14 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
   });
   assert.deepEqual(observed[6].operation, panelCrons.body.input);
 
+  const finalEdgePage = await request(
+    port,
+    '/api/crons?searchValue=&page=4&size=20&filters=%7B%7D',
+  );
+  assert.equal(finalEdgePage.statusCode, 200);
+  assert.equal(finalEdgePage.body.input.maximumRows, 64);
+  assert.equal(finalEdgePage.body.input.page, 4);
+
   const unsupportedPanelQuery = await request(
     port,
     '/api/crons?searchValue=private&page=1&size=20&filters=%7B%7D',
@@ -285,7 +293,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     code: 'invalid_panel_cron_list_query',
   });
   assert.equal(unsupportedPanelQuery.statusCode, 400);
-  assert.equal(observed.length, 7);
+  assert.equal(observed.length, 8);
 
   const cancellationBody = JSON.stringify({
     schema: 'qinglong/run-cancellation@v1',
@@ -306,7 +314,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
   );
   assert.equal(cancellation.statusCode, 202);
   assert.deepEqual(cancellation.body.accepted, JSON.parse(cancellationBody));
-  assert.deepEqual(observed[7].operation, {
+  assert.deepEqual(observed[8].operation, {
     operationId: 'run.cancel',
     projectId: 'prj_default',
     runId: 'run_123',
@@ -333,7 +341,7 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
   );
   assert.equal(taskStart.statusCode, 202);
   assert.deepEqual(taskStart.body.accepted, JSON.parse(taskStartBody));
-  assert.deepEqual(observed[8].operation, {
+  assert.deepEqual(observed[9].operation, {
     operationId: 'task.start',
     projectId: 'prj_default',
     taskId: 'task_1',
@@ -357,20 +365,20 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
   );
   assert.equal(taskPut.statusCode, 202);
   assert.deepEqual(taskPut.body.accepted, JSON.parse(taskPutBody));
-  assert.deepEqual(observed[9].operation, {
+  assert.deepEqual(observed[10].operation, {
     operationId: 'task.put',
     projectId: 'prj_default',
     taskId: 'task_1',
   });
-  assert.equal(observed[9].localPresence, 'ql3p_request_bound_proof');
-  assert.equal(observed[9].taskAuthoringLease, 'ql3a_exact_snapshot_lease');
+  assert.equal(observed[10].localPresence, 'ql3p_request_bound_proof');
+  assert.equal(observed[10].taskAuthoringLease, 'ql3a_exact_snapshot_lease');
 
   const log = await request(
     port,
     '/api/v3/projects/prj_default/runs/run_123/attempts/attempt_1/log?offset=4&length=32',
   );
   assert.deepEqual(log.body, { range: { offset: 4, length: 32 } });
-  assert.deepEqual(observed[10].operation, {
+  assert.deepEqual(observed[11].operation, {
     operationId: 'run.log.read',
     projectId: 'prj_default',
     runId: 'run_123',
@@ -399,19 +407,19 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     },
   );
   assert.equal(authoring.statusCode, 200);
-  assert.deepEqual(observed[12].operation, {
+  assert.deepEqual(observed[13].operation, {
     operationId: 'task.authoring',
     projectId: 'prj_default',
     taskId: 'task_1',
   });
-  assert.equal(observed[12].localPresence, 'ql3p_authoring_read_proof');
+  assert.equal(observed[13].localPresence, 'ql3p_authoring_read_proof');
 
   const secrets = await request(
     port,
     '/api/v3/projects/prj_default/secrets?limit=8&after=YWxwaGE',
   );
   assert.deepEqual(secrets.body, { secrets: [], truncated: false });
-  assert.deepEqual(observed[13].operation, {
+  assert.deepEqual(observed[14].operation, {
     operationId: 'secret.list',
     projectId: 'prj_default',
     limit: 8,
@@ -435,11 +443,11 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
   );
   assert.equal(secretPut.statusCode, 202);
   assert.deepEqual(secretPut.body.accepted, JSON.parse(secretPutBody));
-  assert.deepEqual(observed[14].operation, {
+  assert.deepEqual(observed[15].operation, {
     operationId: 'secret.put',
     projectId: 'prj_default',
   });
-  assert.equal(observed[14].localPresence, 'ql3p_secret_bound_proof');
+  assert.equal(observed[15].localPresence, 'ql3p_secret_bound_proof');
 
   for (const invalidPath of [
     '/api/v3/projects/prj_default/runs/run_123?expanded=true',
@@ -521,11 +529,84 @@ test('serves only the fixed canonical loopback Run route and drains idempotently
     assert.equal(invalid.statusCode, 400);
     assert.deepEqual(invalid.body, { code: 'invalid_run_step_list_query' });
   }
-  assert.equal(observed.length, 15);
+  assert.equal(observed.length, 16);
   assert.deepEqual(
     await Promise.all([surface.stopAndDrain(), surface.stopAndDrain()]),
     ['stopped', 'stopped'],
   );
+});
+
+test('serves the public capability shell and authenticates private panel bootstrap reads', async (t) => {
+  const port = await reservePort();
+  const observed = [];
+  const surface = await startLocalApiHttpSurface({
+    profile: 'edge',
+    host: '127.0.0.1',
+    port,
+    admission: preparedAdmission(async (value) => {
+      observed.push(value);
+      return {
+        statusCode: 200,
+        body: {
+          code: 200,
+          data: { operationId: value.operation.operationId },
+        },
+      };
+    }),
+    randomUuid: () => '019f70c0-0000-4000-8000-000000000013',
+  });
+  t.after(() => surface.stopAndDrain());
+
+  const health = await request(port, '/api/health?t=100', { headers: {} });
+  assert.equal(health.statusCode, 200);
+  assert.equal(health.body.data.status, 'ok');
+  assert.equal(health.body.data.ql3.capabilitiesPath, '/api/v3/capabilities');
+
+  const system = await request(port, '/api/system', { headers: {} });
+  assert.equal(system.statusCode, 200);
+  assert.equal(system.body.data.isInitialized, true);
+  assert.equal(system.body.data.ql3.profile, 'edge');
+
+  const capabilities = await request(port, '/api/v3/capabilities?t=101', {
+    headers: {},
+  });
+  assert.equal(capabilities.statusCode, 200);
+  assert.equal(
+    capabilities.body.capabilities.authentication.loginEndpoint,
+    null,
+  );
+  assert.equal(capabilities.body.capabilities.panel.legacyLogin, false);
+  assert.equal(capabilities.body.capabilities.limits.cronRows, 64);
+  assert.equal(observed.length, 0);
+
+  const user = await request(port, '/api/user?t=102');
+  assert.deepEqual(user.body, {
+    code: 200,
+    data: { operationId: 'panel.user.get' },
+  });
+  assert.deepEqual(observed[0].operation, {
+    operationId: 'panel.user.get',
+    projectId: 'default',
+  });
+
+  const config = await request(port, '/api/system/config?t=103');
+  assert.deepEqual(config.body, {
+    code: 200,
+    data: { operationId: 'panel.system.config.get' },
+  });
+  assert.deepEqual(observed[1].operation, {
+    operationId: 'panel.system.config.get',
+    projectId: 'default',
+  });
+
+  const invalid = await request(port, '/api/system?search=wide', {
+    headers: {},
+  });
+  assert.equal(invalid.statusCode, 400);
+  assert.deepEqual(invalid.body, { code: 'invalid_panel_bootstrap_query' });
+  const encoded = await request(port, '/api/%73ystem', { headers: {} });
+  assert.equal(encoded.statusCode, 404);
+  assert.equal(observed.length, 2);
 });
 
 test('rejects GET bodies without invoking the prepared route handler', async (t) => {

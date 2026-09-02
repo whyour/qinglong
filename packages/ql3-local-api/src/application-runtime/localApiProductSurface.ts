@@ -32,6 +32,7 @@ import {
   createLocalApiSecretPutRoute,
 } from '../secret/secretRoutes';
 import { createPanelCronListRoute } from '../panel-compatibility/panelCronListRoute';
+import { createPanelBootstrapRoute } from '../panel-compatibility/panelBootstrapRoute';
 import { startLocalApiHttpSurface } from '../transport/httpSurface';
 
 export interface LocalApiProductSurfaceEvent {
@@ -226,6 +227,7 @@ export function createLocalApiProductSurface(
         tasks: authority.taskDefinitions,
         triggers: authority.triggers,
       });
+      const panelBootstrapRoute = createPanelBootstrapRoute(authority.profile);
       const admission = createLocalApiAdmission({
         authenticator,
         policy,
@@ -247,6 +249,7 @@ export function createLocalApiProductSurface(
         secretListRoute,
         secretPutRoute,
         panelCronListRoute,
+        panelBootstrapRoute,
         ...(options.now === undefined ? {} : { now: options.now }),
         ...(options.randomUuid === undefined
           ? {}

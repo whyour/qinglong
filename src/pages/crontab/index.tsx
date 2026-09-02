@@ -5,6 +5,10 @@ import config from '@/utils/config';
 import { diffTime } from '@/utils/date';
 import { request } from '@/utils/http';
 import {
+  isQingLong3PanelSession,
+  qingLong3Capabilities,
+} from '@/utils/qinglong3';
+import {
   CheckCircleOutlined,
   CheckOutlined,
   ClockCircleOutlined,
@@ -66,6 +70,9 @@ const SHOW_TAB_COUNT = 10;
 
 const Crontab = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
+  const qingLong3 = qingLong3Capabilities();
+  const qingLong3ReadOnly = qingLong3 !== null;
+  const qingLong3Authenticated = isQingLong3PanelSession();
   const [allSubscriptions, setAllSubscriptions] = useState<any[]>([]);
   const columns: ColumnProps<ICrontab>[] = [
     {
@@ -79,16 +86,21 @@ const Crontab = () => {
           style={{
             wordBreak: 'break-all',
             marginBottom: 0,
-            color: '#1890ff',
-            cursor: 'pointer',
+            color: qingLong3ReadOnly ? undefined : '#1890ff',
+            cursor: qingLong3ReadOnly ? 'default' : 'pointer',
           }}
           ellipsis={{ tooltip: text, rows: 2 }}
           onClick={() => {
+            if (qingLong3ReadOnly) return;
             setDetailCron(record);
             setIsDetailModalVisible(true);
           }}
         >
-          <Link>{record.name || '-'}</Link>
+          {qingLong3ReadOnly ? (
+            record.name || '-'
+          ) : (
+            <Link>{record.name || '-'}</Link>
+          )}
         </Paragraph>
       ),
       sorter: {
@@ -109,13 +121,17 @@ const Crontab = () => {
             }}
             ellipsis={{ tooltip: text, rows: 2 }}
           >
-            <a
-              onClick={() => {
-                goToScriptManager(record);
-              }}
-            >
-              {text}
-            </a>
+            {qingLong3ReadOnly ? (
+              text
+            ) : (
+              <a
+                onClick={() => {
+                  goToScriptManager(record);
+                }}
+              >
+                {text}
+              </a>
+            )}
           </Paragraph>
         );
       },
@@ -248,8 +264,8 @@ const Crontab = () => {
           >
             {record.last_execution_time
               ? dayjs(record.last_execution_time * 1000).format(
-                'YYYY-MM-DD HH:mm:ss',
-              )
+                  'YYYY-MM-DD HH:mm:ss',
+                )
               : '-'}
           </span>
         );
@@ -354,6 +370,19 @@ const Crontab = () => {
   const tableRef = useRef<HTMLDivElement>(null);
   const tableScrollHeight = useTableScrollHeight(tableRef);
   const [activeKey, setActiveKey] = useState('');
+  const visibleColumns = qingLong3ReadOnly
+    ? columns
+        .filter((column) =>
+          ['name', 'command', 'status', 'schedule'].includes(
+            String(column.key || ''),
+          ),
+        )
+        .map((column) => ({
+          ...column,
+          sorter: undefined,
+          filters: undefined,
+        }))
+    : columns;
 
   const goToScriptManager = (record: any) => {
     const result = getCommandScript(record.command);
@@ -366,12 +395,20 @@ const Crontab = () => {
   };
 
   const getCrons = async (silent?: boolean) => {
+    if (qingLong3ReadOnly && !qingLong3Authenticated) {
+      if (!silent) setLoading(false);
+      return;
+    }
     if (!silent) setLoading(true);
     const { page = 1, size = 20, sorter, filters = {} } = pageConf;
-    let url = `${config.apiPrefix
-      }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
-        filters,
-      )}`;
+    const effectiveSize = qingLong3ReadOnly
+      ? Math.min(size, qingLong3?.limits.cronPageSize || 20)
+      : size;
+    const effectiveSearchText = qingLong3ReadOnly ? '' : searchText;
+    const serializedFilters = qingLong3ReadOnly
+      ? encodeURIComponent('{}')
+      : JSON.stringify(filters);
+    let url = `${config.apiPrefix}crons?searchValue=${effectiveSearchText}&page=${page}&size=${effectiveSize}&filters=${serializedFilters}`;
     if (sorter && sorter.column && sorter.order) {
       url += `&sorter=${JSON.stringify({
         field: sorter.column.key,
@@ -390,6 +427,11 @@ const Crontab = () => {
       .then(async ({ code, data: _data }) => {
         if (code === 200) {
           const { data, total } = _data;
+          if (qingLong3ReadOnly) {
+            setValue(data);
+            setTotal(total);
+            return;
+          }
           const subscriptions = await request.get(
             `${config.apiPrefix}subscriptions?ids=${JSON.stringify([
               ...new Set(data.map((x) => x.sub_id).filter(Boolean)),
@@ -544,8 +586,9 @@ const Crontab = () => {
 
   const enabledOrDisabledCron = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
-        }`,
+      title: `确认${
+        record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
+      }`,
       content: (
         <>
           {intl.get('确认')}
@@ -560,7 +603,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${record.isDisabled === 1 ? 'enable' : 'disable'
+            `${config.apiPrefix}crons/${
+              record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             [record.id],
           )
@@ -584,8 +628,9 @@ const Crontab = () => {
 
   const pinOrUnPinCron = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
-        }`,
+      title: `确认${
+        record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
+      }`,
       content: (
         <>
           {intl.get('确认')}
@@ -600,7 +645,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${record.isPinned === 1 ? 'unpin' : 'pin'
+            `${config.apiPrefix}crons/${
+              record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             [record.id],
           )
@@ -777,8 +823,8 @@ const Crontab = () => {
     setPageConf({
       page: current as number,
       size: pageSize as number,
-      sorter,
-      filters,
+      sorter: qingLong3ReadOnly ? {} : sorter,
+      filters: qingLong3ReadOnly ? {} : filters,
     });
     localStorage.setItem('pageSize', String(pageSize));
   };
@@ -824,10 +870,20 @@ const Crontab = () => {
           setAllSubscriptions(data || []);
         }
       })
-      .catch(() => { });
+      .catch(() => {});
   };
 
   useEffect(() => {
+    if (qingLong3ReadOnly) {
+      setPageConf({
+        page: 1,
+        size: Math.min(20, qingLong3?.limits.cronPageSize || 20),
+        sorter: {},
+        filters: {},
+      });
+      setActiveKey('all');
+      return;
+    }
     getCronViews();
     getAllSubscriptions();
   }, []);
@@ -931,56 +987,63 @@ const Crontab = () => {
     <PageContainer
       className="ql-container-wrapper crontab-wrapper ql-container-wrapper-has-tab"
       title={intl.get('定时任务')}
-      extra={[
-        <Search
-          placeholder={intl.get('请输入名称或者关键词')}
-          style={{ width: 'auto' }}
-          enterButton
-          allowClear
-          loading={loading}
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
-          onSearch={onSearch}
-        />,
-        <Button key="2" type="primary" onClick={() => addCron()}>
-          {intl.get('创建任务')}
-        </Button>,
-      ]}
+      extra={
+        qingLong3ReadOnly
+          ? [<Tag key="ql3-read-only">QingLong 3.0 · 有界只读</Tag>]
+          : [
+              <Search
+                key="search"
+                placeholder={intl.get('请输入名称或者关键词')}
+                style={{ width: 'auto' }}
+                enterButton
+                allowClear
+                loading={loading}
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onSearch={onSearch}
+              />,
+              <Button key="create" type="primary" onClick={() => addCron()}>
+                {intl.get('创建任务')}
+              </Button>,
+            ]
+      }
       header={{
         style: headerStyle,
       }}
     >
-      <Tabs
-        defaultActiveKey="all"
-        size="small"
-        activeKey={activeKey}
-        tabPosition="top"
-        className={`crontab-view ${moreMenuActive ? 'more-active' : ''}`}
-        tabBarExtraContent={
-          <Dropdown
-            menu={menu}
-            trigger={['click']}
-            overlayStyle={{ minWidth: 200 }}
-          >
-            <div className={`view-more ${moreMenuActive ? 'active' : ''}`}>
-              <Space>
-                {intl.get('更多')}
-                <DownOutlined />
-              </Space>
-              <div className="ant-tabs-ink-bar ant-tabs-ink-bar-animated"></div>
-            </div>
-          </Dropdown>
-        }
-        onTabClick={tabClick}
-        items={[
-          ...[...enabledCronViews].slice(0, SHOW_TAB_COUNT).map((x) => ({
-            key: x.id,
-            label: x.name,
-          })),
-        ]}
-      />
+      {!qingLong3ReadOnly && (
+        <Tabs
+          defaultActiveKey="all"
+          size="small"
+          activeKey={activeKey}
+          tabPosition="top"
+          className={`crontab-view ${moreMenuActive ? 'more-active' : ''}`}
+          tabBarExtraContent={
+            <Dropdown
+              menu={menu}
+              trigger={['click']}
+              overlayStyle={{ minWidth: 200 }}
+            >
+              <div className={`view-more ${moreMenuActive ? 'active' : ''}`}>
+                <Space>
+                  {intl.get('更多')}
+                  <DownOutlined />
+                </Space>
+                <div className="ant-tabs-ink-bar ant-tabs-ink-bar-animated"></div>
+              </div>
+            </Dropdown>
+          }
+          onTabClick={tabClick}
+          items={[
+            ...[...enabledCronViews].slice(0, SHOW_TAB_COUNT).map((x) => ({
+              key: x.id,
+              label: x.name,
+            })),
+          ]}
+        />
+      )}
       <div ref={tableRef}>
-        {selectedRowIds.length > 0 && (
+        {!qingLong3ReadOnly && selectedRowIds.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <Button
               type="primary"
@@ -1042,7 +1105,7 @@ const Crontab = () => {
           </div>
         )}
         <Table
-          columns={columns}
+          columns={visibleColumns}
           sortDirections={['descend', 'ascend']}
           pagination={{
             current: pageConf.page,
@@ -1052,22 +1115,24 @@ const Crontab = () => {
             total,
             showTotal: (total: number, range: number[]) =>
               `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
-            pageSizeOptions: [10, 20, 50, 100, 200, 500, total || 10000].sort(
-              (a, b) => a - b,
-            ),
+            pageSizeOptions: qingLong3ReadOnly
+              ? [10, 20, 50, qingLong3?.limits.cronPageSize || 64]
+              : [10, 20, 50, 100, 200, 500, total || 10000].sort(
+                  (a, b) => a - b,
+                ),
           }}
           dataSource={value}
           rowKey="id"
           size="middle"
           scroll={{ x: 1200, y: tableScrollHeight }}
           loading={loading}
-          rowSelection={rowSelection}
+          rowSelection={qingLong3ReadOnly ? undefined : rowSelection}
           rowClassName={getRowClassName}
           onChange={onPageChange}
           components={isPhone || pageConf.size < 50 ? undefined : vt}
         />
       </div>
-      {isLogModalVisible && (
+      {!qingLong3ReadOnly && isLogModalVisible && (
         <CronLogModal
           handleCancel={() => {
             getCronDetail(logCron);
@@ -1076,10 +1141,10 @@ const Crontab = () => {
           cron={logCron}
         />
       )}
-      {isModalVisible && (
+      {!qingLong3ReadOnly && isModalVisible && (
         <CronModal handleCancel={handleCancel} cron={editedCron} />
       )}
-      {isLabelModalVisible && (
+      {!qingLong3ReadOnly && isLabelModalVisible && (
         <CronLabelModal
           handleCancel={(needUpdate?: boolean) => {
             setIsLabelModalVisible(false);
@@ -1090,7 +1155,7 @@ const Crontab = () => {
           ids={selectedRowIds}
         />
       )}
-      {isDetailModalVisible && (
+      {!qingLong3ReadOnly && isDetailModalVisible && (
         <CronDetailModal
           handleCancel={(needUpdate?: boolean) => {
             setIsDetailModalVisible(false);
@@ -1103,7 +1168,7 @@ const Crontab = () => {
           isPhone={isPhone}
         />
       )}
-      {isCreateViewModalVisible && (
+      {!qingLong3ReadOnly && isCreateViewModalVisible && (
         <ViewCreateModal
           handleCancel={(data) => {
             setIsCreateViewModalVisible(false);
@@ -1111,7 +1176,7 @@ const Crontab = () => {
           }}
         />
       )}
-      {isViewManageModalVisible && (
+      {!qingLong3ReadOnly && isViewManageModalVisible && (
         <ViewManageModal
           cronViews={cronViews}
           handleCancel={() => {

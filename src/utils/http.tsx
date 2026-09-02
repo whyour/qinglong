@@ -9,6 +9,7 @@ import axios, {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from 'axios';
+import { clearQingLong3Credential, qingLong3Credential } from './qinglong3';
 
 export interface IResponseData {
   code?: number;
@@ -49,6 +50,7 @@ const errorHandler = function (
     } else if (responseStatus === 401) {
       if (history.location.pathname !== '/login') {
         message.error(intl.get('登录已过期，请重新登录'));
+        clearQingLong3Credential();
         localStorage.removeItem(config.authKey);
         history.push('/login');
       }
@@ -93,7 +95,7 @@ const apiWhiteList = [
 ];
 
 _request.interceptors.request.use((_config) => {
-  const token = localStorage.getItem(config.authKey);
+  const token = qingLong3Credential() || localStorage.getItem(config.authKey);
   if (token && !apiWhiteList.includes(_config.url!)) {
     _config.headers.Authorization = `Bearer ${token}`;
     return _config;
@@ -107,6 +109,7 @@ _request.interceptors.response.use(async (response) => {
     history.push('/error');
   } else if (responseStatus === 401) {
     if (history.location.pathname !== '/login') {
+      clearQingLong3Credential();
       localStorage.removeItem(config.authKey);
       history.push('/login');
     }

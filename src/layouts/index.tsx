@@ -18,6 +18,13 @@ import defaultProps from './defaultProps';
 import './index.less';
 import { init } from '../utils/init';
 import WebSocketManager from '../utils/websocket';
+import {
+  clearQingLong3Credential,
+  discoverQingLong3,
+  isQingLong3PanelSession,
+  qingLong3Capabilities,
+  qingLong3Credential,
+} from '../utils/qinglong3';
 
 export interface SharedContext {
   headerStyle: React.CSSProperties;
@@ -38,6 +45,12 @@ interface TSystemInfo {
   version: string;
   changeLog: string;
   changeLogLink: string;
+  ql3?: {
+    schemaVersion: 1;
+    mode: 'local';
+    profile: 'edge' | 'standalone';
+    capabilitiesPath: string;
+  };
 }
 
 export default function () {
@@ -48,7 +61,8 @@ export default function () {
   const [loading, setLoading] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<TSystemInfo>();
   const [siteTitle, setSiteTitle] = useState(
-    () => localStorage.getItem('qinglong_panel_title')?.trim() || intl.get('青龙'),
+    () =>
+      localStorage.getItem('qinglong_panel_title')?.trim() || intl.get('青龙'),
   );
   const [collapsed, setCollapsed] = useState(false);
   const [initLoading, setInitLoading] = useState<boolean>(true);
@@ -61,6 +75,12 @@ export default function () {
   } = DarkReader || {};
 
   const logout = () => {
+    if (isQingLong3PanelSession()) {
+      clearQingLong3Credential();
+      setUser({});
+      history.push('/login');
+      return;
+    }
     request.post(`${config.apiPrefix}user/logout`).then(() => {
       localStorage.removeItem(config.authKey);
       history.push('/login');
@@ -70,14 +90,27 @@ export default function () {
   const getSystemInfo = () => {
     request
       .get(`${config.apiPrefix}system`)
-      .then(({ code, data }) => {
+      .then(async ({ code, data }) => {
         if (code === 200) {
+          let qingLong3 = null;
+          if (data?.ql3?.capabilitiesPath === '/api/v3/capabilities') {
+            qingLong3 = await discoverQingLong3(
+              `${config.apiPrefix}v3/capabilities`,
+            );
+          }
           setSystemInfo(data);
           if (!data.isInitialized) {
             history.push('/initialization');
           } else {
             init(data.version);
-            getUser();
+            if (!qingLong3 || qingLong3Credential()) {
+              getUser();
+            } else {
+              setLoading(false);
+              if (!['/login', '/error'].includes(location.pathname)) {
+                history.replace('/login');
+              }
+            }
           }
         }
       })
@@ -94,7 +127,7 @@ export default function () {
         if (code === 200 && data.username) {
           setUser(data);
           if (location.pathname === '/') {
-            history.push('/dashboard');
+            history.push(data?.ql3?.panelHome || '/dashboard');
           }
         }
         needLoading && setLoading(false);
@@ -165,8 +198,10 @@ export default function () {
   }, []);
 
   useEffect(() => {
+    if (!systemInfo) return;
+    if (systemInfo.ql3 && !isQingLong3PanelSession()) return;
     reloadSystemConfig();
-  }, []);
+  }, [systemInfo]);
 
   useEffect(() => {
     if (!['/login', '/initialization', '/error'].includes(location.pathname)) {
@@ -210,7 +245,7 @@ export default function () {
   }, []);
 
   useEffect(() => {
-    if (!user || !user.username) return;
+    if (!user || !user.username || isQingLong3PanelSession()) return;
     const ws = WebSocketManager.getInstance(
       `${window.location.origin}${
         config.apiPrefix
@@ -221,6 +256,16 @@ export default function () {
       ws.close();
     };
   }, [user]);
+
+  useEffect(() => {
+    if (
+      isQingLong3PanelSession() &&
+      user?.username &&
+      !['/login', '/error', '/crontab'].includes(location.pathname)
+    ) {
+      history.replace('/crontab');
+    }
+  }, [location.pathname, user]);
 
   useEffect(() => {
     window.onload = () => {
@@ -244,7 +289,7 @@ export default function () {
 
   if (['/login', '/initialization', '/error'].includes(location.pathname)) {
     if (systemInfo?.isInitialized && location.pathname === '/initialization') {
-      history.push('/dashboard');
+      history.push(qingLong3Capabilities() ? '/crontab' : '/dashboard');
     }
 
     if (systemInfo || location.pathname === '/error') {
@@ -282,6 +327,17 @@ export default function () {
       },
     ],
   };
+  const layoutProps = isQingLong3PanelSession()
+    ? {
+        ...defaultProps,
+        route: {
+          ...defaultProps.route,
+          routes: defaultProps.route?.routes?.filter((item) =>
+            ['/login', '/error', '/crontab'].includes(item.path || ''),
+          ),
+        },
+      }
+    : defaultProps;
   return loading ? (
     <PageLoading />
   ) : (
@@ -393,7 +449,7 @@ export default function () {
           </span>
         </span>
       )}
-      {...defaultProps}
+      {...layoutProps}
     >
       <Outlet
         context={{

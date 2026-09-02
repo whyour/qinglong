@@ -17,24 +17,59 @@ import { useTheme } from '@/utils/hooks';
 import { MobileOutlined } from '@ant-design/icons';
 import { SharedContext } from '@/layouts';
 import dayjs from 'dayjs';
+import {
+  clearQingLong3Credential,
+  qingLong3Capabilities,
+  qingLong3Credential,
+  setQingLong3Credential,
+} from '@/utils/qinglong3';
 
 const FormItem = Form.Item;
 const { Countdown } = Statistic;
 const isDemoEnv = window.__ENV__DeployEnv === 'demo';
 
 const Login = () => {
-  const { reloadUser } = useOutletContext<SharedContext>();
+  const { reloadSystemConfig, reloadUser } = useOutletContext<SharedContext>();
   const [loading, setLoading] = useState(false);
   const [waitTime, setWaitTime] = useState<any>();
   const { theme } = useTheme();
   const [twoFactor, setTwoFactor] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [loginInfo, setLoginInfo] = useState<any>();
+  const qingLong3 = qingLong3Capabilities();
 
   const handleOk = (values: any) => {
     setLoading(true);
     setTwoFactor(false);
     setWaitTime(null);
+    if (qingLong3) {
+      const token = String(values.credential || '').trim();
+      if (!setQingLong3Credential(token)) {
+        message.error('API Credential 格式无效');
+        setLoading(false);
+        return;
+      }
+      request
+        .get(`${config.apiPrefix}user`)
+        .then(({ code, data }: any) => {
+          if (code !== 200 || !data?.username) {
+            throw new TypeError('QL3 identity is unavailable');
+          }
+          notification.success({
+            message: 'QingLong 3.0 已连接',
+            description: `${data.username} · ${qingLong3.deployment.profile}`,
+          });
+          reloadSystemConfig();
+          reloadUser(true);
+          history.push('/crontab');
+        })
+        .catch(() => {
+          clearQingLong3Credential();
+          message.error('API Credential 验证失败');
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
     request
       .post(`${config.apiPrefix}user/login`, {
         username: values.username,
@@ -134,11 +169,13 @@ const Login = () => {
   };
 
   useEffect(() => {
-    const isAuth = localStorage.getItem(config.authKey);
+    const isAuth = qingLong3
+      ? qingLong3Credential()
+      : localStorage.getItem(config.authKey);
     if (isAuth) {
-      history.push('/dashboard');
+      history.push(qingLong3 ? '/crontab' : '/dashboard');
     }
-  }, []);
+  }, [qingLong3]);
 
   return (
     <div className={styles.container}>
@@ -150,7 +187,11 @@ const Login = () => {
             src="https://qn.whyour.cn/logo.png"
           />
           <span className={styles.title}>
-            {twoFactor ? intl.get('两步验证') : config.siteName}
+            {twoFactor
+              ? intl.get('两步验证')
+              : qingLong3
+              ? 'QingLong 3.0'
+              : config.siteName}
           </span>
         </div>
       </div>
@@ -186,20 +227,44 @@ const Login = () => {
           </Form>
         ) : (
           <Form layout="vertical" onFinish={handleOk}>
-            <FormItem name="username" label={intl.get('用户名')} hasFeedback>
-              <Input
-                placeholder={`${intl.get('用户名')}${
-                  isDemoEnv ? ': admin' : ''
-                }`}
-                autoFocus
-              />
-            </FormItem>
-            <FormItem name="password" label={intl.get('密码')} hasFeedback>
-              <Input
-                type="password"
-                placeholder={`${intl.get('密码')}${isDemoEnv ? ': 123' : ''}`}
-              />
-            </FormItem>
+            {qingLong3 ? (
+              <FormItem
+                name="credential"
+                label="API Credential"
+                hasFeedback
+                rules={[{ required: true, message: '请输入 API Credential' }]}
+                extra="凭据只保存在当前页面内存；刷新或关闭页面后需要重新输入。"
+              >
+                <Input.Password
+                  placeholder="ql3c_…"
+                  autoComplete="off"
+                  autoFocus
+                />
+              </FormItem>
+            ) : (
+              <>
+                <FormItem
+                  name="username"
+                  label={intl.get('用户名')}
+                  hasFeedback
+                >
+                  <Input
+                    placeholder={`${intl.get('用户名')}${
+                      isDemoEnv ? ': admin' : ''
+                    }`}
+                    autoFocus
+                  />
+                </FormItem>
+                <FormItem name="password" label={intl.get('密码')} hasFeedback>
+                  <Input
+                    type="password"
+                    placeholder={`${intl.get('密码')}${
+                      isDemoEnv ? ': 123' : ''
+                    }`}
+                  />
+                </FormItem>
+              </>
+            )}
             <Row>
               {waitTime ? (
                 <Button type="primary" style={{ width: '100%' }} disabled>

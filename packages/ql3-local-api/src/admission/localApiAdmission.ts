@@ -38,6 +38,7 @@ import type {
   LocalApiSecretPutRoute,
 } from '../secret/secretRoutes';
 import type { PanelCronListRoute } from '../panel-compatibility/panelCronListRoute';
+import type { PanelBootstrapRoute } from '../panel-compatibility/panelBootstrapRoute';
 import type { LocalApiResponse } from '../transport/contract';
 
 export type LocalApiAdmissionOperation =
@@ -133,6 +134,10 @@ export type LocalApiAdmissionOperation =
       page: number;
       size: number;
       maximumRows: number;
+    }>
+  | Readonly<{
+      operationId: 'panel.user.get' | 'panel.system.config.get';
+      projectId: 'default';
     }>;
 
 export interface LocalApiAdmissionRequest {
@@ -177,6 +182,7 @@ export interface LocalApiAdmissionOptions {
   readonly secretListRoute: LocalApiSecretListRoute;
   readonly secretPutRoute: LocalApiSecretPutRoute;
   readonly panelCronListRoute: PanelCronListRoute;
+  readonly panelBootstrapRoute: PanelBootstrapRoute;
   readonly now?: () => number;
   readonly randomUuid?: () => string;
 }
@@ -263,6 +269,7 @@ export function createLocalApiAdmission(
     typeof options.secretListRoute?.handle !== 'function' ||
     typeof options.secretPutRoute?.handle !== 'function' ||
     typeof options.panelCronListRoute?.handle !== 'function' ||
+    typeof options.panelBootstrapRoute?.handle !== 'function' ||
     (options.now !== undefined && typeof options.now !== 'function') ||
     (options.randomUuid !== undefined &&
       typeof options.randomUuid !== 'function')
@@ -404,7 +411,9 @@ export function createLocalApiAdmission(
                 request.operation.operationId === 'task.get' ||
                 request.operation.operationId === 'trigger.list' ||
                 request.operation.operationId === 'trigger.get' ||
-                request.operation.operationId === 'panel.cron.list'
+                request.operation.operationId === 'panel.cron.list' ||
+                request.operation.operationId === 'panel.user.get' ||
+                request.operation.operationId === 'panel.system.config.get'
               ? 'task.read'
               : request.operation.operationId === 'secret.list'
               ? 'secret.manage'
@@ -571,6 +580,13 @@ export function createLocalApiAdmission(
                 page: request.operation.page,
                 size: request.operation.size,
                 maximumRows: request.operation.maximumRows,
+              });
+            case 'panel.user.get':
+            case 'panel.system.config.get':
+              if (body !== null) return response(400, 'invalid_request_body');
+              return options.panelBootstrapRoute.handle({
+                operationId: request.operation.operationId,
+                principal: authenticated.principal,
               });
             case 'task.put':
             case 'task.authoring':

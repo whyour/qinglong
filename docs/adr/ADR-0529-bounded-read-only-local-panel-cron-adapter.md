@@ -1,6 +1,6 @@
 # ADR-0529：有界只读 Local 旧面板 Cron Adapter
 
-- 状态：Proposed（源码候选，尚未进入双架构阶段实物）
+- 状态：Accepted（D-427 双架构阶段实物已交付）
 - 日期：2026-09-02
 - 关联 RFC：QL-RFC-0001 D-427、D-423、D-424、D-426c3
 
@@ -25,7 +25,7 @@ QingLong 2.x 面板以 `/api/crons`、数值型 Cron 行和 `{code,data}` 包络
 
 - 接受旧页面初始读取所需的 `page`、`size`、空 `searchValue`、空 `filters={}` 和 Axios cache-buster `t`。
 - 非空搜索、排序、View query 或其他字段暂时返回 `400 invalid_panel_cron_list_query`，不能静默忽略并给出错误结果。
-- `size` 最大 64；`page * size` 在 Edge 最大 64、Standalone 最大 256。Adapter 用同一上限向 Trigger source 做一次有界 keyset 前缀读取，再截取所需页。
+- `size` 最大 64；页起点 `(page - 1) * size` 必须小于 Edge 64、Standalone 256 行预算。Adapter 以 `min(page * size, maximumRows)` 向 Trigger source 做一次有界 keyset 前缀读取，再截取所需页，因此最后一个不足整页的窗口仍可到达，但不能越过 Profile 上限。
 - `total` 是当前已观察前缀加一个 `truncated` 继续标记；它足以让旧分页逐页推进，但不执行无界 COUNT 或全表扫描。
 
 ### 领域映射
@@ -48,7 +48,7 @@ QingLong 2.x 面板以 `/api/crons`、数值型 Cron 行和 `{code,data}` 包络
 
 ## 验证与后续门禁
 
-源码候选必须通过：
+本切片通过：
 
 1. Adapter 单测：分页、禁用合成、pinned identity、未知 schema、预算和 storage failure；
 2. HTTP 契约：编码的 `{}` 查询、正式 operation 解析、拒绝非空搜索且不进入 Admission；
@@ -56,4 +56,6 @@ QingLong 2.x 面板以 `/api/crons`、数值型 Cron 行和 `{code,data}` 包络
 4. 真实 SQLite 集成：正式 credential、Policy、Task/Trigger revision 和 durable audit，且响应不出现真实 argv；
 5. Local API 全包、18-package build/test、dependency/import、Console/Headless image 与双架构 artifact 门。
 
-后续按 `health/system/user capability → Run/Log read → 显式写操作` 推进。只有改造版面板取消 Local Storage credential、按 capability 隐藏未实现页面，并完成真实浏览器 journey 后，才能声明“现有面板页面可复用”；完整 2.x 零改兼容不作为 3.0 目标。
+提交 `83966a128705f6ef0ae54367c8f656e3d578e9c6` 的显式 Local headless [run 33576693917](https://github.com/whyour/qinglong/actions/runs/33576693917) 与 Local Console [run 33578754251](https://github.com/whyour/qinglong/actions/runs/33578754251) 均成功。headless amd64/arm64/milestone artifact 为 `9827434236`/`9827259756`/`9827553099`，Console 为 `9828792297`/`9828714089`/`9828941802`；均绑定同一 source revision，保留至 2026-10-02。headless 继续不携带 Local API/旧面板；Console artifact 携带本 Adapter，但仍只证明后端兼容切片，不包含改造后的 2.x 静态面板。
+
+后续按 `health/system/user capability → Run/Log read → 显式写操作` 推进。ADR-0530 已完成 capability/bootstrap 与旧面板源码的内存凭据、菜单降级、只读 Crontab 适配；仍须完成同源静态资源装配和真实浏览器 journey，才能把该页面作为可下载阶段产物交付。完整 2.x 零改兼容不作为 3.0 目标。

@@ -18,6 +18,7 @@ import {
   loadLocalConsoleAssets,
   type LocalConsoleAsset,
 } from '../console/localConsoleAssets';
+import { panelPublicResponse } from '../panel-compatibility/panelBootstrapRoute';
 import type { LocalApiResponse } from './contract';
 
 const MAX_HEADER_BYTES = 8 * 1_024;
@@ -65,8 +66,11 @@ type LocalApiRouteResolution =
         | 'invalid_task_list_query'
         | 'invalid_trigger_list_query'
         | 'invalid_secret_list_query'
-        | 'invalid_panel_cron_list_query';
+        | 'invalid_panel_cron_list_query'
+        | 'invalid_panel_bootstrap_query';
     }>;
+
+type PanelPublicOperation = 'capabilities' | 'health' | 'system';
 
 export interface LocalApiHttpSurfaceOptions {
   readonly profile: LocalApplicationProfile;
@@ -589,7 +593,7 @@ function parsePanelCronListRoute(
       size < 1 ||
       size > 64 ||
       String(size) !== rawSize ||
-      page * size > maximumRows ||
+      (page - 1) * size >= maximumRows ||
       (timestamp !== null && !/^\d{1,20}$/u.test(timestamp))
     ) {
       throw new TypeError();
@@ -604,6 +608,53 @@ function parsePanelCronListRoute(
   } catch {
     return Object.freeze({ errorCode: 'invalid_panel_cron_list_query' });
   }
+}
+
+function panelExactGetPath(
+  rawUrl: string,
+  expectedPath: string,
+): 'invalid' | 'match' | 'unrelated' {
+  const separator = rawUrl.indexOf('?');
+  const path = separator < 0 ? rawUrl : rawUrl.slice(0, separator);
+  if (path !== expectedPath) return 'unrelated';
+  if (separator !== rawUrl.lastIndexOf('?')) return 'invalid';
+  if (separator < 0) return 'match';
+  try {
+    const query = new URLSearchParams(rawUrl.slice(separator + 1));
+    if (
+      [...query.keys()].some(
+        (key) => key !== 't' || query.getAll(key).length !== 1,
+      )
+    ) {
+      return 'invalid';
+    }
+    const timestamp = query.get('t');
+    return timestamp !== null && /^\d{1,20}$/u.test(timestamp)
+      ? 'match'
+      : 'invalid';
+  } catch {
+    return 'invalid';
+  }
+}
+
+function panelPublicOperation(
+  request: IncomingMessage,
+): PanelPublicOperation | 'invalid' | null {
+  if (request.method !== 'GET' || typeof request.url !== 'string') return null;
+  const paths = Object.freeze([
+    Object.freeze({ path: '/api/health', operation: 'health' as const }),
+    Object.freeze({ path: '/api/system', operation: 'system' as const }),
+    Object.freeze({
+      path: '/api/v3/capabilities',
+      operation: 'capabilities' as const,
+    }),
+  ]);
+  for (const candidate of paths) {
+    const result = panelExactGetPath(request.url, candidate.path);
+    if (result === 'invalid') return 'invalid';
+    if (result === 'match') return candidate.operation;
+  }
+  return null;
 }
 
 function route(
@@ -622,6 +673,24 @@ function route(
   if (request.method === 'GET') {
     const panelCronList = parsePanelCronListRoute(rawUrl, profile);
     if (panelCronList) return panelCronList;
+    const panelUser = panelExactGetPath(rawUrl, '/api/user');
+    if (panelUser !== 'unrelated') {
+      return panelUser === 'match'
+        ? Object.freeze({
+            operationId: 'panel.user.get',
+            projectId: 'default',
+          })
+        : Object.freeze({ errorCode: 'invalid_panel_bootstrap_query' });
+    }
+    const panelSystemConfig = panelExactGetPath(rawUrl, '/api/system/config');
+    if (panelSystemConfig !== 'unrelated') {
+      return panelSystemConfig === 'match'
+        ? Object.freeze({
+            operationId: 'panel.system.config.get',
+            projectId: 'default',
+          })
+        : Object.freeze({ errorCode: 'invalid_panel_bootstrap_query' });
+    }
   }
   if (rawUrl.includes('%')) return null;
   const separator = rawUrl.indexOf('?');
@@ -938,6 +1007,22 @@ export async function startLocalApiHttpSurface(
           return;
         }
         sendConsoleFavicon(response, requestId);
+        return;
+      }
+      const publicOperation = panelPublicOperation(request);
+      if (publicOperation) {
+        if (hasRequestBody(request)) {
+          send(response, requestId, errorResponse(400, 'invalid_request_body'));
+          request.resume();
+          return;
+        }
+        send(
+          response,
+          requestId,
+          publicOperation === 'invalid'
+            ? errorResponse(400, 'invalid_panel_bootstrap_query')
+            : panelPublicResponse(publicOperation, options.profile),
+        );
         return;
       }
       const resolvedRoute = route(request, options.profile);

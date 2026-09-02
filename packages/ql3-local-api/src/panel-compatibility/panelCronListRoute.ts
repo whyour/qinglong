@@ -49,7 +49,7 @@ function validRequest(request: Readonly<PanelCronListRequest>): boolean {
     Number.isSafeInteger(request.maximumRows) &&
     request.maximumRows >= 1 &&
     request.maximumRows <= 256 &&
-    request.page * request.size <= request.maximumRows
+    (request.page - 1) * request.size < request.maximumRows
   );
 }
 
@@ -72,7 +72,10 @@ export function createPanelCronListRoute(
         return response(400, { code: 400, message: '参数错误' });
       }
       try {
-        const scanLimit = request.page * request.size;
+        const scanLimit = Math.min(
+          request.page * request.size,
+          request.maximumRows,
+        );
         const page = await sources.triggers.listTriggers({
           projectId: request.projectId,
           limit: scanLimit,
@@ -149,7 +152,10 @@ export function createPanelCronListRoute(
           code: 200,
           data: Object.freeze({
             data: Object.freeze(data),
-            total: page.triggers.length + (page.truncated ? 1 : 0),
+            total: Math.min(
+              request.maximumRows,
+              page.triggers.length + (page.truncated ? 1 : 0),
+            ),
           }),
         });
       } catch {

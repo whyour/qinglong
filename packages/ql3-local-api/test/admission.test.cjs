@@ -314,6 +314,17 @@ function fixture(overrides = {}) {
         };
       },
     },
+    panelBootstrapRoute: {
+      async handle(value) {
+        events.push(
+          `panel-bootstrap:${value.operationId}:${value.principal.subject.id}`,
+        );
+        return {
+          statusCode: 200,
+          body: { code: 200, data: { username: value.principal.subject.id } },
+        };
+      },
+    },
     now: () => 10_000,
     randomUuid: () => '019f70c0-0000-4000-8000-000000000002',
     ...overrides,
@@ -546,6 +557,27 @@ test('uses task.read and the exact panel Cron audit identity for the compatibili
     'confirm',
     'panel-crons:default:1:20:64',
   ]);
+});
+
+test('uses the same authenticated task.read chain for the panel bootstrap identity', async () => {
+  for (const operationId of ['panel.user.get', 'panel.system.config.get']) {
+    const { admission, events } = fixture();
+    const result = await execute(
+      admission,
+      request({
+        operation: Object.freeze({ operationId, projectId: 'default' }),
+      }),
+    );
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body.data.username, 'usr_local');
+    assert.deepEqual(events, [
+      'authenticate',
+      'authorize:task.read:default',
+      `audit:allowed:${operationId}`,
+      'confirm',
+      `panel-bootstrap:${operationId}:usr_local`,
+    ]);
+  }
 });
 
 test('authorizes and audits run.stop before exposing the cancellation body handler', async () => {

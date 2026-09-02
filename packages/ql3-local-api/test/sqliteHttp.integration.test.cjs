@@ -462,6 +462,34 @@ test('serves an authenticated Run through one real SQLite authority and durable 
   });
   t.after(() => active.stopAndDrain());
 
+  const health = await request(
+    port,
+    'Bearer ignored-public-credential',
+    '/api/health?t=100',
+  );
+  assert.equal(health.statusCode, 200);
+  assert.equal(health.body.data.status, 'ok');
+  const capabilities = await request(
+    port,
+    'Bearer ignored-public-credential',
+    '/api/v3/capabilities',
+  );
+  assert.equal(capabilities.statusCode, 200);
+  assert.equal(capabilities.body.capabilities.deployment.profile, 'edge');
+  assert.equal(capabilities.body.capabilities.panel.legacyMutations, false);
+  const panelUser = await request(port, `Bearer ${TOKEN}`, '/api/user?t=101');
+  assert.equal(panelUser.statusCode, 200);
+  assert.equal(panelUser.body.data.username, 'local-api-user');
+  assert.equal(panelUser.body.data.ql3.credentialPersistence, 'memory_only');
+  const panelConfig = await request(
+    port,
+    `Bearer ${TOKEN}`,
+    '/api/system/config?t=102',
+  );
+  assert.equal(panelConfig.statusCode, 200);
+  assert.equal(panelConfig.body.data.info.panelTitle, 'QingLong 3.0');
+  assert.equal(panelConfig.body.data.ql3.limits.cronRows, 64);
+
   const accepted = await request(port, `Bearer ${TOKEN}`);
   assert.equal(accepted.statusCode, 200);
   assert.equal(accepted.body.run.id, RUN_ID);
@@ -1132,6 +1160,7 @@ test('serves an authenticated Run through one real SQLite authority and durable 
              'run.get', 'run.list', 'run.events.list', 'run.steps.list',
              'run.cancel', 'task.authoring.read', 'task.create', 'task.get',
              'task.list', 'task.start', 'task.update', 'run.log.read',
+             'panel.system.config.get', 'panel.user.get',
              'trigger.create', 'trigger.get', 'trigger.list', 'trigger.update',
              'secret.create', 'secret.list'
            )
@@ -1140,6 +1169,8 @@ test('serves an authenticated Run through one real SQLite authority and durable 
         .all()
         .map(({ operation_id, outcome }) => `${operation_id}:${outcome}`),
       [
+        'panel.system.config.get:allowed',
+        'panel.user.get:allowed',
         'run.cancel:allowed',
         'run.cancel:allowed',
         'run.events.list:allowed',
