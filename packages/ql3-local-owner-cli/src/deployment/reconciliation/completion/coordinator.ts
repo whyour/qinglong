@@ -86,6 +86,7 @@ interface AutomationProof {
 interface SecretConfigProof {
   readonly intent: Readonly<LocalReconciliationSecretConfigApplyIntent>;
   readonly receipt: Readonly<LocalReconciliationSecretConfigApplyReceipt>;
+  readonly preparedHeadDigest: string;
   readonly paths: ReturnType<typeof localReconciliationSecretConfigApplyPaths>;
   readonly storageState: 'applied' | 'completed';
 }
@@ -107,6 +108,7 @@ export interface LocalReconciliationCompletionDependencies
 async function runHistoryProof(
   command: Readonly<LocalReconciliationCompleteCommand>,
   terminal: Readonly<LocalReconciliationApplicationTerminal>,
+  secretConfig: Readonly<SecretConfigProof> | null,
   uid: number,
   dependencies: LocalReconciliationCompletionDependencies,
 ): Promise<Readonly<RunHistoryProof> | null> {
@@ -153,7 +155,8 @@ async function runHistoryProof(
       command.request.runHistory.expectedPreservationDigest ||
     history.receipt.applicationPlanDigest !==
       terminal.plan.applicationPlanDigest ||
-    history.receipt.sourceHeadDigest !== command.request.expectedHeadDigest
+    history.receipt.sourceHeadDigest !==
+      (secretConfig?.preparedHeadDigest ?? command.request.expectedHeadDigest)
   ) {
     fail('run history preservation evidence is detached');
   }
@@ -571,6 +574,7 @@ async function secretConfigProof(
     selected,
     uid,
   );
+  const targetSnapshotSha256 = decision.context.planHeader.targetSnapshotSha256;
   if (
     intent.command.options.deploymentRoot !== command.options.deploymentRoot ||
     intent.command.options.applicationRoot !==
@@ -589,8 +593,9 @@ async function secretConfigProof(
     receipt.decisionId !== binding.decisionId ||
     receipt.applyDigest !== binding.expectedApplyDigest ||
     receipt.preparationDigest !== intent.preparationDigest ||
-    (automation !== null &&
-      intent.backup.sha256 !== automation.receipt.targetAfter.sha256) ||
+    (automation === null
+      ? targetSnapshotSha256 !== null
+      : targetSnapshotSha256 !== automation.receipt.targetAfter.sha256) ||
     fs.existsSync(selected.rollbackReceipt)
   ) {
     fail('secret config apply evidence is detached');
@@ -623,6 +628,7 @@ async function secretConfigProof(
   return Object.freeze({
     intent,
     receipt,
+    preparedHeadDigest: decision.context.planHeader.preparedHeadDigest,
     paths: selected,
     storageState,
   });
@@ -820,6 +826,7 @@ export async function completeLocalReconciliation(
   const runHistory = await runHistoryProof(
     command,
     terminal,
+    secretConfig,
     uid,
     dependencies,
   );
@@ -1015,6 +1022,7 @@ export async function verifyLocalReconciliationCompletion(
   const runHistory = await runHistoryProof(
     syntheticCompleteCommand,
     terminal,
+    secretConfig,
     uid,
     dependencies,
   );

@@ -4402,6 +4402,66 @@ test('Secret/Config plan follows applied Automation and preserved Run History on
   );
   assert.equal(applied.state, 'reconciliation_secret_config_applied');
   assert.equal(applied.activeBindingCount, 1);
+
+  const completionRoot = path.join(
+    path.dirname(state.captureRoot),
+    'cross-domain-completion',
+  );
+  fs.mkdirSync(completionRoot, { mode: 0o700 });
+  const completionCommand = {
+    schemaVersion: 3,
+    operation: 'local.deployment.reconciliation.complete',
+    options: {
+      deploymentRoot: state.deploymentRoot,
+      applicationRoot: state.applicationRoot,
+      completionRoot,
+      automation: {
+        automationRoot: state.automationRoot,
+        automationDecisionRoot: state.automationDecisionRoot,
+        automationApplyRoot: state.automationApplyRoot,
+        targetDatabasePath: state.targetDatabasePath,
+      },
+      secretConfig: {
+        secretConfigRoot,
+        secretConfigDecisionRoot,
+        secretConfigApplyRoot,
+        targetDatabasePath: state.targetDatabasePath,
+      },
+      runHistory: {
+        runHistoryRoot,
+        decisionFilePath: state.reviewFile.filePath,
+      },
+      allowRootService: rootAcknowledgement(),
+    },
+    request: {
+      completionId: '00000000-0000-4000-8000-000000000434',
+      applicationId: state.application.applicationId,
+      expectedApplicationPlanDigest: state.application.applicationPlanDigest,
+      expectedHeadDigest: applied.instanceHeadDigest,
+      automation: {
+        automationId: state.automationCommand.request.automationId,
+        decisionId: state.decisionId,
+        expectedApplyDigest: state.applied.applyDigest,
+      },
+      secretConfig: {
+        secretConfigId,
+        decisionId: secretConfigDecisionId,
+        expectedApplyDigest: applied.applyDigest,
+      },
+      runHistory: {
+        preservationId: preservationCommand.request.preservationId,
+        expectedPreservationDigest: preserved.preservationDigest,
+      },
+      completedAtMs: appliedAtMs + 1,
+    },
+  };
+  const completed = await completeLocalReconciliation(completionCommand);
+  assert.equal(completed.state, 'reconciliation_completed');
+  assert.equal(completed.adapterCount, 3);
+  assert.equal(
+    (await completeLocalReconciliation(completionCommand)).status,
+    'existing',
+  );
 });
 
 test('Secret/Config decision reauthenticates the same reviewer, seals exact candidates and verifies content-free', async (t) => {
