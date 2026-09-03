@@ -716,6 +716,23 @@ jobs:
             --security-opt no-new-privileges \
             --entrypoint /usr/bin/docker \
             "${OPERATOR_IMAGE}" --version
+      - name: Verify live sparse output and byte quotas in the installed runtime
+        env:
+          IMAGE: qinglong3-local-application:ci-${{ matrix.image_arch }}
+          CONSOLE_IMAGE: qinglong3-local-console:ci-${{ matrix.image_arch }}
+        run: |
+          for capture_image in "${IMAGE}" "${CONSOLE_IMAGE}"; do
+            docker run --rm --read-only \
+              --network none \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
+              --memory=128m --memory-swap=128m --cpus=0.5 --pids-limit=64 \
+              --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
+              --volume "${GITHUB_WORKSPACE}/packages/ql3-local-process/test:/opt/qinglong/node_modules/@qinglong/local-process/test:ro" \
+              --entrypoint node "${capture_image}" \
+              --test --test-name-pattern='publishes sparse|keeps byte-exact|rejects unsupported' \
+              /opt/qinglong/node_modules/@qinglong/local-process/test/launcher.test.cjs
+          done
       - name: Build the short-lived fresh deployment authority
         working-directory: packages/ql3-local-owner-cli
         run: node ../../scripts/ql3-build-package-closure.cjs

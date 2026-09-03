@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { quotaEnvironment } = require('./helpers/quotaEnvironment.cjs');
 const { test } = require('node:test');
 const { CompletionReceiptFileStore } = require('../dist');
 const { LocalProcessLaunchError, LocalProcessLauncher } = require('../dist');
@@ -212,6 +213,7 @@ test('hard-caps durable output and publishes an immutable truncation fact', asyn
     attemptId: ATTEMPT_ID,
     callbackSequence: 1,
     callbackToken: TOKEN,
+    environment: quotaEnvironment(directory),
     command: {
       kind: 'argv',
       file: process.execPath,
@@ -260,4 +262,163 @@ test('hard-caps durable output and publishes an immutable truncation fact', asyn
     fs.readdirSync(outputDirectory).filter((name) => name.endsWith('.fifo')),
     [],
   );
+});
+
+for (const kind of ['argv', 'shell']) {
+  test(`publishes sparse binary ${kind} output before the process exits`, async (t) => {
+    const { directory, receiptRoot } = fixture(t);
+    const logArtifactId = `local-${'c'.repeat(30)}`;
+    const outputFilePath = path.join(directory, `${logArtifactId}.log`);
+    const release = path.join(directory, 'release');
+    const marker = Buffer.from([0x00, 0xff, 0x71, 0x6c, 0x33]);
+    const script = path.join(directory, 'producer.cjs');
+    fs.writeFileSync(script, `
+      const fs = require('node:fs');
+      process.stdout.write(Buffer.from([0x00, 0xff, 0x71, 0x6c, 0x33]));
+      const deadline = setTimeout(() => process.exit(92), 15000);
+      const timer = setInterval(() => {
+        if (!fs.existsSync(process.argv[2])) return;
+        clearInterval(timer);
+        clearTimeout(deadline);
+        process.stderr.write('tail', () => process.exit(7));
+      }, 10);
+    `, { mode: 0o600 });
+    const launcher = new LocalProcessLauncher(
+      { register: async () => undefined },
+      { receiptRoot, identityProvider: identityProvider() },
+    );
+    const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+    const handle = await launcher.start({
+      runId: RUN_ID, attemptId: ATTEMPT_ID,
+      callbackSequence: 1, callbackToken: TOKEN,
+      environment: quotaEnvironment(directory),
+      command: kind === 'argv'
+        ? { kind, file: process.execPath, args: [script, release] }
+        : { kind, command: [process.execPath, script, release].map(quote).join(' ') },
+      output: { filePath: outputFilePath, maximumBytes: 65536, logArtifactId },
+    });
+    try {
+      const deadline = Date.now() + 5000;
+      while (fs.statSync(outputFilePath).size < marker.length && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert.deepEqual(fs.readFileSync(outputFilePath), marker,
+        'sparse bytes must be readable while the producer is waiting for release');
+      assert.equal(await new CompletionReceiptFileStore(receiptRoot).read(ATTEMPT_ID), undefined);
+      fs.writeFileSync(release, '', { mode: 0o600 });
+      assert.deepEqual(await handle.completion, { exitCode: 7, signal: null });
+      assert.deepEqual(fs.readFileSync(outputFilePath), Buffer.concat([marker, Buffer.from('tail')]));
+      const fact = JSON.parse(fs.readFileSync(path.join(directory, `.${logArtifactId}.log.truncated.json`)));
+      assert.equal(fact.quotaReached, false);
+      assert.equal((await waitForReceipt(new CompletionReceiptFileStore(receiptRoot))).exitCode, 7);
+    } finally {
+      fs.writeFileSync(release, '', { mode: 0o600 });
+      await handle.completion;
+    }
+  });
+}
+
+for (const [label, initialBytes, producedBytes] of [
+  ['empty output', 0, 0],
+  ['exact quota', 0, 65536],
+  ['one-byte overflow', 0, 65537],
+  ['partial final block', 65513, 31],
+  ['exhausted quota', 65536, 23],
+  ['exhausted quota without overflow', 65536, 0],
+]) {
+  test(`keeps byte-exact capture and truncation for ${label}`, async (t) => {
+    const { directory, receiptRoot } = fixture(t);
+    const logArtifactId = `local-${'d'.repeat(30)}`;
+    const filePath = path.join(directory, `${logArtifactId}.log`);
+    const initial = Buffer.alloc(initialBytes, 0x5a);
+    fs.writeFileSync(filePath, initial, { mode: 0o600 });
+    const produced = Buffer.from(Array.from({ length: producedBytes }, (_, i) => i % 256));
+    const launcher = new LocalProcessLauncher(
+      { register: async () => undefined },
+      { receiptRoot, identityProvider: identityProvider() },
+    );
+    const handle = await launcher.start({
+      runId: RUN_ID, attemptId: ATTEMPT_ID,
+      callbackSequence: 1, callbackToken: TOKEN,
+      environment: quotaEnvironment(directory),
+      command: { kind: 'argv', file: process.execPath, args: ['-e', `
+        const data = Buffer.from(Array.from({length: ${producedBytes}}, (_, i) => i % 256));
+        let offset = 0;
+        function write() {
+          if (offset === data.length) return process.exit(9);
+          const end = Math.min(data.length, offset + 997);
+          const chunk = data.subarray(offset, end);
+          offset = end;
+          process.stdout.write(chunk, () => setImmediate(write));
+        }
+        write();
+      `] },
+      output: { filePath, maximumBytes: 65536, logArtifactId },
+    });
+    assert.deepEqual(await handle.completion, { exitCode: 9, signal: null });
+    assert.deepEqual(fs.readFileSync(filePath), Buffer.concat([initial, produced]).subarray(0, 65536));
+    const fact = JSON.parse(fs.readFileSync(path.join(directory, `.${logArtifactId}.log.truncated.json`)));
+    assert.equal(fact.quotaReached, initialBytes + producedBytes > 65536);
+    assert.equal((await waitForReceipt(new CompletionReceiptFileStore(receiptRoot))).exitCode, 9);
+  });
+}
+
+test('rejects unsupported capture utilities before running user code', async (t) => {
+  const { directory, receiptRoot } = fixture(t);
+  const bin = path.join(directory, 'unsupported-bin');
+  fs.mkdirSync(bin, { mode: 0o700 });
+  for (const name of ['busybox', 'head', 'stdbuf']) {
+    fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nexit 1\n', { mode: 0o700 });
+  }
+  const marker = path.join(directory, 'must-not-run');
+  const logArtifactId = `local-${'e'.repeat(30)}`;
+  const filePath = path.join(directory, `${logArtifactId}.log`);
+  const launcher = new LocalProcessLauncher(
+    { register: async () => undefined },
+    { receiptRoot, identityProvider: identityProvider() },
+  );
+  const handle = await launcher.start({
+    runId: RUN_ID, attemptId: ATTEMPT_ID,
+    callbackSequence: 1, callbackToken: TOKEN,
+    environment: { PATH: `${bin}:/usr/bin:/bin` },
+    command: { kind: 'argv', file: '/usr/bin/touch', args: [marker] },
+    output: { filePath, maximumBytes: 65536, logArtifactId },
+  });
+  assert.deepEqual(await handle.completion, { exitCode: 125, signal: null });
+  assert.equal(fs.existsSync(marker), false);
+  assert.equal(fs.statSync(filePath).size, 0);
+  assert.equal(await new CompletionReceiptFileStore(receiptRoot).read(ATTEMPT_ID), undefined);
+  assert.equal(fs.readdirSync(directory).some((name) => name.endsWith('.fifo')), false);
+});
+
+test('capture failure drains output without forging a truncation fact or changing user exit', async (t) => {
+  const { directory, receiptRoot } = fixture(t);
+  const bin = path.join(directory, 'failing-bin');
+  fs.mkdirSync(bin, { mode: 0o700 });
+  fs.writeFileSync(path.join(bin, 'busybox'), `#!/bin/sh
+case " $* " in
+  *' count=0 '*) exit 0 ;;
+esac
+printf 'capture failure must not bypass the log quota' >&2
+exit 1
+`, { mode: 0o700 });
+  const logArtifactId = `local-${'f'.repeat(30)}`;
+  const filePath = path.join(directory, `${logArtifactId}.log`);
+  const launcher = new LocalProcessLauncher(
+    { register: async () => undefined },
+    { receiptRoot, identityProvider: identityProvider() },
+  );
+  const handle = await launcher.start({
+    runId: RUN_ID, attemptId: ATTEMPT_ID,
+    callbackSequence: 1, callbackToken: TOKEN,
+    environment: { PATH: `${bin}:/usr/bin:/bin` },
+    command: { kind: 'argv', file: process.execPath, args: [
+      '-e', 'process.stdout.write(Buffer.alloc(256 * 1024), () => process.exit(9));',
+    ] },
+    output: { filePath, maximumBytes: 65536, logArtifactId },
+  });
+  assert.deepEqual(await handle.completion, { exitCode: 9, signal: null });
+  assert.equal(fs.statSync(filePath).size, 0);
+  assert.equal(fs.existsSync(path.join(directory, `.${logArtifactId}.log.truncated.json`)), false);
+  assert.equal((await waitForReceipt(new CompletionReceiptFileStore(receiptRoot))).exitCode, 9);
 });

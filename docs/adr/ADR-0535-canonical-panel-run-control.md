@@ -1,6 +1,6 @@
 # ADR-0535：现有面板的规范 Task/Run 执行管理
 
-- 状态：Accepted（D-433 原始源码主 CI 已通过；客户端组合门与实物待验证）
+- 状态：Accepted（D-433 原始源码主 CI 已通过；增强组合门发现运行中日志缺陷，修复待 Linux 验证）
 - 日期：2026-09-04
 - 关联：QL-RFC-0001 D-433、ADR-0530、ADR-0531、ADR-0534
 
@@ -29,7 +29,7 @@ Node 20 legacy migration toolchain 的 production panel build 通过；裁剪包
 
 本切片不是完整旧面板迁移：任务/定时创建编辑、脚本、订阅、环境变量、依赖与多用户远程 Web 会话仍未闭合。Local 仍仅 loopback/SSH tunnel；不可将本地 mock 或 unit tests 当成实际 Owner 写入、公开发布或双架构镜像证据。D-431 实物不含本切片，交付必须绑定自己的 source revision。
 
-## 真实客户端组合验收（待 Linux 执行）
+## 真实客户端组合验收
 
 已有 `ql3-local-api-cancellation-live-contract` 不再手写面板启动与取消请求，而是在宿主机将实际 `src/utils/qinglong3.ts` 和 `src/components/qinglong3/runControl.ts` 编译为临时测试模块，在同一个隔离 Linux 网络命名空间中使用真实 fetch 连接生产 Local API。记录两个源文件的 SHA-256；TypeScript、VM 适配器与生成模块均不进入产品制品，不新增 workspace package 或生产依赖。
 
@@ -56,3 +56,24 @@ Node 20 legacy migration toolchain 的 production panel build 通过；裁剪包
 两架构最终 Application layer 的原生 `console.js` 均为 82,521 bytes，SHA-256 `dfcba011a165743052fe290e4f4c6b6b90074fde8dec20392252100332a6eaed`，与该 source revision 逐字节相同，包含会话隔离修复；Crontab chunk 为 76,500 bytes，SHA-256 `16f7f79622947024b84c7bd43c74b81841a2372d90a09864e473fda863794446`，核对含 `task_run_v1`、版本确认、规范 cancellation 与 receipt 校验代码。240 文件 panel manifest 的两架构摘要同为 `923ea32ae7c08624f495e7e90aa9b37a66edfc69bbda3d971001d06cb439e842`。
 
 这些证据只排除了“包里仍是旧页面”的问题，没有补齐浏览器端到端、客户端 Linux 组合门或成功 milestone；失败流水线的中间包不提供给用户部署，不替代 D-431 已交付阶段包。
+
+## 运行中稀疏日志缺陷与修复
+
+提交 `ed4ba9b817b859ca1afe8b0552116b86d90f92c7` 的主 CI [33805484737](https://github.com/whyour/qinglong/actions/runs/33805484737) 已失败。amd64 job `100816011201` 与 arm64 job `100816011278` 均在真实客户端 Edge 组合门报告 `panel reads running process log marker did not converge`，尚未进入随后取消与 Standalone 验收；此前已完成的 Console fresh Owner/终态日志检查不能替代运行中日志证明。
+
+生产 `local-process` 启动器的 FIFO 截流器原用 `head -c`；小段输出在进程持续运行时留在工具的 stdio 缓冲区。新增回归让真实子进程写出包含 NUL/0xff、无换行的 5 字节标记，等待测试端确认实际日志文件可读后才释放退出；argv/shell 两条路径在修复前均失败（文件仍为 0 字节），不会靠增大输出或先结束进程掩盖问题。
+
+修复仅替换已打包的 3.0 启动器采集原语并更新其审核摘要：
+
+- Alpine/BusyBox：显式调用 `busybox dd bs=16384 count=remaining iflag=count_bytes status=none`，每次短读直接写出，按真实字节扣减余额。
+- Debian/GNU：使用 `stdbuf -o0 head -c remaining`，保留 GNU head 的精确读取边界，关闭其输出缓冲。
+- 启动用户代码前验证所需工具能力；不支持则退出 125，不回退到缓冲复制或逐字节系统调用。工具错误不得通过继承的 stderr 绕过日志限额；复制失败仍排空用户输出，但不发布虚假的完整截断事实，读取侧保持 unknown。
+- 不增加 package、OS 安装项、每任务 Node sidecar、监听器、timer 或持久状态；两种工具组合来自现有 Linux 基础环境。`shell/ql3-launcher.sh` 属遗留路径，本次不修改。
+
+曾评估统一使用 GNU/BusyBox `dd iflag=count_bytes`，但 GNU dd 的短读计数使原有 64 KiB 精确配额回归只保留 32 KiB，因此该候选已撤回；`fullblock` 又会重新引入等待完整块的问题。不能将两种实现当作等价。
+
+回归还覆盖空输出、恰好上限、超出一个字节、已有日志的非整块剩余额度、余额为零有/无新输出，以及工具不兼容和复制故障。Local 与 Worker 共用启动器，因此 Worker POSIX 测试同步使用真实 GNU 工具验证；macOS 测试只替换工具查找目录并保留既有 fake identity，不声称提供 macOS 生产进程身份支持。
+
+主 CI 的 amd64/arm64 Local image job 增加安装后 headless/Console 镜像的稀疏输出与精确字节测试，保持 128 MiB、0.5 CPU、64 PID、只读、无网络及 noexec tmpfs 条件。该测试读取镜像自身 dist/assets，只把测试代码只读挂入；原实际面板客户端 Linux 组合门及其稳定步骤名不变。修复需由新提交的 Linux CI 和后续成功产物流水线证明，不把本地结果或旧归档算作已交付。
+
+本地最终回归：Local process + Worker 163/163（首次受限环境的 3 项 loopback EPERM 已在获准环境重跑通过）；完整后端 1705 项，1703 pass / 2 条件 skip / 0 fail；镜像/客户端专项 24/24，Worker 编译与类型检查、Local/Operator image audit、18-package boundary audit、YAML 解析与新增步骤 shell 语法检查通过。本机 Docker Engine 仍不可连接，没有本地 Linux/Alpine 成功证据。

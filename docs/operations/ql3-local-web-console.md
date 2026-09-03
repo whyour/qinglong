@@ -29,7 +29,7 @@ D-431 给原生 Task、Trigger、Run 列表增加页脚“下一页／回到首�
 
 D-433 源码候选为旧面板定时行增加“执行管理”：先展示当前 Task revision，再显式确认运行；选择确切 Run 后可以刷新、读该次日志或请求取消。它不恢复旧 Cron 写接口，也不修改定时绑定版本。网络结果不明时只重试同一 mutation，关闭窗口不会撤销已提交请求。此功能需服务端 capability 显式开放，不包含在上表任何旧归档中，见 [ADR-0535](../adr/ADR-0535-canonical-panel-run-control.md)。
 
-执行管理的后续验收已接入实际面板客户端与 Linux Local API 组合门，要求读取真实进程日志、取消响应丢失后的精确重试以及重启后持久状态/日志；当前仍待 Linux 实跑。该门使用隔离数据库夹具，不是浏览器与 Owner 初始化全链路证明。阶段包可用与“原版 2.x 所有页面可直接替换后端”是不同结论，请按上表的 source revision 选择。
+执行管理的后续验收已接入实际面板客户端与 Linux Local API 组合门，要求读取真实进程日志、取消响应丢失后的精确重试以及重启后持久状态/日志。`ed4ba9b` 双架构实跑发现运行中稀疏日志不能及时读到，启动器修复及镜像回归尚待新 Linux CI 验证，不能将该候选视为可交付。该门使用隔离数据库夹具，不是浏览器与 Owner 初始化全链路证明。阶段包可用与“原版 2.x 所有页面可直接替换后端”是不同结论，请按上表的 source revision 选择。
 
 D-426b2c 又补齐了 Console 镜像的 adopted-target 入口证据：切换演练使用 `ql3-local-api --cutover-probe --config <local-api.json>`，同时绑定外层 API 配置、内层 Application 配置与 exact mounts，但该模式不会启动本页使用的 listener、credential、scheduler 或 mutation surface。正常启动仍使用下文不带 `--cutover-probe` 的命令；提交 `229c3cb4e826866a0c7c4d81cb5e52cdc3975eec` 的 [artifact run 33463415938](https://github.com/whyour/qinglong/actions/runs/33463415938) 已交付 exact amd64/arm64 Console Trial Kit 与 milestone，三份下载产物的离线 auditor 均为 `compatible=true`。
 

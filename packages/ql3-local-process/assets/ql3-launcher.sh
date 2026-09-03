@@ -63,6 +63,19 @@ if [ -n "$output_quota_fifo" ]; then
     [ -z "$output_truncation_temporary" ]; then
     exit 125
   fi
+  # Use each supported Linux userspace's byte-exact, streaming copy primitive.
+  # GNU dd counts short reads as blocks even with count_bytes; do not use it.
+  # BusyBox head can read ahead past the quota; do not use it either.
+  if command -v busybox >/dev/null 2>&1 &&
+    busybox dd bs=16384 count=0 iflag=count_bytes status=none </dev/null >/dev/null 2>&1; then
+    output_copy=busybox
+  elif head --version >/dev/null 2>&1 &&
+    stdbuf -o0 head -c 0 </dev/null >/dev/null 2>&1; then
+    output_copy=gnu
+  else
+    # No buffered or per-byte fallback on unsupported systems.
+    exit 125
+  fi
   rm -f "$output_truncation_temporary" 2>/dev/null || exit 125
   if ! mkfifo -m 600 "$output_quota_fifo" 2>/dev/null; then
     exit 125
@@ -83,15 +96,25 @@ if [ -n "$output_quota_fifo" ]; then
   }
 
   (
+    capture_succeeded=true
     if [ "$output_quota_remaining_bytes" -gt 0 ]; then
-      head -c "$output_quota_remaining_bytes"
+      # Diagnostics must not bypass that quota through inherited stderr.
+      if [ "$output_copy" = busybox ]; then
+        busybox dd bs=16384 count="$output_quota_remaining_bytes" iflag=count_bytes status=none 2>/dev/null || capture_succeeded=false
+      else
+        stdbuf -o0 head -c "$output_quota_remaining_bytes" 2>/dev/null || capture_succeeded=false
+      fi
     fi
     overflow_bytes=$(wc -c | tr -d '[:space:]') || overflow_bytes=
-    case "$overflow_bytes" in
-      ''|*[!0-9]*) ;;
-      0) publish_output_truncation false ;;
-      *) publish_output_truncation true ;;
-    esac
+    # A failed copy cannot attest complete capture. Still drain the producer;
+    # leave truncation unknown and retain its own exit/receipt semantics.
+    if [ "$capture_succeeded" = true ]; then
+      case "$overflow_bytes" in
+        ''|*[!0-9]*) ;;
+        0) publish_output_truncation false ;;
+        *) publish_output_truncation true ;;
+      esac
+    fi
   ) < "$output_quota_fifo" &
   drain_pid=$!
 fi

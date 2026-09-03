@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { test } = require('node:test');
+const { test, before, after } = require('node:test');
+const { quotaEnvironment } = require('../../ql3-local-process/test/helpers/quotaEnvironment.cjs');
 const { CompletionReceiptFileStore } = require('@qinglong/local-process');
 const {
   WorkerFileLogArtifactAllocator,
@@ -17,6 +18,16 @@ const {
 const RUN_ID = '019f70e0-0000-7000-8000-000000000101';
 const ATTEMPT_ID = '019f70e0-0000-7000-8000-000000000102';
 const TOKEN = Buffer.alloc(32, 0x5a);
+let utilityRoot;
+let utilityEnvironment = [];
+before(async () => {
+  utilityRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'ql3-worker-utilities-'));
+  utilityEnvironment = Object.entries(quotaEnvironment(utilityRoot))
+    .map(([name, value]) => ({ name, value }));
+});
+after(async () => {
+  if (utilityRoot) await fs.rm(utilityRoot, { recursive: true, force: true });
+});
 
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql3-worker-posix-'));
@@ -78,7 +89,7 @@ function launch(prepared, output, overrides = {}) {
         "process.stdout.write(process.env.QL3_RECEIPT_CALLBACK_TOKEN ? 'leaked' : 'worker-output')",
       ],
     },
-    environment: [],
+    environment: utilityEnvironment,
     logArtifactId: prepared.logArtifactId,
     output,
     completionCallback: { sequence: 1, token: Buffer.from(TOKEN) },

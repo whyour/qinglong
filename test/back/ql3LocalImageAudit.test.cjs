@@ -137,6 +137,22 @@ test('rejects a Local runtime without the verified process launcher asset', () =
   }
 });
 
+test('rejects removal of the installed runtime sparse output gate', () => {
+  const current = fixture();
+  try {
+    const workflow = path.join(current.root, '.github/workflows/ql3-ci.yml');
+    fs.writeFileSync(workflow, fs.readFileSync(workflow, 'utf8').replace(
+      '--test --test-name-pattern=\'publishes sparse|keeps byte-exact|rejects unsupported\'',
+      '--test --test-name-pattern=\'no-tests\'',
+    ));
+    const report = auditLocalImageContract(current.root);
+    assert.equal(report.compatible, false);
+    assert.ok(report.findings.some(({ code }) => code === 'LOCAL_IMAGE_CI_CONTRACT_DRIFT'));
+  } finally {
+    current.close();
+  }
+});
+
 test('rejects a mutable runtime base image', () => {
   const current = fixture();
   try {
