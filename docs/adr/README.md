@@ -535,6 +535,7 @@
 | [ADR-0529](./ADR-0529-bounded-read-only-local-panel-cron-adapter.md)                              | 有界只读 Local 旧面板 Cron Adapter                                                                                                                                                                                                      | Accepted（D-427 双架构阶段实物已交付） |
 | [ADR-0530](./ADR-0530-bounded-local-panel-capability-bootstrap.md)                                | 有界 Local 面板能力发现与启动适配                                                                                                                                                                                                        | Accepted（D-428 exact Console 双架构阶段实物已交付） |
 | [ADR-0531](./ADR-0531-canonical-run-log-bridge-for-legacy-panel.md)                               | 现有面板到规范 Run 日志的有界桥接                                                                                                                                                                                                         | Accepted（D-429 exact Console 双架构阶段实物已交付） |
+| [ADR-0532](./ADR-0532-native-console-log-window-navigation.md) | 原生 Console 日志窗口导航 | Accepted（D-430 源码候选；实物待验证） |
 
 ## 规则
 

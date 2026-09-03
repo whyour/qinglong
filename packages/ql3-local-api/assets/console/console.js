@@ -1527,6 +1527,14 @@
 
   async function selectRun(runId) {
     state.selectedId = runId;
+    const selection = { project: state.project };
+    state.runSelection = selection;
+    const isCurrent = () =>
+      state.runSelection === selection &&
+      state.selectedId === runId &&
+      state.view === 'runs' &&
+      state.project === selection.project &&
+      Boolean(state.token);
     const selected = nodes.ledger.querySelectorAll('.record');
     for (const row of selected) {
       if (row.dataset.identity === runId) {
@@ -1544,24 +1552,44 @@
         api(`/api/v3/projects/${state.project}/runs/${runId}/events?limit=64`),
         api(`/api/v3/projects/${state.project}/runs/${runId}/steps?limit=64`),
       ]);
-      const logView = await readRunLog(runValue.run);
-      renderRunDetail(runValue.run, eventValue, stepValue, logView);
+      if (!isCurrent()) return;
+      if (runValue.run?.id !== runId) throw new Error('Run identity mismatch');
+      const loadPage = (offset) =>
+        readRunLog(runValue.run, offset, selection.project);
+      const logView = await loadPage(0);
+      if (!isCurrent()) return;
+      renderRunDetail(runValue.run, eventValue, stepValue, {
+        ...logView,
+        loadPage,
+        isCurrent,
+      });
     } catch (error) {
-      detailEmpty(describeError(error));
+      if (isCurrent()) detailEmpty(describeError(error));
     }
   }
 
-  async function readRunLog(run) {
+  async function readRunLog(run, offset = 0, project = state.project) {
     const attempt = run?.latestAttempt;
     if (!attempt || typeof attempt.id !== 'string') {
       return Object.freeze({ status: 'not_started' });
     }
+    const context = { attempt, offset };
+    if (!Number.isSafeInteger(offset) || offset < 0) {
+      return Object.freeze({ status: 'unavailable', ...context });
+    }
     try {
       const value = await api(
-        `/api/v3/projects/${state.project}/runs/${run.id}/attempts/${attempt.id}/log?offset=0&length=${LOG_READ_BYTES}`,
+        `/api/v3/projects/${project}/runs/${run.id}/attempts/${attempt.id}/log?offset=${offset}&length=${LOG_READ_BYTES}`,
       );
+      if (
+        value.schema !== 'qinglong/run-attempt-log-read-result@v1' ||
+        value.projectId !== project ||
+        value.runId !== run.id ||
+        value.attemptId !== attempt.id
+      )
+        return Object.freeze({ status: 'unavailable', ...context });
       if (value.status === 'pending') {
-        return Object.freeze({ status: 'pending', attempt });
+        return Object.freeze({ status: 'pending', ...context });
       }
       const content =
         value.status === 'available' && value.encoding === 'base64'
@@ -1572,25 +1600,36 @@
         !value.range ||
         !Number.isSafeInteger(value.range.start) ||
         !Number.isSafeInteger(value.range.endExclusive) ||
-        !Number.isSafeInteger(value.range.totalBytes)
+        !Number.isSafeInteger(value.range.totalBytes) ||
+        value.range.totalBytes < 0 ||
+        value.range.start !== Math.min(offset, value.range.totalBytes) ||
+        value.range.endExclusive < value.range.start ||
+        value.range.endExclusive > value.range.totalBytes ||
+        value.range.endExclusive - value.range.start > LOG_READ_BYTES ||
+        window.atob(value.content).length !==
+          value.range.endExclusive - value.range.start ||
+        (value.range.endExclusive < value.range.totalBytes
+          ? value.range.nextOffset !== value.range.endExclusive ||
+            value.range.nextOffset <= offset
+          : value.range.nextOffset !== undefined)
       ) {
-        return Object.freeze({ status: 'unavailable', attempt });
+        return Object.freeze({ status: 'unavailable', ...context });
       }
       return Object.freeze({
         status: 'available',
-        attempt,
+        ...context,
         content,
         range: value.range,
         truncation: value.truncation,
       });
     } catch (error) {
       if (error instanceof ConsoleRequestError && error.status === 410) {
-        return Object.freeze({ status: 'retired', attempt });
+        return Object.freeze({ status: 'retired', ...context });
       }
       if (error instanceof ConsoleRequestError && error.status === 404) {
-        return Object.freeze({ status: 'not_found', attempt });
+        return Object.freeze({ status: 'not_found', ...context });
       }
-      return Object.freeze({ status: 'unavailable', attempt });
+      return Object.freeze({ status: 'unavailable', ...context });
     }
   }
 
@@ -1609,6 +1648,45 @@
       );
     }
     section.append(header);
+    if (logView.attempt && logView.loadPage && logView.isCurrent) {
+      const actions = element('div', 'detail-actions');
+      let busy = false;
+      const load = async (offset) => {
+        if (busy || !section.isConnected || !logView.isCurrent()) return;
+        busy = true;
+        section.setAttribute('aria-busy', 'true');
+        for (const button of actions.querySelectorAll('button'))
+          button.disabled = true;
+        try {
+          const page = await logView.loadPage(offset);
+          if (!section.isConnected || !logView.isCurrent()) return;
+          section.replaceWith(
+            renderRunLog({
+              ...page,
+              loadPage: logView.loadPage,
+              isCurrent: logView.isCurrent,
+            }),
+          );
+        } finally {
+          busy = false;
+          section.setAttribute('aria-busy', 'false');
+          for (const button of actions.querySelectorAll('button'))
+            button.disabled = false;
+        }
+      };
+      actions.append(actionButton('刷新当前片段', () => load(logView.offset)));
+      if (logView.offset > 0)
+        actions.append(actionButton('回到开头', () => load(0)));
+      if (
+        logView.status === 'available' &&
+        logView.range.nextOffset !== undefined
+      ) {
+        actions.append(
+          actionButton('下一片段', () => load(logView.range.nextOffset)),
+        );
+      }
+      section.append(actions);
+    }
     if (logView.status === 'available') {
       const metadata = [
         `${logView.range.start}–${logView.range.endExclusive} / ${logView.range.totalBytes} bytes`,
@@ -1617,7 +1695,8 @@
       if (logView.truncation?.truncated === 'unknown')
         metadata.push('截断状态未知');
       if (logView.range.nextOffset !== undefined)
-        metadata.push('后续内容可经 API 分页读取');
+        metadata.push('有后续片段；翻页替换当前窗口，不累计全文');
+      metadata.push('按字节分片，跨片段的 UTF-8 字符可能显示替换符');
       section.append(element('p', 'run-log-meta', metadata.join(' · ')));
       section.append(
         element('pre', 'run-log-content', logView.content || '（空日志）'),
