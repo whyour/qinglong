@@ -140,6 +140,7 @@
 
   const state = {
     token: null,
+    session: {},
     project: 'default',
     view: 'tasks',
     selectedId: null,
@@ -375,10 +376,21 @@
     return Object.freeze(entries);
   }
 
+  function isCurrentSession(session) {
+    return state.session === session && Boolean(state.token);
+  }
+
+  function assertCurrentSession(session) {
+    if (!isCurrentSession(session)) {
+      throw new ConsoleRequestError('session_changed', 0, null);
+    }
+  }
+
   async function api(path, options = {}) {
     if (!state.token) {
       throw new ConsoleRequestError('authentication_required', 401, null);
     }
+    const session = state.session;
     const headers = {
       accept: 'application/json',
       authorization: `Bearer ${state.token}`,
@@ -406,18 +418,21 @@
         referrerPolicy: 'no-referrer',
       });
     } catch {
+      assertCurrentSession(session);
       throw new ConsoleRequestError('request_unavailable', 503, null);
     }
     let value;
     try {
       value = await response.json();
     } catch {
+      assertCurrentSession(session);
       throw new ConsoleRequestError(
         'response_unavailable',
         response.status,
         response.headers.get('x-request-id'),
       );
     }
+    assertCurrentSession(session);
     if (!response.ok && response.status !== options.acceptStatus) {
       throw new ConsoleRequestError(
         typeof value.code === 'string' ? value.code : 'request_unavailable',
@@ -776,9 +791,11 @@
   }
 
   async function saveTriggerDraft() {
+    const session = state.session;
     nodes.triggerEditorSave.disabled = true;
     try {
       const mutation = await triggerDraft();
+      assertCurrentSession(session);
       const value = await api(
         `/api/v3/projects/${state.project}/triggers/${mutation.triggerId}`,
         {
@@ -787,15 +804,16 @@
           acceptStatus: 428,
         },
       );
+      assertCurrentSession(session);
       if (value.code === 'local_presence_required') {
         showPresenceChallenge({ kind: 'trigger-mutation', mutation }, value);
         return;
       }
       throw new ConsoleRequestError('response_unavailable', 503, null);
     } catch (error) {
-      showToast(describeError(error), 'error');
+      if (isCurrentSession(session)) showToast(describeError(error), 'error');
     } finally {
-      nodes.triggerEditorSave.disabled = false;
+      if (isCurrentSession(session)) nodes.triggerEditorSave.disabled = false;
     }
   }
 
@@ -829,9 +847,11 @@
   }
 
   async function loadSecretCatalog() {
+    const session = state.session;
     const value = await api(
       `/api/v3/projects/${state.project}/secrets?limit=64`,
     );
+    assertCurrentSession(session);
     state.secretCatalog = normalizeSecretMetadata(value);
     return Object.freeze({
       secrets: state.secretCatalog,
@@ -886,6 +906,7 @@
   }
 
   async function saveSecretDraft() {
+    const session = state.session;
     let body;
     try {
       body = secretDraft();
@@ -903,6 +924,7 @@
         body,
         acceptStatus: 428,
       });
+      assertCurrentSession(session);
       if (value.code === 'local_presence_required') {
         showPresenceChallenge({ kind: 'secret-mutation', body }, value);
         return;
@@ -910,9 +932,9 @@
       throw new ConsoleRequestError('response_unavailable', 503, null);
     } catch (error) {
       body = null;
-      showToast(describeError(error), 'error');
+      if (isCurrentSession(session)) showToast(describeError(error), 'error');
     } finally {
-      nodes.secretEditorSave.disabled = false;
+      if (isCurrentSession(session)) nodes.secretEditorSave.disabled = false;
     }
   }
 
@@ -1051,6 +1073,7 @@
   }
 
   async function saveTaskDraft() {
+    const session = state.session;
     let mutation;
     try {
       mutation = taskDraft();
@@ -1074,24 +1097,27 @@
             : {}),
         },
       );
+      assertCurrentSession(session);
       if (value.code === 'local_presence_required') {
         showPresenceChallenge({ kind: 'mutation', mutation }, value);
         return;
       }
       throw new ConsoleRequestError('response_unavailable', 503, null);
     } catch (error) {
-      showToast(describeError(error), 'error');
+      if (isCurrentSession(session)) showToast(describeError(error), 'error');
     } finally {
-      nodes.taskEditorSave.disabled = false;
+      if (isCurrentSession(session)) nodes.taskEditorSave.disabled = false;
     }
   }
 
   async function beginTaskAuthoring(task) {
+    const session = state.session;
     try {
       const value = await api(
         `/api/v3/projects/${state.project}/tasks/${task.taskId}/authoring`,
         { method: 'POST', acceptStatus: 428 },
       );
+      assertCurrentSession(session);
       if (value.code === 'local_presence_required') {
         showPresenceChallenge(
           { kind: 'authoring', taskId: task.taskId },
@@ -1101,11 +1127,12 @@
       }
       throw new ConsoleRequestError('response_unavailable', 503, null);
     } catch (error) {
-      showToast(describeError(error), 'error');
+      if (isCurrentSession(session)) showToast(describeError(error), 'error');
     }
   }
 
   async function completeTaskMutation() {
+    const session = state.session;
     const pending = state.pendingPresence;
     const proof = nodes.presenceProof.value.trim();
     if (!pending || !PRESENCE_PATTERN.test(proof)) {
@@ -1123,6 +1150,7 @@
           `/api/v3/projects/${state.project}/tasks/${pending.taskId}/authoring`,
           { method: 'POST', presence: proof },
         );
+        assertCurrentSession(session);
         const snapshot = authoringSnapshot(value, pending.taskId);
         state.pendingPresence = null;
         nodes.presenceProof.value = '';
@@ -1130,12 +1158,14 @@
         try {
           await loadSecretCatalog();
         } catch {
+          if (!isCurrentSession(session)) return;
           state.secretCatalog = [];
           showToast(
             'Task 已加载，但 Secret 目录暂不可用；已有绑定仍会保留。',
             'error',
           );
         }
+        assertCurrentSession(session);
         openTaskEditor(snapshot);
         showToast('完整 Task 定义已加载；保存仍需要新的本机证明。');
         return;
@@ -1149,6 +1179,7 @@
             presence: proof,
           },
         );
+        assertCurrentSession(session);
         const updated = pending.mutation.body.expectedRevision !== null;
         state.pendingPresence = null;
         state.triggerSnapshot = null;
@@ -1165,6 +1196,7 @@
         state.selectedId = pending.mutation.triggerId;
         updateNavigation();
         await refresh();
+        assertCurrentSession(session);
         await selectTrigger(pending.mutation.triggerId);
         return;
       }
@@ -1174,6 +1206,7 @@
           body: pending.body,
           presence: proof,
         });
+        assertCurrentSession(session);
         const rotated = pending.body.expectedCurrentVersion > 0;
         state.pendingPresence = null;
         state.secretSnapshot = null;
@@ -1191,6 +1224,7 @@
         state.selectedId = pending.body.name;
         updateNavigation();
         await refresh();
+        assertCurrentSession(session);
         selectSecret(pending.body.name);
         return;
       }
@@ -1205,6 +1239,7 @@
             : {}),
         },
       );
+      assertCurrentSession(session);
       const updated = pending.mutation.body.expectedRevision !== null;
       state.pendingPresence = null;
       state.authoringSnapshot = null;
@@ -1219,13 +1254,16 @@
       );
       state.selectedId = pending.mutation.taskId;
       await refresh();
+      assertCurrentSession(session);
       await selectTask(pending.mutation.taskId);
     } catch (error) {
-      nodes.presenceError.textContent = describeError(error);
-      nodes.presenceError.hidden = false;
-      nodes.presenceProof.select();
+      if (isCurrentSession(session)) {
+        nodes.presenceError.textContent = describeError(error);
+        nodes.presenceError.hidden = false;
+        nodes.presenceProof.select();
+      }
     } finally {
-      nodes.presenceSubmit.disabled = false;
+      if (isCurrentSession(session)) nodes.presenceSubmit.disabled = false;
     }
   }
 
@@ -1455,6 +1493,7 @@
   }
 
   async function startTask(task) {
+    const session = state.session;
     try {
       const value = await api(
         `/api/v3/projects/${state.project}/tasks/${task.taskId}/runs`,
@@ -1468,6 +1507,7 @@
           },
         },
       );
+      assertCurrentSession(session);
       showToast(
         value.status === 'existing'
           ? '已找到同一启动请求。'
@@ -1477,9 +1517,10 @@
       state.selectedId = value.runId;
       updateNavigation();
       await refresh();
+      assertCurrentSession(session);
       await selectRun(value.runId);
     } catch (error) {
-      showToast(describeError(error), 'error');
+      if (isCurrentSession(session)) showToast(describeError(error), 'error');
     }
   }
 
@@ -1602,11 +1643,12 @@
     }
     actions.append(
       actionButton('查看绑定任务', async () => {
+        const session = state.session;
         state.view = 'tasks';
         state.selectedId = trigger.taskId;
         updateNavigation();
         await refresh();
-        await selectTask(trigger.taskId);
+        if (isCurrentSession(session)) await selectTask(trigger.taskId);
       }),
     );
     fragment.append(actions);
@@ -1921,6 +1963,7 @@
   }
 
   async function cancelRun(run) {
+    const session = state.session;
     try {
       const value = await api(
         `/api/v3/projects/${state.project}/runs/${run.id}/cancellation`,
@@ -1932,6 +1975,7 @@
           },
         },
       );
+      assertCurrentSession(session);
       showToast(
         value.status === 'already_terminal'
           ? '运行已经结束。'
@@ -1940,9 +1984,10 @@
           : '取消请求已写入。',
       );
       await refresh();
+      assertCurrentSession(session);
       await selectRun(run.id);
     } catch (error) {
-      showToast(describeError(error), 'error');
+      if (isCurrentSession(session)) showToast(describeError(error), 'error');
     }
   }
 
@@ -2021,6 +2066,7 @@
   }
 
   function connect(token, project) {
+    state.session = {};
     state.token = token;
     state.project = project;
     state.view = 'tasks';
@@ -2039,6 +2085,7 @@
   }
 
   function disconnect() {
+    state.session = {};
     state.token = null;
     state.selectedId = null;
     state.pendingAction = null;
@@ -2047,6 +2094,10 @@
     state.triggerSnapshot = null;
     state.secretSnapshot = null;
     state.secretCatalog = [];
+    nodes.taskEditorSave.disabled = false;
+    nodes.triggerEditorSave.disabled = false;
+    nodes.secretEditorSave.disabled = false;
+    nodes.presenceSubmit.disabled = false;
     if (nodes.taskEditor.open) nodes.taskEditor.close();
     if (nodes.triggerEditor.open) nodes.triggerEditor.close();
     if (nodes.secretEditor.open) nodes.secretEditor.close();
@@ -2098,11 +2149,12 @@
   nodes.disconnect.addEventListener('click', disconnect);
   nodes.refresh.addEventListener('click', refresh);
   nodes.createTask.addEventListener('click', async () => {
+    const session = state.session;
     try {
       await loadSecretCatalog();
-      openTaskEditor();
+      if (isCurrentSession(session)) openTaskEditor();
     } catch (error) {
-      showToast(describeError(error), 'error');
+      if (isCurrentSession(session)) showToast(describeError(error), 'error');
     }
   });
   nodes.createTrigger.addEventListener('click', () => openTriggerEditor());

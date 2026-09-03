@@ -1,5 +1,7 @@
 # QingLong 3.0 Architecture RFC
 
+- D-432/ADR-0534（原生 Console 源码候选）：修复断开/重连后的异步结果污染。每次连接使用独立内存代次，统一请求与编辑/执行链拒绝旧成功、失败和 finally；旧响应不得重开编辑器、恢复 Secret catalog、覆盖 proof 或在新连接下发出后续请求。16 项针对性回归、完整 Local API 130/130、后端 1683 pass/2 环境 skip/0 fail，静态资产合计 114,042 bytes。断开不撤销已提交的服务端写入，重连须核对 durable 状态；不新增包、后台服务或后端权限。此修复尚未通过同源远端 CI/阶段实物验收，见 [ADR-0534](./adr/ADR-0534-native-console-session-isolation.md)。
+
 - D-431/ADR-0533（原生 Console 源码候选）：Task、Trigger、Run 列表接入既有 keyset API，开放下一页、回到首页和当前页刷新，每次最多 64 条并替换 DOM，不缓存历史页、不轮询或扩大后端查询。验证规范 cursor、页内/跨页顺序与继续边界；请求/选择代次防止旧列表、错误、详情和 Secret catalog 覆盖当前页面。客户端与生产 HTTP parser 集成 15/15、完整 Local API 114/114，静态资产共 111,857 bytes；默认 headless/Cluster 不变。远端 CI、浏览器证据和 exact 阶段实物分别核验，不借用 D-430 archive。
 
 - D-430/ADR-0532（exact Console 双架构阶段实物已交付）：在原生运行详情中开放日志下一片段、回到开头与当前片段刷新，固定 32 KiB 替换窗口，不累计全文或后台轮询。严格验证响应身份、字节范围与前进 cursor，按不含凭据的选择代次丢弃过期响应，防止切换或断开后覆盖新详情。复用既有 API/Policy/Audit，不新增包、依赖、迁移或后端 authority；默认 headless 与 Cluster 不变。提交 `12ed38b7d72fe6366ad8f1ac84aebb1bb772f3b5` 主 CI run `33793623200` 为 42 success/3 expected skip/0 fail，独立 Kubernetes run `33793623184` 成功；Console artifact run `33793687627` 为 43 success/2 expected skip/0 fail。amd64/arm64/milestone artifact `9909229721`/`9909131639`/`9909265138` 实际下载后的 checksum、bundle v8 与 milestone v7 auditor 均通过；两个 archive 内的原生 JS 都与该提交逐字节一致。该实物不包含后续 D-431 列表分页，不等同完整 3.0 或 Public Release。

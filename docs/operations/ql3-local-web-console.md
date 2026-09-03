@@ -83,6 +83,8 @@ ssh -L 5701:127.0.0.1:5701 router.example
 
 Credential 只存在当前页面内存，不进入 URL、Cookie 或 Web Storage。页面刷新会丢失 credential，需要重新输入；这是当前安全边界，不是缺陷。
 
+断开连接不会撤销服务端已经收到的写入、启动或取消请求。重连后先核对 Task/Trigger/Secret revision 与 durable Run 状态，不要因为页面没有收到结果就直接重复提交。D-432 源码候选修复旧连接的慢响应重新打开编辑器、回填 Secret 目录或影响新提交的缺陷，见 [ADR-0534](../adr/ADR-0534-native-console-session-isolation.md)；上述 D-429/D-430 归档及 D-431 构建均不包含这项修复，不能把本地回归通过当作已下载版本已更新。
+
 ## 当前阶段可用边界
 
 D-424 阶段实物的原生 `/console` 可操作闭环是内建 argv command Task create/list/read/update/enable/disable/start、Task pinned Secret binding、Secret current metadata/create/rotate、`qinglong/cron@v1` Trigger list/read/create/update/enable/disable，以及 Run list/read/events/steps/log/cancel。Task 编辑器只修改当前展示字段并保留完整快照中的其他 config/labels；其他 Task kind 或 Trigger schema 继续使用受信管理入口。
