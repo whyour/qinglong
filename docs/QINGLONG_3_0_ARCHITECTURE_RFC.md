@@ -1,5 +1,7 @@
 # QingLong 3.0 Architecture RFC
 
+- D-433 验收补强（待 Linux 实跑）：现有 Local API cancellation 门接入真实面板 TypeScript 客户端，以 loopback HTTP 验证 capability、版本确认、运行列表、真实日志、取消响应丢失后的同请求重试以及重启持久性。v2 报告绑定客户端源摘要并明确不包含浏览器渲染和 Owner 初始化；专项 21/21、后端 1702 pass/2 条件 skip/0 fail，本机 Docker Engine 未恢复，不能声称组合门已通过。详见 [ADR-0535](./adr/ADR-0535-canonical-panel-run-control.md)。
+
 - D-433/ADR-0535（现有面板执行管理源码候选）：通过可选 `panel.runControl=task_run_v1` 开放逐项 Task start 和确切 Run cancellation，不恢复旧 Cron 写接口。确认前分别展示定时绑定版本与当前任务版本；每次项目 Run 窗口最多 64 条，只显示当前 Task 匹配项，支持显式选择、状态刷新和该次执行首片日志。确认绑定 mutation UUID，结果不明时只显式重试同一请求；关闭或重登后的响应不得继续操作。客户端 14 项含规范 body parser 与新旧 capability 回归，Node 20 面板构建与 240 files / 11,993,647 bytes 裁剪审计通过；全量前端类型诊断与基线同为 41 项，无新增。此切片仍待同源远端 CI/双架构实物，不代表旧面板已完整迁移，见 [ADR-0535](./adr/ADR-0535-canonical-panel-run-control.md)。
 
 - D-432/ADR-0534（原生 Console 源码候选）：修复断开/重连后的异步结果污染。每次连接使用独立内存代次，统一请求与编辑/执行链拒绝旧成功、失败和 finally；旧响应不得重开编辑器、恢复 Secret catalog、覆盖 proof 或在新连接下发出后续请求。16 项针对性回归、完整 Local API 130/130、后端 1683 pass/2 环境 skip/0 fail，静态资产合计 114,042 bytes。断开不撤销已提交的服务端写入，重连须核对 durable 状态；不新增包、后台服务或后端权限。此修复尚未通过同源远端 CI/阶段实物验收，见 [ADR-0534](./adr/ADR-0534-native-console-session-isolation.md)。

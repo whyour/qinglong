@@ -13,6 +13,9 @@ const {
 } = require('./ql3-local-api-cancellation-live-audit.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
+const {
+  preparePanelClient,
+} = require('./lib/ql3-panel-run-control-live-client.cjs');
 const NODE_IMAGE =
   'node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d';
 
@@ -80,6 +83,7 @@ function main(argv = process.argv.slice(2)) {
   const evidenceRoot = path.join(temporaryRoot, 'evidence');
   fs.mkdirSync(evidenceRoot, { mode: 0o700 });
   try {
+    preparePanelClient(ROOT, path.join(evidenceRoot, 'panel-client'));
     const artifactOutput = run(process.execPath, [
       path.join(ROOT, 'scripts/ql3-local-profile-artifact-audit.cjs'),
       `${selected.profile}-application-api`,
@@ -148,7 +152,7 @@ function main(argv = process.argv.slice(2)) {
     });
     process.stdout.write(
       `${JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: 2,
         profile: selected.profile,
         reportWritten: true,
         compatible: true,

@@ -28,3 +28,13 @@
 Node 20 legacy migration toolchain 的 production panel build 通过；裁剪包为 240 files / 11,993,647 bytes，仍在 256 files / 13 MiB 边界。全量前端 TypeScript 检查存在 41 项错误；通过 compiler host 读取提交前源码作对比，确认本次没有新增诊断，不将存量类型错误称为通过。
 
 本切片不是完整旧面板迁移：任务/定时创建编辑、脚本、订阅、环境变量、依赖与多用户远程 Web 会话仍未闭合。Local 仍仅 loopback/SSH tunnel；不可将本地 mock 或 unit tests 当成实际 Owner 写入、公开发布或双架构镜像证据。D-431 实物不含本切片，交付必须绑定自己的 source revision。
+
+## 真实客户端组合验收（待 Linux 执行）
+
+已有 `ql3-local-api-cancellation-live-contract` 不再手写面板启动与取消请求，而是在宿主机将实际 `src/utils/qinglong3.ts` 和 `src/components/qinglong3/runControl.ts` 编译为临时测试模块，在同一个隔离 Linux 网络命名空间中使用真实 fetch 连接生产 Local API。记录两个源文件的 SHA-256；TypeScript、VM 适配器与生成模块均不进入产品制品，不新增 workspace package 或生产依赖。
+
+验收顺序为未认证请求 401、实际 capability discovery、读取 Task 当前版本、确认前零写入、启动一次、SQLite/PID start identity 核对、运行列表与指定 Run 读取、运行中日志标记、取消响应已被服务端接受后模拟丢失、同一客户端 action 精确重试、进程退出、唯一取消事件与两条 allowed audit、有序重启后读取 cancelled 及原日志。等待仅属于测试驱动，不在页面中增加轮询。
+
+报告升级为 `schemaVersion=2`，要求客户端源摘要、日志/重启日志、响应丢失和相同 body 重试事实，以及一次 start POST、两次 cancellation POST。旧 v1 报告不能代替新门；原 Linux、128/256 MiB、64/256 PID、SQLite 完整性和精确事件计数要求保持不变。报告明确固定 `browserRendering=false`、`ownerProvisioning=seeded_fixture`，不能声称已经完成浏览器渲染、真实 Owner 初始化、任务创建或定时配置全链路。
+
+本地专项回归 21/21，完整后端 1704 项（1702 pass / 2 条件 skip / 0 fail）；Local image 与 18-package boundary audit 均通过。沙箱内完整回归因 loopback `EPERM` 失败后，在允许本机端口的环境完成上述重跑，不将首次失败算作通过。本机 Docker Engine 不可连接，官方启动/恢复尝试未成功，因此新增 Linux 客户端组合门尚未执行；原有 CI amd64/arm64 Local image job 将继续执行此门，不以单元测试替代。

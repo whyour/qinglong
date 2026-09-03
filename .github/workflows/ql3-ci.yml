@@ -750,7 +750,7 @@ jobs:
             --operator-image="${OPERATOR_IMAGE}" \
             --profile=edge \
             --variant=console
-      - name: Run authenticated Local API cancellation through real Linux processes
+      - name: Run actual panel client through Local API, Linux logs and cancellation
         env:
           QL3_LOCAL_API_CANCELLATION_LIVE: '1'
         run: |

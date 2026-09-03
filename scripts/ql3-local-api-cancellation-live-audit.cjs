@@ -23,13 +23,14 @@ function validateLocalApiCancellationLiveReport(value) {
     'artifact',
     'compatible',
     'observations',
+    'panelClient',
     'platform',
     'profile',
     'qualification',
     'resourceEnvelope',
     'schemaVersion',
   ]);
-  if (!record || value.schemaVersion !== 1 || !PROFILES.has(value.profile)) {
+  if (!record || value.schemaVersion !== 2 || !PROFILES.has(value.profile)) {
     return Object.freeze({
       compatible: false,
       findings: ['report identity is invalid'],
@@ -105,6 +106,38 @@ function validateLocalApiCancellationLiveReport(value) {
     observed?.sqliteIntegrity !== 'ok'
   )
     findings.push('API to durable process-stop observations are incomplete');
+  const panel = value.panelClient;
+  if (
+    !exactKeys(panel, [
+      'authSourceSha256',
+      'controlSourceSha256',
+      'unauthenticatedStatus',
+      'capabilityDiscovered',
+      'runListed',
+      'logMarkerObserved',
+      'restartLogMarkerObserved',
+      'cancellationResponseLost',
+      'exactCancellationBodyReplay',
+      'startPosts',
+      'cancellationPosts',
+      'browserRendering',
+      'ownerProvisioning',
+    ]) ||
+    !/^[a-f0-9]{64}$/.test(panel?.authSourceSha256 ?? '') ||
+    !/^[a-f0-9]{64}$/.test(panel?.controlSourceSha256 ?? '') ||
+    panel?.unauthenticatedStatus !== 401 ||
+    panel?.capabilityDiscovered !== true ||
+    panel?.runListed !== true ||
+    panel?.logMarkerObserved !== true ||
+    panel?.restartLogMarkerObserved !== true ||
+    panel?.cancellationResponseLost !== true ||
+    panel?.exactCancellationBodyReplay !== true ||
+    panel?.startPosts !== 1 ||
+    panel?.cancellationPosts !== 2 ||
+    panel?.browserRendering !== false ||
+    panel?.ownerProvisioning !== 'seeded_fixture'
+  )
+    findings.push('actual panel client execution evidence is incomplete');
   if (
     !exactKeys(value.qualification, [
       'evidenceClass',

@@ -35,3 +35,5 @@
 上述本地验证不代表修复已进入既有下载产物。D-431 的 `ce8c3a7d2afdbb11b2a33f4884702454d1d22a53` 产物也不包含本修复；本切片必须以自己的 source revision、CI 和阶段归档证据验收。
 
 提交 `03afd7e8` 的独立 Kubernetes deployment 验证通过，但主 CI [run 33799350582](https://github.com/whyour/qinglong/actions/runs/33799350582) 在 CloudNativePG live gate 失败：rollout 已完成，旧 operator Pod 仍为 Terminating，`verifyImageIds` 纳入其空 imageID 后拒绝。`2005cb6b` 单独修正 operator 取样，排除 deletionTimestamp 已设置的 Pod；存活 Pod 仍执行原摘要校验，空集合仍失败，针对性回归 11/11。此本地修复不改写旧 run 的失败结论，须由后续同源 CI 验证。
+
+2026-09-04 后续核对：包含上述修复的 `e4ba5d405f55543dd5d3ca432c24648171ebdda4` 主 CI [run 33802395394](https://github.com/whyour/qinglong/actions/runs/33802395394) 中 CloudNativePG live failover job 已成功，因而 operator 取样修复已有远程实测证据；这不改写旧失败 run，也不单独代表整体 CI 或 Console 实物交付完成。

@@ -11,7 +11,7 @@ const {
 
 function report(profile = 'edge') {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     profile,
     platform: { os: 'linux', architecture: 'arm64', procfs: true },
     resourceEnvelope: {
@@ -35,6 +35,21 @@ function report(profile = 'edge') {
       evidenceClass: 'linux_virtualized_live_contract',
       physicalDevice: false,
       passed: true,
+    },
+    panelClient: {
+      authSourceSha256: 'a'.repeat(64),
+      controlSourceSha256: 'b'.repeat(64),
+      unauthenticatedStatus: 401,
+      capabilityDiscovered: true,
+      runListed: true,
+      logMarkerObserved: true,
+      restartLogMarkerObserved: true,
+      cancellationResponseLost: true,
+      exactCancellationBodyReplay: true,
+      startPosts: 1,
+      cancellationPosts: 2,
+      browserRendering: false,
+      ownerProvisioning: 'seeded_fixture',
     },
     compatible: true,
     artifact: {
@@ -119,5 +134,31 @@ test('requires a fresh private report before Docker opt-in is checked', () => {
     assert.doesNotMatch(existing.stderr, /docker/i);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects old reports and every missing or overstated panel client observation', () => {
+  const old = report();
+  old.schemaVersion = 1;
+  delete old.panelClient;
+  assert.equal(validateLocalApiCancellationLiveReport(old).compatible, false);
+  for (const key of Object.keys(report().panelClient)) {
+    const missing = report();
+    delete missing.panelClient[key];
+    assert.equal(
+      validateLocalApiCancellationLiveReport(missing).compatible,
+      false,
+      key,
+    );
+    const invalid = report();
+    invalid.panelClient[key] =
+      typeof invalid.panelClient[key] === 'boolean'
+        ? !invalid.panelClient[key]
+        : null;
+    assert.equal(
+      validateLocalApiCancellationLiveReport(invalid).compatible,
+      false,
+      key,
+    );
   }
 });

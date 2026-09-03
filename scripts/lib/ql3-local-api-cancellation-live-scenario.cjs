@@ -10,6 +10,8 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 const { spawn } = require('node:child_process');
 const { DatabaseSync } = require('node:sqlite');
+const assert = require('node:assert/strict');
+const { loadPanelClient } = require('./ql3-panel-run-control-live-client.cjs');
 
 const TIMEOUT_MS = 45_000;
 
@@ -188,7 +190,10 @@ function insertTaskAndIdentity(
         command: {
           kind: 'argv',
           file: '/bin/sh',
-          args: ['-c', 'trap "exit 0" TERM INT; while :; do sleep 1; done'],
+          args: [
+            '-c',
+            'trap "exit 0" TERM INT; printf "qinglong3-panel-live-log\\n"; while :; do sleep 1; done',
+          ],
         },
       },
     },
@@ -529,35 +534,44 @@ async function main(argv = process.argv.slice(2)) {
       () => active.events.some((event) => event.event === 'listening'),
       'Local API listener',
     );
-    const startBody = JSON.stringify({
-      schema: 'qinglong/task-start@v1',
-      mutationId: '019f8700-0000-7000-8000-000000000004',
-      expectedRevision: seeded.definition.revision,
-      expectedContentDigest: seeded.definition.contentDigest,
-    });
-    const started = await request(
+    const unauthorized = await request(
       port,
-      seeded.token,
-      '/api/v3/projects/default/tasks/live-cancellation-task/runs',
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'content-length': String(Buffer.byteLength(startBody)),
-        },
-        body: startBody,
-      },
+      '',
+      '/api/v3/projects/default/tasks/live-cancellation-task',
     );
-    if (started.statusCode !== 202 || started.body.status !== 'accepted') {
-      fail(`task start was rejected: ${JSON.stringify(started)}`);
-    }
+    assert.equal(unauthorized.statusCode, 401);
+    const panel = loadPanelClient(
+      path.join(value.evidenceRoot, 'panel-client'),
+      port,
+    );
+    const capabilities = await panel.auth.discoverQingLong3(
+      '/api/v3/capabilities',
+    );
+    assert.equal(capabilities?.panel.runControl, 'task_run_v1');
+    assert.equal(panel.auth.setQingLong3Credential(seeded.token), true);
+    const client = panel.control.createPanelRunControl(
+      {
+        ql3: {
+          projectId: 'default',
+          taskId: 'live-cancellation-task',
+        },
+      },
+      capabilities,
+    );
+    const task = await client.readTask();
+    assert.equal(task.revision, seeded.definition.revision);
+    assert.equal(task.contentDigest, seeded.definition.contentDigest);
+    const start = client.prepareStart(task);
+    assert.equal(panel.requests.filter((r) => r.method === 'POST').length, 0);
+    const started = await start.execute();
+    assert.equal(started.status, 'accepted');
     const running = await waitFor(() => {
       const row = query(
         databasePath,
         `SELECT run.status, attempt.status AS attemptStatus, attempt.pid
            FROM Runs AS run JOIN RunAttempts AS attempt ON attempt.run_id = run.id
           WHERE run.id = ?`,
-        started.body.runId,
+        started.runId,
       );
       return row?.status === 'running' &&
         row?.attemptStatus === 'running' &&
@@ -568,47 +582,39 @@ async function main(argv = process.argv.slice(2)) {
     const taskPid = Number(running.pid);
     const taskStartTicks = procStartTicks(taskPid);
     const apiRssBytes = rssBytes(active.child.pid);
-    const cancellationBody = JSON.stringify({
-      schema: 'qinglong/run-cancellation@v1',
-      mutationId: 'local-live-cancellation-1',
-    });
-    const cancellationPath = `/api/v3/projects/default/runs/${started.body.runId}/cancellation`;
-    const requestOptions = {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'content-length': String(Buffer.byteLength(cancellationBody)),
-      },
-      body: cancellationBody,
-    };
-    const accepted = await request(
-      port,
-      seeded.token,
-      cancellationPath,
-      requestOptions,
+    const page = await client.listRuns();
+    assert.equal(page.scanned, 1);
+    assert.equal(page.runs[0]?.id, started.runId);
+    let selected;
+    await waitFor(async () => {
+      selected = await client.readRun(started.runId);
+      return (await client.readLog(selected)).includes(
+        'qinglong3-panel-live-log',
+      );
+    }, 'panel reads running process log marker');
+    assert.equal(selected.status, 'running');
+    const cancellation = client.prepareCancel(selected);
+    panel.loseNextCancellationResponse();
+    await assert.rejects(
+      cancellation.execute(),
+      (error) => error.uncertain === true,
     );
-    const replay = await request(
-      port,
-      seeded.token,
-      cancellationPath,
-      requestOptions,
+    const replay = await cancellation.execute();
+    assert.equal(replay.status, 'already_requested');
+    assert.equal(replay.runId, started.runId);
+    const cancelRequests = panel.requests.filter(
+      (r) => r.method === 'POST' && r.path.endsWith('/cancellation'),
     );
-    if (accepted.statusCode !== 202 || accepted.body.status !== 'accepted') {
-      fail(`cancellation was rejected: ${JSON.stringify(accepted)}`);
-    }
-    if (
-      replay.statusCode !== 200 ||
-      replay.body.status !== 'already_requested'
-    ) {
-      fail(`cancellation replay drifted: ${JSON.stringify(replay)}`);
-    }
+    assert.equal(cancelRequests.length, 2);
+    assert.equal(cancelRequests[0].body, cancelRequests[1].body);
+    assert.equal(cancelRequests[0].path, cancelRequests[1].path);
     const terminal = await waitFor(() => {
       const row = query(
         databasePath,
         `SELECT run.status, attempt.status AS attemptStatus
            FROM Runs AS run JOIN RunAttempts AS attempt ON attempt.run_id = run.id
           WHERE run.id = ?`,
-        started.body.runId,
+        started.runId,
       );
       return row?.status === 'cancelled' && row?.attemptStatus === 'cancelled'
         ? row
@@ -618,23 +624,25 @@ async function main(argv = process.argv.slice(2)) {
       () => !sameProcessExists(taskPid, taskStartTicks),
       'task process identity exit',
     );
+    await waitFor(async () => {
+      const current = await client.readRun(started.runId);
+      return (await client.readLog(current)).includes(
+        'qinglong3-panel-live-log',
+      );
+    }, 'panel reads actual task log marker');
     await stopApi(active);
     active = startApi(executable, apiConfigPath);
     await waitFor(
       () => active.events.some((event) => event.event === 'listening'),
       'restarted Local API listener',
     );
-    const observed = await request(
-      port,
-      seeded.token,
-      `/api/v3/projects/default/runs/${started.body.runId}`,
+    const observed = await client.readRun(started.runId);
+    assert.equal(observed.status, 'cancelled');
+    assert.ok(
+      (await client.readLog(observed)).includes('qinglong3-panel-live-log'),
     );
-    if (
-      observed.statusCode !== 200 ||
-      observed.body.run.status !== 'cancelled'
-    ) {
-      fail(`restart observation drifted: ${JSON.stringify(observed)}`);
-    }
+    client.dispose();
+    panel.auth.clearQingLong3Credential();
     await stopApi(active);
     const facts = query(
       databasePath,
@@ -643,8 +651,8 @@ async function main(argv = process.argv.slice(2)) {
          (SELECT COUNT(*) FROM RunEvents WHERE run_id = ? AND type = 'run.cancelled') AS cancelledEvents,
          (SELECT COUNT(*) FROM QingLong3SecurityAuditEvents WHERE operation_id = 'run.cancel' AND outcome = 'allowed') AS cancelAudits,
          (SELECT integrity_check FROM pragma_integrity_check LIMIT 1) AS integrity`,
-      started.body.runId,
-      started.body.runId,
+      started.runId,
+      started.runId,
     );
     if (
       facts.cancelEvents !== 1 ||
@@ -654,7 +662,7 @@ async function main(argv = process.argv.slice(2)) {
     )
       fail(`durable facts drifted: ${JSON.stringify(facts)}`);
     const report = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       profile: value.profile,
       platform: { os: 'linux', architecture: process.arch, procfs: true },
       resourceEnvelope: {
@@ -674,6 +682,23 @@ async function main(argv = process.argv.slice(2)) {
         processIdentityGone: !sameProcessExists(taskPid, taskStartTicks),
         restartObservedCancelled: true,
         sqliteIntegrity: facts.integrity,
+      },
+      panelClient: {
+        authSourceSha256: panel.manifest.auth.sourceSha256,
+        controlSourceSha256: panel.manifest.control.sourceSha256,
+        unauthenticatedStatus: unauthorized.statusCode,
+        capabilityDiscovered: true,
+        runListed: true,
+        logMarkerObserved: true,
+        restartLogMarkerObserved: true,
+        cancellationResponseLost: true,
+        exactCancellationBodyReplay: true,
+        startPosts: panel.requests.filter(
+          (r) => r.method === 'POST' && r.path.endsWith('/runs'),
+        ).length,
+        cancellationPosts: cancelRequests.length,
+        browserRendering: false,
+        ownerProvisioning: 'seeded_fixture',
       },
       qualification: {
         evidenceClass: 'linux_virtualized_live_contract',
