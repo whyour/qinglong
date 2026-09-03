@@ -363,33 +363,45 @@ for (const [label, initialBytes, producedBytes] of [
   });
 }
 
-test('rejects unsupported capture utilities before running user code', async (t) => {
-  const { directory, receiptRoot } = fixture(t);
-  const bin = path.join(directory, 'unsupported-bin');
-  fs.mkdirSync(bin, { mode: 0o700 });
-  for (const name of ['busybox', 'head', 'stdbuf']) {
-    fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nexit 1\n', { mode: 0o700 });
-  }
-  const marker = path.join(directory, 'must-not-run');
-  const logArtifactId = `local-${'e'.repeat(30)}`;
-  const filePath = path.join(directory, `${logArtifactId}.log`);
-  const launcher = new LocalProcessLauncher(
-    { register: async () => undefined },
-    { receiptRoot, identityProvider: identityProvider() },
-  );
-  const handle = await launcher.start({
-    runId: RUN_ID, attemptId: ATTEMPT_ID,
-    callbackSequence: 1, callbackToken: TOKEN,
-    environment: { PATH: `${bin}:/usr/bin:/bin` },
-    command: { kind: 'argv', file: '/usr/bin/touch', args: [marker] },
-    output: { filePath, maximumBytes: 65536, logArtifactId },
+for (const availability of ['missing', 'not-executable', 'rejecting']) {
+  test(`rejects unsupported capture utilities (${availability}) before running user code`, async (t) => {
+    const { directory, receiptRoot } = fixture(t);
+    const bin = path.join(directory, 'unsupported-bin');
+    fs.mkdirSync(bin, { mode: 0o700 });
+    if (availability !== 'missing') {
+      for (const name of ['busybox', 'head', 'stdbuf']) {
+        fs.writeFileSync(path.join(bin, name), '#!/bin/sh\nexit 1\n', {
+          mode: availability === 'not-executable' ? 0o600 : 0o700,
+        });
+      }
+    }
+    const marker = path.join(directory, 'must-not-run');
+    const logArtifactId = `local-${'e'.repeat(30)}`;
+    const filePath = path.join(directory, `${logArtifactId}.log`);
+    const launcher = new LocalProcessLauncher(
+      { register: async () => undefined },
+      { receiptRoot, identityProvider: identityProvider() },
+    );
+    const handle = await launcher.start({
+      runId: RUN_ID, attemptId: ATTEMPT_ID,
+      callbackSequence: 1, callbackToken: TOKEN,
+      // Keep this negative fixture isolated even on a noexec tmpfs: a shell
+      // must not fall through an unexecutable stub to real system utilities.
+      environment: { PATH: bin },
+      // Use the actual installed Node binary so an accidental launch always
+      // writes the marker, rather than failing because /usr/bin/touch is absent.
+      command: { kind: 'argv', file: process.execPath, args: [
+        '-e', "require('node:fs').writeFileSync(process.argv[1], 'ran');", marker,
+      ] },
+      output: { filePath, maximumBytes: 65536, logArtifactId },
+    });
+    assert.deepEqual(await handle.completion, { exitCode: 125, signal: null });
+    assert.equal(fs.existsSync(marker), false);
+    assert.equal(fs.statSync(filePath).size, 0);
+    assert.equal(await new CompletionReceiptFileStore(receiptRoot).read(ATTEMPT_ID), undefined);
+    assert.equal(fs.readdirSync(directory).some((name) => name.endsWith('.fifo')), false);
   });
-  assert.deepEqual(await handle.completion, { exitCode: 125, signal: null });
-  assert.equal(fs.existsSync(marker), false);
-  assert.equal(fs.statSync(filePath).size, 0);
-  assert.equal(await new CompletionReceiptFileStore(receiptRoot).read(ATTEMPT_ID), undefined);
-  assert.equal(fs.readdirSync(directory).some((name) => name.endsWith('.fifo')), false);
-});
+}
 
 test('capture failure drains output without forging a truncation fact or changing user exit', async (t) => {
   const { directory, receiptRoot } = fixture(t);

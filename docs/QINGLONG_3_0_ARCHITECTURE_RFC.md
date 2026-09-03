@@ -1,6 +1,6 @@
 # QingLong 3.0 Architecture RFC
 
-- D-433 验收补强（待 Linux 实跑）：现有 Local API cancellation 门接入真实面板 TypeScript 客户端，以 loopback HTTP 验证 capability、版本确认、运行列表、真实日志、取消响应丢失后的同请求重试以及重启持久性。v2 报告绑定客户端源摘要并明确不包含浏览器渲染和 Owner 初始化；专项 21/21、后端 1702 pass/2 条件 skip/0 fail，本机 Docker Engine 未恢复，不能声称组合门已通过。详见 [ADR-0535](./adr/ADR-0535-canonical-panel-run-control.md)。
+- D-433 验收补强（运行中日志修复，组合门尚未通过）：真实面板 TypeScript 客户端已接入 Linux Local API cancellation 门，v2 报告要求 capability、版本确认、运行列表、真实日志、取消响应丢失后的精确重试和重启持久性，并明确不包含浏览器渲染与 Owner 初始化。`ed4ba9b` 双架构暴露稀疏日志缓冲缺陷；`efb7379f` 修复后，两个已安装 headless 镜像的即时二进制日志与 6 项字节配额边界均通过，但不支持工具的 noexec 负例夹具失败，后续 Console/面板组合门未执行。夹具已收紧 PATH 并强化意外执行探针，仍须新 CI 验证，不以旧包或局部通过替代交付。详见 [ADR-0535](./adr/ADR-0535-canonical-panel-run-control.md)。
 
 - D-433/ADR-0535（现有面板执行管理源码候选）：通过可选 `panel.runControl=task_run_v1` 开放逐项 Task start 和确切 Run cancellation，不恢复旧 Cron 写接口。确认前分别展示定时绑定版本与当前任务版本；每次项目 Run 窗口最多 64 条，只显示当前 Task 匹配项，支持显式选择、状态刷新和该次执行首片日志。确认绑定 mutation UUID，结果不明时只显式重试同一请求；关闭或重登后的响应不得继续操作。客户端 14 项含规范 body parser 与新旧 capability 回归，Node 20 面板构建与 240 files / 11,993,647 bytes 裁剪审计通过；全量前端类型诊断与基线同为 41 项，无新增。此切片仍待同源远端 CI/双架构实物，不代表旧面板已完整迁移，见 [ADR-0535](./adr/ADR-0535-canonical-panel-run-control.md)。
 

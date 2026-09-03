@@ -77,3 +77,9 @@ Node 20 legacy migration toolchain 的 production panel build 通过；裁剪包
 主 CI 的 amd64/arm64 Local image job 增加安装后 headless/Console 镜像的稀疏输出与精确字节测试，保持 128 MiB、0.5 CPU、64 PID、只读、无网络及 noexec tmpfs 条件。该测试读取镜像自身 dist/assets，只把测试代码只读挂入；原实际面板客户端 Linux 组合门及其稳定步骤名不变。修复需由新提交的 Linux CI 和后续成功产物流水线证明，不把本地结果或旧归档算作已交付。
 
 本地最终回归：Local process + Worker 163/163（首次受限环境的 3 项 loopback EPERM 已在获准环境重跑通过）；完整后端 1705 项，1703 pass / 2 条件 skip / 0 fail；镜像/客户端专项 24/24，Worker 编译与类型检查、Local/Operator image audit、18-package boundary audit、YAML 解析与新增步骤 shell 语法检查通过。本机 Docker Engine 仍不可连接，没有本地 Linux/Alpine 成功证据。
+
+### 安装后负例夹具修正
+
+修复提交 `efb7379fa96974c181769a6d64afc7c21bf7e6f0` 的主 CI [33808509607](https://github.com/whyour/qinglong/actions/runs/33808509607) 中，amd64 `100825140097`、arm64 `100825140142` 的已安装 headless 镜像均通过 argv/shell 稀疏二进制输出以及全部 6 项精确配额边界。第 9 项“不支持采集工具”负例返回 127 而非 125，阻止了随后 Console 镜像循环及实际面板客户端门；不将这些未执行项记为通过。
+
+负例在 noexec tmpfs 中创建假工具，却仍把 `/usr/bin:/bin` 加入 PATH，shell 可以在假工具不可执行时继续找到真实工具；负例命令又使用镜像中不保证存在的 `/usr/bin/touch`，因此不能可靠识别意外执行。修正只收紧测试 PATH 到隔离目录，分别覆盖工具缺失、无执行权限和主动拒绝三种情形，并以实际 Node 可执行文件写入标记作为意外执行探针。退出 125、无标记、空日志、无回执与无 FIFO 断言全部保留；不改生产工具选择、运行时摘要、noexec 挂载或 CI gate。Local process 本地 30/30，真实 noexec 镜像结果仍须后续 CI 证明。
