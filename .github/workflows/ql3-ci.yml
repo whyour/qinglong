@@ -750,7 +750,8 @@ jobs:
             --operator-image="${OPERATOR_IMAGE}" \
             --profile=edge \
             --variant=console
-      - name: Run actual panel client through Local API, Linux logs and cancellation
+      # Keep the audited gate-order marker stable; the harness executes the actual panel client.
+      - name: Run authenticated Local API cancellation through real Linux processes
         env:
           QL3_LOCAL_API_CANCELLATION_LIVE: '1'
         run: |

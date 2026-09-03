@@ -46,3 +46,13 @@ Node 20 legacy migration toolchain 的 production panel build 通过；裁剪包
 同一原始提交的 Console 流水线 [33802432083](https://github.com/whyour/qinglong/actions/runs/33802432083) 中 PostgreSQL 18 x64 job `100804888235` 失败于 `postgres.integration.test.cjs` 的双副本调度测试：首次 `initialized` 合计为 0、期望 1。该夹具将 Trigger 时间设为观察时间前 999 ms，又使用整分钟对齐的 evaluator；在 :00 附近首次调度会合法得到 `admit`，而不是 `initialize`。本地直接执行真实 `resolveLocalScheduleDecision` 已复现这一断言失败。
 
 修正仅将这个副本/lease 测试注入的 evaluator 改为相对一分钟，避免日历边界决定测试阶段；后续仍通过 PostgreSQL 明确置 due，保持两个副本只接纳一次、一个 Run/两个事件及过期 claim 接管断言。新增覆盖分钟偏移 0、1、999、1000、59999 ms 的回归，确认初始化与显式 due admission 分离；不修改生产 croner、misfire、数据库时钟或 claim fence。相关本地 20 项通过，真实 PostgreSQL 集成因无服务跳过 1 项，仍须由远程 CI 验证；不得将旧失败 run 改记为通过。
+
+后续 `eaf1370c` 主 CI [33804738059](https://github.com/whyour/qinglong/actions/runs/33804738059) 的 PostgreSQL 18 x64 job 已通过，但 arm64 后端 job `100812384844` 暴露验收步骤改名回归：Local Operator 静态审计按稳定步骤名校验 gate 顺序，改名导致 `LOCAL_OPERATOR_CI_GATE_ORDER_DRIFT`。此前全量本地回归发生在工作流步骤改名之前，因此不能作为最终提交全绿证据。修正恢复原步骤名，仅增加说明实际客户端验收的注释；不放宽审计、不改变执行内容。最终工作流状态下专项 12/12、完整后端 1704 项（1702 pass / 2 条件 skip / 0 fail）及 Operator image audit 均通过，仍需新 CI 终态证明。
+
+## 中间包检查，不构成交付
+
+`e4ba5d40` 的 Console 流水线虽然存在上述 PostgreSQL 失败，amd64 artifact `9912447836` 与 arm64 artifact `9912402613` 已上传。两份实际下载物的 `SHA256SUMS`、bundle v8 离线审计通过；archive SHA-256 分别为 `0a8a7ba60acc4753c3889fe18255adfd2cf8fde696814a066df87e7618282f2b`、`4d6b87c4822258233ff977bac36a09064a2c4e90df6a20ccb1d86af20d3fd583`。
+
+两架构最终 Application layer 的原生 `console.js` 均为 82,521 bytes，SHA-256 `dfcba011a165743052fe290e4f4c6b6b90074fde8dec20392252100332a6eaed`，与该 source revision 逐字节相同，包含会话隔离修复；Crontab chunk 为 76,500 bytes，SHA-256 `16f7f79622947024b84c7bd43c74b81841a2372d90a09864e473fda863794446`，核对含 `task_run_v1`、版本确认、规范 cancellation 与 receipt 校验代码。240 文件 panel manifest 的两架构摘要同为 `923ea32ae7c08624f495e7e90aa9b37a66edfc69bbda3d971001d06cb439e842`。
+
+这些证据只排除了“包里仍是旧页面”的问题，没有补齐浏览器端到端、客户端 Linux 组合门或成功 milestone；失败流水线的中间包不提供给用户部署，不替代 D-431 已交付阶段包。
