@@ -20,7 +20,7 @@ D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一�
 | 阶段 | 页面能力 | 交付依据 |
 | --- | --- | --- |
 | D-429 | 原生 Task/Trigger/Secret/Run 操作；适配后旧面板登录、只读 Cron 列表与首片日志 | `09ef1745226c05521a9a44accb9d9ef95dd46c85`；[Console milestone run 33789576578](https://github.com/whyour/qinglong/actions/runs/33789576578)，已交付，见 [ADR-0531](../adr/ADR-0531-canonical-run-log-bridge-for-legacy-panel.md) |
-| D-430 | 原生 `/console` 日志“下一片段”“回到开头”“刷新当前片段” | `12ed38b7d72fe6366ad8f1ac84aebb1bb772f3b5`；[Console artifact run 33793687627](https://github.com/whyour/qinglong/actions/runs/33793687627) 已启动，尚未完成阶段实物验收，见 [ADR-0532](../adr/ADR-0532-native-console-log-window-navigation.md) |
+| D-430 | 原生 `/console` 日志“下一片段”“回到开头”“刷新当前片段” | `12ed38b7d72fe6366ad8f1ac84aebb1bb772f3b5`；[Console artifact run 33793687627](https://github.com/whyour/qinglong/actions/runs/33793687627) 已交付，两个下载 bundle 与 milestone 均通过离线审计，见 [ADR-0532](../adr/ADR-0532-native-console-log-window-navigation.md) |
 
 上表的旧面板是 bundle 自带的适配版本，不是未修改的 2.x 静态页面；旧账号密码/JWT、现有 2.x 数据和 Cluster 管理能力不会因页面可打开而自动接通。
 
@@ -98,7 +98,7 @@ D-424 阶段实物的原生 `/console` 可操作闭环是内建 argv command Tas
 - 日志整文件下载、终端、文件管理或 2.x 数据迁移；
 - LAN/public 暴露、TLS termination、多用户 Web session 或 Cluster 管理。
 
-原生 `/console` 的三项静态资产受 192 KiB 总闭包和单文件 96 KiB 门约束；D-430 源码候选合计 106,216 bytes。D-429 兼容面板经裁剪后为 240 files / 11,965,017 bytes，上限 256 files / 13 MiB / 单文件 3 MiB，不携带 `.gz` 副本或 Monaco Editor。Console 镜像仍按 12-package 闭包及 768 files / 20 MiB 门审计，exact 文件数与字节数以该次构建结果为准，不能沿用旧镜像统计。AI 依赖仍被排除；默认 headless Edge 不携带 Console/API/兼容面板资产、listener 或 Secret mutation surface。
+原生 `/console` 的三项静态资产受 192 KiB 总闭包和单文件 96 KiB 门约束；D-430 阶段实物合计 106,216 bytes。D-429 兼容面板经裁剪后为 240 files / 11,965,017 bytes，上限 256 files / 13 MiB / 单文件 3 MiB，不携带 `.gz` 副本或 Monaco Editor。Console 镜像仍按 12-package 闭包及 768 files / 20 MiB 门审计，exact 文件数与字节数以该次构建结果为准，不能沿用旧镜像统计。AI 依赖仍被排除；默认 headless Edge 不携带 Console/API/兼容面板资产、listener 或 Secret mutation surface。
 
 静态资源采用 64 KiB 流式发送；Edge 为 API 保留 4 个并发名额、另给静态资源 16 个，Standalone 分别为 32/64。兼容面板残留的外部图标和装饰图片会被严格 CSP 阻止，不影响登录、只读 Crontab 或原生 `/console`；不要为恢复装饰资源放宽 CSP 或联网边界。
 

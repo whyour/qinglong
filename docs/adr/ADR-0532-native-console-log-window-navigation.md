@@ -1,6 +1,6 @@
 # ADR-0532：原生 Console 的日志窗口导航
 
-- 状态：Accepted（D-430 源码候选；远端 CI 与 exact Console 实物待验证）
+- 状态：Accepted（D-430 exact Console 双架构阶段实物已交付）
 - 日期：2026-09-04
 - 关联：QL-RFC-0001 D-430、ADR-0515、ADR-0531
 
@@ -24,4 +24,12 @@
 
 本地验证：客户端行为测试 6/6、完整 Local API 99/99、后端 1685 项（1683 pass / 2 环境条件 skip / 0 fail），Local image 与 package boundary audit 均 compatible。原生 JS 为 74,695 bytes，三项资产合计 106,216 bytes，均在既有硬上限内。
 
-源码与本地门通过不等同阶段镜像交付。远端完整 CI、exact Console 双架构构建与离线实物校验仍需闭合；此前 ADR-0531 的 `09ef1745` artifact 不包含本切片。
+## 阶段实物
+
+提交 `12ed38b7d72fe6366ad8f1ac84aebb1bb772f3b5` 的主 CI [run 33793623200](https://github.com/whyour/qinglong/actions/runs/33793623200) 为 42 success / 3 expected skip / 0 fail；独立 Kubernetes deployment [run 33793623184](https://github.com/whyour/qinglong/actions/runs/33793623184) 成功。显式 Console artifact [run 33793687627](https://github.com/whyour/qinglong/actions/runs/33793687627) 为 43 success / 2 expected skip / 0 fail。
+
+该 run 交付 amd64/arm64/milestone artifact `9909229721`/`9909131639`/`9909265138`，GitHub ZIP 大小为 `239032779`/`234432459`/`6797` bytes，UTC 保留至 2026-10-03。三份实际下载产物的 `SHA256SUMS` 全部通过，两个 bundle v8 auditor 和 milestone v7 auditor 均返回 `compatible=true`，绑定相同 source revision、Console variant、workflow/run/attempt 与两个架构。
+
+本机还将两个下载 bundle 的 manifest SHA-256 与 milestone 索引逐一比对，并直接读取 Docker archive 中 Application 最终层的 `console.js`；两者都与该提交的源码逐字节一致，均为 74,695 bytes，SHA-256 为 `ad1a7d1e8f85f158268f9375b2db5e8c52fbb03ada5888a973f57020c36d4c02`。这确认日志导航确实进入镜像，而非只改了标签或文档。本机执行的是下载后离线校验，不是额外启动真实部署。
+
+此前 ADR-0531 的 `09ef1745` artifact 不包含本切片；本次 `12ed38b7` artifact 同样不含后续 D-431 列表分页。阶段实物仍是 `alpha_candidate_not_public_release`，不声明完整 3.0、Cluster 页面或生产升级已经完成。

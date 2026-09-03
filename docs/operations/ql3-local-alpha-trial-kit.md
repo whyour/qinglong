@@ -81,8 +81,8 @@ Console quickstart 还会通过 strong local operator 创建一个默认不自�
 `alpha-first-automation`。在页面输入 `owner-credential.json` 中的 token，选择该 Task，
 核对 revision/content digest 后显式运行；它只执行 `/bin/echo` 固定标记，不使用网络、
 SecretRef 或 Trigger。D-429 已交付产物选择该 Run 后，会经既有 `artifact.read` 权限链展示 latest
-Attempt 首个 32 KiB 日志。D-430 源码候选在原生 `/console` 增加手动分段导航；其 exact 双架构
-产物尚待验收，不应把旧 archive 当作支持翻页的版本。版本与入口差异见
+Attempt 首个 32 KiB 日志。D-430 已交付的 `12ed38b7` 双架构产物在原生 `/console` 增加手动日志分段导航；
+它不包含后续 D-431 Task/Trigger/Run 列表分页，也不应将更旧的 archive 当作支持日志翻页的版本。版本与入口差异见
 [页面功能与下载版本](./ql3-local-web-console.md#页面功能与下载版本)。页面不会自动轮询或下载整份日志。
 headless 不创建示例 Task，因此低配默认档没有示例数据或稳态开销。
 
