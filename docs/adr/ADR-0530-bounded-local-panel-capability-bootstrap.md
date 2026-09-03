@@ -1,6 +1,6 @@
 # ADR-0530：有界 Local 面板能力发现与启动适配
 
-- 状态：Accepted（D-428 本地同源装配候选已闭合，等待远端 CI 与双架构可下载实物门）
+- 状态：Accepted（D-428 exact Console 双架构阶段实物已交付）
 - 日期：2026-09-02
 - 关联 RFC：QL-RFC-0001 D-428、D-427、D-423、D-424
 
@@ -40,13 +40,14 @@ ADR-0529 已交付认证后的只读 `/api/crons` Adapter，但现有 2.x 面板
 
 本地装配候选已经通过 12-package Console closure、719 files / 16,162,123 bytes（上限 768 files / 20 MiB）镜像审计，以及面板 240-file 哈希/磁盘闭包复核。最终 arm64 Edge 镜像 `sha256:27472cf1bdd66d9fa4e937622ef69d4e36f74918a759de62818b4e59d265714c` 已完成 fresh setup/replay、Owner provision/challenge/claim/presentation/ack、首个 Task 执行与日志标记、graceful stop、SQLite integrity 和 HTTP 200/401 边界，结果为 `compatible=true`。
 
-真实浏览器已验证现有页面使用内存中的 `ql3c_` credential 完成 `/login` → `/crontab`，53 个同源静态请求全部为 200，`/api/health`、`/api/system`、`/api/v3/capabilities`、`/api/user`、`/api/system/config` 和 `/api/crons` 均为 200；最终镜像同时验证 `/console` 原生管理台与 `/login` 旧页面共存。旧页面仍引用的外部图标/装饰图片被严格 CSP 阻止，页面功能可用但这些装饰会缺失；本阶段不为消除装饰错误而放宽网络或 CSP。远端 CI 和可下载双架构实物仍待闭合。
+真实浏览器已验证现有页面使用内存中的 `ql3c_` credential 完成 `/login` → `/crontab`，53 个同源静态请求全部为 200，`/api/health`、`/api/system`、`/api/v3/capabilities`、`/api/user`、`/api/system/config` 和 `/api/crons` 均为 200；最终镜像同时验证 `/console` 原生管理台与 `/login` 旧页面共存。旧页面仍引用的外部图标/装饰图片被严格 CSP 阻止，页面功能可用但这些装饰会缺失；本阶段不为消除装饰错误而放宽网络或 CSP。
+
+提交 `fa730da0912d0e3c503697e7816aa0b14fa02165` 的普通主 CI [run 33597913690](https://github.com/whyour/qinglong/actions/runs/33597913690) 为 42 success / 3 expected condition skip / 0 fail；显式 Console artifact [run 33597938992](https://github.com/whyour/qinglong/actions/runs/33597938992) 为 43 success / 2 expected skip / 0 fail。该 run 交付 amd64/arm64/milestone artifact `9834695619`/`9834657575`/`9834716653`，大小 `239011275`/`234410955`/`6797` bytes，保留至 2026-10-02；下载后的 milestone `SHA256SUMS` 与 v7 auditor 均通过并返回 `compatible=true`。D-428 因此闭合为可直接试运行的 exact 双架构阶段页面产物。
 
 仍未完成：
 
-1. 推送后通过远端完整 CI，并生成、下载和离线复核 exact amd64/arm64 Console Trial Kit 与 milestone；
-2. 把旧面板引用的外部图标和装饰图片转为受审本地资产，做到严格 CSP 下无外部请求；
-3. 为旧页面增加 Run/Log 只读 adapter 后再开放日志入口；
-4. 写操作必须逐项映射到 3.0 revision、Policy、presence/approval、audit 和 mutation fence，不能用通配兼容路由一次性开放。
+1. 把旧面板引用的外部图标和装饰图片转为受审本地资产，做到严格 CSP 下无外部请求；
+2. Run/Log 入口由 ADR-0531 以规范 v3 API 的 caller-driven 客户端桥接继续推进；
+3. 写操作必须逐项映射到 3.0 revision、Policy、presence/approval、audit 和 mutation fence，不能用通配兼容路由一次性开放。
 
-在远端实物门完成前，本 ADR 声明的是“当前提交可装配并实跑现有面板的受控子集”，不是 Public Release，也不声明完整 2.x 面板可以零修改直连。
+本 ADR 声明的是“已有 exact 双架构阶段产物可装配并实跑现有面板的受控子集”，不是 Public Release，也不声明完整 2.x 面板可以零修改直连。

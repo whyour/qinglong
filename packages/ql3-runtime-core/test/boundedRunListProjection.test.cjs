@@ -37,7 +37,11 @@ test('projects one descending bounded page and a stable keyset cursor', async ()
     {
       async listRunsByProject(query) {
         calls.push(query);
-        return [run('run-c', 30), run('run-b', 20), run('run-a', 10)];
+        return [
+          run('run-c', 30, { triggerId: 'cron:task-run-c' }),
+          run('run-b', 20),
+          run('run-a', 10),
+        ];
       },
     },
     'prj_default',
@@ -50,6 +54,7 @@ test('projects one descending bounded page and a stable keyset cursor', async ()
         id: 'run-c',
         taskId: 'task-run-c',
         taskRevision: 'revision-1',
+        triggerId: 'cron:task-run-c',
         status: 'succeeded',
         version: 2,
         eventSequence: 3,
@@ -109,7 +114,11 @@ test('uses default and maximum bounds and passes an exact cursor', async () => {
 });
 
 test('fails closed on malformed inputs, rows, ordering and repository failures', async () => {
-  const reader = { async listRunsByProject() { return []; } };
+  const reader = {
+    async listRunsByProject() {
+      return [];
+    },
+  };
   for (const input of [
     null,
     { limit: 0 },
@@ -131,7 +140,11 @@ test('fails closed on malformed inputs, rows, ordering and repository failures',
   ]) {
     await assert.rejects(
       executeBoundedRunListProjection(
-        { async listRunsByProject() { return rows; } },
+        {
+          async listRunsByProject() {
+            return rows;
+          },
+        },
         'prj_default',
         {},
       ),
@@ -140,7 +153,11 @@ test('fails closed on malformed inputs, rows, ordering and repository failures',
   }
   await assert.rejects(
     executeBoundedRunListProjection(
-      { async listRunsByProject() { throw new Error('offline'); } },
+      {
+        async listRunsByProject() {
+          throw new Error('offline');
+        },
+      },
       'prj_default',
       {},
     ),

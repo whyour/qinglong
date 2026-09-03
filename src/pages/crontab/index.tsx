@@ -305,7 +305,7 @@ const Crontab = () => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
-            {record.status === CrontabStatus.idle && (
+            {!qingLong3ReadOnly && record.status === CrontabStatus.idle && (
               <a
                 onClick={(e) => {
                   e.stopPropagation();
@@ -315,7 +315,7 @@ const Crontab = () => {
                 {intl.get('运行')}
               </a>
             )}
-            {record.status !== CrontabStatus.idle && (
+            {!qingLong3ReadOnly && record.status !== CrontabStatus.idle && (
               <a
                 onClick={(e) => {
                   e.stopPropagation();
@@ -333,7 +333,9 @@ const Crontab = () => {
             >
               {intl.get('日志')}
             </a>
-            <MoreBtn key="more" record={record} index={index} />
+            {!qingLong3ReadOnly && (
+              <MoreBtn key="more" record={record} index={index} />
+            )}
           </Space>
         );
       },
@@ -373,7 +375,7 @@ const Crontab = () => {
   const visibleColumns = qingLong3ReadOnly
     ? columns
         .filter((column) =>
-          ['name', 'command', 'status', 'schedule'].includes(
+          ['name', 'command', 'status', 'schedule', 'action'].includes(
             String(column.key || ''),
           ),
         )
@@ -465,6 +467,7 @@ const Crontab = () => {
   };
 
   useEffect(() => {
+    if (qingLong3ReadOnly) return;
     let timer: ReturnType<typeof setTimeout>;
     let cancelled = false;
     const poll = async () => {
@@ -1132,13 +1135,14 @@ const Crontab = () => {
           components={isPhone || pageConf.size < 50 ? undefined : vt}
         />
       </div>
-      {!qingLong3ReadOnly && isLogModalVisible && (
+      {isLogModalVisible && (
         <CronLogModal
           handleCancel={() => {
-            getCronDetail(logCron);
+            if (!qingLong3ReadOnly) getCronDetail(logCron);
             setIsLogModalVisible(false);
           }}
           cron={logCron}
+          qingLong3={qingLong3}
         />
       )}
       {!qingLong3ReadOnly && isModalVisible && (

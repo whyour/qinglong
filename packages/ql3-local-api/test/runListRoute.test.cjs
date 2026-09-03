@@ -1,9 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
-const {
-  createLocalApiRunListRoute,
-} = require('../dist/run/runListRoute.js');
+const { createLocalApiRunListRoute } = require('../dist/run/runListRoute.js');
 
 function run(id, createdAtMs, overrides = {}) {
   return {
@@ -29,7 +27,7 @@ test('returns the shared bounded Project Run list projection', async () => {
   const route = createLocalApiRunListRoute({
     async listRunsByProject(query) {
       calls.push(query);
-      return [run('run-b', 20), run('run-a', 10)];
+      return [run('run-b', 20, { triggerId: 'cron:task-b' }), run('run-a', 10)];
     },
   });
   const response = await route.handle({
@@ -39,6 +37,7 @@ test('returns the shared bounded Project Run list projection', async () => {
   assert.deepEqual(calls, [{ projectId: 'prj_default', limit: 2 }]);
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.runs[0].id, 'run-b');
+  assert.equal(response.body.runs[0].triggerId, 'cron:task-b');
   assert.equal(response.body.hasMore, true);
   assert.deepEqual(response.body.next, { createdAtMs: 20, runId: 'run-b' });
   assert.equal(JSON.stringify(response).includes('secret-adjacent'), false);
@@ -50,7 +49,9 @@ test('fails closed on cross-Project, malformed and unavailable pages', async () 
     [run('run-a', 10, { status: 'invented' })],
   ]) {
     const route = createLocalApiRunListRoute({
-      async listRunsByProject() { return rows; },
+      async listRunsByProject() {
+        return rows;
+      },
     });
     assert.deepEqual(
       await route.handle({ projectId: 'prj_default', input: {} }),
@@ -58,7 +59,9 @@ test('fails closed on cross-Project, malformed and unavailable pages', async () 
     );
   }
   const unavailable = createLocalApiRunListRoute({
-    async listRunsByProject() { throw new Error('offline'); },
+    async listRunsByProject() {
+      throw new Error('offline');
+    },
   });
   assert.deepEqual(
     await unavailable.handle({ projectId: 'prj_default', input: {} }),

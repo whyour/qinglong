@@ -58,4 +58,4 @@ QingLong 2.x 面板以 `/api/crons`、数值型 Cron 行和 `{code,data}` 包络
 
 提交 `83966a128705f6ef0ae54367c8f656e3d578e9c6` 的显式 Local headless [run 33576693917](https://github.com/whyour/qinglong/actions/runs/33576693917) 与 Local Console [run 33578754251](https://github.com/whyour/qinglong/actions/runs/33578754251) 均成功。headless amd64/arm64/milestone artifact 为 `9827434236`/`9827259756`/`9827553099`，Console 为 `9828792297`/`9828714089`/`9828941802`；均绑定同一 source revision，保留至 2026-10-02。headless 继续不携带 Local API/旧面板；Console artifact 携带本 Adapter，但仍只证明后端兼容切片，不包含改造后的 2.x 静态面板。
 
-后续按 `health/system/user capability → Run/Log read → 显式写操作` 推进。ADR-0530 已完成 capability/bootstrap 与旧面板源码的内存凭据、菜单降级、只读 Crontab 适配；仍须完成同源静态资源装配和真实浏览器 journey，才能把该页面作为可下载阶段产物交付。完整 2.x 零改兼容不作为 3.0 目标。
+后续按 `health/system/user capability → Run/Log read → 显式写操作` 推进。ADR-0530 已完成 capability/bootstrap、同源静态装配、真实浏览器 journey 和双架构阶段实物；ADR-0531 继续以规范 v3 API、caller-driven 读取和 Profile 预算开放 Cron 日志。完整 2.x 零改兼容不作为 3.0 目标。

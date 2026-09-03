@@ -28,6 +28,7 @@ export interface BoundedRunListItem {
   readonly id: string;
   readonly taskId: string;
   readonly taskRevision: string;
+  readonly triggerId?: string;
   readonly status: RunStatus;
   readonly version: number;
   readonly eventSequence: number;
@@ -73,7 +74,11 @@ function boundedText(value: unknown, maximum: number): value is string {
   );
 }
 
-function integer(value: unknown, minimum: number, maximum: number): value is number {
+function integer(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+): value is number {
   return (
     Number.isSafeInteger(value) &&
     Number(value) >= minimum &&
@@ -89,7 +94,11 @@ function cursor(value: unknown): value is Readonly<ProjectRunListCursor> {
     Reflect.ownKeys(value).length === 2 &&
     Object.hasOwn(value, 'createdAtMs') &&
     Object.hasOwn(value, 'runId') &&
-    integer((value as ProjectRunListCursor).createdAtMs, 0, Number.MAX_SAFE_INTEGER) &&
+    integer(
+      (value as ProjectRunListCursor).createdAtMs,
+      0,
+      Number.MAX_SAFE_INTEGER,
+    ) &&
     boundedText((value as ProjectRunListCursor).runId, 128)
   );
 }
@@ -153,6 +162,7 @@ function projectRun(
     (boundary !== undefined && !isBefore(rowCursor, boundary)) ||
     !boundedText(value.taskId, 255) ||
     !boundedText(value.taskRevision, 255) ||
+    (value.triggerId !== undefined && !boundedText(value.triggerId, 128)) ||
     !RUN_STATUSES.includes(value.status) ||
     !EXECUTION_ORIGINS.includes(value.executionOrigin) ||
     (value.executionOwner !== 'legacy' && value.executionOwner !== 'runtime') ||
@@ -169,6 +179,7 @@ function projectRun(
     id: value.id,
     taskId: value.taskId,
     taskRevision: value.taskRevision,
+    ...(value.triggerId === undefined ? {} : { triggerId: value.triggerId }),
     status: value.status,
     version: value.version,
     eventSequence: value.eventSequence,
@@ -177,8 +188,12 @@ function projectRun(
     executionOwner: value.executionOwner,
     createdAtMs: value.createdAtMs,
     ...(value.queuedAtMs === undefined ? {} : { queuedAtMs: value.queuedAtMs }),
-    ...(value.startedAtMs === undefined ? {} : { startedAtMs: value.startedAtMs }),
-    ...(value.finishedAtMs === undefined ? {} : { finishedAtMs: value.finishedAtMs }),
+    ...(value.startedAtMs === undefined
+      ? {}
+      : { startedAtMs: value.startedAtMs }),
+    ...(value.finishedAtMs === undefined
+      ? {}
+      : { finishedAtMs: value.finishedAtMs }),
   });
 }
 

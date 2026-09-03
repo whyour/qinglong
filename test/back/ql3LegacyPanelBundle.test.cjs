@@ -138,3 +138,39 @@ test('rejects mutable assets and external entrypoint drift', (t) => {
     /retains an external origin/u,
   );
 });
+
+test('keeps the QL3 legacy panel log journey canonical, bounded and caller-driven', () => {
+  const crontab = fs.readFileSync(
+    path.resolve(__dirname, '../../src/pages/crontab/index.tsx'),
+    'utf8',
+  );
+  const logModal = fs.readFileSync(
+    path.resolve(__dirname, '../../src/pages/crontab/logModal.tsx'),
+    'utf8',
+  );
+
+  assert.match(
+    crontab,
+    /\['name', 'command', 'status', 'schedule', 'action'\]/u,
+  );
+  assert.match(crontab, /!qingLong3ReadOnly && record\.status/u);
+  assert.match(crontab, /qingLong3=\{qingLong3\}/u);
+  assert.match(
+    crontab,
+    /useEffect\(\(\) => \{\s+if \(qingLong3ReadOnly\) return;[\s\S]+setTimeout\(poll, 10000\)/u,
+  );
+
+  assert.match(logModal, /qingLong3Credential\(\)/u);
+  assert.match(
+    logModal,
+    /Math\.min\(capabilities\.limits\.cronPageSize, remaining\)/u,
+  );
+  assert.match(logModal, /\/api\/v3\/projects\/\$\{projectId\}\/runs\?/u);
+  assert.match(logModal, /run\?\.triggerId === triggerId/u);
+  assert.match(logModal, /attempts\/\$\{attempt\.id\}\/log\?offset=0&length=/u);
+  assert.match(
+    logModal,
+    /if \(qingLong3\) \{[\s\S]+readQingLong3CronLog[\s\S]+return;\s+\}\s+request/u,
+  );
+  assert.match(logModal, />\s*刷新\s*<\/Button>/u);
+});
