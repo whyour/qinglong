@@ -33,3 +33,5 @@
 真实 Chromium 使用当前静态资产和仅监听本机的合成 HTTP 服务完成连接、创建 Task、确认 Secret GET 挂起、断开、放行旧响应的交互；页面保持等待凭据且没有重开编辑器。测试没有真实数据库、生产 credential 或写入 authority，不能代替镜像端到端验收。
 
 上述本地验证不代表修复已进入既有下载产物。D-431 的 `ce8c3a7d2afdbb11b2a33f4884702454d1d22a53` 产物也不包含本修复；本切片必须以自己的 source revision、CI 和阶段归档证据验收。
+
+提交 `03afd7e8` 的独立 Kubernetes deployment 验证通过，但主 CI [run 33799350582](https://github.com/whyour/qinglong/actions/runs/33799350582) 在 CloudNativePG live gate 失败：rollout 已完成，旧 operator Pod 仍为 Terminating，`verifyImageIds` 纳入其空 imageID 后拒绝。`2005cb6b` 单独修正 operator 取样，排除 deletionTimestamp 已设置的 Pod；存活 Pod 仍执行原摘要校验，空集合仍失败，针对性回归 11/11。此本地修复不改写旧 run 的失败结论，须由后续同源 CI 验证。

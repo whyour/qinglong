@@ -1,6 +1,6 @@
 # ADR-0533：原生 Console 的任务、定时与运行列表分页
 
-- 状态：Accepted（D-431 远端 CI 与产物构建通过；下载实物复核待完成）
+- 状态：Accepted（D-431 exact 双架构 Console 阶段实物已交付并复核）
 - 日期：2026-09-04
 - 关联：QL-RFC-0001 D-431、ADR-0532
 
@@ -29,4 +29,6 @@
 
 真实 Chromium 使用当前原生静态资产与合成 HTTP 数据验证了 Task、Trigger、Run 的第 65 条可达，任务详情可从第二页打开，DOM 每次只保留当前页。请求记录包含三个规范 continuation URL，浏览期间没有自动列表轮询。该浏览器证据验证交互，不冒充真实数据库、Owner 写入或双架构镜像验收。
 
-提交 `ce8c3a7d2afdbb11b2a33f4884702454d1d22a53` 的主 CI [run 33796190607](https://github.com/whyour/qinglong/actions/runs/33796190607) 与 Console artifact [run 33797144811](https://github.com/whyour/qinglong/actions/runs/33797144811) 均已完成并成功。上传清单包含 amd64 `9910148271`（239,038,659 bytes）、arm64 `9910153237`（234,438,339 bytes）及 milestone `9910185111`（6,797 bytes）；本记录仅确认远端成功与上传存在，下载后的 checksum、离线 auditor 和 archive 源码复核尚未完成。这些归档不包含后续 ADR-0534 的客户端连接代次修复。
+提交 `ce8c3a7d2afdbb11b2a33f4884702454d1d22a53` 的主 CI [run 33796190607](https://github.com/whyour/qinglong/actions/runs/33796190607) 与 Console artifact [run 33797144811](https://github.com/whyour/qinglong/actions/runs/33797144811) 均已完成并成功。上传清单包含 amd64 `9910148271`（239,038,659 bytes）、arm64 `9910153237`（234,438,339 bytes）及 milestone `9910185111`（6,797 bytes）。三份已实际下载，SHA256SUMS、双 bundle v8 auditor、milestone v7 auditor 均通过，两份 bundle manifest digest 与 milestone 一致。Docker archive 内 application 最终层的 `console.js` 均为 80,336 bytes、SHA256 `febac949f0f72ebeda41fe743909074762d5add0804895ca6802b54d0d51a6a5`，与该提交逐字节一致。amd64 archive SHA256 为 `dffa8606ee30e6cbf45bd1166ad0c716450e15ac21c07e7e15e539db140d3281`，arm64 为 `25cad723858afea09f2787cf42160db4150e48690e03afdbb0ac396eb1bcb8c9`。
+
+因本机空间不足，完成审计后已删除本轮两份临时 Docker archive，保留 manifest 等小文件；归档可从上述 run 重新下载。这些实物仍为 Alpha，不包含后续 ADR-0534 的客户端连接代次修复或 ADR-0535 的旧面板执行管理。

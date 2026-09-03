@@ -51,6 +51,7 @@ export function panelCapabilities(
     panel: Object.freeze({
       bootstrap: true,
       cronList: 'bounded_read_only',
+      runControl: 'task_run_v1',
       taskRead: true,
       triggerRead: true,
       runRead: true,

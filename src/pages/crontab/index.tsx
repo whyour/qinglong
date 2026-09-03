@@ -53,6 +53,7 @@ import { getScheduleType } from './const';
 import CronDetailModal from './detail';
 import './index.less';
 import CronLogModal from './logModal';
+import QingLong3RunControlModal from '@/components/qinglong3/runControlModal';
 import CronModal, { CronLabelModal } from './modal';
 import {
   CrontabStatus,
@@ -305,6 +306,16 @@ const Crontab = () => {
         const isPc = !isPhone;
         return (
           <Space size="middle">
+            {qingLong3?.panel.runControl === 'task_run_v1' && (
+              <a
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRunControlCron(record);
+                }}
+              >
+                执行管理
+              </a>
+            )}
             {!qingLong3ReadOnly && record.status === CrontabStatus.idle && (
               <a
                 onClick={(e) => {
@@ -350,6 +361,7 @@ const Crontab = () => {
   const [searchText, setSearchText] = useState('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
+  const [runControlCron, setRunControlCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [pageConf, setPageConf] = useState<{
     page: number;
@@ -992,7 +1004,13 @@ const Crontab = () => {
       title={intl.get('定时任务')}
       extra={
         qingLong3ReadOnly
-          ? [<Tag key="ql3-read-only">QingLong 3.0 · 有界只读</Tag>]
+          ? [
+              <Tag key="ql3-read-only">
+                {qingLong3?.panel.runControl === 'task_run_v1'
+                  ? 'QingLong 3.0 · 定时只读 / 执行可管理'
+                  : 'QingLong 3.0 · 有界只读'}
+              </Tag>,
+            ]
           : [
               <Search
                 key="search"
@@ -1143,6 +1161,13 @@ const Crontab = () => {
           }}
           cron={logCron}
           qingLong3={qingLong3}
+        />
+      )}
+      {runControlCron && qingLong3?.panel.runControl === 'task_run_v1' && (
+        <QingLong3RunControlModal
+          cron={runControlCron}
+          capabilities={qingLong3}
+          onClose={() => setRunControlCron(undefined)}
         />
       )}
       {!qingLong3ReadOnly && isModalVisible && (

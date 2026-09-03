@@ -15,6 +15,7 @@ export interface QingLong3Capabilities {
   readonly panel: Readonly<{
     bootstrap: true;
     cronList: 'bounded_read_only';
+    runControl?: 'task_run_v1';
     legacyMutations: false;
     legacyLogin: false;
     subscriptions: false;
@@ -34,6 +35,11 @@ const CREDENTIAL_PATTERN =
 
 let capabilities: Readonly<QingLong3Capabilities> | null = null;
 let credential: string | null = null;
+let session: Readonly<object> = Object.freeze({});
+
+export function qingLong3Session(): Readonly<object> {
+  return session;
+}
 
 function validCapabilities(value: any): value is QingLong3Capabilities {
   const profile = value?.deployment?.profile;
@@ -50,6 +56,8 @@ function validCapabilities(value: any): value is QingLong3Capabilities {
       value?.authentication?.loginEndpoint === null &&
       value?.panel?.bootstrap === true &&
       value?.panel?.cronList === 'bounded_read_only' &&
+      (value?.panel?.runControl === undefined ||
+        value.panel.runControl === 'task_run_v1') &&
       value?.panel?.legacyMutations === false &&
       value?.panel?.legacyLogin === false &&
       value?.panel?.subscriptions === false &&
@@ -96,6 +104,7 @@ export function qingLong3Capabilities(): Readonly<QingLong3Capabilities> | null 
 
 export function setQingLong3Credential(value: string): boolean {
   if (!CREDENTIAL_PATTERN.test(value)) return false;
+  session = Object.freeze({});
   credential = value;
   return true;
 }
@@ -105,6 +114,7 @@ export function qingLong3Credential(): string | null {
 }
 
 export function clearQingLong3Credential(): void {
+  session = Object.freeze({});
   credential = null;
 }
 

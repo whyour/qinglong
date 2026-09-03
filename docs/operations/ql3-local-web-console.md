@@ -21,10 +21,13 @@ D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一�
 | --- | --- | --- |
 | D-429 | 原生 Task/Trigger/Secret/Run 操作；适配后旧面板登录、只读 Cron 列表与首片日志 | `09ef1745226c05521a9a44accb9d9ef95dd46c85`；[Console milestone run 33789576578](https://github.com/whyour/qinglong/actions/runs/33789576578)，已交付，见 [ADR-0531](../adr/ADR-0531-canonical-run-log-bridge-for-legacy-panel.md) |
 | D-430 | 原生 `/console` 日志“下一片段”“回到开头”“刷新当前片段” | `12ed38b7d72fe6366ad8f1ac84aebb1bb772f3b5`；[Console artifact run 33793687627](https://github.com/whyour/qinglong/actions/runs/33793687627) 已交付，两个下载 bundle 与 milestone 均通过离线审计，见 [ADR-0532](../adr/ADR-0532-native-console-log-window-navigation.md) |
+| D-431 | 原生 Task/Trigger/Run 列表下一页、回到首页与当前页刷新 | `ce8c3a7d2afdbb11b2a33f4884702454d1d22a53`；[Console artifact run 33797144811](https://github.com/whyour/qinglong/actions/runs/33797144811) 已下载并完成双架构 checksum、auditor 和 archive 源码复核，见 [ADR-0533](../adr/ADR-0533-native-console-ledger-pagination.md) |
 
 上表的旧面板是 bundle 自带的适配版本，不是未修改的 2.x 静态页面；旧账号密码/JWT、现有 2.x 数据和 Cluster 管理能力不会因页面可打开而自动接通。
 
-D-431 源码候选进一步给原生 Task、Trigger、Run 列表增加页脚“下一页／回到首页／刷新当前页”。每次只显示最多 64 条，翻页替换旧记录和详情，不累积全文；顶部刷新与切换栏目回首页，页脚刷新保留当前边界。浏览期间数据可能变化，因此不提供固定总页数或快照承诺。Secret 目录和 Run Event/Step 仍维持现有窗口限制。此功能尚未交付到上表的 D-429 或 D-430 archive，见 [ADR-0533](../adr/ADR-0533-native-console-ledger-pagination.md)。
+D-431 给原生 Task、Trigger、Run 列表增加页脚“下一页／回到首页／刷新当前页”。每次只显示最多 64 条，翻页替换旧记录和详情，不累积全文；顶部刷新与切换栏目回首页，页脚刷新保留当前边界。浏览期间数据可能变化，因此不提供固定总页数或快照承诺。Secret 目录和 Run Event/Step 仍维持现有窗口限制。此功能不在 D-429 或 D-430 archive 中，见 [ADR-0533](../adr/ADR-0533-native-console-ledger-pagination.md)。
+
+D-433 源码候选为旧面板定时行增加“执行管理”：先展示当前 Task revision，再显式确认运行；选择确切 Run 后可以刷新、读该次日志或请求取消。它不恢复旧 Cron 写接口，也不修改定时绑定版本。网络结果不明时只重试同一 mutation，关闭窗口不会撤销已提交请求。此功能需服务端 capability 显式开放，不包含在上表任何旧归档中，见 [ADR-0535](../adr/ADR-0535-canonical-panel-run-control.md)。
 
 D-426b2c 又补齐了 Console 镜像的 adopted-target 入口证据：切换演练使用 `ql3-local-api --cutover-probe --config <local-api.json>`，同时绑定外层 API 配置、内层 Application 配置与 exact mounts，但该模式不会启动本页使用的 listener、credential、scheduler 或 mutation surface。正常启动仍使用下文不带 `--cutover-probe` 的命令；提交 `229c3cb4e826866a0c7c4d81cb5e52cdc3975eec` 的 [artifact run 33463415938](https://github.com/whyour/qinglong/actions/runs/33463415938) 已交付 exact amd64/arm64 Console Trial Kit 与 milestone，三份下载产物的离线 auditor 均为 `compatible=true`。
 

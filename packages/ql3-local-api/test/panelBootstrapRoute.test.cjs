@@ -33,6 +33,7 @@ test('publishes an exact profile-aware capability contract', () => {
     panel: {
       bootstrap: true,
       cronList: 'bounded_read_only',
+      runControl: 'task_run_v1',
       taskRead: true,
       triggerRead: true,
       runRead: true,

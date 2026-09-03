@@ -536,8 +536,9 @@
 | [ADR-0530](./ADR-0530-bounded-local-panel-capability-bootstrap.md)                                | 有界 Local 面板能力发现与启动适配                                                                                                                                                                                                        | Accepted（D-428 exact Console 双架构阶段实物已交付） |
 | [ADR-0531](./ADR-0531-canonical-run-log-bridge-for-legacy-panel.md)                               | 现有面板到规范 Run 日志的有界桥接                                                                                                                                                                                                         | Accepted（D-429 exact Console 双架构阶段实物已交付） |
 | [ADR-0532](./ADR-0532-native-console-log-window-navigation.md) | 原生 Console 日志窗口导航 | Accepted（D-430 exact Console 双架构阶段实物已交付） |
-| [ADR-0533](./ADR-0533-native-console-ledger-pagination.md) | 原生 Console 任务、定时与运行列表分页 | Accepted（D-431 源码候选；实物待验证） |
+| [ADR-0533](./ADR-0533-native-console-ledger-pagination.md) | 原生 Console 任务、定时与运行列表分页 | Accepted（D-431 exact 双架构 Console 阶段实物已交付并复核） |
 | [ADR-0534](./ADR-0534-native-console-session-isolation.md) | 原生 Console 异步操作的连接代次隔离 | Accepted（D-432 源码候选；同源 CI 与实物待验证） |
+| [ADR-0535](./ADR-0535-canonical-panel-run-control.md) | 现有面板的规范 Task/Run 执行管理 | Accepted（D-433 源码候选；同源 CI 与实物待验证） |
 
 ## 规则
 
