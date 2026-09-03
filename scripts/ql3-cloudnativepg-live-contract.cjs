@@ -485,11 +485,21 @@ function verifyImageIds(pods, expectedDigests, description) {
   return [...new Set(imageIds)];
 }
 
+function activeOperatorPods(pods) {
+  // A successful Deployment rollout can leave the old Pod terminating with
+  // an empty imageID. It is not evidence for the new serving generation.
+  return pods.filter(
+    (pod) =>
+      !pod.metadata?.deletionTimestamp &&
+      (pod.spec?.containers || []).some((container) =>
+        container.image.includes('cloudnative-pg'),
+      ),
+  );
+}
+
 function operatorPods() {
-  return kubectlJson(['-n', 'cnpg-system', 'get', 'pods']).items.filter((pod) =>
-    (pod.spec?.containers || []).some((container) =>
-      container.image.includes('cloudnative-pg'),
-    ),
+  return activeOperatorPods(
+    kubectlJson(['-n', 'cnpg-system', 'get', 'pods']).items,
   );
 }
 
@@ -1034,6 +1044,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  activeOperatorPods,
   imageDigest,
   imageTag,
   localApplicationManifest,

@@ -5,6 +5,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 
 const {
+  activeOperatorPods,
   imageDigest,
   imageTag,
   localApplicationManifest,
@@ -19,6 +20,49 @@ const {
 const INDEX = `sha256:${'a'.repeat(64)}`;
 const PLATFORM = `sha256:${'b'.repeat(64)}`;
 const VERSION = readReleaseIdentity(path.resolve(__dirname, '../..')).version;
+
+test('operator image evidence excludes terminating rollout remnants but never missing or unreviewed live pods', () => {
+  const operator = (imageID, deleting = false) => ({
+    metadata: deleting ? { deletionTimestamp: '2026-09-03T20:00:17Z' } : {},
+    spec: {
+      containers: [
+        { image: `ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0@${INDEX}` },
+      ],
+    },
+    status: { containerStatuses: [{ imageID }] },
+  });
+  const live = operator(`ghcr.io/cloudnative-pg/cloudnative-pg@${PLATFORM}`);
+  const old = operator('', true);
+  assert.throws(() =>
+    verifyImageIds([live, old], [INDEX, PLATFORM], 'operator'),
+  );
+  assert.deepEqual(activeOperatorPods([live, old]), [live]);
+  assert.deepEqual(
+    verifyImageIds(
+      activeOperatorPods([live, old]),
+      [INDEX, PLATFORM],
+      'operator',
+    ),
+    [`ghcr.io/cloudnative-pg/cloudnative-pg@${PLATFORM}`],
+  );
+  assert.throws(() =>
+    verifyImageIds(activeOperatorPods([old]), [INDEX], 'operator'),
+  );
+  assert.throws(() =>
+    verifyImageIds(
+      activeOperatorPods([live, operator('')]),
+      [INDEX, PLATFORM],
+      'operator',
+    ),
+  );
+  assert.throws(() =>
+    verifyImageIds(
+      activeOperatorPods([live, operator(`sha256:${'c'.repeat(64)}`)]),
+      [INDEX, PLATFORM],
+      'operator',
+    ),
+  );
+});
 
 function pods(...imageIds) {
   return imageIds.map((imageID) => ({
