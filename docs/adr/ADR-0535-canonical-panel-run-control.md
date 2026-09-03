@@ -1,6 +1,6 @@
 # ADR-0535：现有面板的规范 Task/Run 执行管理
 
-- 状态：Accepted（D-433 源码候选；同源 CI 与实物待验证）
+- 状态：Accepted（D-433 原始源码主 CI 已通过；客户端组合门与实物待验证）
 - 日期：2026-09-04
 - 关联：QL-RFC-0001 D-433、ADR-0530、ADR-0531、ADR-0534
 
@@ -38,3 +38,11 @@ Node 20 legacy migration toolchain 的 production panel build 通过；裁剪包
 报告升级为 `schemaVersion=2`，要求客户端源摘要、日志/重启日志、响应丢失和相同 body 重试事实，以及一次 start POST、两次 cancellation POST。旧 v1 报告不能代替新门；原 Linux、128/256 MiB、64/256 PID、SQLite 完整性和精确事件计数要求保持不变。报告明确固定 `browserRendering=false`、`ownerProvisioning=seeded_fixture`，不能声称已经完成浏览器渲染、真实 Owner 初始化、任务创建或定时配置全链路。
 
 本地专项回归 21/21，完整后端 1704 项（1702 pass / 2 条件 skip / 0 fail）；Local image 与 18-package boundary audit 均通过。沙箱内完整回归因 loopback `EPERM` 失败后，在允许本机端口的环境完成上述重跑，不将首次失败算作通过。本机 Docker Engine 不可连接，官方启动/恢复尝试未成功，因此新增 Linux 客户端组合门尚未执行；原有 CI amd64/arm64 Local image job 将继续执行此门，不以单元测试替代。
+
+## 远程 CI 与整分钟边界回归
+
+原始面板执行管理提交 `e4ba5d405f55543dd5d3ca432c24648171ebdda4` 的主 CI [33802395394](https://github.com/whyour/qinglong/actions/runs/33802395394) 已成功；它不包含后续 `e684a6e6` 的真实客户端组合验收增强。
+
+同一原始提交的 Console 流水线 [33802432083](https://github.com/whyour/qinglong/actions/runs/33802432083) 中 PostgreSQL 18 x64 job `100804888235` 失败于 `postgres.integration.test.cjs` 的双副本调度测试：首次 `initialized` 合计为 0、期望 1。该夹具将 Trigger 时间设为观察时间前 999 ms，又使用整分钟对齐的 evaluator；在 :00 附近首次调度会合法得到 `admit`，而不是 `initialize`。本地直接执行真实 `resolveLocalScheduleDecision` 已复现这一断言失败。
+
+修正仅将这个副本/lease 测试注入的 evaluator 改为相对一分钟，避免日历边界决定测试阶段；后续仍通过 PostgreSQL 明确置 due，保持两个副本只接纳一次、一个 Run/两个事件及过期 claim 接管断言。新增覆盖分钟偏移 0、1、999、1000、59999 ms 的回归，确认初始化与显式 due admission 分离；不修改生产 croner、misfire、数据库时钟或 claim fence。相关本地 20 项通过，真实 PostgreSQL 集成因无服务跳过 1 项，仍须由远程 CI 验证；不得将旧失败 run 改记为通过。

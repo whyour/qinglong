@@ -77,8 +77,50 @@ function nextMinute(schedule, afterMs) {
   if (schedule.expression !== '* * * * *' || schedule.timezone !== 'UTC') {
     throw new Error('unsupported test schedule');
   }
-  return Math.floor(afterMs / 60_000 + 1) * 60_000;
+  // This fixture tests replica claims, not calendar cron evaluation. A relative
+  // minute keeps initialization in the future even when setup crosses :00;
+  // the admission phase explicitly makes next_fire_at_ms due in PostgreSQL.
+  return afterMs + 60_000;
 }
+
+test('replica fixture initializes independently of wall-clock minute boundaries', () => {
+  const {
+    resolveLocalScheduleDecision,
+  } = require('@qinglong/runtime-core/local-scheduler');
+  for (const offset of [0, 1, 999, 1_000, 59_999]) {
+    const observedAtMs = 120_000 + offset;
+    const candidate = {
+      projectId: 'default',
+      triggerId: 'trigger-multi-replica',
+      triggerRevision: 1,
+      triggerContentDigest: 'a'.repeat(64),
+      triggerUpdatedAtMs: observedAtMs - 999,
+      taskId: 'task-multi-replica',
+      taskRevision: 1,
+      taskContentDigest: 'b'.repeat(64),
+      expression: '* * * * *',
+      timezone: 'UTC',
+      misfirePolicy: 'skip',
+      stateVersion: 0,
+      nextFireAtMs: null,
+    };
+    assert.equal(
+      resolveLocalScheduleDecision(candidate, observedAtMs, 5_000, nextMinute)
+        .disposition,
+      'initialize',
+      `minute offset ${offset}`,
+    );
+    assert.equal(
+      resolveLocalScheduleDecision(
+        { ...candidate, nextFireAtMs: observedAtMs },
+        observedAtMs,
+        5_000,
+        nextMinute,
+      ).disposition,
+      'admit',
+    );
+  }
+});
 
 function workerRequest(address, requestPath, token, body) {
   const payload = Buffer.from(JSON.stringify(body));
