@@ -80,8 +80,10 @@ AI-excluded，但 quickstart 会在 Linux 上使用 host network，让容器内�
 Console quickstart 还会通过 strong local operator 创建一个默认不自动运行的
 `alpha-first-automation`。在页面输入 `owner-credential.json` 中的 token，选择该 Task，
 核对 revision/content digest 后显式运行；它只执行 `/bin/echo` 固定标记，不使用网络、
-SecretRef 或 Trigger。D-420 后选择该 Run 还会经既有 `artifact.read` 权限链展示 latest
-Attempt 首个 32 KiB 日志；后续内容继续使用 API 分页，页面不会自动轮询或下载整份日志。
+SecretRef 或 Trigger。D-429 已交付产物选择该 Run 后，会经既有 `artifact.read` 权限链展示 latest
+Attempt 首个 32 KiB 日志。D-430 源码候选在原生 `/console` 增加手动分段导航；其 exact 双架构
+产物尚待验收，不应把旧 archive 当作支持翻页的版本。版本与入口差异见
+[页面功能与下载版本](./ql3-local-web-console.md#页面功能与下载版本)。页面不会自动轮询或下载整份日志。
 headless 不创建示例 Task，因此低配默认档没有示例数据或稳态开销。
 
 ## 只读检查现有 2.x 升级就绪度
