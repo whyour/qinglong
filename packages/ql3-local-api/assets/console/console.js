@@ -916,8 +916,16 @@
     }
   }
 
-  async function renderSecrets() {
-    const value = await loadSecretCatalog();
+  async function renderSecrets(request) {
+    const response = await api(
+      `/api/v3/projects/${request.project}/secrets?limit=64`,
+    );
+    if (!request.isCurrent()) return;
+    state.secretCatalog = normalizeSecretMetadata(response);
+    const value = {
+      secrets: state.secretCatalog,
+      truncated: response.truncated === true,
+    };
     if (value.secrets.length === 0) {
       empty('还没有加密 Secret。创建后可在命令 Task 中绑定固定版本。');
       return;
@@ -1221,11 +1229,122 @@
     }
   }
 
-  async function renderTasks() {
-    const value = await api(`/api/v3/projects/${state.project}/tasks?limit=64`);
-    const tasks = Array.isArray(value.tasks) ? value.tasks : [];
+  function ledgerCursor(view, value) {
+    const field =
+      view === 'runs' ? 'runId' : view === 'tasks' ? 'taskId' : 'triggerId';
+    const keys = view === 'runs' ? [field, 'createdAtMs'] : [field];
+    if (
+      !value ||
+      Object.keys(value).length !== keys.length ||
+      !keys.every((key) => Object.hasOwn(value, key)) ||
+      typeof value[field] !== 'string' ||
+      !TASK_PATTERN.test(value[field]) ||
+      (view === 'runs' &&
+        (!Number.isSafeInteger(value.createdAtMs) || value.createdAtMs < 0))
+    ) {
+      throw new TypeError('列表分页边界无效，请回到首页重新读取。');
+    }
+    return view === 'runs'
+      ? { runId: value.runId, createdAtMs: value.createdAtMs }
+      : { [field]: value[field] };
+  }
+
+  function ledgerCursorFollows(view, cursor, previous) {
+    if (!previous) return true;
+    if (view === 'runs')
+      return (
+        cursor.createdAtMs < previous.createdAtMs ||
+        (cursor.createdAtMs === previous.createdAtMs &&
+          cursor.runId < previous.runId)
+      );
+    const field = view === 'tasks' ? 'taskId' : 'triggerId';
+    return cursor[field] > previous[field];
+  }
+
+  async function readLedgerPage(request) {
+    const { view, project, after } = request;
+    let query = 'limit=64';
+    if (after) {
+      const cursor = ledgerCursor(view, after);
+      // The HTTP contract accepts canonical ASCII IDs, not percent-encoded aliases.
+      query +=
+        view === 'runs'
+          ? `&after_created_at_ms=${cursor.createdAtMs}&after_run_id=${cursor.runId}`
+          : view === 'tasks'
+          ? `&after_task_id=${cursor.taskId}`
+          : `&after_trigger_id=${cursor.triggerId}`;
+    }
+    const value = await api(`/api/v3/projects/${project}/${view}?${query}`);
+    if (!request.isCurrent()) return null;
+    const rows = value[view];
+    const hasMore = view === 'triggers' ? value.truncated : value.hasMore;
+    if (
+      !Array.isArray(rows) ||
+      rows.length > 64 ||
+      typeof hasMore !== 'boolean'
+    ) {
+      throw new TypeError('列表响应无效，请重新读取。');
+    }
+    let boundary = after;
+    for (const row of rows) {
+      const cursor = ledgerCursor(
+        view,
+        view === 'runs'
+          ? { runId: row?.id, createdAtMs: row?.createdAtMs }
+          : view === 'tasks'
+          ? { taskId: row?.taskId }
+          : { triggerId: row?.triggerId },
+      );
+      if (!ledgerCursorFollows(view, cursor, boundary)) {
+        throw new TypeError('列表顺序或分页边界发生异常，请回到首页。');
+      }
+      boundary = cursor;
+    }
+    let next = null;
+    if (hasMore) {
+      next = ledgerCursor(view, value.next);
+      if (!rows.length || JSON.stringify(next) !== JSON.stringify(boundary)) {
+        throw new TypeError('列表继续边界不匹配，请回到首页。');
+      }
+    } else if (value.next != null) {
+      throw new TypeError('列表终点携带异常继续边界，请回到首页。');
+    }
+    return { rows, next };
+  }
+
+  function ledgerNavigation(request, next) {
+    const footer = element('section');
+    const actions = element('div', 'detail-actions');
+    const load = (after) => {
+      if (!footer.isConnected || !request.isCurrent()) return;
+      return refresh({ pageCursor: after });
+    };
+    actions.append(actionButton('刷新当前页', () => load(request.after)));
+    if (request.after)
+      actions.append(actionButton('回到首页', () => load(null)));
+    if (next) actions.append(actionButton('下一页', () => load(next)));
+    footer.append(
+      actions,
+      element(
+        'p',
+        'privacy-note',
+        '每次最多 64 条，翻页替换当前窗口。列表不是固定快照；顶部刷新或切换栏目从首页重新读取。',
+      ),
+    );
+    return footer;
+  }
+
+  async function renderTasks(request) {
+    const page = await readLedgerPage(request);
+    if (!page) return;
+    const tasks = page.rows;
     if (tasks.length === 0) {
-      empty('还没有可见任务。请先通过受信任的管理入口发布 Task。');
+      empty(
+        request.after
+          ? '当前窗口没有任务，可回到首页重新读取。'
+          : '还没有可见任务。选择“创建任务”开始。',
+      );
+      nodes.ledger.append(ledgerNavigation(request, page.next));
       return;
     }
     const fragment = document.createDocumentFragment();
@@ -1260,20 +1379,23 @@
       list.append(button);
     }
     fragment.append(list);
-    if (value.hasMore) {
-      fragment.append(
-        element(
-          'p',
-          'privacy-note',
-          '当前只展示前 64 条；完整分页将在后续 Console 切片开放。',
-        ),
-      );
-    }
+    fragment.append(ledgerNavigation(request, page.next));
     replace(nodes.ledger, fragment);
   }
 
   async function selectTask(taskId) {
     state.selectedId = taskId;
+    const selection = {};
+    const project = state.project;
+    const listRequest = state.listRequest;
+    state.detailSelection = selection;
+    const isCurrent = () =>
+      state.detailSelection === selection &&
+      state.listRequest === listRequest &&
+      state.selectedId === taskId &&
+      state.view === 'tasks' &&
+      state.project === project &&
+      Boolean(state.token);
     const selected = nodes.ledger.querySelectorAll('.record');
     for (const row of selected) {
       if (row.dataset.identity === taskId) {
@@ -1286,12 +1408,13 @@
     loadingBox.append(element('span'));
     replace(nodes.detail, loadingBox);
     try {
-      const value = await api(
-        `/api/v3/projects/${state.project}/tasks/${taskId}`,
-      );
+      const value = await api(`/api/v3/projects/${project}/tasks/${taskId}`);
+      if (!isCurrent()) return;
+      if (value.task?.taskId !== taskId)
+        throw new Error('Task identity mismatch');
       renderTaskDetail(value.task);
     } catch (error) {
-      detailEmpty(describeError(error));
+      if (isCurrent()) detailEmpty(describeError(error));
     }
   }
 
@@ -1360,13 +1483,17 @@
     }
   }
 
-  async function renderTriggers() {
-    const value = await api(
-      `/api/v3/projects/${state.project}/triggers?limit=64`,
-    );
-    const triggers = Array.isArray(value.triggers) ? value.triggers : [];
+  async function renderTriggers(request) {
+    const page = await readLedgerPage(request);
+    if (!page) return;
+    const triggers = page.rows;
     if (triggers.length === 0) {
-      empty('还没有定时触发器。创建后，现有本地调度器会按 cron 自动生成 Run。');
+      empty(
+        request.after
+          ? '当前窗口没有定时，可回到首页重新读取。'
+          : '还没有定时触发器。创建后，本地调度器会按 cron 自动生成 Run。',
+      );
+      nodes.ledger.append(ledgerNavigation(request, page.next));
       return;
     }
     const fragment = document.createDocumentFragment();
@@ -1404,20 +1531,23 @@
       list.append(button);
     }
     fragment.append(list);
-    if (value.truncated) {
-      fragment.append(
-        element(
-          'p',
-          'privacy-note',
-          '当前只展示前 64 条；使用 API 可继续读取下一页。',
-        ),
-      );
-    }
+    fragment.append(ledgerNavigation(request, page.next));
     replace(nodes.ledger, fragment);
   }
 
   async function selectTrigger(triggerId) {
     state.selectedId = triggerId;
+    const selection = {};
+    const project = state.project;
+    const listRequest = state.listRequest;
+    state.detailSelection = selection;
+    const isCurrent = () =>
+      state.detailSelection === selection &&
+      state.listRequest === listRequest &&
+      state.selectedId === triggerId &&
+      state.view === 'triggers' &&
+      state.project === project &&
+      Boolean(state.token);
     for (const row of nodes.ledger.querySelectorAll('.record')) {
       if (row.dataset.identity === triggerId) {
         row.setAttribute('aria-current', 'true');
@@ -1430,11 +1560,14 @@
     replace(nodes.detail, loadingBox);
     try {
       const value = await api(
-        `/api/v3/projects/${state.project}/triggers/${triggerId}`,
+        `/api/v3/projects/${project}/triggers/${triggerId}`,
       );
+      if (!isCurrent()) return;
+      if (value.trigger?.triggerId !== triggerId)
+        throw new Error('Trigger identity mismatch');
       renderTriggerDetail(value.trigger);
     } catch (error) {
-      detailEmpty(describeError(error));
+      if (isCurrent()) detailEmpty(describeError(error));
     }
   }
 
@@ -1480,11 +1613,17 @@
     replace(nodes.detail, fragment);
   }
 
-  async function renderRuns() {
-    const value = await api(`/api/v3/projects/${state.project}/runs?limit=64`);
-    const runs = Array.isArray(value.runs) ? value.runs : [];
+  async function renderRuns(request) {
+    const page = await readLedgerPage(request);
+    if (!page) return;
+    const runs = page.rows;
     if (runs.length === 0) {
-      empty('还没有运行记录。切换到任务，选择一个已启用 Task 开始运行。');
+      empty(
+        request.after
+          ? '当前窗口没有运行，可回到首页重新读取。'
+          : '还没有运行记录。切换到任务，选择一个已启用 Task 开始运行。',
+      );
+      nodes.ledger.append(ledgerNavigation(request, page.next));
       return;
     }
     const fragment = document.createDocumentFragment();
@@ -1513,15 +1652,7 @@
       list.append(button);
     }
     fragment.append(list);
-    if (value.hasMore) {
-      fragment.append(
-        element(
-          'p',
-          'privacy-note',
-          '当前只展示最近 64 条；使用 API 可继续读取下一页。',
-        ),
-      );
-    }
+    fragment.append(ledgerNavigation(request, page.next));
     replace(nodes.ledger, fragment);
   }
 
@@ -1856,19 +1987,36 @@
     }
   }
 
-  async function refresh() {
+  async function refresh(options = {}) {
     if (!state.token) return;
+    state.selectedId = null;
+    detailEmpty();
+    const request = {
+      project: state.project,
+      view: state.view,
+      after: options.pageCursor ?? null,
+    };
+    state.listRequest = request;
+    request.isCurrent = () =>
+      state.listRequest === request &&
+      state.project === request.project &&
+      state.view === request.view &&
+      Boolean(state.token);
     loading();
     try {
-      if (state.view === 'tasks') await renderTasks();
-      else if (state.view === 'triggers') await renderTriggers();
-      else if (state.view === 'secrets') await renderSecrets();
-      else await renderRuns();
-      setConnection('connected', `${state.project} · 已连接`);
+      if (request.view === 'tasks') await renderTasks(request);
+      else if (request.view === 'triggers') await renderTriggers(request);
+      else if (request.view === 'secrets') await renderSecrets(request);
+      else await renderRuns(request);
+      if (request.isCurrent())
+        setConnection('connected', `${request.project} · 已连接`);
     } catch (error) {
-      errorState(error);
+      if (request.isCurrent()) {
+        errorState(error);
+        if (request.after) nodes.ledger.append(ledgerNavigation(request, null));
+      }
     } finally {
-      setBusy(false);
+      if (request.isCurrent()) setBusy(false);
     }
   }
 

@@ -24,6 +24,8 @@ D-418 已闭合独立 Console image/Trial Kit；D-419 的 v5 quickstart 进一�
 
 上表的旧面板是 bundle 自带的适配版本，不是未修改的 2.x 静态页面；旧账号密码/JWT、现有 2.x 数据和 Cluster 管理能力不会因页面可打开而自动接通。
 
+D-431 源码候选进一步给原生 Task、Trigger、Run 列表增加页脚“下一页／回到首页／刷新当前页”。每次只显示最多 64 条，翻页替换旧记录和详情，不累积全文；顶部刷新与切换栏目回首页，页脚刷新保留当前边界。浏览期间数据可能变化，因此不提供固定总页数或快照承诺。Secret 目录和 Run Event/Step 仍维持现有窗口限制。此功能尚未交付到上表的 D-429 或 D-430 archive，见 [ADR-0533](../adr/ADR-0533-native-console-ledger-pagination.md)。
+
 D-426b2c 又补齐了 Console 镜像的 adopted-target 入口证据：切换演练使用 `ql3-local-api --cutover-probe --config <local-api.json>`，同时绑定外层 API 配置、内层 Application 配置与 exact mounts，但该模式不会启动本页使用的 listener、credential、scheduler 或 mutation surface。正常启动仍使用下文不带 `--cutover-probe` 的命令；提交 `229c3cb4e826866a0c7c4d81cb5e52cdc3975eec` 的 [artifact run 33463415938](https://github.com/whyour/qinglong/actions/runs/33463415938) 已交付 exact amd64/arm64 Console Trial Kit 与 milestone，三份下载产物的离线 auditor 均为 `compatible=true`。
 
 ## 前置条件
