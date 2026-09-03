@@ -1,6 +1,6 @@
 # ADR-0531：现有面板到规范 Run 日志的有界桥接
 
-- 状态：Accepted（D-429 源码候选；远端 CI 与双架构 Console 实物待 gate）
+- 状态：Accepted（D-429 exact Console 双架构阶段实物已交付）
 - 日期：2026-09-04
 - 关联 RFC：QL-RFC-0001 D-429、D-428、D-415
 
@@ -30,7 +30,9 @@ Run 聚合已经持久化可选 `triggerId`，规范 Local API 已提供有界 R
 
 本地已完成 runtime-core 594/594、Local API 93/93、18-package clean build/test、后端 1685 项（1683 pass / 2 environment skip / 0 fail）、兼容闭包回归 4/4、Node 20 production panel build，以及 package boundary、Edge import、Cluster dependency 和 240 files / 11,965,017 bytes 离线闭包审计。真实 Chromium mock journey 验证了 QL3 credential 登录、只读 Action 列、Run list → Run detail → Attempt log 三个规范请求和 Base64/UTF-8 日志展示；页面稳定 15 秒只有一次 Cron list，日志打开后稳定 5 秒没有自动重读。
 
-仍须完成 GitNexus staged/default-branch change detection、阶段提交、远端完整 CI，并生成、下载和离线复核 exact amd64/arm64 Console Trial Kit 与 milestone，才可把 D-429 标记为双架构阶段实物已交付。
+运行时代码提交 `09ef1745226c05521a9a44accb9d9ef95dd46c85` 的主 CI [run 33787481413](https://github.com/whyour/qinglong/actions/runs/33787481413) 为 42 success / 3 expected condition skip / 0 fail；独立 Kubernetes deployment live [run 33787481415](https://github.com/whyour/qinglong/actions/runs/33787481415) 与 Security Administration live [run 33787481443](https://github.com/whyour/qinglong/actions/runs/33787481443) 均成功。显式 Console artifact [run 33789576578](https://github.com/whyour/qinglong/actions/runs/33789576578) 为 43 success / 2 expected skip / 0 fail，交付 amd64/arm64/milestone artifact `9907367021`/`9907250404`/`9907412968`，大小 `239029707`/`234429387`/`6797` bytes，保留至 2026-10-03。下载后的 `SHA256SUMS` 与 `qinglong/alpha-local-milestone-audit@v7` 均通过，source revision、Console variant、workflow run 和双架构身份完全一致，`compatible=true`。D-429 因此闭合为可直接试运行的阶段页面产物。
+
+后续仍需把旧面板外部装饰资产本地化，并按独立 ADR 评审原生 `/console` 的任务详情、日志续读和明确写操作；不得用兼容面一次性恢复 2.x 全部管理权限。
 
 ## 不做的方案
 
