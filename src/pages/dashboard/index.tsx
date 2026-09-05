@@ -16,6 +16,7 @@ import { SharedContext } from '@/layouts';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import CronLogModal from '../crontab/logModal';
+import FailureModal from './failureModal';
 
 interface Overview {
   total: number;
@@ -93,6 +94,7 @@ const Dashboard = () => {
   const [labels, setLabels] = useState<any[]>([]);
   const [logCron, setLogCron] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showFailures, setShowFailures] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -193,7 +195,16 @@ const Dashboard = () => {
           <Card size="small"><Statistic title={intl.get('今日成功')} value={overview?.todaySuccess || 0} valueStyle={{ color: '#52c41a' }} prefix={<CheckCircleOutlined />} /></Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={3}>
-          <Card size="small"><Statistic title={intl.get('今日失败')} value={overview?.todayFail || 0} valueStyle={{ color: '#ff4d4f' }} prefix={<CloseCircleOutlined />} /></Card>
+          <Card size="small" hoverable role="button" tabIndex={0}
+            aria-label={intl.get('今日失败')}
+            onClick={() => setShowFailures(true)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setShowFailures(true);
+              }
+            }}
+          ><Statistic title={intl.get('今日失败')} value={overview?.todayFail || 0} valueStyle={{ color: '#ff4d4f' }} prefix={<CloseCircleOutlined />} /></Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={3}>
           <Card size="small"><Statistic title={intl.get('平均耗时')} value={overview?.avgTime ? `${(overview.avgTime / 1000).toFixed(1)}s` : '-'} prefix={<ClockCircleOutlined />} /></Card>
@@ -350,6 +361,7 @@ const Dashboard = () => {
           </Card>
         </Col>
       </Row>
+      {showFailures && <FailureModal onCancel={() => setShowFailures(false)} />}
       {logCron && (
         <CronLogModal
           cron={logCron}

@@ -657,5 +657,9 @@
   "已完成": "Completed",
   "已停止": "Stopped",
   "退出码": "Exit Code",
-  "结束": "End"
+  "结束": "End",
+  "失败次数": "Failure count",
+  "最新日志": "Latest log",
+  "加载失败": "Failed to load",
+  "重试": "Retry"
 }
