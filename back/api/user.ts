@@ -22,7 +22,25 @@ const storage = multer.diskStorage({
     cb(null, key + ext);
   },
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const imageTypes: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.avif': 'image/avif',
+    };
+    if (imageTypes[ext] !== file.mimetype) {
+      return cb(new Error(t('仅支持 PNG、JPEG、GIF、WebP、AVIF 图片')));
+    }
+    cb(null, true);
+  },
+});
 
 export default (app: Router) => {
   app.use('/user', route);
@@ -35,8 +53,8 @@ export default (app: Router) => {
     }),
     celebrate({
       body: Joi.object({
-        username: Joi.string().required(),
-        password: Joi.string().required(),
+        username: Joi.string().max(1024).required(),
+        password: Joi.string().max(1024).required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -70,8 +88,8 @@ export default (app: Router) => {
     '/',
     celebrate({
       body: Joi.object({
-        username: Joi.string().required(),
-        password: Joi.string().required(),
+        username: Joi.string().max(1024).required(),
+        password: Joi.string().max(1024).required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -156,11 +174,12 @@ export default (app: Router) => {
 
   route.put(
     '/two-factor/login',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
     celebrate({
       body: Joi.object({
         code: Joi.string().required(),
-        username: Joi.string().required(),
-        password: Joi.string().required(),
+        username: Joi.string().max(1024).required(),
+        password: Joi.string().max(1024).required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -272,17 +291,18 @@ export default (app: Router) => {
 
   route.put(
     '/init',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
     celebrate({
       body: Joi.object({
-        username: Joi.string().required(),
-        password: Joi.string().required(),
+        username: Joi.string().max(1024).required(),
+        password: Joi.string().max(1024).required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const userService = Container.get(UserService);
-        const result = await userService.updateUsernameAndPassword(req.body);
+        const result = await userService.initializeUser(req.body);
         res.send(result);
       } catch (e) {
         return next(e);

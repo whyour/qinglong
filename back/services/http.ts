@@ -12,7 +12,7 @@ export class HttpServerService {
   async initialize(expressApp: express.Application, port: number) {
     const hostsToTry = [
       config.bindHost,
-      ...(config.bindHost !== '0.0.0.0' ? ['0.0.0.0'] : [])
+      ...(config.bindHost === '::' ? ['0.0.0.0'] : [])
     ];
 
     let lastError: Error | null = null;

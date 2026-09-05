@@ -75,6 +75,8 @@ export interface AuthInfo {
   lastaddr: string;
   platform: string;
   isTwoFactorChecking: boolean;
+  twoFactorExpiresAt?: number;
+  lastTwoFactorStep?: number;
   token: string;
   tokens: Record<string, string | TokenInfo[]>;
   twoFactorActivated: boolean;

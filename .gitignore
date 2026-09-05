@@ -35,3 +35,6 @@ __pycache__
 
 # local Kubernetes overlays
 /deploy/kubernetes/overlays/local/
+
+# Local security audit artifacts
+/audit/

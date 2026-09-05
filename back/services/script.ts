@@ -1,3 +1,4 @@
+import { resolveFileAccess } from '../shared/fileAccess';
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import path, { join } from 'path';
@@ -65,8 +66,11 @@ export default class ScriptService {
   }
 
   public checkFilePath(filePath: string, fileName: string) {
-    const finalPath = path.resolve(config.scriptPath, filePath, fileName);
-    return finalPath.startsWith(config.scriptPath) ? finalPath : '';
+    return resolveFileAccess(
+      config.scriptPath,
+      [filePath || '', fileName],
+      config.blackFileList,
+    );
   }
 
   public async getFile(filePath: string, fileName: string) {

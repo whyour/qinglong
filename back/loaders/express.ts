@@ -48,7 +48,26 @@ export default ({ app }: { app: Application }) => {
   }
 
   app.get(`${config.api.prefix}/env.js`, serveEnv);
-  app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
+  app.use(
+    `${config.api.prefix}/static`,
+    express.static(config.uploadPath, {
+      setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+      },
+    }),
+  );
+
+  const credentialPaths = ['/api', '/open'].flatMap((prefix) =>
+    ['/user/login', '/user/init', '/user/two-factor/login'].map(
+      (route) => `${prefix}${route}`,
+    ),
+  );
+  app.use(
+    credentialPaths,
+    bodyParser.json({ limit: '16kb' }),
+    bodyParser.urlencoded({ limit: '16kb', extended: false }),
+  );
 
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
@@ -123,7 +142,7 @@ export default ({ app }: { app: Application }) => {
     }
 
     const authInfo = await shareStore.getAuthInfo();
-    if (isValidToken(authInfo, headerToken, req.platform)) {
+    if (isValidToken(authInfo, headerToken, req.platform, config.jwt.secret)) {
       return next();
     }
 

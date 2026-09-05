@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+import { resolveFileAccess } from '../shared/fileAccess';
 import { fileExist, readDirs, readDir, rmPath, IFile } from '../config/util';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
@@ -14,15 +16,17 @@ const route = Router();
 
 function isPathAllowed(targetPath: string): boolean {
   const resolved = path.resolve(targetPath);
-  return config.writePathList.some((x) => resolved.startsWith(x));
+  return config.writePathList.some((x) =>
+    Boolean(resolveFileAccess(x, [resolved], config.blackFileList)),
+  );
 }
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, config.scriptPath);
+    cb(null, config.tmpPath);
   },
   filename: function (req, file, cb) {
-    cb(null, file.originalname);
+    cb(null, randomUUID());
   },
 });
 const upload = multer({ storage: storage });
@@ -50,6 +54,15 @@ export default (app: Router) => {
           'package-lock.json',
         ];
         if (req.query.path) {
+          if (
+            !resolveFileAccess(
+              config.scriptPath,
+              [req.query.path as string],
+              config.blackFileList,
+            )
+          ) {
+            return res.send({ code: 403, message: t('暂无权限') });
+          }
           result = await readDir(
             req.query.path as string,
             config.scriptPath,
@@ -77,7 +90,8 @@ export default (app: Router) => {
         logger.error('🔥 error: %o', e);
         return next(e);
       }
-    });
+    },
+  );
 
   route.get(
     '/detail',
@@ -91,7 +105,7 @@ export default (app: Router) => {
       try {
         const scriptService = Container.get(ScriptService);
         const content = await scriptService.getFile(
-          req.query?.path as string || '',
+          (req.query?.path as string) || '',
           req.query.file as string,
         );
         res.send({ code: 200, data: content });
@@ -101,18 +115,21 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/:file',
-    (req: Request, res: Response) => {
-      return res.send({
-        code: 410,
-        message: t('接口已下线，请使用 /scripts/detail 接口'),
-      });
-    },
-  );
+  route.get('/:file', (req: Request, res: Response) => {
+    return res.send({
+      code: 410,
+      message: t('接口已下线，请使用 /scripts/detail 接口'),
+    });
+  });
 
   route.post(
     '/',
+    (req: Request, res: Response, next: NextFunction) => {
+      res.on('finish', () => {
+        if (req.file?.path) fs.unlink(req.file.path).catch(() => undefined);
+      });
+      next();
+    },
     upload.single('file'),
     celebrate({
       body: Joi.object({
@@ -156,7 +173,8 @@ export default (app: Router) => {
           if (!isPathAllowed(uploadPath)) {
             return res.send({ code: 403, message: t('暂无权限') });
           }
-          await fs.rename(req.file.path, uploadPath);
+          await fs.copyFile(req.file.path, uploadPath);
+          await fs.unlink(req.file.path);
           return res.send({ code: 200 });
         }
 

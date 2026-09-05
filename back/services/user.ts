@@ -26,6 +26,13 @@ import isNil from 'lodash/isNil';
 import { shareStore } from '../shared/store';
 import { t, tf } from '../shared/i18n';
 import { getClientIp, normalizeClientIp } from '../shared/clientIp';
+import { isDefaultAuthInfo } from '../shared/auth';
+import {
+  hashPassword,
+  isPasswordHash,
+  verifyPassword,
+} from '../shared/password';
+import { serializeAuthMutation } from '../shared/authMutation';
 
 @Service()
 export default class UserService {
@@ -38,7 +45,15 @@ export default class UserService {
     private sockService: SockService,
   ) {}
 
+  @serializeAuthMutation
   public async login(
+    payloads: { username: string; password: string },
+    req: Request,
+  ): Promise<any> {
+    return this.authenticate(payloads, req);
+  }
+
+  private async authenticate(
     payloads: {
       username: string;
       password: string;
@@ -48,6 +63,9 @@ export default class UserService {
   ): Promise<any> {
     let { username, password } = payloads;
     const content = await this.getAuthInfo();
+    if (isDefaultAuthInfo(content)) {
+      return { code: 450, message: t('请先初始化') };
+    }
     const timestamp = Date.now();
     const ip = getClientIp(req);
     const query = new IP2Region();
@@ -100,14 +118,13 @@ export default class UserService {
       };
     }
 
-    if (
-      username === cUsername &&
-      password === cPassword &&
-      twoFactorActivated &&
-      needTwoFactor
-    ) {
+    const passwordMatches =
+      username === cUsername && (await verifyPassword(password, cPassword));
+
+    if (passwordMatches && twoFactorActivated && needTwoFactor) {
       await this.updateAuthInfo(content, {
         isTwoFactorChecking: true,
+        twoFactorExpiresAt: timestamp + 5 * 60 * 1000,
       });
       return {
         code: 420,
@@ -115,7 +132,7 @@ export default class UserService {
       };
     }
 
-    if (username === cUsername && password === cPassword) {
+    if (passwordMatches) {
       const data = createRandomString(50, 100);
       const expiration = twoFactorActivated ? '60d' : '20d';
       let token = jwt.sign({ data }, config.jwt.secret, {
@@ -138,6 +155,9 @@ export default class UserService {
       );
 
       await this.updateAuthInfo(content, {
+        password: isPasswordHash(cPassword)
+          ? cPassword
+          : await hashPassword(password),
         token,
         tokens: updatedTokens,
         lastlogon: timestamp,
@@ -146,6 +166,7 @@ export default class UserService {
         lastaddr: address,
         platform: req.platform,
         isTwoFactorChecking: false,
+        twoFactorExpiresAt: 0,
       });
       this.notificationService.notify(
         t('登录通知'),
@@ -231,6 +252,7 @@ export default class UserService {
     }
   }
 
+  @serializeAuthMutation
   public async logout(platform: string, tokenValue: string): Promise<any> {
     if (!platform || !tokenValue) {
       this.logger.warn('Invalid logout parameters - empty platform or token');
@@ -291,6 +313,7 @@ export default class UserService {
     );
   }
 
+  @serializeAuthMutation
   public async blockIp(ip: string): Promise<string[]> {
     const authInfo = await this.getAuthInfo();
     const blockedIps = uniq([
@@ -301,6 +324,7 @@ export default class UserService {
     return blockedIps;
   }
 
+  @serializeAuthMutation
   public async unblockIp(ip: string): Promise<string[]> {
     const authInfo = await this.getAuthInfo();
     const normalizedIp = normalizeClientIp(ip);
@@ -316,6 +340,33 @@ export default class UserService {
     return doc;
   }
 
+  @serializeAuthMutation
+  public async initializeUser({
+    username,
+    password,
+  }: {
+    username: string;
+    password: string;
+  }) {
+    const authInfo = await this.getAuthInfo();
+    if (!isDefaultAuthInfo(authInfo)) {
+      return { code: 450, message: t('未知错误') };
+    }
+    if (password === 'admin') {
+      return { code: 400, message: t('密码不能设置为admin') };
+    }
+    await this.updateAuthInfo(authInfo, {
+      username,
+      password: await hashPassword(password),
+      token: '',
+      tokens: {},
+      isTwoFactorChecking: false,
+      twoFactorExpiresAt: 0,
+    });
+    return { code: 200, message: t('更新成功') };
+  }
+
+  @serializeAuthMutation
   public async updateUsernameAndPassword({
     username,
     password,
@@ -327,24 +378,37 @@ export default class UserService {
       return { code: 400, message: t('密码不能设置为admin') };
     }
     const authInfo = await this.getAuthInfo();
-    await this.updateAuthInfo(authInfo, { username, password });
+    await this.updateAuthInfo(authInfo, {
+      username,
+      password: await hashPassword(password),
+      token: '',
+      tokens: {},
+      isTwoFactorChecking: false,
+      twoFactorExpiresAt: 0,
+    });
     return { code: 200, message: t('更新成功') };
   }
 
+  @serializeAuthMutation
   public async updateAvatar(avatar: string) {
     const authInfo = await this.getAuthInfo();
     await this.updateAuthInfo(authInfo, { avatar });
     return { code: 200, data: avatar, message: t('更新成功') };
   }
 
+  @serializeAuthMutation
   public async initTwoFactor() {
     const secret = authenticator.generateSecret();
     const authInfo = await this.getAuthInfo();
+    if (authInfo.twoFactorActivated) {
+      throw new Error(t('请先关闭两步验证'));
+    }
     const otpauth = authenticator.keyuri(authInfo.username, 'qinglong', secret);
     await this.updateAuthInfo(authInfo, { twoFactorSecret: secret });
     return { secret, url: otpauth };
   }
 
+  @serializeAuthMutation
   public async activeTwoFactor(code: string) {
     const authInfo = await this.getAuthInfo();
     const isValid = authenticator.verify({
@@ -352,11 +416,18 @@ export default class UserService {
       secret: authInfo.twoFactorSecret,
     });
     if (isValid) {
-      await this.updateAuthInfo(authInfo, { twoFactorActivated: true });
+      await this.updateAuthInfo(authInfo, {
+        twoFactorActivated: true,
+        token: '',
+        tokens: {},
+        isTwoFactorChecking: false,
+        twoFactorExpiresAt: 0,
+      });
     }
     return isValid;
   }
 
+  @serializeAuthMutation
   public async twoFactorLogin(
     {
       username,
@@ -367,15 +438,28 @@ export default class UserService {
   ) {
     const authInfo = await this.getAuthInfo();
     const { isTwoFactorChecking, twoFactorSecret } = authInfo;
-    if (!isTwoFactorChecking) {
+    const now = Date.now();
+    const retries = authInfo.retries || 0;
+    if (retries > 2 && now - authInfo.lastlogon < Math.pow(3, retries) * 1000) {
+      return { code: 410, message: t('失败次数过多，请稍后重试') };
+    }
+    if (
+      !isTwoFactorChecking ||
+      !authInfo.twoFactorActivated ||
+      !authInfo.twoFactorExpiresAt ||
+      authInfo.twoFactorExpiresAt <= now
+    ) {
       return { code: 450, message: t('未知错误') };
     }
-    const isValid = authenticator.verify({
-      token: code,
-      secret: twoFactorSecret,
-    });
+    const step = Math.floor(now / 30000);
+    const isValid =
+      username === authInfo.username &&
+      (await verifyPassword(password, authInfo.password)) &&
+      authInfo.lastTwoFactorStep !== step &&
+      authenticator.verify({ token: code, secret: twoFactorSecret });
     if (isValid) {
-      return this.login({ username, password }, req, false);
+      await this.updateAuthInfo(authInfo, { lastTwoFactorStep: step });
+      return this.authenticate({ username, password }, req, false);
     } else {
       const ip = getClientIp(req);
       const query = new IP2Region();
@@ -388,6 +472,9 @@ export default class UserService {
           .join(' ');
       }
       await this.updateAuthInfo(authInfo, {
+        retries: retries + 1,
+        lastlogon: now,
+        isTwoFactorChecking: retries + 1 < 5,
         lastip: ip,
         lastaddr: address,
         platform: req.platform,
@@ -396,11 +483,16 @@ export default class UserService {
     }
   }
 
+  @serializeAuthMutation
   public async deactivateTwoFactor() {
     const authInfo = await this.getAuthInfo();
     await this.updateAuthInfo(authInfo, {
       twoFactorActivated: false,
       twoFactorSecret: '',
+      token: '',
+      tokens: {},
+      isTwoFactorChecking: false,
+      twoFactorExpiresAt: 0,
     });
     return true;
   }
@@ -421,6 +513,9 @@ export default class UserService {
       type: AuthDataType.authConfig,
       info: result,
     });
+    if (info.tokens && Object.keys(info.tokens).length === 0) {
+      this.sockService.getClients().forEach((conn) => conn.close('401'));
+    }
   }
 
   public async getNotificationMode(): Promise<NotificationInfo> {
@@ -562,6 +657,7 @@ export default class UserService {
     return undefined;
   }
 
+  @serializeAuthMutation
   public async resetAuthInfo(info: Partial<AuthInfo>) {
     const { retries, twoFactorActivated, password, username } = info;
     if (password === 'admin') {
@@ -578,6 +674,21 @@ export default class UserService {
       (x) => !isNil(x),
     );
 
+    if (password !== undefined) {
+      payload.password = await hashPassword(password);
+    }
+    if (
+      password !== undefined ||
+      username !== undefined ||
+      twoFactorActivated !== undefined
+    ) {
+      Object.assign(payload, {
+        token: '',
+        tokens: {},
+        isTwoFactorChecking: false,
+        twoFactorExpiresAt: 0,
+      });
+    }
     await this.updateAuthInfo(authInfo, payload);
   }
 }

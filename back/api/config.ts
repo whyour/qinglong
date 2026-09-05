@@ -9,6 +9,7 @@ import { SAMPLE_FILES } from '../config/const';
 import { t } from '../shared/i18n';
 import ConfigService from '../services/config';
 import { writeFileWithLock } from '../shared/utils';
+import { resolveFileAccess } from '../shared/fileAccess';
 const route = Router();
 
 export default (app: Router) => {
@@ -78,14 +79,12 @@ export default (app: Router) => {
           basePath = join(config.rootPath, 'data/scripts');
         }
         const cleanName = name.replace(/^data\/scripts\//, '');
-        const resolvedPath = join(basePath, cleanName);
-        const normalized = join(resolvedPath);
-        // Verify the resolved path stays within allowed directory
-        if (!normalized.startsWith(basePath)) {
-          return res.send({ code: 403, message: t('文件路径无效') });
-        }
-        // Check blacklist on actual filename (not user input)
-        if (config.blackFileList.includes(basename(normalized))) {
+        const normalized = resolveFileAccess(
+          basePath,
+          [cleanName],
+          config.blackFileList,
+        );
+        if (!normalized) {
           return res.send({ code: 403, message: t('文件无法访问') });
         }
         await writeFileWithLock(normalized, content);
@@ -96,13 +95,10 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/:file',
-    (req: Request, res: Response) => {
-      return res.send({
-        code: 410,
-        message: t('接口已下线，请使用 /configs/detail 接口'),
-      });
-    },
-  );
+  route.get('/:file', (req: Request, res: Response) => {
+    return res.send({
+      code: 410,
+      message: t('接口已下线，请使用 /configs/detail 接口'),
+    });
+  });
 };

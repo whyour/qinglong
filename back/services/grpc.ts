@@ -40,7 +40,7 @@ export class GrpcServerService {
       const grpcPort = config.grpcPort;
       const hostsToTry = [
         config.bindHostGrpc,
-        ...(config.bindHostGrpc !== '0.0.0.0' ? ['0.0.0.0'] : [])
+        ...(config.bindHostGrpc === '::' ? ['0.0.0.0'] : [])
       ];
       const bindAsync = promisify(this.server.bindAsync).bind(this.server);
 

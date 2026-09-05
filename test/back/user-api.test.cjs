@@ -46,7 +46,7 @@ test('initialization returns the username and password validation result', async
     paths: [],
   };
   Container.get = () => ({
-    updateUsernameAndPassword: async () => ({
+    initializeUser: async () => ({
       code: 400,
       message: 'password rejected',
     }),

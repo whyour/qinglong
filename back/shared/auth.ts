@@ -1,11 +1,8 @@
 import { AuthInfo, TokenInfo } from '../data/system';
+import jwt from 'jsonwebtoken';
 
 export function isDefaultAuthInfo(authInfo: AuthInfo): boolean {
-  return (
-    Object.keys(authInfo).length === 2 &&
-    authInfo.username === 'admin' &&
-    authInfo.password === 'admin'
-  );
+  return authInfo.username === 'admin' && authInfo.password === 'admin';
 }
 
 /**
@@ -21,8 +18,18 @@ export function isValidToken(
   authInfo: AuthInfo | null | undefined,
   headerToken: string,
   platform: string,
+  secret: string,
 ): boolean {
   if (!authInfo || !headerToken) {
+    return false;
+  }
+
+  try {
+    const claims = jwt.verify(headerToken, secret, { algorithms: ['HS384'] });
+    if (typeof claims === 'string' || typeof claims.exp !== 'number') {
+      return false;
+    }
+  } catch {
     return false;
   }
 
@@ -46,7 +53,12 @@ export function isValidToken(
     return headerToken === platformTokens;
   } else if (Array.isArray(platformTokens)) {
     // New format: array of TokenInfo objects
-    return platformTokens.some((t: TokenInfo) => t && t.value === headerToken);
+    return platformTokens.some(
+      (t: TokenInfo) =>
+        t &&
+        t.value === headerToken &&
+        (t.expiration === undefined || t.expiration > Date.now() / 1000),
+    );
   }
 
   // Unexpected type - log warning and reject
