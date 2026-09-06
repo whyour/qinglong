@@ -21,6 +21,7 @@ export enum NotificationMode {
   'ntfy' = 'ntfy',
   'wxPusherBot' = 'wxPusherBot',
   'openiLink' = 'openiLink',
+  'wpush' = 'wpush',
 }
 
 abstract class NotificationBaseInfo {
@@ -172,6 +173,12 @@ export class OpeniLinkNotification extends NotificationBaseInfo {
   public openiLinkContextToken = '';
 }
 
+export class WpushNotification extends NotificationBaseInfo {
+  public wpushApiKey = '';
+  public wpushChannel = '';
+  public wpushTopicCode = '';
+}
+
 export interface NotificationInfo
   extends GoCqHttpBotNotification,
     GotifyNotification,
@@ -195,4 +202,5 @@ export interface NotificationInfo
     NtfyNotification,
     WxPusherBotNotification,
     WxPusherSptNotification,
-    OpeniLinkNotification {}
+    OpeniLinkNotification,
+    WpushNotification {}

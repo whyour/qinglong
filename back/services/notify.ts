@@ -37,6 +37,7 @@ export default class NotificationService {
     ['wxPusherBot', this.wxPusherBot],
     ['wxPusherSpt', this.wxPusherSpt],
     ['openiLink', this.openiLink],
+    ['wpush', this.wpush],
   ]);
 
   private title = '';
@@ -947,4 +948,31 @@ export default class NotificationService {
       throw new Error(error.response ? error.response.body : error);
     }
   }
+  private async wpush() {
+    const { wpushApiKey, wpushChannel, wpushTopicCode } = this.params;
+    const url = 'https://api.wpush.cn/api/v1/send';
+    const json: Record<string, string> = {
+      apikey: `${wpushApiKey}`,
+      title: `${this.title}`,
+      content: `${this.content}`,
+      channel: `${wpushChannel || 'wechat'}`,
+    };
+    if (wpushTopicCode) {
+      json.topic_code = `${wpushTopicCode}`;
+    }
+    try {
+      const res = await httpClient.post(url, {
+        ...this.gotOption,
+        json,
+      });
+      if (res.code === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
 }

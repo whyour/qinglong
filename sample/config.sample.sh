@@ -276,3 +276,13 @@ export OPENILINK_HUB_URL=""
 export OPENILINK_CONTEXT_TOKEN=""
 
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可
+
+## 23. WPUSH
+## 官方文档: https://wpush.cn/docs
+## WPUSH_APIKEY (必填) 在 https://wpush.cn/settings 获取，以 WPUSH 开头
+export WPUSH_APIKEY=""
+## 推送渠道，支持 wechat/app/sms/mail/webhook/dingtalk/feishu/wechat_work/clawbot/qqbot，默认 wechat
+export WPUSH_CHANNEL="wechat"
+## 可选，Topic 广播编码；填写后按 Topic 推送
+export WPUSH_TOPIC_CODE=""
+

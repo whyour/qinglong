@@ -162,6 +162,11 @@ const push_config = {
   OPENILINK_APP_TOKEN: '', // OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取
   OPENILINK_HUB_URL: '', // OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
   OPENILINK_CONTEXT_TOKEN: '', // OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
+
+  // WPUSH 官方文档: https://wpush.cn/docs
+  WPUSH_APIKEY: '', // WPUSH 的 API Key，在 https://wpush.cn/settings 获取
+  WPUSH_CHANNEL: 'wechat', // 推送渠道，支持 wechat/app/sms/mail/webhook/dingtalk/feishu/wechat_work/clawbot/qqbot
+  WPUSH_TOPIC_CODE: '', // 可选，Topic 广播编码
 };
 
 for (const key in push_config) {
@@ -1494,6 +1499,54 @@ function wxPusherSptNotify(text, desp) {
   });
 }
 
+
+
+function wpushNotify(text, desp) {
+  return new Promise((resolve) => {
+    const { WPUSH_APIKEY, WPUSH_CHANNEL, WPUSH_TOPIC_CODE } = push_config;
+    if (WPUSH_APIKEY) {
+      const body = {
+        apikey: `${WPUSH_APIKEY}`,
+        title: `${text}`,
+        content: `${desp}`,
+        channel: `${WPUSH_CHANNEL || 'wechat'}`,
+      };
+      if (WPUSH_TOPIC_CODE) {
+        body.topic_code = WPUSH_TOPIC_CODE;
+      }
+      const options = {
+        url: `https://api.wpush.cn/api/v1/send`,
+        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout,
+      };
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('WPUSH 发送通知消息失败！\n', err);
+          } else {
+            if (data.code === 0) {
+              console.log('WPUSH 发送通知消息成功！');
+            } else {
+              console.log(
+                `WPUSH 发送通知消息异常：${data.message || JSON.stringify(data)}`,
+              );
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(data);
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
 function openiLinkNotify(text, desp) {
   return new Promise((resolve) => {
     const { OPENILINK_APP_TOKEN, OPENILINK_HUB_URL, OPENILINK_CONTEXT_TOKEN } =
@@ -1674,6 +1727,7 @@ async function sendNotify(text, desp, params = {}) {
     wxPusherNotify(text, desp), // wxpusher
     wxPusherSptNotify(text, desp), // wxpusher SPT
     openiLinkNotify(text, desp), // OpeniLink
+    wpushNotify(text, desp), // WPUSH
   ]);
 }
 

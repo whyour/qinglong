@@ -661,5 +661,8 @@
   "失败次数": "失败次数",
   "最新日志": "最新日志",
   "加载失败": "加载失败",
-  "重试": "重试"
+  "重试": "重试",
+  "WPUSH的API Key，在 https://wpush.cn/settings 获取，参考 https://wpush.cn/docs": "WPUSH的API Key，在 https://wpush.cn/settings 获取，参考 https://wpush.cn/docs",
+  "推送渠道，支持 wechat/app/sms/mail/webhook/dingtalk/feishu/wechat_work/clawbot/qqbot，默认 wechat": "推送渠道，支持 wechat/app/sms/mail/webhook/dingtalk/feishu/wechat_work/clawbot/qqbot，默认 wechat",
+  "可选，Topic 广播编码；填写后按 Topic 推送，参考 https://wpush.cn/docs": "可选，Topic 广播编码；填写后按 Topic 推送，参考 https://wpush.cn/docs"
 }

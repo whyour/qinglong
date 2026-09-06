@@ -147,6 +147,11 @@ push_config = {
     'OPENILINK_APP_TOKEN': '',          # OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取 官方文档: https://openilink.com/docs/hub/apps
     'OPENILINK_HUB_URL': '',            # OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
     'OPENILINK_CONTEXT_TOKEN': '',      # OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
+
+  # WPUSH 官方文档: https://wpush.cn/docs
+  'WPUSH_APIKEY': '',  # WPUSH 的 API Key，在 https://wpush.cn/settings 获取
+  'WPUSH_CHANNEL': 'wechat',  # 推送渠道，支持 wechat/app/sms/mail/webhook/dingtalk/feishu/wechat_work/clawbot/qqbot
+  'WPUSH_TOPIC_CODE': '',  # 可选，Topic 广播编码
 }
 # fmt: on
 
@@ -956,6 +961,36 @@ def wxpusher_spt(title: str, content: str) -> None:
         print(f"wxpusher SPT 推送失败！错误信息：{response.get('msg')}")
 
 
+
+def wpush(title: str, content: str) -> None:
+    """
+    通过 WPUSH 推送消息。
+    官方文档: https://wpush.cn/docs
+    """
+    if not push_config.get("WPUSH_APIKEY"):
+        return
+
+    print("WPUSH 服务启动")
+
+    url = "https://api.wpush.cn/api/v1/send"
+    data = {
+        "apikey": push_config.get("WPUSH_APIKEY"),
+        "title": title,
+        "content": content,
+        "channel": push_config.get("WPUSH_CHANNEL") or "wechat",
+    }
+    if push_config.get("WPUSH_TOPIC_CODE"):
+        data["topic_code"] = push_config.get("WPUSH_TOPIC_CODE")
+
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url=url, json=data, headers=headers, timeout=15).json()
+
+    if response.get("code") == 0:
+        print("WPUSH 推送成功！")
+    else:
+        print(f'WPUSH 推送失败！错误信息：{response.get("message") or response}')
+
+
 def openilink(title: str, content: str) -> None:
     """
     通过 OpeniLink 推送消息。
@@ -1162,6 +1197,8 @@ def add_notify_function():
         notify_function.append(wxpusher_spt)
     if push_config.get("OPENILINK_APP_TOKEN"):
         notify_function.append(openilink)
+    if push_config.get("WPUSH_APIKEY"):
+        notify_function.append(wpush)
     if not notify_function:
         print(f"无推送渠道，请检查通知变量是否正确")
     return notify_function
