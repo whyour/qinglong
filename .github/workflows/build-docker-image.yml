@@ -92,6 +92,7 @@ jobs:
           name: qinglong-static-${{ github.sha }}
           path: static/
           if-no-files-found: error
+          include-hidden-files: true
 
       - name: copy to static repo
         env:

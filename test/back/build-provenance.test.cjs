@@ -14,6 +14,7 @@ test('build verification accepts matching source and rejects stale or dirty arti
   git('config', 'user.name', 'Build test');
   git('config', 'user.email', 'build-test@example.invalid');
   fs.writeFileSync(path.join(dir, 'pnpm-lock.yaml'), 'lockfileVersion: 6.0\n');
+  fs.writeFileSync(path.join(dir, '.gitignore'), 'static/\n');
   git('add', '.');
   git('commit', '-m', 'fixture');
   fs.mkdirSync(path.join(dir, 'static/build'), { recursive: true });
@@ -45,6 +46,8 @@ test('release images receive the same-run artifact and verify it before use', ()
     fs.readFileSync('.github/workflows/build-docker-image.yml', 'utf8'),
   );
   assert.equal(workflow.jobs['build-static'].needs, 'validate');
+  const upload = workflow.jobs['build-static'].steps.find(step => step.uses?.startsWith('actions/upload-artifact@'));
+  assert.equal(upload.with['include-hidden-files'], true);
   for (const name of [
     'build-alpine',
     'build-debian',
@@ -73,4 +76,75 @@ test('release images receive the same-run artifact and verify it before use', ()
     );
     assert.match(dockerfile, /node \/tmp\/verify-build.cjs/);
   }
+});
+
+test('complete artifact manifests reject changed, missing, extra files and untracked build inputs', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-build-manifest-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: dir, stdio: 'pipe' });
+  git('init');
+  git('config', 'user.name', 'Build test');
+  git('config', 'user.email', 'build-test@example.invalid');
+  fs.writeFileSync(path.join(dir, '.gitignore'), 'static/\n');
+  fs.writeFileSync(path.join(dir, 'pnpm-lock.yaml'), 'lockfileVersion: 6.0\n');
+  git('add', '.');
+  git('commit', '-m', 'fixture');
+  const artifacts = [
+    'build/app.js',
+    'build/services/http.js',
+    'dist/index.html',
+    'dist/chunks/main.js',
+    'dist/assets/main.css',
+    'dist/.well-known/config',
+  ];
+  for (const file of artifacts) {
+    fs.mkdirSync(path.dirname(path.join(dir, 'static', file)), {
+      recursive: true,
+    });
+    fs.writeFileSync(path.join(dir, 'static', file), file);
+  }
+  const write = path.resolve('scripts/write-build-info.cjs');
+  const verify = path.resolve('docker/verify-build.cjs');
+  const run = (script) =>
+    spawnSync(process.execPath, [script], { cwd: dir, encoding: 'utf8' });
+  assert.equal(run(write).status, 0);
+  const manifestFile = path.join(dir, 'static/build-info.json');
+  const original = fs.readFileSync(manifestFile, 'utf8');
+  assert.deepEqual(
+    Object.keys(JSON.parse(original).files).sort(),
+    artifacts.sort(),
+  );
+  assert.equal(run(write).status, 0);
+  assert.equal(fs.readFileSync(manifestFile, 'utf8'), original);
+  assert.equal(run(verify).status, 0);
+  for (const name of [
+    'build/services/http.js',
+    'dist/chunks/main.js',
+    'dist/assets/main.css',
+    'dist/.well-known/config',
+  ]) {
+    const file = path.join(dir, 'static', name);
+    fs.writeFileSync(file, 'stale');
+    assert.notEqual(run(verify).status, 0);
+    fs.unlinkSync(file);
+    assert.notEqual(run(verify).status, 0);
+    fs.writeFileSync(file, name);
+    assert.equal(run(verify).status, 0);
+  }
+  const extra = path.join(dir, 'static/build/stale.js');
+  fs.writeFileSync(extra, 'extra');
+  assert.notEqual(run(verify).status, 0);
+  fs.unlinkSync(extra);
+  const source = path.join(dir, 'custom.config.js');
+  fs.writeFileSync(source, 'untracked build input');
+  assert.equal(run(write).status, 0);
+  assert.equal(JSON.parse(fs.readFileSync(manifestFile)).dirty, true);
+  assert.notEqual(run(verify).status, 0);
+  fs.unlinkSync(source);
+  assert.equal(run(write).status, 0);
+  assert.equal(run(verify).status, 0);
+  fs.symlinkSync(path.join(dir, 'pnpm-lock.yaml'), extra);
+  assert.notEqual(run(write).status, 0);
+  assert.notEqual(run(verify).status, 0);
 });

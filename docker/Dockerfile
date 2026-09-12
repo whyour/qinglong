@@ -83,7 +83,7 @@ RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
 
 # Downloaded by CI from the build-static job in this workflow run.
 COPY static/ /ql/static/
-COPY docker/verify-build.cjs /tmp/verify-build.cjs
+COPY docker/verify-build.cjs docker/build-manifest.cjs /tmp/
 COPY --from=builder /tmp/build/pnpm-lock.yaml /tmp/dependency-lock.yaml
 RUN cd ${QL_DIR} && node /tmp/verify-build.cjs /tmp/dependency-lock.yaml
 

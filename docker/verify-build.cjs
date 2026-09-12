@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
+const { collectBuildFiles } = require('./build-manifest.cjs');
 
 const manifest = JSON.parse(fs.readFileSync('static/build-info.json', 'utf8'));
 const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -31,15 +32,18 @@ if (process.argv[2]) {
     );
 }
 
-for (const [file, key] of [
-  ['static/build/app.js', 'backendSha256'],
-  ['static/dist/index.html', 'frontendSha256'],
-]) {
-  const hash = crypto
-    .createHash('sha256')
-    .update(fs.readFileSync(file))
-    .digest('hex');
-  if (hash !== manifest[key])
+const actual = collectBuildFiles();
+if (
+  manifest.version !== 1 ||
+  !manifest.files ||
+  JSON.stringify(Object.keys(actual).sort()) !==
+    JSON.stringify(Object.keys(manifest.files).sort())
+)
+  throw new Error(
+    'Build output file set mismatch. Rebuild the complete artifacts.',
+  );
+for (const [file, hash] of Object.entries(actual)) {
+  if (hash !== manifest.files[file])
     throw new Error(`Build output checksum mismatch: ${file}`);
 }
 console.log(`Verified build artifacts for ${sourceCommit}`);
