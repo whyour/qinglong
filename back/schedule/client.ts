@@ -16,9 +16,19 @@ class Client {
   readonly readiness = new SchedulerReadiness(() => this.probe());
 
   private async waitForReady(timeoutMs: number) {
-    await new Promise<void>((resolve, reject) => {
-      this.client.waitForReady(Date.now() + timeoutMs, (err) => err ? reject(err) : resolve());
-    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        this.client.waitForReady(Date.now() + timeoutMs, (err) =>
+          err ? reject(err) : resolve()
+        );
+      });
+    } catch (error) {
+      this.readiness.invalidate();
+      throw Object.assign(
+        error instanceof Error ? error : new Error(String(error)),
+        { status: 503 }
+      );
+    }
   }
 
   private async probe(): Promise<void> {
@@ -52,16 +62,27 @@ class Client {
     return this._client;
   }
 
-  async addCron(request: AddCronRequest['crons']): Promise<AddCronResponse> {
+  async addCron(
+    request: AddCronRequest['crons'],
+    replace = false
+  ): Promise<AddCronResponse> {
     await this.waitForReady(2000);
     return new Promise((resolve, reject) => {
-      this.client.addCron({ crons: request }, new Metadata(), { deadline: Date.now() + 5000 }, (err, res) => {
-        if (err) {
-          if (err.code === status.UNAVAILABLE) this.readiness.invalidate();
-          return reject(err);
+      this.client.addCron(
+        { crons: request, replace },
+        new Metadata(),
+        { deadline: Date.now() + 5000 },
+        (err, res) => {
+          if (err) {
+            if (err.code === status.UNAVAILABLE) {
+              this.readiness.invalidate();
+              Object.assign(err, { status: 503 });
+            }
+            return reject(err);
+          }
+          resolve(res);
         }
-        resolve(res);
-      });
+      );
     });
   }
 
@@ -70,7 +91,10 @@ class Client {
     return new Promise((resolve, reject) => {
       this.client.delCron({ ids: request }, new Metadata(), { deadline: Date.now() + 5000 }, (err, res) => {
         if (err) {
-          if (err.code === status.UNAVAILABLE) this.readiness.invalidate();
+          if (err.code === status.UNAVAILABLE) {
+            this.readiness.invalidate();
+            Object.assign(err, { status: 503 });
+          }
           return reject(err);
         }
         resolve(res);

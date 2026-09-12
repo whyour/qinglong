@@ -25,6 +25,7 @@ test(
           update: async (data, options) => {
             await new Promise((resolve) => setTimeout(resolve, 40));
             updates.push({ data, options });
+            return [1];
           },
         },
       },

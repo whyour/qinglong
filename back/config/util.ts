@@ -489,18 +489,48 @@ export function psTree(pid: number): Promise<number[]> {
   });
 }
 
-export async function killTask(pid: number) {
-  const pids = await psTree(pid);
-
-  if (pids.length) {
-    try {
-      [pid, ...pids].reverse().forEach((x) => {
-        process.kill(x, 15);
-      });
-    } catch (error) { }
-  } else {
-    process.kill(pid, 2);
+export async function killTask(pid: number, waitForExit = false) {
+  const descendants = await psTree(pid);
+  if (!waitForExit) {
+    if (descendants.length) {
+      try {
+        [pid, ...descendants]
+          .reverse()
+          .forEach((target) => process.kill(target, 15));
+      } catch {}
+    } else process.kill(pid, 2);
+    return;
   }
+  const pids = [...descendants.reverse(), pid];
+  const signal = (target: number, sig: NodeJS.Signals) => {
+    try {
+      process.kill(target, sig);
+    } catch (error: any) {
+      if (error.code !== 'ESRCH') throw error;
+    }
+  };
+  for (const target of pids) signal(target, 'SIGTERM');
+  const alive = (target: number) => {
+    try {
+      process.kill(target, 0);
+      return true;
+    } catch (error: any) {
+      if (error.code === 'ESRCH') return false;
+      throw error;
+    }
+  };
+  const wait = async () => {
+    const deadline = Date.now() + 1000;
+    while (pids.some(alive) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    return pids.filter(alive);
+  };
+  let remaining = await wait();
+  for (const target of remaining) signal(target, 'SIGKILL');
+  remaining = await wait();
+  if (remaining.length)
+    throw new Error(`Task processes did not exit: ${remaining.join(', ')}`);
 }
 
 export async function getPid(cmd: string) {

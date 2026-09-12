@@ -69,6 +69,15 @@ const addCron = (
     return;
   }
 
+  // Recovery replaces the whole snapshot, including deletions and disabled jobs.
+  // Validation above must finish before touching the previous schedule.
+  if (call.request.replace) {
+    for (const jobs of scheduleStacks.values()) {
+      for (const job of jobs) job?.cancel();
+    }
+    scheduleStacks.clear();
+  }
+
   // ===== 第二遍：注册所有任务 =====
   for (const item of call.request.crons) {
     const { id, schedule, command, extra_schedules, name } = item;

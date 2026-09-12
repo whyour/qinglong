@@ -38,6 +38,7 @@ async function fixture(t, onKill = async () => {}) {
     { id: 5, cron_id: 2, pid: 201, status: 0 },
   ]);
   let service;
+  const killed = [];
   const CronService = load(path.resolve('back/services/cron.ts'), {
     '../config': {},
     '../data/cron': {
@@ -49,8 +50,14 @@ async function fixture(t, onKill = async () => {}) {
       InstanceStatus: { running: 0, finished: 1, stopped: 2, error: 3 },
     },
     '../config/util': {
-      killTask: async (pid) => onKill({ pid, service, instances }),
-      killAllTasks: async () => {},
+      killTask: async (pid, wait) => {
+        assert.equal(wait, true);
+        killed.push(pid);
+        await onKill({ pid, service, instances, crons });
+      },
+      killAllTasks: async () => {
+        throw Error('command-wide scans must not run');
+      },
     },
     '../config/const': {},
     '../schedule/client': {},
@@ -59,11 +66,11 @@ async function fixture(t, onKill = async () => {}) {
     '../shared/i18n': { t: (s) => s },
     '../shared/logReader': {},
     '../shared/logStreamManager': {},
-    '../shared/childProcess': {},
+    '../shared/childProcess': require('../../back/shared/childProcess'),
   }).default;
   service = new CronService({ info() {}, error() {} });
   service.getDb = ({ id }) => crons.findByPk(id);
-  return { service, instances, crons };
+  return { service, instances, crons, killed };
 }
 async function report(service, pid, code) {
   await service.status({
@@ -103,7 +110,8 @@ test('late shell completion cannot overwrite stopped instances', async (t) => {
 });
 test('rows created after the stop snapshot are not relabelled', async (t) => {
   const f = await fixture(t, async ({ instances }) => {
-    await instances.create({ id: 6, cron_id: 1, pid: 103, status: 0 });
+    if (!(await instances.findByPk(6)))
+      await instances.create({ id: 6, cron_id: 1, pid: 103, status: 0 });
   });
   await f.service.stop([1]);
   assert.equal((await f.instances.findByPk(6)).status, 0);
@@ -127,4 +135,32 @@ test('batch stop captures running instances from every requested cron', async (t
   await f.service.stop([1, 2]);
   assert.equal((await f.instances.findByPk(5)).status, 2);
   assert.equal((await f.instances.findByPk(3)).status, 1);
+});
+
+test('stop signals every snapshotted PID exactly once and preserves a later running instance', async (t) => {
+  const f = await fixture(t, async ({ instances, crons }) => {
+    if (!(await instances.findByPk(6))) {
+      await instances.create({ id: 6, cron_id: 1, pid: 103, status: 0 });
+      await crons.update(
+        { pid: 103, log_path: 'later.log', status: 0 },
+        { where: { id: 1 } },
+      );
+    }
+  });
+  await f.service.stop([1]);
+  assert.deepEqual(f.killed, [101, 102]);
+  assert.equal((await f.instances.findByPk(6)).status, 0);
+  assert.equal((await f.crons.findByPk(1)).pid, 103);
+  assert.equal((await f.crons.findByPk(1)).status, 0);
+});
+
+test('failed termination is not finalized as stopped', async (t) => {
+  const f = await fixture(t, async ({ pid }) => {
+    if (pid === 102) throw Error('still alive');
+  });
+  await f.service.stop([1]);
+  assert.deepEqual(f.killed, [101, 102]);
+  assert.equal((await f.instances.findByPk(1)).status, 2);
+  assert.equal((await f.instances.findByPk(2)).status, 0);
+  assert.equal((await f.crons.findByPk(1)).status, 0);
 });

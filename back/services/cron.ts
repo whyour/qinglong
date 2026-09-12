@@ -13,7 +13,6 @@ import {
   getFileContentByName,
   fileExist,
   killTask,
-  killAllTasks,
   getUniqPath,
   safeJSONParse,
   isDemoEnv,
@@ -583,44 +582,83 @@ export default class CronService {
 
   public async stop(ids: number[]) {
     const docs = await CrontabModel.findAll({ where: { id: ids } });
-    // Capture stop targets before signalling. A shell exit report may finish
-    // these rows while killTask is awaiting the process tree/termination.
+    // Cancel the queued snapshot first, so a late spawn cannot claim it.
+    for (const doc of docs) {
+      if (doc.status === CrontabStatus.queued) {
+        const [cancelled] = await CrontabModel.update(
+          { status: CrontabStatus.idle, pid: null } as any,
+          {
+            where: {
+              id: doc.id,
+              status: CrontabStatus.queued,
+              [Op.and]: where(colFn('log_path'), {
+                [Op.eq]: doc.log_path ?? null,
+              }),
+            },
+          }
+        );
+        // A concurrent claim may have won; capture its PID before signalling.
+        if (!cancelled) await doc.reload();
+      }
+    }
     const stoppingInstances = await RunningInstanceModel.findAll({
-      attributes: ['id'],
+      attributes: ['id', 'pid', 'cron_id'],
       where: { cron_id: ids, status: InstanceStatus.running },
     });
-    for (const doc of docs) {
-      // Kill all running instances of this task
+    const targets = new Set<number>(
+      [
+        ...stoppingInstances.map((instance) => instance.pid),
+        ...docs
+          .filter((doc) => doc.status === CrontabStatus.running)
+          .map((doc) => doc.pid),
+      ].filter((pid): pid is number => typeof pid === 'number' && pid > 0)
+    );
+    const stopped = new Set<number>();
+    for (const pid of targets) {
       try {
-        if (doc.pid) {
-          await killTask(doc.pid);
-        }
-        const command = doc.command.replace(/\s+/g, ' ').trim();
-        await killAllTasks(command);
-        this.logger.info(
-          `[panel][停止所有运行中的任务实例] 任务ID: ${doc.id}, 命令: ${command}`,
-        );
+        await killTask(pid, true);
+        stopped.add(pid);
       } catch (error) {
         this.logger.error(
-          `[panel][停止任务失败] 任务ID: ${doc.id}, 错误: ${error}`,
+          '[panel][停止任务失败] PID: %s, 错误: %s',
+          pid,
+          asError(error).message
         );
       }
     }
-
-    // Finalize only the captured targets, including any whose exit report won
-    // the race. Historical rows and later instances are not stop targets.
-    const finishedAt = dayjs().unix();
-    if (stoppingInstances.length) {
+    const stoppedIds = stoppingInstances
+      .filter((instance) => instance.pid && stopped.has(instance.pid))
+      .map((instance) => instance.id!);
+    if (stoppedIds.length) {
       await RunningInstanceModel.update(
-        { status: InstanceStatus.stopped, finished_at: finishedAt },
-        { where: { id: stoppingInstances.map((instance) => instance.id!) } },
+        { status: InstanceStatus.stopped, finished_at: dayjs().unix() },
+        { where: { id: stoppedIds } }
       );
     }
-
-    await CrontabModel.update(
-      { status: CrontabStatus.idle, pid: undefined },
-      { where: { id: ids } },
-    );
+    for (const doc of docs) {
+      if (
+        doc.status !== CrontabStatus.running ||
+        (doc.pid && !stopped.has(doc.pid))
+      )
+        continue;
+      const remaining = await RunningInstanceModel.count({
+        where: { cron_id: doc.id, status: InstanceStatus.running },
+      });
+      if (remaining) continue;
+      await CrontabModel.update(
+        { status: CrontabStatus.idle, pid: null } as any,
+        {
+          where: {
+            id: doc.id,
+            status: CrontabStatus.running,
+            [Op.and]: [
+              where(colFn('pid'), { [Op.eq]: doc.pid ?? null }),
+              where(colFn('log_path'), { [Op.eq]: doc.log_path ?? null }),
+            ],
+          },
+        }
+      );
+    }
   }
 
   public async stopInstance(instanceId: number) {
@@ -675,24 +713,46 @@ export default class CronService {
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         logPath = `${uniqPath}/${logTime}.log`;
         absolutePath = resolveFileAccess(config.logPath, [logPath]);
-        if (!absolutePath) throw new Error('Log path is outside the log directory');
+        if (!absolutePath)
+          throw new Error('Log path is outside the log directory');
         await fs.mkdir(path.dirname(absolutePath), { recursive: true });
         const outputPath = absolutePath;
         const cp = spawn(
           `real_log_path=${logPath} no_delay=true ${this.makeCommand(
             cron,
-            true,
+            true
           )}`,
-          { shell: '/bin/bash' },
+          { shell: '/bin/bash' }
         );
         // Install observers before the first await: very short children may already exit.
         const { completed } = observeChildProcess(cp, {
           onStart: async () => {
-            await CrontabModel.update(
-              { status: CrontabStatus.running, pid: cp.pid, log_path: logPath },
-              { where: { id } },
-            );
-            claimed = true;
+            try {
+              const [count] = await CrontabModel.update(
+                {
+                  status: CrontabStatus.running,
+                  pid: cp.pid,
+                  log_path: logPath,
+                },
+                {
+                  where: {
+                    id,
+                    status: CrontabStatus.queued,
+                    [Op.and]: where(colFn('log_path'), {
+                      [Op.eq]: queuedLogPath,
+                    }),
+                  },
+                }
+              );
+              if (count !== 1)
+                throw new Error(
+                  'Task was stopped or superseded before startup'
+                );
+              claimed = true;
+            } catch (error) {
+              if (cp.pid) await killTask(cp.pid, true);
+              throw error;
+            }
           },
           onStdout: (message) => logStreamManager.write(outputPath, message),
           onStderr: (message) => logStreamManager.write(outputPath, message),
@@ -702,20 +762,20 @@ export default class CronService {
           this.logger.error(
             '[panel][执行任务失败] 任务ID: %s, 错误: %s',
             id,
-            result.error.message,
+            result.error.message
           );
         }
         this.logger.info(
           '[panel][执行任务结束] 任务ID: %s, 退出码: %j',
           id,
-          result.code,
+          result.code
         );
         return { ...cron, pid: cp.pid, ...result } as any;
       } catch (error) {
         this.logger.error(
           '[panel][创建任务失败] 任务ID: %s, 错误: %s',
           cronId,
-          asError(error).message,
+          asError(error).message
         );
       } finally {
         try {
@@ -723,7 +783,7 @@ export default class CronService {
         } catch (error) {
           this.logger.error(
             '[panel][关闭任务日志失败] %s',
-            asError(error).message,
+            asError(error).message
           );
         }
         try {
@@ -744,17 +804,17 @@ export default class CronService {
                         },
                       ]
                     : []),
-                  ...(logPath
+                  ...(claimed && logPath
                     ? [{ log_path: logPath, status: CrontabStatus.running }]
                     : []),
                 ],
               },
-            },
+            }
           );
         } catch (error) {
           this.logger.error(
             '[panel][清理任务状态失败] %s',
-            asError(error).message,
+            asError(error).message
           );
         }
       }
@@ -1023,7 +1083,7 @@ export default class CronService {
     // 这避免了因调度器短暂不可用导致 crontab.list 与数据库脱节（订阅更新误判任务已存在）。
     await this.setCrontab(tabs);
     try {
-      await cronClient.addCron(regularCrons);
+      await cronClient.addCron(regularCrons, requireScheduler);
     } catch (error: any) {
       this.logger.warn(
         '[crontab] Failed to register cron job in scheduler:',
