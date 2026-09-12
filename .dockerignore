@@ -1,0 +1,13 @@
+.git
+.gitnexus
+.claude
+.codex
+.env*
+node_modules
+data
+audit
+docs
+test
+src/.umi*
+**/__pycache__
+**/*.log

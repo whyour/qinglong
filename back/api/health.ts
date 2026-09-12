@@ -11,8 +11,8 @@ export default (app: Router) => {
     try {
       const healthService = Container.get(HealthService);
       const health = await healthService.check();
-      res.status(200).send({
-        code: 200,
+      res.status(health.status === 'ok' ? 200 : 503).send({
+        code: health.status === 'ok' ? 200 : 503,
         data: health,
       });
     } catch (err: any) {

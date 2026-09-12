@@ -4,6 +4,9 @@ module.exports = {
   apps: [
     {
       name: 'qinglong',
+      // Keep process supervision; enable injected diagnostics only on demand
+      // in containers. Standalone installs retain PM2's monitoring default.
+      pmx: !isContainer || process.env.QL_PRIMARY_APM === 'true',
       max_restarts: 5,
       kill_timeout: 1000,
       wait_ready: true,

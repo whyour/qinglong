@@ -39,7 +39,13 @@ export class HttpServerService {
 
   private async tryListen(expressApp: express.Application, port: number, host: string): Promise<Server> {
     return new Promise((resolve, reject) => {
-      const server = expressApp.listen(port, host, () => {
+      // There is one HTTP worker; accepting here avoids primary IPC handoff
+      // for every connection. Restore shared listening for custom clusters.
+      const server = expressApp.listen({
+        port,
+        host,
+        exclusive: process.env.QL_HTTP_SHARED_LISTEN !== 'true',
+      }, () => {
         resolve(server);
       });
 

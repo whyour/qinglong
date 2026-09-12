@@ -20,7 +20,7 @@ RUN set -x \
   && npm_config_target_platform=linux \
     npm_config_target_arch="${NODE_ARCH}" \
     npm_config_target_libc=musl \
-    pnpm install --prod
+    pnpm install --prod --frozen-lockfile
 
 FROM python:3.11-alpine
 
@@ -73,15 +73,19 @@ RUN set -x \
   && ulimit -c 0
 
 ARG SOURCE_COMMIT
+LABEL org.opencontainers.image.revision=${SOURCE_COMMIT}
 RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
   && cd ${QL_DIR} \
+  && if [ -n "${SOURCE_COMMIT}" ]; then git fetch --depth=1 origin "${SOURCE_COMMIT}" && git reset --hard FETCH_HEAD; fi \
   && cp -f .env.example .env \
   && chmod 777 ${QL_DIR}/shell/*.sh \
-  && chmod 777 ${QL_DIR}/docker/*.sh \
-  && git clone --depth=1 -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
-  && mkdir -p ${QL_DIR}/static \
-  && cp -rf /static/* ${QL_DIR}/static \
-  && rm -rf /static
+  && chmod 777 ${QL_DIR}/docker/*.sh
+
+# Downloaded by CI from the build-static job in this workflow run.
+COPY static/ /ql/static/
+COPY docker/verify-build.cjs /tmp/verify-build.cjs
+COPY --from=builder /tmp/build/pnpm-lock.yaml /tmp/dependency-lock.yaml
+RUN cd ${QL_DIR} && node /tmp/verify-build.cjs /tmp/dependency-lock.yaml
 
 ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \

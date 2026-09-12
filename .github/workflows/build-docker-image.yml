@@ -15,6 +15,9 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml
+
   code_gitlab:
     runs-on: ubuntu-latest
     steps:
@@ -63,6 +66,7 @@ jobs:
           git push --force --tags gitee 2>&1 || echo "::warning::Gitee tags push failed"
 
   build-static:
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -72,6 +76,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
+          node-version: "20"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -80,6 +85,13 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build:front
           pnpm build:back
+          pnpm build:info
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
+          if-no-files-found: error
 
       - name: copy to static repo
         env:
@@ -151,11 +163,16 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
       - uses: pnpm/action-setup@v6
         with:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
+          node-version: "20"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -208,7 +225,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            MAINTAINER=${{ github.repository_owner }}
+            QL_MAINTAINER=${{ github.repository_owner }}
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
@@ -232,11 +249,16 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
       - uses: pnpm/action-setup@v6
         with:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
+          node-version: "20"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -288,7 +310,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            MAINTAINER=${{ github.repository_owner }}
+            QL_MAINTAINER=${{ github.repository_owner }}
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
@@ -313,11 +335,16 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
       - uses: pnpm/action-setup@v6
         with:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
+          node-version: "20"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -355,7 +382,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            MAINTAINER=${{ github.repository_owner }}
+            QL_MAINTAINER=${{ github.repository_owner }}
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
@@ -380,11 +407,16 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
       - uses: pnpm/action-setup@v6
         with:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
+          node-version: "20"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -422,7 +454,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           build-args: |
-            MAINTAINER=${{ github.repository_owner }}
+            QL_MAINTAINER=${{ github.repository_owner }}
             QL_BRANCH=${{ github.ref_name }}
             SOURCE_COMMIT=${{ github.sha }}
           network: host
@@ -451,6 +483,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
+          node-version: "20"
           cache: "pnpm"
 
       - name: build front and back

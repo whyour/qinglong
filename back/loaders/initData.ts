@@ -17,6 +17,7 @@ import { createRandomString, fileExist, isDemoEnv, safeJSONParse } from '../conf
 import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
 import Logger from './logger';
+import cronClient from '../schedule/client';
 import { AppModel } from '../data/open';
 import { InstanceStatus, RunningInstanceModel } from '../data/runningInstance';
 import { setLang, systemLang } from '../shared/i18n';
@@ -236,7 +237,8 @@ export default async () => {
   } catch { }
 
   // 初始化保存一次ck和定时任务数据
-  await cronService.autosave_crontab();
+  cronClient.readiness.configure(() => cronService.autosave_crontab(true));
+  await cronClient.readiness.recover();
 
   await envService.set_envs();
 

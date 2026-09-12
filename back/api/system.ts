@@ -273,8 +273,11 @@ export default (app: Router) => {
             },
             onEnd: async (cp, endTime, diff) => {
               // Close the stream after task completion
-              await logStreamManager.closeStream(await handleLogPath(logPath));
-              res.end();
+              try {
+                await logStreamManager.closeStream(await handleLogPath(logPath));
+              } finally {
+                res.end();
+              }
             },
             onError: async (message: string) => {
               res.write(message);

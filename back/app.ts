@@ -11,6 +11,7 @@ import { monitoringMiddleware } from './middlewares/monitoring';
 import { errStack } from './config/util';
 import { type GrpcServerService } from './services/grpc';
 import { type HttpServerService } from './services/http';
+import cronClient from './schedule/client';
 
 interface WorkerMetadata {
   id: number;
@@ -79,6 +80,11 @@ class Application {
           );
           // If gRPC worker died, restart it and wait for it to be ready
           if (metadata.serviceType === 'grpc') {
+            try {
+              this.httpWorker?.send('scheduler-unavailable');
+            } catch (error) {
+              Logger.warn('Unable to notify HTTP worker of scheduler exit');
+            }
             const newGrpcWorker = this.forkWorker('grpc');
             this.waitForWorkerReady(newGrpcWorker, 30000)
               .then(() => {
@@ -132,7 +138,14 @@ class Application {
   }
 
   private forkWorker(serviceType: string): Worker {
-    const worker = cluster.fork({ SERVICE_TYPE: serviceType });
+    const workerEnv: NodeJS.ProcessEnv = { SERVICE_TYPE: serviceType };
+    // PM2's fork launcher is inherited by our own cluster workers. Their APM
+    // messages go to this primary, not PM2, and duplicate its sampling work.
+    // Keep primary monitoring and allow restoring the inherited worker APM.
+    if (process.env.pm_id !== undefined && process.env.QL_WORKER_APM !== 'true') {
+      workerEnv.pmx = 'false';
+    }
+    const worker = cluster.fork(workerEnv);
 
     this.workerMetadataMap.set(worker.id, {
       id: worker.id,
@@ -264,17 +277,9 @@ class Application {
     process.on('message', async (msg) => {
       if (msg === 'shutdown') {
         this.gracefulShutdown(serviceType);
-      } else if (msg === 'reregister-crons' && serviceType === 'http') {
-        // Re-register cron jobs when gRPC worker restarts
-        try {
-          Logger.info('[boot] Received reregister-crons message, re-registering cron jobs...');
-          const CronService = (await import('./services/cron')).default;
-          const cronService = Container.get(CronService);
-          await cronService.autosave_crontab();
-          Logger.info('[boot] Cron jobs re-registered successfully');
-        } catch (error) {
-          Logger.error(`[boot] Failed to re-register cron jobs:\n${errStack(error)}`);
-        }
+      } else if (serviceType === 'http' &&
+        (msg === 'reregister-crons' || msg === 'scheduler-unavailable')) {
+        cronClient.readiness.invalidate();
       }
     });
 

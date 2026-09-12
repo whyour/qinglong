@@ -31,6 +31,7 @@ import { writeFileWithLock } from '../shared/utils';
 import { t } from '../shared/i18n';
 import { ScheduleType } from '../interface/schedule';
 import { logStreamManager } from '../shared/logStreamManager';
+import { observeChildProcess, asError } from '../shared/childProcess';
 import { isEmpty } from 'lodash';
 import { LogReadOptions, readLogChunk } from '../shared/logReader';
 
@@ -581,6 +582,12 @@ export default class CronService {
 
   public async stop(ids: number[]) {
     const docs = await CrontabModel.findAll({ where: { id: ids } });
+    // Capture stop targets before signalling. A shell exit report may finish
+    // these rows while killTask is awaiting the process tree/termination.
+    const stoppingInstances = await RunningInstanceModel.findAll({
+      attributes: ['id'],
+      where: { cron_id: ids, status: InstanceStatus.running },
+    });
     for (const doc of docs) {
       // Kill all running instances of this task
       try {
@@ -599,12 +606,15 @@ export default class CronService {
       }
     }
 
-    // Mark all running instances as stopped
+    // Finalize only the captured targets, including any whose exit report won
+    // the race. Historical rows and later instances are not stop targets.
     const finishedAt = dayjs().unix();
-    await RunningInstanceModel.update(
-      { status: InstanceStatus.stopped, finished_at: finishedAt },
-      { where: { cron_id: ids, status: InstanceStatus.running } },
-    );
+    if (stoppingInstances.length) {
+      await RunningInstanceModel.update(
+        { status: InstanceStatus.stopped, finished_at: finishedAt },
+        { where: { id: stoppingInstances.map((instance) => instance.id!) } },
+      );
+    }
 
     await CrontabModel.update(
       { status: CrontabStatus.idle, pid: undefined },
@@ -647,35 +657,27 @@ export default class CronService {
   }
 
   private async runSingle(cronId: number): Promise<number | void> {
-    return taskLimit.manualRunWithCronLimit(() => {
-      return new Promise(async (resolve: any) => {
+    return taskLimit.manualRunWithCronLimit(async () => {
+      let absolutePath: string | undefined;
+      let logPath: string | undefined;
+      let queuedLogPath: string | null | undefined;
+      let claimed = false;
+      try {
         const cron = await this.getDb({ id: cronId });
-        const params = {
-          name: cron.name,
-          command: cron.command,
-          schedule: cron.schedule,
-          extra_schedules: cron.extra_schedules,
-        };
-        if (cron.status !== CrontabStatus.queued) {
-          resolve(params);
-          return;
-        }
-
-        this.logger.info(
-          `[panel][开始执行任务] 参数: ${JSON.stringify(params)}`,
-        );
-
-        let { id, command, log_name } = cron;
-
+        if (cron.status !== CrontabStatus.queued) return;
+        queuedLogPath = cron.log_path ?? null;
+        const { id, command, log_name } = cron;
         const uniqPath =
           log_name === '/dev/null' || !log_name
             ? await getUniqPath(command, `${id}`)
             : log_name;
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
-        const logDirPath = path.resolve(config.logPath, `${uniqPath}`);
-        await fs.mkdir(logDirPath, { recursive: true });
-        const logPath = `${uniqPath}/${logTime}.log`;
-        const absolutePath = path.resolve(config.logPath, `${logPath}`);
+        await fs.mkdir(path.resolve(config.logPath, uniqPath), {
+          recursive: true,
+        });
+        logPath = `${uniqPath}/${logTime}.log`;
+        absolutePath = path.resolve(config.logPath, logPath);
+        const outputPath = absolutePath;
         const cp = spawn(
           `real_log_path=${logPath} no_delay=true ${this.makeCommand(
             cron,
@@ -683,41 +685,79 @@ export default class CronService {
           )}`,
           { shell: '/bin/bash' },
         );
-
-        await CrontabModel.update(
-          { status: CrontabStatus.running, pid: cp.pid, log_path: logPath },
-          { where: { id } },
-        );
-        cp.stdout.on('data', async (data) => {
-          await logStreamManager.write(absolutePath, data.toString());
+        // Install observers before the first await: very short children may already exit.
+        const { completed } = observeChildProcess(cp, {
+          onStart: async () => {
+            await CrontabModel.update(
+              { status: CrontabStatus.running, pid: cp.pid, log_path: logPath },
+              { where: { id } },
+            );
+            claimed = true;
+          },
+          onStdout: (message) => logStreamManager.write(outputPath, message),
+          onStderr: (message) => logStreamManager.write(outputPath, message),
         });
-        cp.stderr.on('data', async (data) => {
-          this.logger.info(
-            '[panel][执行任务失败] 命令: %s, 错误信息: %j',
-            command,
-            data.toString(),
-          );
-          await logStreamManager.write(absolutePath, data.toString());
-        });
-        cp.on('error', async (err) => {
+        const result = await completed;
+        if (result.error) {
           this.logger.error(
-            '[panel][创建任务失败] 命令: %s, 错误信息: %j',
-            command,
-            err,
+            '[panel][执行任务失败] 任务ID: %s, 错误: %s',
+            id,
+            result.error.message,
           );
-          await logStreamManager.write(absolutePath, JSON.stringify(err));
-        });
-
-        cp.on('exit', async (code) => {
-          this.logger.info(
-            '[panel][执行任务结束] 参数: %s, 退出码: %j',
-            JSON.stringify(params),
-            code,
+        }
+        this.logger.info(
+          '[panel][执行任务结束] 任务ID: %s, 退出码: %j',
+          id,
+          result.code,
+        );
+        return { ...cron, pid: cp.pid, ...result } as any;
+      } catch (error) {
+        this.logger.error(
+          '[panel][创建任务失败] 任务ID: %s, 错误: %s',
+          cronId,
+          asError(error).message,
+        );
+      } finally {
+        try {
+          if (absolutePath) await logStreamManager.closeStream(absolutePath);
+        } catch (error) {
+          this.logger.error(
+            '[panel][关闭任务日志失败] %s',
+            asError(error).message,
           );
-          await logStreamManager.closeStream(absolutePath);
-          resolve({ ...params, pid: cp.pid, code });
-        });
-      });
+        }
+        try {
+          // Do not overwrite a newer run's state or its script-reported exit code.
+          await CrontabModel.update(
+            { status: CrontabStatus.idle, pid: null } as any,
+            {
+              where: {
+                id: cronId,
+                [Op.or]: [
+                  ...(queuedLogPath !== undefined && !claimed
+                    ? [
+                        {
+                          status: CrontabStatus.queued,
+                          [Op.and]: where(colFn('log_path'), {
+                            [Op.eq]: queuedLogPath,
+                          }),
+                        },
+                      ]
+                    : []),
+                  ...(logPath
+                    ? [{ log_path: logPath, status: CrontabStatus.running }]
+                    : []),
+                ],
+              },
+            },
+          );
+        } catch (error) {
+          this.logger.error(
+            '[panel][清理任务状态失败] %s',
+            asError(error).message,
+          );
+        }
+      }
     });
   }
 
@@ -957,7 +997,7 @@ export default class CronService {
     });
   }
 
-  public async autosave_crontab() {
+  public async autosave_crontab(requireScheduler = false) {
     const tabs = await this.crontabs();
     const regularCrons = tabs.data
       .filter(
@@ -989,6 +1029,7 @@ export default class CronService {
         '[crontab] Failed to register cron job in scheduler:',
         error?.message || error,
       );
+      if (requireScheduler) throw error;
     }
   }
 

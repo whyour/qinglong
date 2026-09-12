@@ -10,16 +10,39 @@ create_token() {
 }
 
 get_token() {
-  if [[ -f $file_auth_token ]]; then
-    __ql_token__=$(cat $file_auth_token | jq -r .value)
-    local expiration=$(cat $file_auth_token | jq -r .expiration)
-    local currentTimeStamp=$(date +%s)
-    if [[ $currentTimeStamp -ge $expiration ]]; then
-      create_token
+  local token_data expiration token_value
+  local currentTimeStamp=${EPOCHSECONDS:-$(date +%s)}
+  if [[ -f "$file_auth_token" ]] && token_data=$(jq -er \
+    'select((.expiration | type) == "number" and (.value | type) == "string" and (.value | length) > 0 and (.value | test("[\r\n]") | not)) | .expiration, .value' \
+    "$file_auth_token" 2>/dev/null); then
+    expiration=${token_data%%$'\n'*}
+    token_value=${token_data#*$'\n'}
+    if [[ "$expiration" =~ ^[1-9][0-9]{0,10}$ && -n "$token_value" && "$token_value" != *$'\n'* && "$token_value" != *$'\r'* ]] && \
+      (( currentTimeStamp < expiration )); then
+      __ql_token__=$token_value
+      return 0
     fi
-  else
-    create_token
   fi
+  create_token
+}
+
+# Read the status response once; preserve multiline error messages and the
+# legacy code/message variables used by the shell API callers.
+ql_parse_status_response() {
+  # Both task status and statistics endpoints normally return this exact body.
+  # Match the whole document; all other JSON and malformed responses still
+  # use jq. Keep its missing-message result for existing callers.
+  if [[ "$1" == '{"code":200}' ]]; then
+    code=200
+    message=null
+    return 0
+  fi
+  local parsed
+  code=""
+  message=""
+  parsed=$(jq -r '.code, .message' <<< "$1") || return $?
+  code=${parsed%%$'\n'*}
+  message=${parsed#*$'\n'}
 }
 
 add_cron_api() {
@@ -142,7 +165,7 @@ update_cron() {
   local lastExecutingTime="${5:-0}"
   local runningTime="${6:-0}"
   local exitCode="${7:-}"
-  local currentTimeStamp=$(date +%s)
+  local currentTimeStamp=${EPOCHSECONDS:-$(date +%s)}
   local dataRaw="{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime"
   if [[ -n $exitCode ]]; then
     dataRaw="${dataRaw},\"exit_code\":$exitCode"
@@ -156,8 +179,7 @@ update_cron() {
       --data-raw "$dataRaw" \
       --compressed
   )
-  code=$(echo "$api" | jq -r .code)
-  message=$(echo "$api" | jq -r .message)
+  ql_parse_status_response "$api" || true
   if [[ $code != 200 ]]; then
     if [[ ! $message ]]; then
       message="$api"
@@ -240,8 +262,7 @@ record_cron_stat() {
     --data-raw "{\"ref_id\":$ref_id,\"code\":$exit_code,\"elapsed\":$elapsed}" \
     --compressed
   )
-  code=$(echo "$api" | jq -r .code)
-  message=$(echo "$api" | jq -r .message)
+  ql_parse_status_response "$api" || true
   if [[ $code != 200 ]]; then
     if [[ ! $message ]]; then
       message="$api"

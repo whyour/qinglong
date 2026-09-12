@@ -10,11 +10,25 @@ import {
   InstanceStatus,
 } from '../data/runningInstance';
 import { t } from '../shared/i18n';
+import cronClient from '../schedule/client';
 
 const route = Router();
 
 export default (app: Router) => {
   app.use('/crons', route);
+
+  route.use(async (req, res, next) => {
+    // Keep stop/status callbacks available even when the scheduler is down.
+    if (['POST', 'PUT', 'DELETE'].includes(req.method) &&
+      ['/', '/run', '/enable', '/disable', '/views/enable', '/views/disable'].includes(req.path)) {
+      try {
+        await cronClient.readiness.ensureReady();
+      } catch (error) {
+        return next(error);
+      }
+    }
+    return next();
+  });
 
   route.get(
     '/views',

@@ -368,9 +368,16 @@ format_timestamp() {
 
 get_env_array() {
   exported_variables=()
-  while IFS= read -r line; do
-    exported_variables+=("$line")
-  done < <(grep '^export ' $file_env | awk '{print $2}' | cut -d= -f1)
+  # Preserve the legacy export-line/second-field rules without evaluating values.
+  local export_name_program='/^export / { name = $2; sub(/=.*/, "", name); print name }'
+  if [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
+    builtin mapfile -t exported_variables < <(awk "$export_name_program" "$file_env")
+  else
+    # macOS still ships Bash 3, which does not provide mapfile.
+    while IFS= read -r line; do
+      exported_variables+=("$line")
+    done < <(awk "$export_name_program" "$file_env")
+  fi
 }
 
 clear_env() {
@@ -411,9 +418,14 @@ run_task_after() {
 }
 
 handle_task_end() {
-  local etime=$(date "+$time_format")
-  local end_time=$(format_time "$time_format" "$etime")
-  local end_timestamp=$(format_timestamp "$time_format" "$etime")
+  local etime end_time end_timestamp
+  if [[ $is_macos -ne 1 && $time_format == '%Y-%m-%d %H:%M:%S' ]]; then
+    IFS='|' read -r end_time end_timestamp < <(date "+$time_format|%s")
+  else
+    etime=$(date "+$time_format")
+    end_time=$(format_time "$time_format" "$etime")
+    end_timestamp=$(format_timestamp "$time_format" "$etime")
+  fi
   local diff_time=$(($end_timestamp - $begin_timestamp))
   local exit_code="${_task_exit_code:-0}"
   [[ "$diff_time" == 0 ]] && diff_time=1

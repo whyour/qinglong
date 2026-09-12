@@ -11,6 +11,7 @@ import {
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
+import { observeChildProcess, asError, ProcessResult } from '../shared/childProcess';
 
 export interface ScheduleTaskType {
   id?: number;
@@ -27,7 +28,7 @@ export interface TaskCallbacks {
     startTime: dayjs.Dayjs,
   ) => Promise<void>;
   onEnd?: (
-    cp: ChildProcessWithoutNullStreams,
+    cp: ChildProcessWithoutNullStreams | undefined,
     endTime: dayjs.Dayjs,
     diff: number,
   ) => Promise<void>;
@@ -63,73 +64,85 @@ export default class ScheduleService {
   ) {
     const { runOrigin, ...others } = params;
 
-    return taskLimit[this.taskLimitMap[runOrigin]](others, () => {
-      return new Promise(async (resolve, reject) => {
-        this.logger.info(
-          `[panel][开始执行任务] 参数: ${JSON.stringify({
-            ...others,
-            command,
-          })}`,
-        );
-
-        try {
-          const startTime = dayjs();
-          await callbacks.onBefore?.(startTime);
-
-          const cp = spawn(command, { shell: '/bin/bash' });
-
-          callbacks.onStart?.(cp, startTime);
-          completionTime === 'start' && resolve(cp.pid);
-
-          cp.stdout.on('data', async (data) => {
-            await callbacks.onLog?.(data.toString());
-          });
-
-          cp.stderr.on('data', async (data) => {
-            this.logger.info(
-              '[panel][执行任务失败] 命令: %s, 错误信息: %j',
-              command,
-              data.toString(),
-            );
-            await callbacks.onError?.(data.toString());
-          });
-
-          cp.on('error', async (err) => {
-            this.logger.error(
-              '[panel][创建任务失败] 命令: %s, 错误信息: %j',
-              command,
-              err,
-            );
-            await callbacks.onError?.(JSON.stringify(err));
-          });
-
-          cp.on('exit', async (code) => {
-            this.logger.info(
-              '[panel][执行任务结束] 参数: %s, 退出码: %j',
-              JSON.stringify({
-                ...others,
-                command,
-              }),
-              code,
-            );
-            const endTime = dayjs();
-            await callbacks.onEnd?.(
-              cp,
-              endTime,
-              endTime.diff(startTime, 'seconds'),
-            );
-            resolve({ ...others, pid: cp.pid, code });
-          });
-        } catch (error) {
-          this.logger.error(
-            '[panel][执行任务失败] 命令: %s, 错误信息: %j',
-            command,
-            error,
-          );
-          await callbacks.onError?.(JSON.stringify(error));
-        }
-      });
+    let resolveStart!: (pid: number | undefined) => void;
+    let rejectStart!: (error: Error) => void;
+    const startResult = new Promise<number | undefined>((resolve, reject) => {
+      resolveStart = resolve;
+      rejectStart = reject;
     });
+    // Most scheduled callers only observe completion (or intentionally detach).
+    void startResult.catch(() => {});
+    const completion = taskLimit[this.taskLimitMap[runOrigin]](
+      others,
+      async () => {
+        const startTime = dayjs();
+        let cp: ChildProcessWithoutNullStreams | undefined;
+        let result: ProcessResult = { code: null, signal: null };
+        try {
+          this.logger.info('[panel][开始执行任务] 任务ID: %s', others.id);
+          await callbacks.onBefore?.(startTime);
+          cp = spawn(command, { shell: '/bin/bash' });
+          const child = cp;
+          const observed = observeChildProcess(child, {
+            onStart: async () => {
+              await callbacks.onStart?.(child, startTime);
+            },
+            onStdout: callbacks.onLog,
+            onStderr: callbacks.onError,
+          });
+          observed.started.then(resolveStart, rejectStart);
+          result = await observed.completed;
+        } catch (error) {
+          result.error = asError(error);
+          rejectStart(result.error);
+        }
+
+        if (result.error) {
+          this.logger.error(
+            '[panel][执行任务失败] 任务ID: %s, 错误: %s',
+            others.id,
+            result.error.message,
+          );
+          try {
+            await callbacks.onError?.(result.error.message);
+          } catch (error) {
+            this.logger.error(
+              '[panel][任务错误回调失败] %s',
+              asError(error).message,
+            );
+          }
+        }
+        // Cleanup also runs after setup/spawn failure, and only after both pipes drain.
+        const endTime = dayjs();
+        try {
+          await callbacks.onEnd?.(
+            cp,
+            endTime,
+            endTime.diff(startTime, 'seconds'),
+          );
+        } catch (error) {
+          result.error ??= asError(error);
+          this.logger.error(
+            '[panel][任务结束回调失败] %s',
+            asError(error).message,
+          );
+        }
+        this.logger.info(
+          '[panel][执行任务结束] 任务ID: %s, 退出码: %j',
+          others.id,
+          result.code,
+        );
+        return { ...others, pid: cp?.pid, ...result };
+      },
+    ).catch((error) => {
+      // Queue/setup failures must not become unhandled rejections in detached callers.
+      rejectStart(asError(error));
+      this.logger.error('[panel][任务队列失败] %s', asError(error).message);
+      return { ...others, code: null, signal: null, error: asError(error) };
+    });
+
+    // Returning a PID must not release the execution slot while the process runs.
+    return completionTime === 'start' ? startResult : completion;
   }
 
   async createCronTask(

@@ -52,6 +52,9 @@ const check = async (
   callback: sendUnaryData<HealthCheckResponse>,
 ) => {
   switch (call.request.service) {
+    // Local scheduler liveness only: never call HTTP from this probe.
+    case 'scheduler':
+      return callback(null, { status: 1 });
     case 'cron': {
       const healthUrl = `http://localhost:${config.port}${
         config.baseUrl || ''

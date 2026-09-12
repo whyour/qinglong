@@ -95,7 +95,13 @@ append_node_dependency_path() {
   # 用户依赖目录加入 NODE_PATH，替代 symlink 到 node_modules 的方式
   export NODE_PATH="${NODE_PATH:+${NODE_PATH}:}${dir_dep}"
 
-  local pnpm_global_path=$(pnpm root -g 2>/dev/null)
+  local pnpm_global_path
+  if [[ -f "$dir_shell/node_path_cache.sh" ]]; then
+    . "$dir_shell/node_path_cache.sh"
+    pnpm_global_path=$(ql_get_node_global_path) || true
+  else
+    pnpm_global_path=$(pnpm root -g 2>/dev/null) || true
+  fi
   if [[ -n "$pnpm_global_path" ]]; then
     export QL_NODE_GLOBAL_PATH="$pnpm_global_path"
     export NODE_PATH="${NODE_PATH:+${NODE_PATH}:}${pnpm_global_path}"

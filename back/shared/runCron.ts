@@ -4,15 +4,13 @@ import Logger from '../loaders/logger';
 import { ICron } from '../protos/cron';
 import { CrontabModel, CrontabStatus } from '../data/cron';
 import { killTask } from '../config/util';
-import {
-  RunningInstanceModel,
-  InstanceStatus,
-} from '../data/runningInstance';
+import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
 import dayjs from 'dayjs';
+import { observeChildProcess, asError } from './childProcess';
 
 export function runCron(cmd: string, cron: ICron): Promise<number | void> {
-  return taskLimit.runWithCronLimit(cron, () => {
-    return new Promise(async (resolve: any) => {
+  return taskLimit.runWithCronLimit(cron, async () => {
+    try {
       // Check if the cron is already running and stop it (only if multiple instances are not allowed)
       try {
         const existingCron = await CrontabModel.findOne({
@@ -38,7 +36,12 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
           const stoppedAt = dayjs().unix();
           await RunningInstanceModel.update(
             { status: InstanceStatus.stopped, finished_at: stoppedAt },
-            { where: { cron_id: Number(cron.id), status: InstanceStatus.running } },
+            {
+              where: {
+                cron_id: Number(cron.id),
+                status: InstanceStatus.running,
+              },
+            },
           );
           // Update the status to idle after killing
           await CrontabModel.update(
@@ -60,33 +63,37 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
       );
       const cp = spawn(cmd, { shell: '/bin/bash' });
 
-      cp.stderr.on('data', (data) => {
-        Logger.info(
-          '[schedule][执行任务失败] 命令: %s, 错误信息: %j',
-          cmd,
-          data.toString(),
-        );
+      const { completed } = observeChildProcess(cp, {
+        onStderr: async (message) => {
+          Logger.info(
+            '[schedule][任务标准错误] 命令: %s, 信息: %s',
+            cmd,
+            message,
+          );
+        },
       });
-      cp.on('error', (err) => {
+      const result = await completed;
+      if (result.error) {
         Logger.error(
-          '[schedule][创建任务失败] 命令: %s, 错误信息: %j',
+          '[schedule][执行任务失败] 命令: %s, 错误: %s',
           cmd,
-          err,
+          result.error.message,
         );
-      });
-
-      cp.on('exit', async (code) => {
-        taskLimit.removeQueuedCron(cron.id);
-        Logger.info(
-          '[schedule][执行任务结束] 参数: %s, 退出码: %j',
-          JSON.stringify({
-            ...cron,
-            command: cmd,
-          }),
-          code,
-        );
-        resolve({ ...cron, command: cmd, pid: cp.pid, code });
-      });
-    });
+      }
+      Logger.info(
+        '[schedule][执行任务结束] 任务ID: %s, 退出码: %j',
+        cron.id,
+        result.code,
+      );
+      return { ...cron, command: cmd, pid: cp.pid, ...result } as any;
+    } catch (error) {
+      Logger.error(
+        '[schedule][创建任务失败] 命令: %s, 错误: %s',
+        cmd,
+        asError(error).message,
+      );
+    } finally {
+      taskLimit.removeQueuedCron(cron.id);
+    }
   });
 }
