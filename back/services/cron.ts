@@ -34,6 +34,7 @@ import { logStreamManager } from '../shared/logStreamManager';
 import { observeChildProcess, asError } from '../shared/childProcess';
 import { isEmpty } from 'lodash';
 import { LogReadOptions, readLogChunk } from '../shared/logReader';
+import { resolveFileAccess } from '../shared/fileAccess';
 
 @Service()
 export default class CronService {
@@ -672,11 +673,10 @@ export default class CronService {
             ? await getUniqPath(command, `${id}`)
             : log_name;
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
-        await fs.mkdir(path.resolve(config.logPath, uniqPath), {
-          recursive: true,
-        });
         logPath = `${uniqPath}/${logTime}.log`;
-        absolutePath = path.resolve(config.logPath, logPath);
+        absolutePath = resolveFileAccess(config.logPath, [logPath]);
+        if (!absolutePath) throw new Error('Log path is outside the log directory');
+        await fs.mkdir(path.dirname(absolutePath), { recursive: true });
         const outputPath = absolutePath;
         const cp = spawn(
           `real_log_path=${logPath} no_delay=true ${this.makeCommand(

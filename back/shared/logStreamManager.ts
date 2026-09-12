@@ -1,5 +1,8 @@
 import { createWriteStream, WriteStream } from 'fs';
 import { EventEmitter } from 'events';
+import path from 'path';
+import config from '../config';
+import { resolveFileAccess } from './fileAccess';
 
 /**
  * Manages write streams for log files to improve performance by avoiding repeated file opens
@@ -11,6 +14,10 @@ export class LogStreamManager extends EventEmitter {
   private closingStreams = new Map<string, Promise<void>>();
   private closedStreams = new WeakSet<WriteStream>();
   private streamErrors = new Map<string, Error>();
+
+  constructor(private readonly logRoot = config.logPath) {
+    super();
+  }
 
   /** Register each write synchronously, so concurrent callers cannot lose the tail. */
   async write(filePath: string, data: string): Promise<void> {
@@ -25,7 +32,16 @@ export class LogStreamManager extends EventEmitter {
           if (failure) return reject(failure);
           let stream = this.streams.get(filePath);
           if (!stream) {
-            stream = createWriteStream(filePath, { flags: 'a' });
+            // Validate only when opening: subsequent chunks reuse the same descriptor.
+            const root = path.resolve(this.logRoot);
+            const target = path.resolve(filePath);
+            if (
+              !target.startsWith(root + path.sep) ||
+              !resolveFileAccess(root, [target])
+            ) {
+              return reject(new Error('Log path is outside the log directory'));
+            }
+            stream = createWriteStream(target, { flags: 'a' });
             this.streams.set(filePath, stream);
             const current = stream;
             stream.once('close', () => this.closedStreams.add(current));

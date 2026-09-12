@@ -13,7 +13,7 @@ test(
   async (t) => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-manual-'));
     t.after(() => fs.rm(root, { recursive: true, force: true }));
-    const logs = new LogStreamManager();
+    const logs = new LogStreamManager(root);
     const updates = [];
     let active = 0;
     let failSpawn = false;

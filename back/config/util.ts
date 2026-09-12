@@ -12,6 +12,7 @@ import { DependenceTypes } from '../data/dependence';
 import { FormData } from 'undici';
 import os from 'os';
 import { maybeSudo, isInContainer } from './container';
+import { resolveFileAccess } from '../shared/fileAccess';
 
 export * from './share';
 
@@ -144,7 +145,8 @@ export async function handleLogPath(
   logPath: string,
   data: string = '',
 ): Promise<string> {
-  const absolutePath = path.resolve(config.logPath, logPath);
+  const absolutePath = resolveFileAccess(config.logPath, [logPath]);
+  if (!absolutePath) throw new Error('Log path is outside the log directory');
   const logFileExist = await fileExist(absolutePath);
   if (!logFileExist) {
     await createFile(absolutePath, data);

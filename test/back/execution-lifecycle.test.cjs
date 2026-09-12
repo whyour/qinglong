@@ -214,7 +214,7 @@ test(
   async (t) => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-log-lifecycle-'));
     t.after(() => fs.rm(dir, { recursive: true, force: true }));
-    const manager = new LogStreamManager();
+    const manager = new LogStreamManager(dir);
     const file = path.join(dir, 'out.log');
     const lines = Array.from({ length: 500 }, (_, i) => `${i}:末尾\n`);
     const writes = lines.map((line) => manager.write(file, line));
