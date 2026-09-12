@@ -38,11 +38,12 @@ test('legacy database upgrades without losing rows and repeated migration is ide
     type: QueryTypes.SELECT,
   });
   assert.equal(rows[0].name, 'keep-me');
+  assert.equal(rows[0].queued_token, null);
   assert.ok(Object.hasOwn(rows[0], 'allow_multiple_instances'));
   const applied = await database.query('SELECT id FROM "SchemaMigrations"', {
     type: QueryTypes.SELECT,
   });
-  assert.equal(applied.length, 14);
+  assert.equal(applied.length, 15);
 });
 
 test('migration failure rolls back added columns and can be retried after repair', async (t) => {

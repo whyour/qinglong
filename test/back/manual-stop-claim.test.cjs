@@ -9,7 +9,7 @@ const load = require('../helpers/load-security-module.cjs');
 const { killTask } = require('../../back/config/util');
 const { LogStreamManager } = require('../../back/shared/logStreamManager');
 
-for (const conflict of ['stop', 'newer-queue']) {
+for (const conflict of ['stop', 'newer-queue', 'stop-requeue']) {
   test(
     `manual startup loses its conditional claim after ${conflict} and terminates the late child`,
     { timeout: 10000 },
@@ -28,6 +28,7 @@ for (const conflict of ['stop', 'newer-queue']) {
         status: DataTypes.INTEGER,
         pid: DataTypes.INTEGER,
         log_path: DataTypes.STRING,
+        queued_token: DataTypes.STRING,
         command: DataTypes.STRING,
       });
       const instances = db.define('Instance', {
@@ -104,7 +105,18 @@ for (const conflict of ['stop', 'newer-queue']) {
       service.makeCommand = () => 'ignored';
       const running = service.runSingle(1);
       await pending;
-      if (conflict === 'stop') await service.stop([1]);
+      if (conflict === 'stop-requeue') {
+        await service.stop([1]);
+        // Queue again through the real API; leave the new runner pending.
+        const pendingRuns = [];
+        service.runSingle = (id, token) => pendingRuns.push({ id, token });
+        await service.run([1]);
+        assert.equal(pendingRuns.length, 1);
+        assert.equal(
+          pendingRuns[0].token,
+          (await crons.findByPk(1)).queued_token,
+        );
+      } else if (conflict === 'stop') await service.stop([1]);
       else await crons.update({ log_path: 'newer.log' }, { where: { id: 1 } });
       release();
       const result = await running;
@@ -115,7 +127,7 @@ for (const conflict of ['stop', 'newer-queue']) {
       assert.equal(row.status, conflict === 'stop' ? 1 : 3);
       assert.equal(
         row.log_path,
-        conflict === 'stop' ? 'previous.log' : 'newer.log',
+        conflict === 'newer-queue' ? 'newer.log' : 'previous.log',
       );
       assert.equal(row.pid, null);
       assert.equal(released, 1);
@@ -141,3 +153,63 @@ test(
     assert.equal(child.signalCode, 'SIGKILL');
   },
 );
+
+test('a runner waiting for a concurrency slot cannot adopt a newer queued generation', async (t) => {
+  const db = new Sequelize({
+    dialect: 'sqlite',
+    storage: ':memory:',
+    logging: false,
+  });
+  t.after(() => db.close());
+  const crons = db.define('Cron', {
+    status: DataTypes.INTEGER,
+    pid: DataTypes.INTEGER,
+    log_path: DataTypes.STRING,
+    queued_token: DataTypes.STRING,
+  });
+  await db.sync();
+  await crons.create({ id: 1, status: 1, log_path: 'same.log' });
+  const waiting = [];
+  const CronService = load('back/services/cron.ts', {
+    '../config': {},
+    '../data/cron': {
+      CrontabModel: crons,
+      CrontabStatus: { queued: 3, idle: 1, running: 0 },
+    },
+    '../data/runningInstance': {
+      RunningInstanceModel: { findAll: async () => [] },
+      InstanceStatus: { running: 0 },
+    },
+    '../config/util': {
+      getUniqPath: () => assert.fail('stale runner must not prepare a child'),
+    },
+    '../config/const': {},
+    '../schedule/client': {},
+    '../shared/pLimit': {
+      manualRunWithCronLimit: (fn) => {
+        waiting.push(fn);
+        return Promise.resolve();
+      },
+    },
+    '../shared/utils': {},
+    '../shared/i18n': {},
+    '../shared/logReader': {},
+    '../shared/logStreamManager': {},
+    'cross-spawn': { spawn: () => assert.fail('stale runner must not spawn') },
+  }).default;
+  const errors = [];
+  const service = new CronService({ error: (...args) => errors.push(args) });
+  await service.run([1]);
+  const first = (await crons.findByPk(1)).queued_token;
+  await service.stop([1]);
+  await service.run([1]);
+  const second = (await crons.findByPk(1)).queued_token;
+  assert.notEqual(first, second);
+  assert.equal(waiting.length, 2);
+  await waiting[0]();
+  const row = await crons.findByPk(1);
+  assert.equal(row.status, 3);
+  assert.equal(row.queued_token, second);
+  assert.equal(row.log_path, 'same.log');
+  assert.deepEqual(errors, []);
+});

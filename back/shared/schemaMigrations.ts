@@ -24,6 +24,7 @@ const columns = [
   { table: 'Crontabs', column: 'work_dir', type: 'VARCHAR(255)' },
   { table: 'Envs', column: 'isPinned', type: 'NUMBER' },
   { table: 'Envs', column: 'labels', type: 'JSON' },
+  { table: 'Crontabs', column: 'queued_token', type: 'VARCHAR(255)' },
 ];
 
 export async function migrateSchema(database: Sequelize): Promise<void> {

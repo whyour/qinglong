@@ -56,7 +56,7 @@ test('recovery registration errors propagate while ordinary autosave retains fil
  const source=fs.readFileSync('back/services/cron.ts','utf8');const a=source.indexOf('  public async autosave_crontab('),z=source.indexOf('  public async bootTask',a);
  const js=ts.transpileModule('class Fixture {\n'+source.slice(a,z)+'}\nmodule.exports=Fixture;', {compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
  const module={exports:{}};let files=0;
- new Function('module','isDemoEnv','cronClient',js)(module,()=>false,{addCron:async()=>{throw Error('registration unavailable');}});
+ new Function('module','isDemoEnv','cronClient','withSchedulerMutation',js)(module,()=>false,{addCron:async()=>{throw Error('registration unavailable');}},fn=>fn());
  const fixture=new module.exports();fixture.crontabs=async()=>({data:[]});fixture.setCrontab=async()=>{files++;};fixture.logger={warn(){}};
  await fixture.autosave_crontab();assert.equal(files,1);
  await assert.rejects(fixture.autosave_crontab(true),/registration unavailable/);assert.equal(files,2);

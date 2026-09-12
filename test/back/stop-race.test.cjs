@@ -15,6 +15,7 @@ async function fixture(t, onKill = async () => {}) {
     status: DataTypes.INTEGER,
     pid: DataTypes.INTEGER,
     log_path: DataTypes.STRING,
+        queued_token: DataTypes.STRING,
     last_execution_time: DataTypes.INTEGER,
     last_running_time: DataTypes.INTEGER,
   });

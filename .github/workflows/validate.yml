@@ -25,7 +25,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build:back
       - run: pnpm benchmark:execution -- --runs=10 --output=execution-baseline.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: execution-baseline
           path: execution-baseline.json

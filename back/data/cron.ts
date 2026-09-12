@@ -13,6 +13,7 @@ export class Crontab {
   pid?: number;
   isDisabled?: 1 | 0;
   log_path?: string;
+  queued_token?: string | null;
   isPinned?: 1 | 0;
   labels?: string[];
   last_running_time?: number;
@@ -83,6 +84,7 @@ export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
   isDisabled: DataTypes.NUMBER,
   isPinned: DataTypes.NUMBER,
   log_path: DataTypes.STRING,
+  queued_token: DataTypes.STRING,
   labels: DataTypes.JSON,
   last_running_time: DataTypes.NUMBER,
   last_execution_time: DataTypes.NUMBER,
