@@ -132,13 +132,17 @@ const Dashboard = () => {
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
     const poll = async () => {
       await fetchData();
+      if (cancelled) return;
       timer = setTimeout(poll, REFRESH_INTERVAL);
     };
-    fetchData();
-    timer = setTimeout(poll, REFRESH_INTERVAL);
-    return () => clearTimeout(timer);
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [fetchData]);
 
   const trendConfig = {
