@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import { Inject, Service } from 'typedi';
 import { parseBody, parseHeaders } from '../config/util';
 import { NotificationInfo } from '../data/notify';
@@ -604,8 +603,11 @@ export default class NotificationService {
   private async email() {
     const { emailPass, emailService, emailUser, emailTo } = this.params;
     const recipients = this.parseMailRecipients(emailTo) || emailUser;
+    // Snapshot this notification before yielding to the optional module load.
+    const { title, content } = this;
 
     try {
+      const { default: nodemailer } = await import('nodemailer');
       const transporter = nodemailer.createTransport({
         service: emailService,
         auth: {
@@ -617,8 +619,8 @@ export default class NotificationService {
       const info = await transporter.sendMail({
         from: `"${t('青龙快讯')}" <${emailUser}>`,
         to: recipients,
-        subject: `${this.title}`,
-        html: `${this.content.replace(/\n/g, '<br/>')}`,
+        subject: title,
+        html: content.replace(/\n/g, '<br/>'),
       });
 
       transporter.close();
