@@ -7,6 +7,7 @@ const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const { setTimeout: delay } = require('node:timers/promises');
 const { Sequelize, DataTypes } = require('sequelize');
+const { status } = require('@grpc/grpc-js');
 const load = require('../helpers/load-security-module.cjs');
 
 function gate() {
@@ -246,6 +247,43 @@ test(
     });
   },
 );
+
+for (const operation of ['update', 'remove', 'disabled']) {
+  for (const code of [status.DEADLINE_EXCEEDED, status.UNAVAILABLE]) {
+    for (const applied of [false, true]) {
+      test(`${operation} aborts on RPC ${code} with deletion applied=${applied} and reconciles the original DB`, async (t) => {
+        const { service, crons, client, jobs } = await fixture(t);
+        await crons.create({
+          id: 1, command: 'old', schedule: '* * * * *', isDisabled: 0,
+        });
+        jobs.set('1', 'old');
+        const before = await crons.findAll({ raw: true });
+        const failure = Object.assign(Error('uncertain deletion'), { code, status: 503 });
+        let deletes = 0;
+        client.delCron = async (ids) => {
+          deletes++;
+          if (applied) ids.forEach((id) => jobs.delete(id));
+          throw failure;
+        };
+        const add = client.addCron;
+        client.addCron = async () => assert.fail('must not register after failed deletion');
+        service.setCrontab = async () => assert.fail('must not publish after failed deletion');
+        await assert.rejects(
+          operation === 'update'
+            ? service.update({ id: 1, command: 'new' })
+            : service[operation]([1]),
+          (error) => error === failure && error.status === 503,
+        );
+        assert.equal(deletes, 1, 'must not replay an uncertain deletion');
+        assert.deepEqual(await crons.findAll({ raw: true }), before);
+        client.addCron = add;
+        service.setCrontab = async () => {};
+        await service.autosave_crontab(true);
+        assert.deepEqual([...jobs.entries()], [['1', 'old']]);
+      });
+    }
+  }
+}
 
 test('configuration rollback cannot restore an obsolete manual queue token', async (t) => {
   const { service, crons, client } = await fixture(t);

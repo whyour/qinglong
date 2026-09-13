@@ -154,20 +154,14 @@ export default class CronService {
       const tab = new Crontab({ ...doc, ...payload });
       tab.saved = false;
       tab.log_name = await this.getLogName(tab);
-      const newDoc = await this.updateDb(tab);
-
       if (doc.isDisabled === 1 || isDemoEnv()) {
-        return newDoc;
+        return await this.updateDb(tab);
       }
 
-      try {
-        await cronClient.delCron([String(newDoc.id)]);
-      } catch (error: any) {
-        this.logger.warn(
-          '[crontab] Failed to unregister cron job in scheduler:',
-          error?.message || error,
-        );
-      }
+      // Keep the DB snapshot unchanged if deletion has an uncertain outcome.
+      // Recovery uses that snapshot after this mutation releases its lock.
+      await cronClient.delCron([String(doc.id)]);
+      const newDoc = await this.updateDb(tab);
 
       if (this.shouldUseCronClient(newDoc)) {
         try {
@@ -305,15 +299,8 @@ export default class CronService {
 
   public async remove(ids: number[]) {
     return withSchedulerMutation(async () => {
+      await cronClient.delCron(ids.map(String));
       await CrontabModel.destroy({ where: { id: ids } });
-      try {
-        await cronClient.delCron(ids.map(String));
-      } catch (error: any) {
-        this.logger.warn(
-          '[crontab] Failed to unregister cron job in scheduler:',
-          error?.message || error,
-        );
-      }
       await this.setCrontab();
     });
   }
@@ -853,15 +840,8 @@ export default class CronService {
 
   public async disabled(ids: number[]) {
     return withSchedulerMutation(async () => {
+      await cronClient.delCron(ids.map(String));
       await CrontabModel.update({ isDisabled: 1 }, { where: { id: ids } });
-      try {
-        await cronClient.delCron(ids.map(String));
-      } catch (error: any) {
-        this.logger.warn(
-          '[crontab] Failed to unregister cron job in scheduler:',
-          error?.message || error,
-        );
-      }
       await this.setCrontab();
     });
   }
