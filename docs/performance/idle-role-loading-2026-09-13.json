@@ -1,0 +1,338 @@
+[
+  {
+    "name": "ql-idle-base-5-20260913",
+    "seconds": 1800.0357511250186,
+    "cpu_percent": 1.4619055751283436,
+    "working_set_mib": 182.8828125,
+    "working_set_start_mib": 175.546875,
+    "working_set_end_mib": 189.75390625,
+    "cpu_window_median": 1.2601598475220852,
+    "pids_range": [
+      46,
+      52
+    ],
+    "cpu_five_minute_windows": [
+      {
+        "seconds": 300.045086625003,
+        "cpu_percent": 1.5360761450362421
+      },
+      {
+        "seconds": 299.9874168749957,
+        "cpu_percent": 1.3913343577804893
+      },
+      {
+        "seconds": 299.9942876250134,
+        "cpu_percent": 1.549955179750664
+      },
+      {
+        "seconds": 300.00712579200626,
+        "cpu_percent": 1.3572667613312057
+      },
+      {
+        "seconds": 300.0157480420021,
+        "cpu_percent": 1.4343740380580066
+      },
+      {
+        "seconds": 299.98608616599813,
+        "cpu_percent": 1.5024203480910812
+      }
+    ],
+    "processes": [
+      {
+        "role": "pm2",
+        "pid": 30,
+        "cpu_percent": 0.16773208736027856,
+        "pss_start_mib": 16.0595703125,
+        "pss_end_mib": 19.7314453125,
+        "heap_used_start_mib": 6.628425598144531,
+        "heap_used_end_mib": 8.687217712402344,
+        "module_count": 168
+      },
+      {
+        "role": "primary",
+        "pid": 60,
+        "cpu_percent": 0.007775659678953311,
+        "pss_start_mib": 40.5078125,
+        "pss_end_mib": 40.6953125,
+        "heap_used_start_mib": 25.25609588623047,
+        "heap_used_end_mib": 25.437728881835938,
+        "module_count": 893
+      },
+      {
+        "role": "grpc",
+        "pid": 1428,
+        "cpu_percent": 0.1344078315933358,
+        "pss_start_mib": 52.2939453125,
+        "pss_end_mib": 52.8564453125,
+        "heap_used_start_mib": 33.35984802246094,
+        "heap_used_end_mib": 33.38536071777344,
+        "module_count": 1226
+      },
+      {
+        "role": "http",
+        "pid": 1562,
+        "cpu_percent": 0.37212085606419415,
+        "pss_start_mib": 65.681640625,
+        "pss_end_mib": 72.091796875,
+        "heap_used_start_mib": 43.217987060546875,
+        "heap_used_end_mib": 42.68212890625,
+        "module_count": 1420
+      }
+    ],
+    "other_cpu_percent_estimate": 0.7798691404315818,
+    "pss_total_start_mib": 174.54296875,
+    "pss_total_end_mib": 185.375
+  },
+  {
+    "name": "ql-idle-opt-5-20260913",
+    "seconds": 1800.034988792002,
+    "cpu_percent": 1.436461688855972,
+    "working_set_mib": 164.2109375,
+    "working_set_start_mib": 157.4765625,
+    "working_set_end_mib": 167.65234375,
+    "cpu_window_median": 1.2853194562064432,
+    "pids_range": [
+      46,
+      52
+    ],
+    "cpu_five_minute_windows": [
+      {
+        "seconds": 300.049639208999,
+        "cpu_percent": 1.4686696546668716
+      },
+      {
+        "seconds": 299.9825842080172,
+        "cpu_percent": 1.3458901324752628
+      },
+      {
+        "seconds": 299.99457241699565,
+        "cpu_percent": 1.5883380694557032
+      },
+      {
+        "seconds": 300.0066478330118,
+        "cpu_percent": 1.3326148033310614
+      },
+      {
+        "seconds": 300.0159495419939,
+        "cpu_percent": 1.4064542256642174
+      },
+      {
+        "seconds": 299.9855955829844,
+        "cpu_percent": 1.4768012415364409
+      }
+    ],
+    "processes": [
+      {
+        "role": "pm2",
+        "pid": 30,
+        "cpu_percent": 0.14717959310107362,
+        "pss_start_mib": 15.1064453125,
+        "pss_end_mib": 16.3046875,
+        "heap_used_start_mib": 6.704505920410156,
+        "heap_used_end_mib": 7.9625244140625,
+        "module_count": 168
+      },
+      {
+        "role": "primary",
+        "pid": 60,
+        "cpu_percent": 0.0016661840728423429,
+        "pss_start_mib": 30.0126953125,
+        "pss_end_mib": 30.16796875,
+        "heap_used_start_mib": 17.28534698486328,
+        "heap_used_end_mib": 16.51921844482422,
+        "module_count": 536
+      },
+      {
+        "role": "grpc",
+        "pid": 1407,
+        "cpu_percent": 0.13440551520928234,
+        "pss_start_mib": 47.486328125,
+        "pss_end_mib": 48.099609375,
+        "heap_used_start_mib": 31.050506591796875,
+        "heap_used_end_mib": 31.246986389160156,
+        "module_count": 1110
+      },
+      {
+        "role": "http",
+        "pid": 1541,
+        "cpu_percent": 0.3793345739171068,
+        "pss_start_mib": 64.197265625,
+        "pss_end_mib": 70.4365234375,
+        "heap_used_start_mib": 43.17451477050781,
+        "heap_used_end_mib": 42.76313781738281,
+        "module_count": 1421
+      }
+    ],
+    "other_cpu_percent_estimate": 0.7738758225556669,
+    "pss_total_start_mib": 156.802734375,
+    "pss_total_end_mib": 165.0087890625
+  },
+  {
+    "name": "ql-idle-base-30-20260913",
+    "seconds": 1800.0358240409987,
+    "cpu_percent": 0.47287147768488685,
+    "working_set_mib": 176.95703125,
+    "working_set_start_mib": 173.328125,
+    "working_set_end_mib": 179.484375,
+    "cpu_window_median": 0.08001989028647158,
+    "pids_range": [
+      46,
+      46
+    ],
+    "cpu_five_minute_windows": [
+      {
+        "seconds": 300.0449727079831,
+        "cpu_percent": 0.48302025757002126
+      },
+      {
+        "seconds": 299.9868865419994,
+        "cpu_percent": 0.4417486428409157
+      },
+      {
+        "seconds": 299.99479983301717,
+        "cpu_percent": 0.4924652030042962
+      },
+      {
+        "seconds": 300.0068661669793,
+        "cpu_percent": 0.47278617923715943
+      },
+      {
+        "seconds": 300.01572066600784,
+        "cpu_percent": 0.47314887261533883
+      },
+      {
+        "seconds": 299.9865781250119,
+        "cpu_percent": 0.47405720912199345
+      }
+    ],
+    "processes": [
+      {
+        "role": "pm2",
+        "pid": 30,
+        "cpu_percent": 0.1260743124775411,
+        "pss_start_mib": 16.4189453125,
+        "pss_end_mib": 18.3916015625,
+        "heap_used_start_mib": 6.8360748291015625,
+        "heap_used_end_mib": 8.632240295410156,
+        "module_count": 168
+      },
+      {
+        "role": "primary",
+        "pid": 59,
+        "cpu_percent": 0.007775508258526765,
+        "pss_start_mib": 41.6640625,
+        "pss_end_mib": 41.8583984375,
+        "heap_used_start_mib": 25.426864624023438,
+        "heap_used_end_mib": 25.8538818359375,
+        "module_count": 893
+      },
+      {
+        "role": "grpc",
+        "pid": 1145,
+        "cpu_percent": 0.05054080368042397,
+        "pss_start_mib": 50.80859375,
+        "pss_end_mib": 50.81640625,
+        "heap_used_start_mib": 32.67463684082031,
+        "heap_used_end_mib": 33.460670471191406,
+        "module_count": 1226
+      },
+      {
+        "role": "http",
+        "pid": 1296,
+        "cpu_percent": 0.14495768967682038,
+        "pss_start_mib": 62.455078125,
+        "pss_end_mib": 66.630859375,
+        "heap_used_start_mib": 42.821388244628906,
+        "heap_used_end_mib": 45.53596496582031,
+        "module_count": 1420
+      }
+    ],
+    "other_cpu_percent_estimate": 0.14352316359157463,
+    "pss_total_start_mib": 171.3466796875,
+    "pss_total_end_mib": 177.697265625
+  },
+  {
+    "name": "ql-idle-opt-30-20260913",
+    "seconds": 1800.0362767920014,
+    "cpu_percent": 0.4571243427751657,
+    "working_set_mib": 163.84765625,
+    "working_set_start_mib": 160.3984375,
+    "working_set_end_mib": 166.78125,
+    "cpu_window_median": 0.07913783185143575,
+    "pids_range": [
+      46,
+      46
+    ],
+    "cpu_five_minute_windows": [
+      {
+        "seconds": 300.04557416701573,
+        "cpu_percent": 0.4763762984900343
+      },
+      {
+        "seconds": 299.9868986670044,
+        "cpu_percent": 0.4565389375621548
+      },
+      {
+        "seconds": 299.9952649579791,
+        "cpu_percent": 0.4641543259674588
+      },
+      {
+        "seconds": 300.00620704202447,
+        "cpu_percent": 0.4492823709514755
+      },
+      {
+        "seconds": 300.01551729097264,
+        "cpu_percent": 0.4567120435544315
+      },
+      {
+        "seconds": 299.9868146670051,
+        "cpu_percent": 0.43967865769837505
+      }
+    ],
+    "processes": [
+      {
+        "role": "pm2",
+        "pid": 30,
+        "cpu_percent": 0.12329767254168253,
+        "pss_start_mib": 14.4580078125,
+        "pss_end_mib": 17.8134765625,
+        "heap_used_start_mib": 6.502464294433594,
+        "heap_used_end_mib": 8.532814025878906,
+        "module_count": 168
+      },
+      {
+        "role": "primary",
+        "pid": 59,
+        "cpu_percent": 0.0016661847640767908,
+        "pss_start_mib": 30.62890625,
+        "pss_end_mib": 30.78515625,
+        "heap_used_start_mib": 17.279754638671875,
+        "heap_used_end_mib": 16.613327026367188,
+        "module_count": 536
+      },
+      {
+        "role": "grpc",
+        "pid": 816,
+        "cpu_percent": 0.04943014800094479,
+        "pss_start_mib": 48.291015625,
+        "pss_end_mib": 48.298828125,
+        "heap_used_start_mib": 30.520523071289062,
+        "heap_used_end_mib": 31.094573974609375,
+        "module_count": 1110
+      },
+      {
+        "role": "http",
+        "pid": 967,
+        "cpu_percent": 0.14051491510380934,
+        "pss_start_mib": 65.314453125,
+        "pss_end_mib": 68.388671875,
+        "heap_used_start_mib": 42.7750244140625,
+        "heap_used_end_mib": 45.503204345703125,
+        "module_count": 1421
+      }
+    ],
+    "other_cpu_percent_estimate": 0.1422154223646523,
+    "pss_total_start_mib": 158.6923828125,
+    "pss_total_end_mib": 165.2861328125
+  }
+]
