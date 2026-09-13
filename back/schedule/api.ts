@@ -21,6 +21,7 @@ import {
 } from '../protos/api';
 import LoggerInstance from '../loaders/logger';
 import pick from 'lodash/pick';
+import SystemService from '../services/system';
 import CronService from '../services/cron';
 import {
   CronDetailRequest,
@@ -233,7 +234,6 @@ export const systemNotify = async (
   callback: sendUnaryData<Response>,
 ) => {
   try {
-    const { default: SystemService } = await import('../services/system');
     const systemService = Container.get(SystemService);
     const data = await systemService.notify({
       title: call.request.title,
