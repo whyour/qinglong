@@ -9,7 +9,9 @@ export async function withSchedulerMutation<T>(
 ): Promise<T> {
   let release: () => Promise<void>;
   try {
-    release = await lockfile.lock(config.crontabFile, {
+    // proper-lockfile indexes held locks by target, not lockfilePath. Keep
+    // this identity separate from nested writeFileWithLock(crontabFile).
+    release = await lockfile.lock(`${config.crontabFile}.scheduler`, {
       realpath: false,
       lockfilePath: `${config.crontabFile}.scheduler.lock`,
       stale: 30000,

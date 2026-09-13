@@ -38,6 +38,7 @@ import {
   RunCronsRequest,
 } from '../protos/api';
 import { NotificationInfo } from '../data/notify';
+import { Model } from 'sequelize';
 
 Container.set('logger', LoggerInstance);
 
@@ -247,13 +248,16 @@ export const systemNotify = async (
 
 const normalizeCronData = (data: CronItem | null): CronItem | undefined => {
   if (!data) return undefined;
+  // create() returns a Sequelize instance; spreading it omits attribute getters.
+  const cron = data instanceof Model ? (data.get({ plain: true }) as CronItem) : data;
   return {
-    ...data,
-    sub_id: data.sub_id ?? undefined,
-    extra_schedules: data.extra_schedules ?? [],
-    pid: data.pid ?? undefined,
-    task_before: data.task_before ?? undefined,
-    task_after: data.task_after ?? undefined,
+    ...cron,
+    labels: cron.labels ?? [],
+    sub_id: cron.sub_id ?? undefined,
+    extra_schedules: cron.extra_schedules ?? [],
+    pid: cron.pid ?? undefined,
+    task_before: cron.task_before ?? undefined,
+    task_after: cron.task_after ?? undefined,
   };
 };
 

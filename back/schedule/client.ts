@@ -74,7 +74,9 @@ class Client {
         { deadline: Date.now() + 5000 },
         (err, res) => {
           if (err) {
-            if (err.code === status.UNAVAILABLE) {
+            if (err.code === status.UNAVAILABLE || err.code === status.DEADLINE_EXCEEDED) {
+              // A timed-out write may already have reached the scheduler.
+              // Reconcile its state from the DB instead of replaying the RPC.
               this.readiness.invalidate();
               Object.assign(err, { status: 503 });
             }
@@ -91,7 +93,7 @@ class Client {
     return new Promise((resolve, reject) => {
       this.client.delCron({ ids: request }, new Metadata(), { deadline: Date.now() + 5000 }, (err, res) => {
         if (err) {
-          if (err.code === status.UNAVAILABLE) {
+          if (err.code === status.UNAVAILABLE || err.code === status.DEADLINE_EXCEEDED) {
             this.readiness.invalidate();
             Object.assign(err, { status: 503 });
           }

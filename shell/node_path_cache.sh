@@ -71,13 +71,23 @@ ql_refresh_node_global_path() (
   if type -P flock &>/dev/null && mkdir -p -- "$dir_tmp" 2>/dev/null; then
     if [[ ! -L "$lock" && ( ! -e "$lock" || ( -f "$lock" && -O "$lock" ) ) ]] && \
       { exec 9>> "$lock"; } 2>/dev/null; then
-      # Bound the wait; absent/unsupported flock or contention falls back to
-      # independent discovery. Never remove the lock file while waiters exist.
-      if flock -w 2 9 2>/dev/null; then
-        if ql_read_node_path_cache "$cache" "$key"; then
-          return 0
+      # BusyBox flock (Alpine) has no -w. Both implementations support -n;
+      # bound contention retries and fall back immediately on other failures.
+      # Never remove the lock file while waiters exist.
+      local lock_attempt=0 lock_status
+      while :; do
+        if flock -n 9 2>/dev/null; then
+          if ql_read_node_path_cache "$cache" "$key"; then
+            return 0
+          fi
+          break
+        else
+          lock_status=$?
         fi
-      fi
+        [[ "$lock_status" == 1 && "$lock_attempt" -lt 20 ]] || break
+        lock_attempt=$((lock_attempt + 1))
+        sleep 0.1
+      done
     fi
   fi
 

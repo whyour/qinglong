@@ -510,23 +510,45 @@ export async function killTask(pid: number, waitForExit = false) {
     }
   };
   for (const target of pids) signal(target, 'SIGTERM');
-  const alive = (target: number) => {
+  const alive = async (target: number) => {
     try {
       process.kill(target, 0);
-      return true;
     } catch (error: any) {
       if (error.code === 'ESRCH') return false;
       throw error;
     }
+    if (process.platform === 'linux') {
+      try {
+        const stat = await fs.readFile(`/proc/${target}/stat`, 'utf8');
+        // The command field may contain spaces and parentheses. Zombies have
+        // exited even while their parent has not reaped the PID yet.
+        const state = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[0];
+        if (['Z', 'X', 'x'].includes(state)) return false;
+      } catch {
+        // /proc may be unavailable, or the process may have just exited.
+        // Retain the portable signal probe rather than assuming it is dead.
+        try {
+          process.kill(target, 0);
+        } catch (error: any) {
+          if (error.code === 'ESRCH') return false;
+          throw error;
+        }
+      }
+    }
+    return true;
   };
   const wait = async () => {
     const deadline = Date.now() + 1000;
-    while (pids.some(alive) && Date.now() < deadline) {
+    let remaining = pids;
+    while (true) {
+      const states = await Promise.all(remaining.map(alive));
+      remaining = remaining.filter((_, index) => states[index]);
+      if (!remaining.length || Date.now() >= deadline) return remaining;
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
-    return pids.filter(alive);
   };
   let remaining = await wait();
+  if (!remaining.length) return;
   for (const target of remaining) signal(target, 'SIGKILL');
   remaining = await wait();
   if (remaining.length)
