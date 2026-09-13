@@ -141,8 +141,8 @@ class Application {
   }
 
   private async initializeDatabase() {
-    const dbLoader = await import('./loaders/db');
-    await dbLoader.default();
+    const { runStartupProcess } = await import('./shared/startupProcess');
+    await runStartupProcess(require.resolve('./bootstrap/database'));
   }
 
   private async setupMiddlewares(): Promise<express.Application> {
