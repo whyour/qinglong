@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const { once } = require('node:events');
 const { Sequelize, DataTypes } = require('sequelize');
 const load = require('../helpers/load-security-module.cjs');
 const { killTask } = require('../../back/config/util');
@@ -147,8 +148,12 @@ test(
       if (child.exitCode === null && child.signalCode === null)
         child.kill('SIGKILL');
     });
+    const exited = once(child, 'exit');
     await new Promise((resolve) => child.stdout.once('data', resolve));
     await killTask(child.pid, true);
+    // Linux may report an exited zombie before Node reaps our child. Wait for
+    // that separate event before requiring the PID to disappear.
+    await exited;
     assert.throws(() => process.kill(child.pid, 0), { code: 'ESRCH' });
     assert.equal(child.signalCode, 'SIGKILL');
   },
