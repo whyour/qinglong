@@ -1,0 +1,142 @@
+[
+  {
+    "name": "ql-db-base-5-20260913",
+    "seconds": 600.0184303330025,
+    "cpu_percent": 1.0104791275553118,
+    "working_set_mib": 237.11328125,
+    "working_set_start_mib": 234.58203125,
+    "working_set_end_mib": 240.3046875,
+    "cpu_window_median": 0.8893015594078196,
+    "pids_range": [
+      46,
+      48
+    ],
+    "samples": 121,
+    "anon_median_mib": 148.41796875,
+    "cpu_five_minute_windows": [
+      {
+        "seconds": 300.0147623330122,
+        "cpu_percent": 1.1043046596228925
+      },
+      {
+        "seconds": 300.0036679999903,
+        "cpu_percent": 0.9166501257578255
+      }
+    ],
+    "processes": [
+      {
+        "role": "pm2",
+        "pid": 29,
+        "cpu_percent": 0.06162399773689885,
+        "pss_start_mib": 16.841796875,
+        "pss_end_mib": 18.130859375,
+        "heap_used_start_mib": 6.461143493652344,
+        "heap_used_end_mib": 7.342308044433594,
+        "module_count": 168
+      },
+      {
+        "role": "primary",
+        "pid": 58,
+        "cpu_percent": 0.004996540357045852,
+        "pss_start_mib": 33.7236328125,
+        "pss_end_mib": 33.9384765625,
+        "heap_used_start_mib": 17.180091857910156,
+        "heap_used_end_mib": 16.520858764648438,
+        "module_count": 536
+      },
+      {
+        "role": "grpc",
+        "pid": 704,
+        "cpu_percent": 0.07994464571273363,
+        "pss_start_mib": 51.806640625,
+        "pss_end_mib": 51.111328125,
+        "heap_used_start_mib": 30.947593688964844,
+        "heap_used_end_mib": 30.558135986328125,
+        "module_count": 1110
+      },
+      {
+        "role": "http",
+        "pid": 830,
+        "cpu_percent": 0.2031926411865313,
+        "pss_start_mib": 67.0810546875,
+        "pss_end_mib": 72.4560546875,
+        "heap_used_start_mib": 42.96131134033203,
+        "heap_used_end_mib": 46.997283935546875,
+        "module_count": 1421
+      }
+    ],
+    "other_cpu_percent_estimate": 0.6607213025621022,
+    "pss_total_start_mib": 169.453125,
+    "pss_total_end_mib": 175.63671875
+  },
+  {
+    "name": "ql-db-opt-5-20260913",
+    "seconds": 600.0188853330037,
+    "cpu_percent": 1.0356877344870774,
+    "working_set_mib": 194.90625,
+    "working_set_start_mib": 190.88671875,
+    "working_set_end_mib": 198.25390625,
+    "cpu_window_median": 0.8745612636994758,
+    "pids_range": [
+      46,
+      48
+    ],
+    "samples": 121,
+    "anon_median_mib": 134.0859375,
+    "cpu_five_minute_windows": [
+      {
+        "seconds": 300.0147350000043,
+        "cpu_percent": 1.1329073553670461
+      },
+      {
+        "seconds": 300.0041503329994,
+        "cpu_percent": 0.9384646835301838
+      }
+    ],
+    "processes": [
+      {
+        "role": "pm2",
+        "pid": 30,
+        "cpu_percent": 0.08660749570618374,
+        "pss_start_mib": 17.404296875,
+        "pss_end_mib": 18.330078125,
+        "heap_used_start_mib": 6.466094970703125,
+        "heap_used_end_mib": 7.5060272216796875,
+        "module_count": 168
+      },
+      {
+        "role": "primary",
+        "pid": 59,
+        "cpu_percent": 0.0,
+        "pss_start_mib": 16.7548828125,
+        "pss_end_mib": 16.7783203125,
+        "heap_used_start_mib": 6.776817321777344,
+        "heap_used_end_mib": 6.80633544921875,
+        "module_count": 130
+      },
+      {
+        "role": "grpc",
+        "pid": 717,
+        "cpu_percent": 0.07661432312470101,
+        "pss_start_mib": 49.8037109375,
+        "pss_end_mib": 52.2099609375,
+        "heap_used_start_mib": 30.391525268554688,
+        "heap_used_end_mib": 30.905502319335938,
+        "module_count": 1110
+      },
+      {
+        "role": "http",
+        "pid": 842,
+        "cpu_percent": 0.20152898039323525,
+        "pss_start_mib": 70.2763671875,
+        "pss_end_mib": 73.3349609375,
+        "heap_used_start_mib": 43.223854064941406,
+        "heap_used_end_mib": 47.23627471923828,
+        "module_count": 1421
+      }
+    ],
+    "other_cpu_percent_estimate": 0.6709369352629574,
+    "pss_total_start_mib": 154.2392578125,
+    "pss_total_end_mib": 160.6533203125
+  }
+]
