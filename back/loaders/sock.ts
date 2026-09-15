@@ -24,13 +24,21 @@ export default async ({ server }: { server: Server }) => {
     const batch = [...sessions];
     try {
       const current = await shareStore.getAuthInfo();
+      // Reuse validation only within this synchronous check of one auth snapshot.
+      const validated = new Map<string, Map<string, boolean>>();
       for (const [conn, { token, platform }] of batch) {
-        if (
-          sessions.has(conn) &&
-          !isValidToken(current, token, platform, config.jwt.secret)
-        ) {
-          conn.close('401');
+        if (!sessions.has(conn)) continue;
+        let platforms = validated.get(token);
+        if (!platforms) {
+          platforms = new Map();
+          validated.set(token, platforms);
         }
+        let valid = platforms.get(platform);
+        if (valid === undefined) {
+          valid = isValidToken(current, token, platform, config.jwt.secret);
+          platforms.set(platform, valid);
+        }
+        if (!valid) conn.close('401');
       }
     } catch {
       for (const [conn] of batch) {

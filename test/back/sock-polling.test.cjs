@@ -13,6 +13,7 @@ async function setup() {
   let auth = { token };
   let read = async () => auth;
   let reads = 0;
+  const validations = [];
   let onConnection;
   const clients = new Set();
   const timers = new Set();
@@ -34,7 +35,7 @@ async function setup() {
       },
     },
     '../services/sock': class {},
-    '../config/util': { getPlatform: () => 'desktop' },
+    '../config/util': { getPlatform: (agent) => agent || 'desktop' },
     '../shared/store': {
       shareStore: {
         getAuthInfo: () => {
@@ -43,7 +44,12 @@ async function setup() {
         },
       },
     },
-    '../shared/auth': { isValidToken },
+    '../shared/auth': {
+      isValidToken: (...args) => {
+        validations.push({ token: args[1], platform: args[2] });
+        return isValidToken(...args);
+      },
+    },
     '../config': { baseUrl: '', jwt: { secret } },
   };
   const source = fs.readFileSync(
@@ -100,6 +106,7 @@ async function setup() {
     secret,
     clients,
     timers,
+    validations,
     connection,
     connect: (c) => onConnection(c),
     get reads() {
@@ -235,4 +242,56 @@ test('an accepted JWT is disconnected when it expires without a store change', a
   }
   assert.equal(c.closeCode, '401');
   assert.equal(h.timers.size, 0);
+});
+
+test('same token and platform share validation only within the current round', async () => {
+  const h = await setup();
+  const sockets = Array.from({ length: 20 }, () => h.connection());
+  await Promise.all(sockets.map(h.connect));
+  assert.equal(
+    h.validations.length,
+    20,
+    'initial authentication stays independent',
+  );
+  h.validations.length = 0;
+  await h.tick();
+  assert.equal(h.validations.length, 1);
+  await h.tick();
+  assert.equal(h.validations.length, 2, 'new rounds revalidate');
+  h.setAuth({ token: '' });
+  await h.tick();
+  assert.equal(
+    h.validations.length,
+    3,
+    'invalid results are also shared for this round',
+  );
+  assert.ok(sockets.every((c) => c.closeCode === '401'));
+  assert.equal(h.timers.size, 0);
+});
+
+test('validation results never cross tokens or platforms', async () => {
+  const h = await setup();
+  const other = jwt.sign({ account: 'other' }, h.secret, {
+    algorithm: 'HS384',
+    expiresIn: '1h',
+  });
+  h.setAuth({
+    tokens: {
+      desktop: [{ value: h.token }, { value: other }],
+      mobile: [{ value: h.token }],
+    },
+  });
+  const desktop = h.connection();
+  const mobile = h.connection();
+  mobile.headers['user-agent'] = 'mobile';
+  const separate = h.connection(other);
+  await Promise.all([desktop, mobile, separate].map(h.connect));
+  h.validations.length = 0;
+  h.setAuth({ tokens: { desktop: [{ value: h.token }], mobile: [] } });
+  await h.tick();
+  assert.equal(h.validations.length, 3);
+  assert.equal(desktop.closeCode, undefined);
+  assert.equal(mobile.closeCode, '401');
+  assert.equal(separate.closeCode, '401');
+  desktop.close();
 });
