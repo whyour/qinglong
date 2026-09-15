@@ -652,11 +652,7 @@ export function safeJSONParse(value?: string) {
   }
 }
 
-export function errStack(error: unknown): string {
-  return error instanceof Error && error.stack
-    ? error.stack
-    : String(error);
-}
+export { errStack } from '../shared/errors';
 
 export async function rmPath(path: string) {
   try {

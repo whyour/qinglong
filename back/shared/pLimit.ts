@@ -3,7 +3,6 @@ import os from 'os';
 import { AuthDataType, SystemModel } from '../data/system';
 import Logger from '../loaders/logger';
 import { Dependence } from '../data/dependence';
-import NotificationService from '../services/notify';
 import { t, tf } from '../shared/i18n';
 import {
   ICronFn,
@@ -70,8 +69,6 @@ class TaskLimit {
   get firstDependencyId() {
     return [...this.queuedDependencyIds.values()][0];
   }
-
-  private notificationService: NotificationService = new NotificationService();
 
   constructor() {
     this.setCustomLimit();
