@@ -107,42 +107,45 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/failures',
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const rows = (await CrontabStatModel.findAll({
-          attributes: ['ref_id', [fn('SUM', col('fail_count')), 'fail_count']],
-          where: { date: dayjs().format('YYYY-MM-DD'), fail_count: { [Op.gt]: 0 } },
-          group: ['ref_id'],
-          order: [[fn('SUM', col('fail_count')), 'DESC'], ['ref_id', 'ASC']],
-          raw: true,
-        })) as any[];
-        const crons = rows.length > 0 ? await CrontabModel.findAll({
-          attributes: ['id', 'name', 'command'],
-          where: { id: { [Op.in]: rows.map((row) => Number(row.ref_id)) } },
-          raw: true,
-        }) : [];
-        const cronMap = new Map(crons.map((cron) => [cron.id, cron]));
-        res.send({
-          code: 200,
-          data: rows.map((row) => {
-            const id = Number(row.ref_id);
-            const cron = cronMap.get(id);
-            return {
-              id,
-              name: cron?.name || cron?.command || tf('任务#%s', id),
-              command: cron?.command || '',
-              failCount: Number(row.fail_count),
-              deleted: !cron,
-            };
-          }),
-        });
-      } catch (e) {
-        next(e);
-      }
-    },
-  );
+  for (const isSuccess of [false, true]) {
+    route.get(
+      isSuccess ? '/successes' : '/failures',
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const countColumn = isSuccess ? 'success_count' : 'fail_count';
+          const rows = (await CrontabStatModel.findAll({
+            attributes: ['ref_id', [fn('SUM', col(countColumn)), 'result_count']],
+            where: { date: dayjs().format('YYYY-MM-DD'), [countColumn]: { [Op.gt]: 0 } },
+            group: ['ref_id'],
+            order: [[fn('SUM', col(countColumn)), 'DESC'], ['ref_id', 'ASC']],
+            raw: true,
+          })) as any[];
+          const crons = rows.length > 0 ? await CrontabModel.findAll({
+            attributes: ['id', 'name', 'command'],
+            where: { id: { [Op.in]: rows.map((row) => Number(row.ref_id)) } },
+            raw: true,
+          }) : [];
+          const cronMap = new Map(crons.map((cron) => [cron.id, cron]));
+          res.send({
+            code: 200,
+            data: rows.map((row) => {
+              const id = Number(row.ref_id);
+              const cron = cronMap.get(id);
+              return {
+                id,
+                name: cron?.name || cron?.command || tf('任务#%s', id),
+                command: cron?.command || '',
+                [isSuccess ? 'successCount' : 'failCount']: Number(row.result_count),
+                deleted: !cron,
+              };
+            }),
+          });
+        } catch (e) {
+          next(e);
+        }
+      },
+    );
+  }
 
   route.get(
     '/trend',

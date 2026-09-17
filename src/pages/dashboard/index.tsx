@@ -16,7 +16,7 @@ import { SharedContext } from '@/layouts';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import CronLogModal from '../crontab/logModal';
-import FailureModal from './failureModal';
+import TaskResultModal from './taskResultModal';
 
 interface Overview {
   total: number;
@@ -94,7 +94,7 @@ const Dashboard = () => {
   const [labels, setLabels] = useState<any[]>([]);
   const [logCron, setLogCron] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [showFailures, setShowFailures] = useState(false);
+  const [result, setResult] = useState<'success' | 'failure' | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -192,16 +192,25 @@ const Dashboard = () => {
           <Card size="small"><Statistic title={intl.get('成功率')} value={`${overview?.successRate || '0'}%`} valueStyle={{ color: '#52c41a' }} /></Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={3}>
-          <Card size="small"><Statistic title={intl.get('今日成功')} value={overview?.todaySuccess || 0} valueStyle={{ color: '#52c41a' }} prefix={<CheckCircleOutlined />} /></Card>
+          <Card size="small" hoverable role="button" tabIndex={0}
+            aria-label={intl.get('今日成功')}
+            onClick={() => setResult('success')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setResult('success');
+              }
+            }}
+          ><Statistic title={intl.get('今日成功')} value={overview?.todaySuccess || 0} valueStyle={{ color: '#52c41a' }} prefix={<CheckCircleOutlined />} /></Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={3}>
           <Card size="small" hoverable role="button" tabIndex={0}
             aria-label={intl.get('今日失败')}
-            onClick={() => setShowFailures(true)}
+            onClick={() => setResult('failure')}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                setShowFailures(true);
+                setResult('failure');
               }
             }}
           ><Statistic title={intl.get('今日失败')} value={overview?.todayFail || 0} valueStyle={{ color: '#ff4d4f' }} prefix={<CloseCircleOutlined />} /></Card>
@@ -361,7 +370,7 @@ const Dashboard = () => {
           </Card>
         </Col>
       </Row>
-      {showFailures && <FailureModal onCancel={() => setShowFailures(false)} />}
+      {result && <TaskResultModal key={result} result={result} onCancel={() => setResult(null)} />}
       {logCron && (
         <CronLogModal
           cron={logCron}

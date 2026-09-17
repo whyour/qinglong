@@ -5,7 +5,7 @@ const { Sequelize, DataTypes } = require('sequelize');
 const dayjs = require('dayjs');
 const express = require('express');
 
-test('today failures includes recovered and deleted tasks, excluding previous days and successes', async (t) => {
+test('today result lists include mixed and deleted tasks and exclude other dates', async (t) => {
   const db = new Sequelize({
     dialect: 'sqlite',
     storage: ':memory:',
@@ -53,11 +53,12 @@ test('today failures includes recovered and deleted tasks, excluding previous da
     { ref_id: 1, date: today, fail_count: 2, success_count: 1 },
     { ref_id: 2, date: today, fail_count: 1, success_count: 0 },
     { ref_id: 3, date: today, fail_count: 0, success_count: 4 },
-    { ref_id: 4, date: today, fail_count: 3, success_count: 0 },
+    { ref_id: 4, date: today, fail_count: 3, success_count: 2 },
     {
       ref_id: 3,
       date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
       fail_count: 10,
+      success_count: 20,
     },
   ]);
   const router = express.Router();
@@ -67,6 +68,9 @@ test('today failures includes recovered and deleted tasks, excluding previous da
   ).handle;
   const handler = dashboard.stack.find(
     (layer) => layer.route?.path === '/failures',
+  ).route.stack[0].handle;
+  const successHandler = dashboard.stack.find(
+    (layer) => layer.route?.path === '/successes',
   ).route.stack[0].handle;
   let response;
   await handler(
@@ -100,7 +104,50 @@ test('today failures includes recovered and deleted tasks, excluding previous da
       },
     ],
   });
+  await successHandler(
+    {},
+    {
+      send: (value) => {
+        response = value;
+      },
+    },
+    (error) => {
+      throw error;
+    },
+  );
+  assert.deepEqual(response, {
+    code: 200,
+    data: [
+      {
+        id: 3,
+        name: 'Successful task',
+        command: 'task success.js',
+        successCount: 4,
+        deleted: false,
+      },
+      { id: 4, name: '任务#4', command: '', successCount: 2, deleted: true },
+      {
+        id: 1,
+        name: 'Recovered task',
+        command: 'task recovered.js',
+        successCount: 1,
+        deleted: false,
+      },
+    ],
+  });
   await stats.destroy({ where: {} });
+  await successHandler(
+    {},
+    {
+      send: (value) => {
+        response = value;
+      },
+    },
+    (error) => {
+      throw error;
+    },
+  );
+  assert.deepEqual(response, { code: 200, data: [] });
   await handler(
     {},
     {

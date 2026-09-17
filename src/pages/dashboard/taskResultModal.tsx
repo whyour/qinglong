@@ -5,31 +5,41 @@ import { request } from '@/utils/http';
 import config from '@/utils/config';
 import CronLogModal from '../crontab/logModal';
 
-interface FailedTask {
+interface TaskResult {
   id: number;
   name: string;
   command: string;
-  failCount: number;
+  failCount?: number;
+  successCount?: number;
   deleted: boolean;
 }
 
-export default function FailureModal({ onCancel }: { onCancel: () => void }) {
-  const [tasks, setTasks] = useState<FailedTask[]>([]);
+export default function TaskResultModal({
+  result,
+  onCancel,
+}: {
+  result: 'success' | 'failure';
+  onCancel: () => void;
+}) {
+  const isSuccess = result === 'success';
+  const [tasks, setTasks] = useState<TaskResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [reload, setReload] = useState(0);
-  const [logCron, setLogCron] = useState<FailedTask | null>(null);
+  const [logCron, setLogCron] = useState<TaskResult | null>(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setFailed(false);
     request
-      .get(`${config.apiPrefix}dashboard/failures`)
+      .get(
+        `${config.apiPrefix}dashboard/${isSuccess ? 'successes' : 'failures'}`,
+      )
       .then((response) => {
         if (!active) return;
         if (response.code !== 200)
-          throw new Error('Failed to load dashboard failures');
+          throw new Error('Failed to load dashboard task results');
         setTasks(response.data);
       })
       .catch(() => {
@@ -41,12 +51,12 @@ export default function FailureModal({ onCancel }: { onCancel: () => void }) {
     return () => {
       active = false;
     };
-  }, [reload]);
+  }, [reload, isSuccess]);
 
   return (
     <>
       <Modal
-        title={intl.get('今日失败')}
+        title={intl.get(isSuccess ? '今日成功' : '今日失败')}
         open
         onCancel={onCancel}
         footer={null}
@@ -64,7 +74,7 @@ export default function FailureModal({ onCancel }: { onCancel: () => void }) {
             }
           />
         ) : (
-          <Table<FailedTask>
+          <Table<TaskResult>
             loading={loading}
             dataSource={tasks}
             rowKey="id"
@@ -84,8 +94,8 @@ export default function FailureModal({ onCancel }: { onCancel: () => void }) {
               },
               { title: intl.get('命令'), dataIndex: 'command', ellipsis: true },
               {
-                title: intl.get('失败次数'),
-                dataIndex: 'failCount',
+                title: intl.get(isSuccess ? '成功次数' : '失败次数'),
+                dataIndex: isSuccess ? 'successCount' : 'failCount',
                 width: 100,
               },
               {

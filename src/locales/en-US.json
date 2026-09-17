@@ -658,6 +658,7 @@
   "已停止": "Stopped",
   "退出码": "Exit Code",
   "结束": "End",
+  "成功次数": "Success count",
   "失败次数": "Failure count",
   "最新日志": "Latest log",
   "加载失败": "Failed to load",
