@@ -85,6 +85,7 @@ const CronDetailModal = ({
   };
 
   useEffect(() => {
+    fetchRunningInstances();
     let timer: ReturnType<typeof setTimeout>;
     let cancelled = false;
     const poll = async () => {

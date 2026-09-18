@@ -19,7 +19,7 @@ import { Request } from 'express';
 import ScheduleService from './schedule';
 import SockService from './sock';
 import dayjs from 'dayjs';
-import { lookupIpAddress } from '../shared/ipAddress';
+import IP2Region from 'ip2region';
 import uniq from 'lodash/uniq';
 import pickBy from 'lodash/pickBy';
 import isNil from 'lodash/isNil';
@@ -68,7 +68,13 @@ export default class UserService {
     }
     const timestamp = Date.now();
     const ip = getClientIp(req);
-    const address = lookupIpAddress(ip);
+    const query = new IP2Region();
+    const ipAddress = query.search(ip);
+    let address = '';
+    if (ipAddress) {
+      const { country, province, city, isp } = ipAddress;
+      address = uniq([country, province, city, isp]).filter(Boolean).join(' ');
+    }
     let {
       username: cUsername,
       password: cPassword,
@@ -456,7 +462,15 @@ export default class UserService {
       return this.authenticate({ username, password }, req, false);
     } else {
       const ip = getClientIp(req);
-      const address = lookupIpAddress(ip);
+      const query = new IP2Region();
+      const ipAddress = query.search(ip);
+      let address = '';
+      if (ipAddress) {
+        const { country, province, city, isp } = ipAddress;
+        address = uniq([country, province, city, isp])
+          .filter(Boolean)
+          .join(' ');
+      }
       await this.updateAuthInfo(authInfo, {
         retries: retries + 1,
         lastlogon: now,

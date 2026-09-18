@@ -108,6 +108,6 @@ RUN ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/task \
 WORKDIR ${QL_DIR}
 
 HEALTHCHECK --interval=5s --timeout=2s --retries=20 \
-  CMD exec curl -sf --noproxy '*' http://localhost:${QlPort:-5700}/api/health
+  CMD curl -sf --noproxy '*' http://localhost:${QlPort:-5700}/api/health || exit 1
 
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]
