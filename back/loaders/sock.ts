@@ -1,4 +1,4 @@
-import sockJs from 'sockjs';
+import sockJs, { Connection } from 'sockjs';
 import { Server } from 'http';
 import { Container } from 'typedi';
 import SockService from '../services/sock';
@@ -13,6 +13,41 @@ export default async ({ server }: { server: Server }) => {
     log: () => {},
   });
   const sockService = Container.get(SockService);
+  const sessions = new Map<Connection, { token: string; platform: string }>();
+  let sessionTimer: ReturnType<typeof setInterval> | undefined;
+  let checking = false;
+
+  const checkSessions = async () => {
+    if (checking || sessions.size === 0) return;
+    checking = true;
+    // Connections accepted during this read must not use an older snapshot.
+    const batch = [...sessions];
+    try {
+      const current = await shareStore.getAuthInfo();
+      // Reuse validation only within this synchronous check of one auth snapshot.
+      const validated = new Map<string, Map<string, boolean>>();
+      for (const [conn, { token, platform }] of batch) {
+        if (!sessions.has(conn)) continue;
+        let platforms = validated.get(token);
+        if (!platforms) {
+          platforms = new Map();
+          validated.set(token, platforms);
+        }
+        let valid = platforms.get(platform);
+        if (valid === undefined) {
+          valid = isValidToken(current, token, platform, config.jwt.secret);
+          platforms.set(platform, valid);
+        }
+        if (!valid) conn.close('401');
+      }
+    } catch {
+      for (const [conn] of batch) {
+        if (sessions.has(conn)) conn.close('401');
+      }
+    } finally {
+      checking = false;
+    }
+  };
 
   echo.on('connection', async (conn) => {
     if (!conn.headers || !conn.url || !conn.pathname) {
@@ -20,33 +55,38 @@ export default async ({ server }: { server: Server }) => {
       return;
     }
 
-    const authInfo = await shareStore.getAuthInfo();
+    let closed = false;
+    conn.on('close', () => {
+      closed = true;
+      sessions.delete(conn);
+      sockService.removeClient(conn);
+      if (sessions.size === 0 && sessionTimer) {
+        clearInterval(sessionTimer);
+        sessionTimer = undefined;
+      }
+    });
+
+    let authInfo;
+    try {
+      authInfo = await shareStore.getAuthInfo();
+    } catch {
+      if (!closed) conn.close('401');
+      return;
+    }
+    if (closed) return;
     const platform = getPlatform(conn.headers['user-agent'] || '') || 'desktop';
     const headerToken = conn.url.replace(`${conn.pathname}?token=`, '');
 
     if (isValidToken(authInfo, headerToken, platform, config.jwt.secret)) {
       sockService.addClient(conn);
-      const checkSession = setInterval(async () => {
-        try {
-          const current = await shareStore.getAuthInfo();
-          if (
-            !isValidToken(current, headerToken, platform, config.jwt.secret)
-          ) {
-            conn.close('401');
-          }
-        } catch {
-          conn.close('401');
-        }
-      }, 1000);
-      checkSession.unref();
+      sessions.set(conn, { token: headerToken, platform });
+      if (!sessionTimer) {
+        sessionTimer = setInterval(checkSessions, 1000);
+        sessionTimer.unref();
+      }
 
       conn.on('data', (message) => {
         conn.write(message);
-      });
-
-      conn.on('close', function () {
-        clearInterval(checkSession);
-        sockService.removeClient(conn);
       });
 
       return;
