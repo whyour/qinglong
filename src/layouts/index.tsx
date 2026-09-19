@@ -114,13 +114,9 @@ export default function () {
           history.push('/error');
         }
       })
-      .catch((error) => {
-        const responseStatus = error.response.status;
-        if (responseStatus !== 401) {
-          history.push('/error');
-        } else {
-          window.location.reload();
-        }
+      .catch(() => {
+        // Health is anonymous; a failure must not trigger a page reload loop.
+        history.push('/error');
       })
       .finally(() => setInitLoading(false));
   };

@@ -49,9 +49,9 @@ const errorHandler = function (
     if ([502, 504].includes(responseStatus)) {
       history.push('/error');
     } else if (responseStatus === 401) {
+      localStorage.removeItem(config.authKey);
       if (history.location.pathname !== '/login') {
         message.error(intl.get('登录已过期，请重新登录'));
-        localStorage.removeItem(config.authKey);
         history.push('/login');
       }
     } else {
@@ -84,6 +84,7 @@ let _request = axios.create({
 });
 
 const apiWhiteList = [
+  `${config.baseUrl}api/health`,
   `${config.baseUrl}api/user/login`,
   `${config.baseUrl}open/auth/token`,
   `${config.baseUrl}api/user/two-factor/login`,
@@ -106,8 +107,8 @@ _request.interceptors.response.use(async (response) => {
   if ([502, 504].includes(responseStatus)) {
     history.push('/error');
   } else if (responseStatus === 401) {
+    localStorage.removeItem(config.authKey);
     if (history.location.pathname !== '/login') {
-      localStorage.removeItem(config.authKey);
       history.push('/login');
     }
   } else {
