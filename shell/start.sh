@@ -91,8 +91,11 @@ if [[ $command != "reload" ]]; then
   pip3 install --prefix ${PYTHON_HOME} requests
 fi
 
-cd ${QL_DIR}
-cp -f .env.example .env
+cd "${QL_DIR}"
+if [[ ! -e .env ]]; then
+  # Preserve user configuration, including a file created concurrently.
+  (umask 077; set -C; cat .env.example > .env)
+fi
 chmod 777 ${QL_DIR}/shell/*.sh
 
 . ${QL_DIR}/shell/share.sh

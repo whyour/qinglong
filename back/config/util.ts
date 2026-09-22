@@ -491,17 +491,6 @@ export function psTree(pid: number): Promise<number[]> {
 
 export async function killTask(pid: number, waitForExit = false) {
   const descendants = await psTree(pid);
-  if (!waitForExit) {
-    if (descendants.length) {
-      try {
-        [pid, ...descendants]
-          .reverse()
-          .forEach((target) => process.kill(target, 15));
-      } catch {}
-    } else process.kill(pid, 2);
-    return;
-  }
-  const pids = [...descendants.reverse(), pid];
   const signal = (target: number, sig: NodeJS.Signals) => {
     try {
       process.kill(target, sig);
@@ -509,6 +498,16 @@ export async function killTask(pid: number, waitForExit = false) {
       if (error.code !== 'ESRCH') throw error;
     }
   };
+  if (!waitForExit) {
+    if (descendants.length) {
+      // A child may exit after psTree; keep signalling the remaining tree.
+      for (const target of [pid, ...descendants].reverse()) {
+        signal(target, 'SIGTERM');
+      }
+    } else signal(pid, 'SIGINT');
+    return;
+  }
+  const pids = [...descendants.reverse(), pid];
   for (const target of pids) signal(target, 'SIGTERM');
   const alive = async (target: number) => {
     try {

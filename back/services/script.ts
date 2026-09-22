@@ -58,9 +58,9 @@ export default class ScriptService {
       taskLimit.removeQueuedCron(relativePath.replace(/ /g, '-'));
       pid = (await getPid(`${TASK_COMMAND} ${relativePath} now`)) as number;
     }
-    try {
-      await killTask(pid);
-    } catch (error) {}
+    if (pid) {
+      await killTask(pid, true);
+    }
 
     return { code: 200 };
   }

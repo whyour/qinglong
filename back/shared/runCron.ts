@@ -31,7 +31,7 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
           Logger.info(
             `[schedule][停止已运行任务] 任务ID: ${cron.id}, PID: ${existingCron.pid}`,
           );
-          await killTask(existingCron.pid);
+          await killTask(existingCron.pid, true);
           // Mark old running instances as stopped
           const stoppedAt = dayjs().unix();
           await RunningInstanceModel.update(
@@ -53,6 +53,7 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
         Logger.error(
           `[schedule][检查已运行任务失败] 任务ID: ${cron.id}, 错误: ${error}`,
         );
+        throw error;
       }
 
       Logger.info(

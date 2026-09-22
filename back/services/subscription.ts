@@ -322,20 +322,22 @@ export default class SubscriptionService {
 
   public async stop(ids: number[]) {
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    let failure: unknown;
     for (const doc of docs) {
-      if (doc.pid) {
-        try {
-          await killTask(doc.pid);
-        } catch (error) {
-          this.logger.error(error);
+      try {
+        if (doc.pid) {
+          await killTask(doc.pid, true);
         }
+        await SubscriptionModel.update(
+          { status: SubscriptionStatus.idle, pid: null } as any,
+          { where: { id: doc.id, pid: doc.pid ?? null } },
+        );
+      } catch (error) {
+        this.logger.error(error);
+        failure ??= error;
       }
     }
-
-    await SubscriptionModel.update(
-      { status: SubscriptionStatus.idle, pid: undefined },
-      { where: { id: ids } },
-    );
+    if (failure) throw failure;
   }
 
   private async runSingle(subscriptionId: number) {
