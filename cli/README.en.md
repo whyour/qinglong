@@ -38,27 +38,75 @@ ql auth logout --json
 
 Use command `--help` and `QL_LANG=en` for English. Command names and JSON fields do not change with language. The npm CLI never interprets unknown task actions as local scripts and does not register a separate `task` executable.
 
+## Complete OpenAPI management
+
+The CLI also supports task/subscription CRUD, application and secret management, environment variables, configuration, scripts, logs, dependencies, system, dashboard and user APIs. `ql api routes --json` lists all 143 active routes; three retired file-reading endpoints are excluded. CI compares the catalogue against backend routes. See the [complete bilingual reference](skills/qinglong-cli/references/openapi.md) for every command and payload.
+
+```sh
+ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
+ql subscription create --type public-repo --url https://example.com/repo.git --alias demo --schedule-type crontab --schedule '0 0 * * *' --json
+ql app create --name agent --scopes crons,subscriptions --show-secrets --json
+ql env create --data @envs.json --json
+ql api request PUT /open/crons/run --data '[12,13]' --json
+```
+
+Use --data JSON/@file/- for bodies, --query for query objects, --file for uploads and --output for downloads. New commands support --timeout seconds. Existing command contracts remain; raw API requests expose all fields and batch operations. Downloads do not overwrite files. App secrets require --show-secrets; other raw resources may contain sensitive data.
+
+Remote ql system commands call the target panel API. Local reload/reset tools remain excluded from npm.
+
 ## Authentication
 
-Create a dedicated panel application with `crons` and/or `subscriptions` permissions as needed. `login` and `auth login` are equivalent. Interactive login prompts for Client ID and a hidden Client Secret. For automation, inject `QL_CLIENT_ID` and `QL_CLIENT_SECRET` through the environment; secret command-line arguments are not supported.
+Protected requests use `Authorization: Bearer <token>`. Two credential sources are supported:
 
-Use the panel root URL, including any reverse-proxy path prefix, without appending `/open`. Remote connections require HTTPS; HTTP is allowed for loopback addresses. Requests do not follow redirects. The 2.x token endpoint carries credentials in query parameters, so configure the proxy to avoid recording that query string.
+| Mode | Supply credentials | Persistence and refresh |
+| --- | --- | --- |
+| Application login | `ql login --url <panel-url>` prompts for Client ID / Client Secret; automation injects `QL_CLIENT_ID` and `QL_CLIENT_SECRET` | Exchanges credentials at `/open/auth/token`, saves credentials/token locally and refreshes expired tokens |
+| Direct access token | Set `QL_URL` and `QL_ACCESS_TOKEN` together; accepts a valid application token or panel session token | Overrides saved configuration, is not persisted and is not refreshed |
 
-Credentials and tokens are stored in `~/.config/qinglong/cli.json`, a plaintext file owned by the current user with mode 0600. Set `QL_CLI_CONFIG` to another file to select a different instance. Expired tokens refresh automatically; operations are not replayed after 401/403 responses.
+### Application login
 
-`auth status` verifies `crons` read access by making a request without printing credentials. Use `--scope subscriptions` to check subscription access. Login verifies application credentials, not its task permissions. `logout` removes local credentials only; reset or delete the application in the panel to revoke access. QingLong 2.x grants both read and execution access through `crons`; the CLI does not add server-side read-only permissions.
+Create a dedicated panel application with the required scopes, such as crons, subscriptions or envs. `login` and `auth login` are equivalent. Interactive login hides the Client Secret; secret command-line arguments are not supported.
+
+```sh
+ql login --url https://ql.example.com
+ql auth status --scope crons --json
+# For automation, inject QL_CLIENT_ID and QL_CLIENT_SECRET before the same login command
+```
+
+Credentials/token are stored in `~/.config/qinglong/cli.json`, a plaintext file owned by the current user with mode 0600. `QL_CLI_CONFIG` selects another file. Login validates application credentials, not every resource permission.
+
+### Direct access token
+
+Inject QL_URL and QL_ACCESS_TOKEN through your terminal or CI credential settings, then invoke commands without login:
+
+```sh
+ql auth status --scope apps --json
+ql app list --json
+```
+
+Both variables are required for protected commands; providing only one is a usage error. They take precedence over the file selected by QL_CLI_CONFIG. Running login still writes application configuration, but subsequent requests continue using the environment token. Run `unset QL_URL QL_ACCESS_TOKEN` in your own terminal to return to saved application credentials.
+
+Application management requires apps permission or an authorized panel session. The current UI does not list every backend scope; the CLI never escalates automatically. Anonymous user login requires only QL_URL and accepts --data @credentials.json or --data -; the returned session is not automatically saved. A two-factor challenge (server 420) exits 3 and directs you to user two-factor-login with username/password/code in its JSON body. Do not put credentials in command arguments or chat.
+
+### Permissions, logout and failures
+
+Auth status checks crons read permission by default. Use --scope subscriptions, --scope apps or another supported scope for that resource. A representative read does not prove permission for every write. The crons scope covers reads and execution.
+
+Auth logout deletes only saved application configuration. It neither revokes server tokens nor clears QL_ACCESS_TOKEN from the parent environment, so direct-token access may continue. Revoke access through the panel's application/session management. Resetting an application secret invalidates its old tokens; login again with the new secret.
+
+Use the panel root URL with any proxy prefix, without /open. Remote connections require HTTPS; loopback HTTP is allowed. Requests never follow redirects. The 2.x application token endpoint carries credentials in query parameters; avoid logging that query at the proxy. Operations are not replayed after 401/403. An expired direct token must be replaced; the CLI does not fall back to saved application credentials.
 
 ## Tasks, subscriptions and output
 
-Subscription commands support `list`, `get`, `run`, `stop`, `logs`, `enable` and `disable`. Subscription lists return `{code:200,data:[...]}`, without task pagination. Subscription reads omit repository URLs, fetch credentials, proxies and executable hooks. Logs are not automatically redacted.
+Subscription commands include create/update/delete/list/get/run/stop/logs/enable/disable/status/log-files. Subscription lists return `{code:200,data:[...]}`, without task pagination. The subscription list/get commands omit repository URLs, fetch credentials, proxies and executable hooks; raw API responses and create/update results may contain sensitive fields. Logs are not automatically redacted.
 
 Commands output pretty-printed JSON by default; `--json` produces a single line. Success goes to stdout and errors to stderr. Help with `--json` returns `{code:200,data:{help:"..."}}`.
 
 - Task list: `{code:200,data:{data:[...tasks],total:123}}`. Default page size: 50; maximum: 200. Task fields retain server content.
 - Task get: `{code:200,data:{id:12,...}}`.
 - Logs: `{code:200,data:"log tail",logStatus:"completed",truncated:true}`. Default tail: 200 lines; maximum: 10000. `logStatus` is omitted when absent from the older API.
-- Task run/stop: `{code:200,data:{taskId:12,action:"run",accepted:true}}`. Subscription mutations use `subscriptionId`. Acceptance does not mean execution succeeded.
-- Errors: `{code:1,message:"..."}`. Exit codes: 0 success, 1 API/network/configuration failure, 2 invalid arguments, 3 missing authentication or HTTP/API 401/403.
+- Task run/stop: `{code:200,data:{taskId:12,action:"run",accepted:true}}`. Subscription run/stop/enable/disable use `subscriptionId`; CRUD and raw API operations retain their server response instead. Acceptance does not mean execution succeeded.
+- Errors: `{code:1,message:"..."}`. Exit codes: 0 success, 1 API/network/configuration failure, 2 invalid arguments, 3 missing authentication, HTTP/API 401/403 or a two-factor challenge.
 
 IDs must be positive integers. Each task run/stop request addresses one task. The 2.x API provides no separate run ID or idempotency key: an error may leave the outcome unknown. Inspect status before retrying. The CLI does not automatically retry HTTP requests.
 
@@ -86,21 +134,3 @@ The CLI package workflow runs type checking, builds and tests on Node 22.12/24 f
 Local execution, subscription synchronization and maintenance ship with panel source/builds, using the full internal dist tree and a separate `qinglong-local` skill. See `cli/LOCAL.md` and `cli/LOCAL.en.md` in the source checkout. An npm installation is not a valid QL_CLI_ROOT. Recovery/reload must run on the actual panel host or inside its container, using docker exec for Docker installations.
 
 API task run returns acceptance; a local runner waits for script completion. Their elapsed times are different measurements. Compare the internal TS runner against Shell using identical configuration/scripts; remote API management has no equivalent old Shell management command.
-
-## Complete OpenAPI management
-
-The CLI also supports task/subscription CRUD, application and secret management, environment variables, configuration, scripts, logs, dependencies, system, dashboard and user APIs. `ql api routes --json` lists all 143 active routes; three retired file-reading endpoints are excluded. CI compares the catalogue against backend routes. See the [complete bilingual reference](skills/qinglong-cli/references/openapi.md) for every command and payload.
-
-```sh
-ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
-ql subscription create --type public-repo --url https://example.com/repo.git --alias demo --schedule-type crontab --schedule '0 0 * * *' --json
-ql app create --name agent --scopes crons,subscriptions --show-secrets --json
-ql env create --data @envs.json --json
-ql api request PUT /open/crons/run --data '[12,13]' --json
-```
-
-Use --data JSON/@file/- for bodies, --query for query objects, --file for uploads and --output for downloads. New commands support --timeout seconds. Existing command contracts remain; raw API requests expose all fields and batch operations. Downloads do not overwrite files. App secrets require --show-secrets; other raw resources may contain sensitive data.
-
-Application management needs apps permission, which the current UI does not list among its scopes. Authorized owner sessions can be supplied with QL_URL and QL_ACCESS_TOKEN together; these override saved configuration, are not persisted/refreshed and cannot be cleared from the parent environment by logout. Anonymous login/init routes require QL_URL. Application credentials never escalate automatically; older panels may lack newer endpoints.
-
-Remote ql system commands call the target panel API. Local reload/reset tools remain excluded from npm.

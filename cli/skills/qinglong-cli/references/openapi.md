@@ -8,9 +8,9 @@ The catalogue covers 143 active routes in the current develop backend. `ql api r
 
 常规使用 `ql login` 的应用凭据。scope 是 /open 后首个路径段：crons、subscriptions、envs、configs、scripts、logs、dependencies、system、dashboard 等。应用管理需要 apps；user、health、update 等路由同样接受服务端权限校验。面板 UI 当前没有列出全部这些 scope，不能把路由存在理解成现有应用已获授权。
 
-应用初次管理可使用本人已授权的有效面板会话，通过执行环境同时注入 `QL_URL` 与 `QL_ACCESS_TOKEN`。它优先于保存的应用配置，只在进程环境中使用，不保存、不自动刷新；logout 不能清除父进程环境。不要将 token 放在命令参数或聊天中。匿名 user login/two-factor-login/init 和 auth/token 请求必须提供 QL_URL，使用 --data/--query @file 或 stdin 传入凭据，不会自动保存返回的面板会话。应用 token 不会自动升级为管理员。
+认证步骤、环境变量优先级、应用登录、面板会话与双因素验证、退出行为，统一见 [认证参考](panel.md#authentication)。应用管理可用 apps 权限的应用或授权面板会话；QL_URL/QL_ACCESS_TOKEN 不保存、不刷新，不自动退回应用配置。
 
-Use application login normally. Permission names are the first path segment under /open. Application management needs apps; the current panel UI does not offer every backend scope. For authorized owner operations, inject QL_URL and QL_ACCESS_TOKEN together through the execution environment. This overrides stored application configuration, is never persisted/refreshed and is not cleared from the parent environment by logout. Anonymous login/init/token routes require QL_URL; pass credentials via a protected file or stdin. Returned owner sessions are not automatically saved. A login challenge (server code 420) exits 3 and directs you to user two-factor-login, whose JSON body includes username/password/code; it does not disable two-factor authentication. Do not disclose credentials in chat or command arguments.
+See the [authentication reference](panel.md#authentication) for application login, direct-token precedence, owner sessions/2FA and logout. App management accepts apps-scoped credentials or an authorized owner session. Direct tokens are not saved/refreshed and never fall back to application configuration.
 
 `auth status --scope <scope>` tests a representative read; update has no read endpoint and is not offered by status. This does not prove permission for every write. `app list/create/update/reset-secret` 默认隐藏 client_secret/tokens；只有明确需要凭据时才加 --show-secrets，并避免把输出记录到共享日志。其他资源/通用请求可能含环境值、配置、脚本、订阅凭据和会话，按敏感数据处理。
 
