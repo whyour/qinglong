@@ -14,7 +14,7 @@ exports.verifyAccountMaintenance = async function verifyAccountMaintenance(
   const local = (action, value) => {
     const result = spawnSync(
       path.join(os.homedir(), 'bin/ql'),
-      [action, ...(value ? [value] : [])],
+      [action, ...(value ? ['--', value] : [])],
       {
         env: { ...process.env, QL_DIR: '/ql' },
         encoding: 'utf8',

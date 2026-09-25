@@ -15,8 +15,8 @@ exports.installEvaluationEntrypoints =
     };
     try {
       for (const [name, moduleName, entry] of [
-        ['task', 'runner', 'runnerMain'],
-        ['ql', 'compat', 'compatibilityMain'],
+        ['task', 'task', 'taskMain'],
+        ['ql', 'ql', 'qlMain'],
       ]) {
         const target = path.join(require('node:os').homedir(), 'bin', name);
         const backup = `${target}.shell-evaluation-backup`;

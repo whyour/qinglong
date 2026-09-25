@@ -11,7 +11,7 @@ test('unified ql groups and task shortcut preserve help, errors and local execut
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const env = { PATH: process.env.PATH, QL_DIR: root, QL_CLI_CONFIG: path.join(root, 'credentials'), QL_LANG: 'en' };
   const call = (entry, args) => spawnSync(process.execPath, [path.resolve(__dirname, `../dist/${entry}.js`), ...args], { env, encoding: 'utf8', timeout: 10000 });
-  for (const group of ['', 'auth', 'task', 'subscription', 'local', 'dev']) {
+  for (const group of ['', 'auth', 'task', 'subscription', 'local']) {
     const result = call('ql', [...(group ? [group] : []), '--help', '--json']);
     assert.equal(result.status, 0, result.stderr);
     assert.match(JSON.parse(result.stdout).data.help, /ql/);

@@ -35,27 +35,6 @@ export const english: Record<string, string> = {
   '单文件订阅需要 HTTP(S) 地址。': 'Raw subscriptions require HTTP(S).',
   '订阅任务同步返回了无效任务列表。':
     'Invalid task list during subscription reconciliation.',
-  '发布仓库路径必须为绝对路径。': 'Release root must be absolute.',
-  '必须指定已配置的 Git 远端名称。': 'Expected a configured Git remote name.',
-  '发布分支无效。': 'Invalid release branch.',
-  '发布需要干净的工作区，不能包含未跟踪文件。':
-    'Release requires a clean working tree, including untracked files.',
-  'version.yaml 必须包含有效的发布版本。':
-    'version.yaml must contain a valid release version.',
-  'HEAD 与已审阅的发布提交不同，请重新生成计划。':
-    'HEAD differs from the reviewed release commit. Generate a new plan.',
-  'CDN 上传期间发布文件发生变化，未更新远端引用。':
-    'Release files changed during CDN upload; remote refs were not updated.',
-  '缺少 CDN 发布凭据。': 'Missing CDN release credentials.',
-  'CDN 上传超时。': 'CDN upload timed out.',
-  'CDN 拒绝了发布元数据。': 'CDN rejected the release metadata.',
-  将本地发布分支重置到已审阅的提交:
-    'Reset local release branch to the reviewed commit',
-  '使用已安装的七牛 SDK 上传 version.yaml':
-    'Upload version.yaml using the installed Qiniu SDK',
-  创建或替换带注释的发布标签: 'Create or replace the annotated release tag',
-  通过显式远端租约原子推送发布分支和标签:
-    'Atomically push only the release branch and tag with explicit remote leases',
   '无法启动必要的可执行程序：%s': 'Cannot start required executable: %s',
   '子进程输出写入失败。': 'Child output sink failed.',
   '子进程输出超过配置的捕获上限。':
@@ -134,15 +113,6 @@ export const english: Record<string, string> = {
     'Staged data must be separate from the installed data directory.',
   '主机开机注册需要 OpenRC 或 systemd；仅在其他管理器负责服务时使用 --no-startup。':
     'Host startup registration requires OpenRC or systemd. Use --no-startup only when another supervisor owns the services.',
-  '请使用 release --root <仓库绝对路径>。':
-    'Expected release --root <absolute repository>.',
-  '--apply 需要通过 --commit 指定已审阅发布计划中的提交。':
-    '--apply requires --commit from a reviewed release plan.',
-  '--commit 必须与 --apply 一起使用。': '--commit requires --apply.',
-  '发布选项无效，请运行 --help。': 'Invalid release options. Run --help.',
-  '发布失败，请检查诊断信息，不要盲目重复外部操作。':
-    'Release failed. Inspect diagnostics; do not blindly repeat external operations.',
-
   '本机命令需要通过 --root 或 QL_DIR 指定绝对路径。':
     'Local commands require an absolute --root or QL_DIR.',
   '面板安装目录不存在或不是目录。': 'Panel root does not exist.',

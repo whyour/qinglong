@@ -86,7 +86,6 @@ test('standalone entry help supports both languages without panel or repository 
     'runner',
     'compat',
     'subscription-worker',
-    'developer',
   ]) {
     for (const language of ['en', 'zh']) {
       const result = spawnSync(

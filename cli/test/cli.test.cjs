@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { spawn } = require('node:child_process');
-const entry = path.resolve(__dirname, '../dist/index.js');
+const entry = path.resolve(__dirname, '../dist/npm/ql.js');
 
 async function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-ts-cli-'));
@@ -322,8 +322,8 @@ test('standalone compiled artifact and symlink run without repo runtime dependen
   const f = await fixture(t);
   const dist = path.join(f.dir, 'standalone');
   fs.cpSync(path.dirname(entry), dist, { recursive: true });
-  const link = path.join(f.dir, 'ql-cli');
-  fs.symlinkSync(path.join(dist, 'index.js'), link);
+  const link = path.join(f.dir, 'ql');
+  fs.symlinkSync(path.join(dist, 'ql.js'), link);
   const help = await f.invoke(['--help', '--json'], {}, link);
   assert.equal(help.code, 0, help.err);
   assert.match(JSON.parse(help.out).data.help, /QingLong 2.x/);

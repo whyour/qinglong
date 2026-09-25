@@ -6,50 +6,6 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { sourceEnvironment } = require('../dist/local/context');
 
-test('developer entry localizes invalid release arguments without invoking Git or publishing', async (t) => {
-  const root = await fs.mkdtemp(
-    path.join(os.tmpdir(), 'ql-release-diagnostics-'),
-  );
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
-  for (const [args, chinese, english] of [
-    [['absent'], /请使用 release --root/, /Expected release --root/],
-    [
-      ['release', '--root', root, '--apply'],
-      /--apply 需要通过 --commit/,
-      /--apply requires --commit/,
-    ],
-    [
-      ['release', '--root', root, '--commit', 'abc'],
-      /--commit 必须与 --apply/,
-      /--commit requires --apply/,
-    ],
-    [
-      ['release', '--unknown-option'],
-      /发布选项无效/,
-      /Invalid release options/,
-    ],
-  ]) {
-    for (const language of ['zh', 'en']) {
-      const result = spawnSync(
-        process.execPath,
-        [path.resolve(__dirname, '../dist/developer.js'), ...args, '--json'],
-        {
-          env: { QL_LANG: language, PATH: '' },
-          cwd: root,
-          encoding: 'utf8',
-          timeout: 5000,
-        },
-      );
-      assert.equal(result.status, 2, result.stderr);
-      assert.equal(result.stdout, '');
-      const error = JSON.parse(result.stderr);
-      assert.equal(error.code, 2);
-      assert.match(error.message, language === 'en' ? english : chinese);
-    }
-  }
-  assert.deepEqual(await fs.readdir(root), []);
-});
-
 test('all local entrypoints report missing, relative and non-directory roots before doing work', async (t) => {
   const base = await fs.mkdtemp(
     path.join(os.tmpdir(), 'ql-context-diagnostics-'),

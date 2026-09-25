@@ -78,7 +78,7 @@ test('subscription management uses panel API, projects credentials out and never
     new Promise((resolve, reject) => {
       const child = spawn(
         process.execPath,
-        [path.resolve(__dirname, '../dist/index.js'), ...args, '--json'],
+        [path.resolve(__dirname, '../dist/npm/ql.js'), ...args, '--json'],
         {
           env: {
             ...process.env,

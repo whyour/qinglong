@@ -49,7 +49,6 @@ function groupHelp(group: 'root' | 'task' | 'local'): string {
     '\n  resetlet/resettfa/resetpwd/resetname' +
     '\n                ' + (english ? 'Local account recovery' : '本机账号恢复') +
     '\n  repo/raw      ' + (english ? 'Local subscription workers' : '本机订阅执行器') +
-    '\n  dev           ' + (english ? 'Developer release tools' : '开发发布工具') +
     '\n\n  ql task run 12\n  ql task exec --root /ql demo.js now\n  task demo.js now\n  ql update --help\n' +
     (english ? '\nUse --help for each group. QL_LANG=en selects English; --json selects JSON output. ql local <command> remains an alias; legacy positional arguments remain supported.'
       : '\n各命令组使用 --help 查看详情；QL_LANG=en 切换英文，--json 输出 JSON。ql local <命令> 保留为兼容写法，旧位置参数继续兼容。');
@@ -57,7 +56,8 @@ function groupHelp(group: 'root' | 'task' | 'local'): string {
 
 export async function taskMain(args = process.argv.slice(2)): Promise<number> {
   const { prefix, body } = splitPrefix(args);
-  if (!body.length || body.every(arg => ['--help', '-h', '--json'].includes(arg)))
+  if (body.some(arg => ['--help', '-h'].includes(arg)) &&
+      body.every(arg => ['--help', '-h', '--json'].includes(arg)))
     return writeHelp(groupHelp('task'), args.includes('--json'));
   const execute = async (scriptArgs: string[]) => {
     const { runnerMain } = await import('./runner');
@@ -109,10 +109,6 @@ export async function qlMain(args = process.argv.slice(2)): Promise<number> {
     ...Object.fromEntries([...operatorActions, 'repo', 'raw'].map(action => [
       action, (rest: string[]) => local([action, ...rest]),
     ])),
-    dev: async rest => {
-      const { developerMain } = await import('./developer');
-      return developerMain([...prefix, ...rest]);
-    },
     ...Object.fromEntries(['auth', 'subscription', 'login'].map(action => [
       action, (rest: string[]) => main([...prefix, action, ...rest]),
     ])),

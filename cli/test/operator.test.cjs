@@ -298,7 +298,7 @@ test('check repairs dependencies and notifications, probes loopback and reloads 
     res.end(
       req.url === '/'
         ? '<html><div id="root"></div></html>'
-        : '{"code":200,"data":{}}',
+        : '{"code":200,"data":{"status":"ok"}}',
     );
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -351,7 +351,7 @@ test('check repairs dependencies and notifications, probes loopback and reloads 
   ]);
   assert.equal(routes.length, 4);
   assert.equal(
-    routes.filter((route) => route.startsWith('/api/system?t=')).length,
+    routes.filter((route) => route.startsWith('/api/health?t=')).length,
     2,
   );
   await fs.writeFile(logfile, 'x'.repeat(1024 * 1024) + '\nlast line\n');

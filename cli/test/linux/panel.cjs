@@ -43,10 +43,10 @@ let restoreEntrypoints;
   const switched = process.env.QL_PANEL_ENTRYPOINTS === '1';
   if (switched && process.env.QL_PANEL_PACKAGED === '1') {
     assert.equal(process.env.QL_CLI_ROOT, '/opt/qinglong-cli');
-    for (const [name, module] of [['task', 'runner'], ['ql', 'compat']]) {
+    for (const [name, module] of [['task', 'task'], ['ql', 'ql']]) {
       const target = require('node:path').join(require('node:os').homedir(), 'bin', name);
       assert.equal((await fs.lstat(target)).isSymbolicLink(), false);
-      assert.ok((await fs.readFile(target, 'utf8')).includes(`/opt/qinglong-cli/dist/${module}.js`));
+      assert.ok((await fs.readFile(target, 'utf8')).includes(Buffer.from(`/opt/qinglong-cli/dist/${module}.js`).toString('base64')));
     }
   } else if (switched)
     restoreEntrypoints =
@@ -73,7 +73,7 @@ let restoreEntrypoints;
   const cli = (args) => {
     const result = spawnSync(
       process.execPath,
-      [path.resolve(__dirname, '../../dist/index.js'), ...args, '--json'],
+      [path.resolve(__dirname, '../../dist/npm/ql.js'), ...args, '--json'],
       {
         env,
         encoding: 'utf8',

@@ -83,18 +83,22 @@ export async function inspectPanel(
   )
     throw new Error(translate(context.env, 'QlPort 必须在 1 到 65535 之间。'));
   const port = Number(portText);
+  const basePath = (context.env.QlBaseUrl || '/').replace(/\/+$/, '');
   const [panel, backend] = await Promise.all([
-    probe(port, '/', (body) =>
+    probe(port, `${basePath}/`, (body) =>
       /<div\s+id=["']root["']\s*>\s*<\/div>/.test(body),
     ),
-    probe(port, `/api/system?t=${Math.floor(Date.now() / 1000)}`, (body) => {
+    probe(port, `${basePath}/api/health?t=${Math.floor(Date.now() / 1000)}`, (body) => {
       try {
         const response: unknown = JSON.parse(body);
         return (
           !!response &&
           typeof response === 'object' &&
           'code' in response &&
-          response.code === 200
+          response.code === 200 &&
+          'data' in response && !!response.data &&
+          typeof response.data === 'object' &&
+          'status' in response.data && response.data.status === 'ok'
         );
       } catch {
         return false;

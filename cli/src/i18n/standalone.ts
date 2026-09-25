@@ -1,4 +1,4 @@
-type Entry = 'runner' | 'compat' | 'worker' | 'developer' | 'startup';
+type Entry = 'runner' | 'compat' | 'worker' | 'startup';
 const english: Record<Entry, string> = {
   startup:
     'Usage: qinglong-cli [reload] [--root PATH] [--data-dir PATH] [--no-startup] [--json]\nCompatibility entry for the legacy qinglong host startup command.\nNo mode: install prerequisites and start services. reload: restart without installing dependencies or registering host startup.\nQL_DIR and QL_DATA_DIR provide environment defaults. Use ql start --help for all options.\n',
@@ -8,8 +8,6 @@ const english: Record<Entry, string> = {
     'Usage: ql-compat [-l] <update|reload|repo|raw|rmlog|extra|bot|check|resetlet|resettfa|resetpwd|resetname> [legacy arguments]\nLocal compatibility adapter; requires QL_DIR. Select it for installed ql via QL_CLI_ROOT.\nUse ql for authenticated panel management, ql task exec for local task execution.\n',
   worker:
     'Usage: ql repo|raw <url> [legacy subscription arguments]\nInternal local executor; manage panel subscriptions with ql subscription.\nRequires QL_DIR and optional QL_DATA_DIR/SUB_ID.\n',
-  developer:
-    'Usage: ql dev release --root <repository> [--remote origin] [--branch master] [--json]\nReview the plan, then execute with --apply --commit <full-reviewed-SHA>.\nPublishes CDN metadata and replaces the release branch/tag. Other tags are not pushed.',
 };
 const chinese: Record<Entry, string> = {
   startup:
@@ -20,8 +18,6 @@ const chinese: Record<Entry, string> = {
     '用法：ql-compat [-l] <update|reload|repo|raw|rmlog|extra|bot|check|resetlet|resettfa|resetpwd|resetname> [legacy arguments]\n本机兼容适配器，需要 QL_DIR。可通过 QL_CLI_ROOT 将其选为已安装的 ql 入口。\n面板认证管理使用 ql，本机任务执行使用 ql task exec。\n',
   worker:
     '用法：ql repo|raw <url> [legacy subscription arguments]\n内部本机执行器；面板订阅管理使用 ql subscription。\n需要 QL_DIR，可选 QL_DATA_DIR/SUB_ID。\n',
-  developer:
-    '用法：ql dev release --root <repository> [--remote origin] [--branch master] [--json]\n先审阅计划，再通过 --apply --commit <full-reviewed-SHA> 执行。\n会发布 CDN 元数据并替换发布分支／标签；不推送其他标签。',
 };
 export function standaloneHelp(
   entry: Entry,

@@ -1,25 +1,17 @@
 {
   "name": "@qinglong/cli",
   "version": "0.1.0",
-  "description": "QingLong 2.x CLI for panel management and local operations",
+  "description": "Authenticated remote management CLI for QingLong 2.x",
   "type": "commonjs",
   "bin": {
-    "ql": "dist/ql.js",
-    "task": "dist/task.js",
-    "qinglong-cli": "dist/startup.js",
-    "ql-cli": "dist/index.js",
-    "ql-local-cli": "dist/admin.js",
-    "ql-dev-cli": "dist/developer.js",
-    "ql-task-cli": "dist/runner.js",
-    "ql-subscription-worker": "dist/subscription-worker.js",
-    "ql-compat": "dist/compat.js"
+    "ql": "dist/npm/ql.js"
   },
   "engines": {
     "node": ">=22.12.0"
   },
   "files": [
-    "dist",
-    "skills",
+    "dist/npm",
+    "skills/qinglong-cli",
     "README.md",
     "README.en.md",
     "LICENSE"
