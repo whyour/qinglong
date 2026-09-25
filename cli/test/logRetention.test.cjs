@@ -54,14 +54,7 @@ test('undated logs use modification calendar date and preserve active references
     execFileSync(
       '/bin/bash',
       [
-        '-c',
-        `
-date() { if [[ $# == 1 && $1 == +%s ]]; then printf '%s' "$FIXED_NOW"; else command date "$@"; fi; }
-t() { :; }
-find_cron_api() { [[ $1 == *active* ]] && printf referenced; }
-. "$1" 7
-`,
-        'fixture',
+        path.join(__dirname, 'fixtures/log-retention.sh'),
         path.resolve(__dirname, '../../shell/rmlog.sh'),
       ],
       {
