@@ -10,7 +10,7 @@ on:
       - 'package.json'
       - '.github/workflows/cli-package.yml'
   push:
-    branches: [develop]
+    branches: [develop, master]
     paths:
       - 'cli/**'
       - 'shell/**'
@@ -19,13 +19,18 @@ on:
       - 'package.json'
       - '.github/workflows/cli-package.yml'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified CLI package (master only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
   group: cli-package-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
   package:
@@ -62,3 +67,51 @@ jobs:
           path: ${{ runner.temp }}/cli-package/*.tgz
           if-no-files-found: error
           retention-days: 14
+
+  publish:
+    needs: package
+    if: >-
+      github.repository == 'whyour/qinglong' &&
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.publish))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-cli-${{ github.sha }}
+          path: cli-package
+      - name: Publish verified npm archive
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          archives=(cli-package/*.tgz)
+          if [ "${#archives[@]}" -ne 1 ]; then
+            echo '::error::Expected exactly one verified CLI archive.'
+            exit 1
+          fi
+          archive="${archives[0]}"
+          metadata=$(tar -xOf "$archive" package/package.json)
+          name=$(jq -er '.name | select(. == "@qinglong/cli")' <<< "$metadata")
+          version=$(jq -er '.version | select(type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' <<< "$metadata")
+          if npm view "$name@$version" version --json --registry=https://registry.npmjs.org > version.json 2> version-error.log; then
+            jq -e --arg version "$version" '. == $version' version.json > /dev/null
+            echo "::notice::$name@$version is already published; bump cli/package.json and its lockfile to release changes."
+            exit 0
+          elif ! jq -e '.error.code == "E404"' version.json > /dev/null; then
+            echo '::error::Could not check the published CLI version; refusing to publish.'
+            exit 1
+          fi
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo '::error::NPM_TOKEN is required to publish @qinglong/cli.'
+            exit 1
+          fi
+          npm publish "./$archive" --access public --tag latest --ignore-scripts --registry=https://registry.npmjs.org

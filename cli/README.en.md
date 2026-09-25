@@ -130,7 +130,9 @@ node cli/scripts/verify-package.cjs
 
 Tests cover requests, token refresh, output, errors, no automatic retries, permissions and isolated installation. Package verification installs the archive offline, verifies the sole ql executable and rejects local commands.
 
-The CLI package workflow runs type checking, builds and tests on Node 22.12/24 for relevant PRs, develop pushes and manual runs. Node 24 uploads the verified archive as `qinglong-cli-<commit>`; it does not publish to npm. Install the tgz from that artifact without build tools.
+The CLI package workflow checks, builds and tests Node 22.12/24 on relevant PRs, develop/master pushes and manual runs. Node 24 uploads the archive verified by offline installation as `qinglong-cli-<commit>`. After both matrix jobs succeed, master pushes publish that exact archive to npm as latest, using the same NPM_TOKEN secret as the Docker workflow. Manual runs publish only when run on master with publish enabled; PRs, develop and forks never publish. The token needs publish permission for @qinglong/cli.
+
+The CLI has an independent stable version in cli/package.json and cli/package-lock.json. Before releasing changes, run `npm version patch --prefix cli --no-git-tag-version` (or minor/major) and commit both files. Existing versions are skipped with a notice; registry failures stop publication. Only stable X.Y.Z versions are published by this workflow. Publication does not rebuild the verified archive or run package lifecycle scripts.
 
 ## Panel-internal tools
 
