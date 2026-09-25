@@ -1,0 +1,40 @@
+{
+  "name": "@whyour/qinglong-cli",
+  "version": "0.1.1",
+  "description": "Authenticated remote management CLI for QingLong 2.x",
+  "type": "commonjs",
+  "bin": {
+    "ql": "dist/npm/ql.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "files": [
+    "dist/npm",
+    "skills/qinglong-cli",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node scripts/test.cjs",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "commander": "15.0.0",
+    "esbuild": "0.28.2",
+    "typescript": "5.2.2",
+    "@types/node": "22.19.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whyour/qinglong.git",
+    "directory": "cli"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -13,6 +13,10 @@
     "url": "https://github.com/whyour/qinglong/issues"
   },
   "scripts": {
+    "build:cli": "node cli/scripts/build.cjs",
+    "check:cli": "npm --prefix cli run check",
+    "test:cli": "npm run build:cli && node cli/scripts/test.cjs",
+    "cli": "node cli/dist/index.js",
     "start": "concurrently -n w: npm:start:*",
     "start:back": "nodemon ./back/app.ts",
     "start:front": "max dev",

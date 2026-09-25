@@ -34,6 +34,7 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 - Support system level notification
 - Support dark mode
 - Support cell phone operation
+- Manage panels through the [remote CLI and Agent Skill](#remote-cli-and-agent-skill)
 
 ## Version
 
@@ -78,6 +79,29 @@ npm i @whyour/qinglong
 ## Built-in commands
 
 [View Documentation](https://qinglong.online/guide/user-guide/basic-explanation)
+
+## Remote CLI and Agent Skill
+
+Use the standalone npm package [@whyour/qinglong-cli](https://www.npmjs.com/package/@whyour/qinglong-cli) to manage a remote QingLong panel from your terminal or automation workflows. Create, update and run tasks and subscriptions, inspect logs, and manage applications, environment variables, scripts, configuration, dependencies and other OpenAPI resources. JSON output supports scripts and AI agents.
+
+Requires Node.js >=22.12; Node.js 24 is recommended. Install the package to use `ql`:
+
+```bash
+npm install -g @whyour/qinglong-cli
+ql login --url https://ql.example.com
+ql auth status --json
+ql task list --json
+ql subscription list --json
+ql --help
+```
+
+Create an application in the panel's System Settings → Application Settings and grant the required permissions. Enter its Client ID/Secret when prompted during login. Existing tokens are also supported through `QL_URL` and `QL_ACCESS_TOKEN`. Each command supports `--help`; set `QL_LANG=en` for English help.
+
+The npm CLI manages remote panels. The panel's built-in executable is also named `ql`; use a separate installation directory on panel hosts to avoid replacing it. For local script execution and maintenance, see [panel-internal tools](cli/LOCAL.en.md).
+
+[CLI guide](cli/README.en.md) · [简体中文](cli/README.md) · [Full command reference](cli/skills/qinglong-cli/references/openapi.md)
+
+The package includes a [remote management skill](cli/skills/qinglong-cli/SKILL.md) covering authentication, command selection and result verification for AI agents. Local execution and maintenance have a separate [internal skill](cli/skills/qinglong-local/SKILL.md).
 
 ## Development
 
