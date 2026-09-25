@@ -4,6 +4,19 @@
 
 A standalone CLI for QingLong 2.x. Manage tasks and subscriptions through the panel's open API, and use separate local tools for execution and maintenance. The original `ql` and `task` Shell commands and user configuration remain available. Installation does not switch panel commands automatically; explicitly select the TypeScript implementation with `QL_CLI_ROOT` as described below. The new implementation does not implicitly invoke the old product Shell scripts.
 
+## Install from npm
+
+The npm package is the only standalone CLI release artifact; no separate CLI image is published. Node >=22.12 is required; Node 24 is recommended. Once the package version is published:
+
+```sh
+npm install -g @qinglong/cli
+ql --help
+# One-off use; select ql explicitly because the package has multiple bins.
+npm exec --package=@qinglong/cli -- ql --help
+```
+
+This branch prepares npm distribution; it does not publish the package. Before publication, run `npm ci --prefix cli`, then run `npm pack` inside `cli` and install that local archive; see the [deployment guide](docs/deployment.md). API management needs only Node; local operations additionally need the panel files and relevant interpreters/system tools. Panel images may integrate the same npm artifact into their normal release. Dockerfiles in this directory are internal test fixtures.
+
 ## Unified entry
 
 Use `ql auth`, `ql task`, `ql subscription` and `ql dev` for grouped operations, and direct commands such as `ql update`, `ql reload` and `ql check` for local maintenance. `task` is shorthand for `ql task`, with identical arguments and behavior.
@@ -63,7 +76,7 @@ node cli/dist/ql.js auth logout --json
 
 The CLI requires Node.js >=22.12.0; Node 24 LTS is recommended. Commander 15 is bundled at build time, so no additional runtime npm installation is needed. API operations do not load the backend or database. Copy the **entire** built `cli/dist` directory to another machine and run `node /absolute/path/to/dist/ql.js`; copying only `ql.js` is insufficient. Local tools additionally require an installed panel and the system tools needed by their operations.
 
-Run `npm pack` inside `cli` after building, then install the local archive in your evaluation environment. The package is private and is not published to a registry. Use an isolated prefix to avoid replacing existing global commands.
+Run `npm pack` inside `cli` after building, then install the local archive in your evaluation environment. The package is configured for public npm distribution but has not been published. Use an isolated prefix to avoid replacing existing global commands.
 
 The source separates argument parsing (`arguments.ts`), command handlers (`commands/`), API requests and validation (`api/`), credentials (`config/`) and boundary types (`types.ts`). A separate strict TypeScript configuration compiles the modules, then esbuild bundles a shared `dist/framework/commander.js`. Business modules remain lazy-loaded. The Commander license ships in `dist/licenses/commander-LICENSE`; build dependencies are pinned in `cli/package-lock.json`. No 3.0 build is involved.
 
@@ -137,7 +150,7 @@ Panels containing this change to `back/loaders/deps.ts` can set `QL_CLI_ROOT=/ab
 
 Unset the variable and restart the panel to restore original Shell links. Installing the npm package alone does not switch commands. Invalid/unreadable paths or missing entries produce startup-link errors rather than silently falling back. Original Shell files remain available. Migration acceptance is complete; production publication has not been performed.
 
-The [derived evaluation image](docs/deployment.md) (Chinese) packages the CLI, documentation and Skill into `/opt/qinglong-cli` with the 2.x selection loader. Build the CLI and run `node cli/scripts/build-panel-loader.cjs` before using `cli/docker/Dockerfile.panel`. Production Dockerfiles are unchanged.
+The internal-only [panel integration test image](docs/deployment.md) packages the CLI, documentation and Skill into `/opt/qinglong-cli` with the 2.x selection loader. Build the CLI and run `node cli/scripts/build-panel-loader.cjs` before using `cli/docker/Dockerfile.panel`. Production Dockerfiles are unchanged.
 
 All executable entries support English help through `QL_LANG=en`; Chinese is the default. Command/option names and JSON keys are stable across languages. Task and maintenance execution messages use the same language setting. Help reads process environment only, without loading panel configuration.
 

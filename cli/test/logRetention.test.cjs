@@ -52,7 +52,7 @@ test('undated logs use modification calendar date and preserve active references
     const legacy = path.join(root, 'legacy');
     await createLogs(legacy);
     execFileSync(
-      'bash',
+      '/bin/bash',
       [
         '-c',
         `
@@ -66,11 +66,11 @@ find_cron_api() { [[ $1 == *active* ]] && printf referenced; }
       ],
       {
         env: {
-          PATH: process.env.PATH,
+          PATH: '/usr/bin:/bin',
           dir_log: legacy,
           is_macos: '0',
           FIXED_NOW: String(now / 1000),
-          ...(process.env.TZ ? { TZ: process.env.TZ } : {}),
+          TZ: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
         stdio: 'pipe',
       },

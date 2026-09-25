@@ -26,15 +26,9 @@ export async function installCliEntrypoints(
     const target = path.join(commandDir, entry.name);
     const temp = `${target}.${randomUUID()}.tmp`;
     const modulePath = path.join(cliRoot, 'dist', entry.module);
-    const source = `#!${
-      process.execPath
-    }\n'use strict';\nrequire(${JSON.stringify(modulePath)}).${
-      entry.method
-    }().then(code => { process.exitCode = code; }).catch(() => { process.stderr.write(process.env.QL_LANG === 'en' ? ${JSON.stringify(
-      translate({ QL_LANG: 'en' }, 'CLI 调用失败。') + '\n',
-    )} : ${JSON.stringify(
-      translate({}, 'CLI 调用失败。') + '\n',
-    )}); process.exitCode = 1; });\n`;
+    // Base64 transports the path as data; it cannot terminate a JS string.
+    const encodedPath = Buffer.from(modulePath, 'utf8').toString('base64');
+    const source = `#!${process.execPath}\n'use strict';\nrequire(Buffer.from('${encodedPath}', 'base64').toString('utf8')).${entry.method}().then(code => { process.exitCode = code; }).catch(() => { process.stderr.write(process.env.QL_LANG === 'en' ? 'CLI invocation failed.\\n' : 'CLI 调用失败。\\n'); process.exitCode = 1; });\n`;
     try {
       await fs.writeFile(temp, source, { flag: 'wx', mode: 0o755 });
       await fs.rename(temp, target);

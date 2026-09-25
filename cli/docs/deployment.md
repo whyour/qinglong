@@ -1,4 +1,40 @@
-# 2.x CLI opt-in panel image
+# npm 交付 / npm distribution
+
+CLI 只独立发布 `@qinglong/cli` npm 包，不维护单独的 CLI 镜像渠道。面板镜像按需集成同一 npm 产物；以下 Docker 说明仅供维护者做集成与兼容性测试。
+
+The npm package is the sole standalone CLI distribution. Panel releases may embed the same artifact. Docker instructions below are internal integration/compatibility tests, not a second CLI release channel.
+
+## 安装 / Install
+
+发布后的使用方式 / After a version is published:
+
+```sh
+npm install -g @qinglong/cli
+ql --help
+npm exec --package=@qinglong/cli -- ql --help
+```
+
+本分支未执行 npm publish。发布前构建并安装本地包 / No npm publish was performed. Build and install a local package before publication:
+
+```sh
+npm ci --prefix cli
+cd cli
+npm pack
+npm install --prefix /tmp/ql-cli-install ./qinglong-cli-0.1.0.tgz
+/tmp/ql-cli-install/node_modules/.bin/ql --help
+```
+
+`prepack` 自动构建 TS 与 Commander，包内包含 JS、许可证、双语说明和 Skill。安装阶段不编译；不需要额外运行时 npm 依赖。远程 API 只需 Node >=22.12（推荐 24）；本机执行/运维需安装相应解释器、系统工具及面板文件。
+
+The prepack hook compiles TypeScript and bundles Commander. The archive contains JS, licenses, bilingual documentation and the Skill. Installation does not compile code and requires no external npm runtime dependencies. Remote API use needs Node >=22.12 (24 recommended); local operations require the relevant interpreters, system tools and panel files.
+
+设置 `QL_CLI_ROOT` 时，指向已安装包的绝对路径，例如 `/tmp/ql-cli-install/node_modules/@qinglong/cli`。仅安装包不切换面板入口。
+
+For panel integration, point QL_CLI_ROOT to the absolute installed package directory. Installing the package alone does not switch panel commands.
+
+---
+
+# Internal panel integration image
 
 This separate Dockerfile packages the compiled standalone CLI in `/opt/qinglong-cli`, alongside its docs and Skill. It adds unified `ql`, its `task` shortcut, prior compatibility commands and the `qinglong` startup alias to a dedicated directory at the front of PATH. The original panel Shell files and base-image entrypoint are retained. Existing production Dockerfiles are unchanged.
 

@@ -8,7 +8,7 @@ function measure(args) {
   const elapsed = [], rss = [];
   for (let index = 0; index < samples; index++) {
     const start = performance.now();
-    const child = spawnSync(process.execPath, ['-e', 'process.on("beforeExit",()=>process.stderr.write(JSON.stringify(process.resourceUsage())));' + args], { encoding: 'utf8' });
+    const child = spawnSync(process.execPath, ['-e', 'process.on("beforeExit",()=>process.stderr.write(JSON.stringify(process.resourceUsage()))); if(process.argv[1]) { const entry=process.argv[1]; process.argv=[process.execPath,entry,"--help"]; require(entry); }', ...args], { encoding: 'utf8' });
     if (child.status !== 0) throw new Error('Benchmark child failed. Build CLI first.');
     elapsed.push(performance.now() - start);
     rss.push(JSON.parse(child.stderr).maxRSS / 1024);
@@ -19,6 +19,6 @@ function measure(args) {
 function artifactBytes(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).reduce((total, entry) => total + (entry.isDirectory() ? artifactBytes(path.join(directory, entry.name)) : fs.statSync(path.join(directory, entry.name)).size), 0);
 }
-const baseline = measure('');
-const help = measure(`process.argv=[process.execPath,${JSON.stringify(entry)},"--help"];require(${JSON.stringify(entry)});`);
+const baseline = measure([]);
+const help = measure([entry]);
 process.stdout.write(JSON.stringify({ node: process.version, platform: process.platform, arch: process.arch, samples, baseline, help, incrementalMedianMs: Number((help.medianMs - baseline.medianMs).toFixed(2)), incrementalPeakRssMiB: Number((help.medianPeakRssMiB - baseline.medianPeakRssMiB).toFixed(2)), distBytesIncludingSourceMaps: artifactBytes(path.dirname(entry)) }, null, 2) + '\n');

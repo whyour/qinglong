@@ -1,8 +1,7 @@
 {
   "name": "@qinglong/cli",
   "version": "0.1.0",
-  "private": true,
-  "description": "Standalone QingLong 2.x API CLI evaluation build",
+  "description": "QingLong 2.x CLI for panel management and local operations",
   "type": "commonjs",
   "bin": {
     "ql": "dist/ql.js",
@@ -23,17 +22,28 @@
     "docs",
     "skills",
     "README.md",
-    "README.en.md"
+    "README.en.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "node scripts/build.cjs",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/*.test.cjs"
+    "test": "npm run build && node --test test/*.test.cjs",
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "commander": "15.0.0",
     "esbuild": "0.28.2",
     "typescript": "5.2.2",
     "@types/node": "22.19.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whyour/qinglong.git",
+    "directory": "cli"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

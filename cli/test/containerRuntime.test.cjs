@@ -96,15 +96,11 @@ test('system scheduler is auto-selected, receives termination and exits before s
   const f = await fixture(t, '');
   const started = path.join(f.root, 'scheduler-started');
   const stopped = path.join(f.root, 'scheduler-stopped');
+  f.context.env.QL_TEST_STARTED = started;
+  f.context.env.QL_TEST_STOPPED = stopped;
   await fs.writeFile(
     path.join(f.root, 'bin/crond'),
-    `#!${
-      process.execPath
-    }\nconst fs=require('node:fs'); fs.writeFileSync(${JSON.stringify(
-      started,
-    )}, JSON.stringify(process.argv.slice(2))); process.on('SIGTERM',()=>{fs.writeFileSync(${JSON.stringify(
-      stopped,
-    )}, 'stopped');process.exit(0)}); setInterval(()=>{},1000);\n`,
+    `#!${process.execPath}\nconst fs=require('node:fs'); fs.writeFileSync(process.env.QL_TEST_STARTED, JSON.stringify(process.argv.slice(2))); process.on('SIGTERM',()=>{fs.writeFileSync(process.env.QL_TEST_STOPPED, 'stopped');process.exit(0)}); setInterval(()=>{},1000);\n`,
     { mode: 0o755 },
   );
   f.options.services.stop = async () => {

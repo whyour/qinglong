@@ -4,6 +4,19 @@
 
 独立 CLI，通过 2.x 开放 API 管理任务和订阅。当前为并行评测入口，默认保留原 `ql`、`task` Shell 入口和用户配置；可通过下文 `QL_CLI_ROOT` 显式选择 TS 入口。新 CLI 不隐式调用旧 Shell。
 
+## npm 安装
+
+npm 包是 CLI 唯一的独立发布产物，不单独发布 CLI 镜像。要求 Node >=22.12，推荐 Node 24。包版本发布后使用：
+
+```sh
+npm install -g @qinglong/cli
+ql --help
+# 临时运行：包有多个 bin，因此显式选择 ql。
+npm exec --package=@qinglong/cli -- ql --help
+```
+
+本分支准备 npm 交付，尚未发布到 registry；发布前可从源码执行 `npm ci --prefix cli`，再进入 `cli` 目录执行 `npm pack` 安装本地产物，详见[交付说明](docs/deployment.md)。远程 API 管理只需要 Node；本机执行和运维还需要面板文件、对应解释器与系统工具。面板镜像可集成同一 npm 产物并随面板发布，仓库内 Dockerfile 仅用于内部测试。
+
 ## 统一入口
 
 所有能力统一使用 `ql`：面板资源按 `auth`、`task`、`subscription` 分组，本机运维直接用 `ql update/reload/check` 等命令，开发发布使用 `ql dev`。`task` 是 `ql task` 的快捷入口，参数和行为相同。
@@ -151,9 +164,9 @@ QL_DIR=/ql ql-compat repo <url> <include> <exclude> <dependencies> <branch> <ext
 
 容器内首次启动可使用 `ql start --root /ql --data-dir /ql/data --no-startup`，显式跳过不适用的系统开机注册；依赖准备、服务启动和 PM2 进程清单保存仍执行。默认不加此选项时继续执行 `pm2 startup`，失败会返回错误。结果中的 `startup` 区分 `registered`、`skipped` 和 `not-requested`。
 
-### 显式派生镜像
+### 内部面板集成测试
 
-已有独立的 [2.x 评测镜像构建入口](docs/deployment.md)，将 CLI、文档和 Skill 打包到 `/opt/qinglong-cli`，并带入本仓库的 2.x 命令选择加载器。构建先执行 `npm run build:cli` 和 `node cli/scripts/build-panel-loader.cjs`，再用 `cli/docker/Dockerfile.panel`。它保留基础镜像的 Shell 文件及容器启动入口；现有生产 Dockerfile 不变。该镜像用于显式切换和验证，完整容器启动迁移证据见验收审计。
+仅供维护者使用的 [2.x 内部评测镜像构建入口](docs/deployment.md)，将 CLI、文档和 Skill 打包到 `/opt/qinglong-cli`，并带入本仓库的 2.x 命令选择加载器。构建先执行 `npm run build:cli` 和 `node cli/scripts/build-panel-loader.cjs`，再用 `cli/docker/Dockerfile.panel`。它保留基础镜像的 Shell 文件及容器启动入口；现有生产 Dockerfile 不变。该镜像用于显式切换和验证，完整容器启动迁移证据见验收审计。
 
 配置了 `QL_DIR` 或传入 `--root` 时，`ql task exec` 不带脚本参数会显示帮助及脚本目录顶层的 JS 脚本列表（排除 `sendNotify.js`），并从文本提取 `new Env(...)` 活动名称。加 `--json` 可读取 `data.scripts`；显式 `--help` 只显示帮助，不读取脚本或执行配置。
 
