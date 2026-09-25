@@ -7,14 +7,32 @@ export function shellSessionArguments(
   argv: string[],
   scriptArgs: string[],
   command = false,
+  timeoutMarker = '',
 ): string[] {
   const scriptIndex = command
     ? argv.findIndex((arg) => /\.(?:js|mjs|py|pyc|sh|ts)$/.test(arg))
     : 0;
   const bridge = `
-__ql_env=$1; __ql_before=$2; __ql_after=$3; __ql_command=$4; __ql_index=$5; __ql_count=$6; shift 6
+__ql_env=$1; __ql_before=$2; __ql_after=$3; __ql_command=$4; __ql_index=$5; __ql_count=$6; __ql_timeout=$7; shift 7
 __ql_hook_args=( "\${@:1:__ql_count}" ); shift "$__ql_count"
 __ql_script_args=( "$@" )
+__ql_after_started=false
+__ql_run_after() {
+  __ql_after_started=true
+  if [ -n "$__ql_timeout" ]; then printf A >&3; fi
+  if [ "$__ql_nounset" = true ]; then set -u; fi
+  export NODE_PATH="\${PREV_NODE_PATH:-}"
+  unset QL_NODE_GLOBAL_PATH
+  if [ -f "$__ql_after" ]; then . "$__ql_after" "\${__ql_hook_args[@]}"; fi
+  if [ -n "\${task_after:-}" ]; then eval "\${task_after%;}"; fi
+}
+__ql_timeout_exit() {
+  if [ -f "$__ql_timeout" ] && [ "$__ql_after_started" = false ]; then
+    _task_exit_code=124
+    __ql_run_after
+    exit 124
+  fi
+}
 if [ -f "$__ql_env" ]; then . "$__ql_env"; fi
 if [ -f "$__ql_before" ]; then . "$__ql_before" "\${__ql_hook_args[@]}"; fi
 if [ -n "\${task_before:-}" ]; then eval "\${task_before%;}"; fi
@@ -40,17 +58,20 @@ fi
 if [ "$__ql_resolve" = true ] && [[ "$__ql_file" == */* ]]; then
   __ql_args[__ql_index]="./\${__ql_file##*/}"
 fi
+if [ -n "$__ql_timeout" ]; then
+  # Preserve a user-owned EXIT trap. If it prevents our cleanup, the parent
+  # performs the fallback after the process group has stopped.
+  if [ -z "$(trap -p EXIT)" ]; then trap '__ql_timeout_exit' EXIT; fi
+  printf T >&3
+fi
 if [ "$__ql_command" = true ]; then
   "\${__ql_args[@]}" "\${__ql_script_args[@]}"
 else
   . "\${__ql_args[0]}" "\${__ql_script_args[@]}"
 fi
 _task_exit_code=$?
-if [ "$__ql_nounset" = true ]; then set -u; fi
-export NODE_PATH="\${PREV_NODE_PATH:-}"
-unset QL_NODE_GLOBAL_PATH
-if [ -f "$__ql_after" ]; then . "$__ql_after" "\${__ql_hook_args[@]}"; fi
-if [ -n "\${task_after:-}" ]; then eval "\${task_after%;}"; fi
+if [ -n "$__ql_timeout" ] && [ -f "$__ql_timeout" ]; then _task_exit_code=124; fi
+__ql_run_after
 exit "$_task_exit_code"
 `;
   return [
@@ -65,6 +86,7 @@ exit "$_task_exit_code"
     String(command),
     String(scriptIndex),
     String(argv.length),
+    timeoutMarker,
     ...argv,
     ...(command ? [] : argv.slice(1)),
     ...scriptArgs,

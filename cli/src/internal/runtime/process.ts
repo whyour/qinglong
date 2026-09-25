@@ -1,5 +1,6 @@
 import { translate } from '../../shared/i18n/index';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { constants } from 'node:os';
 import { fail } from '../../shared/errors';
 import { operationOutput } from './output';
@@ -11,6 +12,8 @@ export interface ProcessOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  // A private fd reports T(ask)/A(fter). Only the task phase owns the timer.
+  timeoutControl?: { marker: string };
   graceMs?: number;
   capture?: boolean;
   captureFd?: 1 | 3;
@@ -24,6 +27,7 @@ export interface ProcessResult {
   stdout: string;
   signal: NodeJS.Signals | null;
   timedOut: boolean;
+  cleanupStarted?: boolean;
 }
 
 function cancellationSignal(signal?: AbortSignal): NodeJS.Signals {
@@ -92,7 +96,7 @@ export async function runProcess(
       env: options.env ?? process.env,
       detached: process.platform !== 'win32',
       stdio:
-        options.captureFd === 3
+        options.captureFd === 3 || options.timeoutControl
           ? [options.stdin ?? 'ignore', 'pipe', 'pipe', 'pipe']
           : [options.stdin ?? 'ignore', 'pipe', 'pipe'],
     });
@@ -103,6 +107,7 @@ export async function runProcess(
     let outputFailure: unknown;
     let aborted = false;
     let terminating = false;
+    let cleanupStarted = false;
     let timeout: NodeJS.Timeout | undefined;
     let escalation: NodeJS.Timeout | undefined;
     const terminate = (signal: NodeJS.Signals) => {
@@ -117,6 +122,21 @@ export async function runProcess(
     const abort = () => {
       aborted = true;
       terminate(cancellationSignal(options.signal));
+    };
+    const startTimeout = () => {
+      if (!options.timeoutMs || options.timeoutMs <= 0 || timedOut || aborted) return;
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        timedOut = true;
+        if (options.timeoutControl) {
+          try {
+            writeFileSync(options.timeoutControl.marker, '', { mode: 0o600 });
+          } catch (error) {
+            outputFailure = error;
+          }
+        }
+        terminate('SIGINT');
+      }, options.timeoutMs);
     };
     const cleanup = () => {
       clearTimeout(timeout);
@@ -164,6 +184,20 @@ export async function runProcess(
       else capture(chunk);
     });
     if (options.captureFd === 3) child.stdio[3]!.on('data', capture);
+    if (options.timeoutControl) child.stdio[3]!.on('data', (chunk: Buffer) => {
+      for (const phase of chunk.toString()) {
+        if (phase === 'T') startTimeout();
+        if (phase === 'A') {
+          cleanupStarted = true;
+          clearTimeout(timeout);
+          // Allow the Shell's cleanup to finish after a cooperative timeout.
+          if (timedOut && !aborted) {
+            clearTimeout(escalation);
+            escalation = undefined;
+          }
+        }
+      }
+    });
     child.stderr!.on('data', (chunk: Buffer) =>
       emit(chunk, options.stderrOutput ?? options.output),
     );
@@ -197,13 +231,10 @@ export async function runProcess(
         stdout: Buffer.concat(chunks).toString('utf8'),
         signal,
         timedOut,
+        ...(options.timeoutControl ? { cleanupStarted } : {}),
       });
     });
-    if (options.timeoutMs && options.timeoutMs > 0)
-      timeout = setTimeout(() => {
-        timedOut = true;
-        terminate('SIGINT');
-      }, options.timeoutMs);
+    if (!options.timeoutControl) startTimeout();
     options.signal?.addEventListener('abort', abort, { once: true });
     if (options.signal?.aborted) abort();
   });

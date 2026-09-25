@@ -2,6 +2,7 @@ import { extendedLifecycle } from '../runtime/lifecycle';
 import fs from 'node:fs/promises';
 import { writeSync } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { randomInt, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { LocalContext } from '../runtime/context';
@@ -410,28 +411,39 @@ export async function executeTask(
           }
         }
       }
-      return runProcess(
-        program.program,
-        sharedShell
-          ? shellSessionArguments(
-              context,
-              options.argv,
-              options.scriptArgs ?? [],
-              program.shellCommand,
-            )
-          : [...program.args, ...(options.scriptArgs ?? [])],
-        {
-          cwd: sharedShell ? context.root : program.cwd,
-          env: childEnv,
-          // Preserve the legacy task's pipe/file input in every execution mode.
-          stdin: 'inherit',
-          output: sink,
-          // Legacy concurrent children merge stderr into their per-account log.
-          stderrOutput: mode === 'conc' ? undefined : stderrOutput,
-          timeoutMs: durationMs(options.timeout ?? env.CommandTimeoutTime, env),
-          signal: options.signal,
-        },
-      );
+      const timeoutMs = durationMs(options.timeout ?? env.CommandTimeoutTime, env);
+      const timeoutDirectory = sharedShell && timeoutMs
+        ? await fs.mkdtemp(path.join(os.tmpdir(), 'ql-task-timeout-'))
+        : undefined;
+      const timeoutMarker = timeoutDirectory ? path.join(timeoutDirectory, 'expired') : '';
+      try {
+        return await runProcess(
+          program.program,
+          sharedShell
+            ? shellSessionArguments(
+                context,
+                options.argv,
+                options.scriptArgs ?? [],
+                program.shellCommand,
+                timeoutMarker,
+              )
+            : [...program.args, ...(options.scriptArgs ?? [])],
+          {
+            cwd: sharedShell ? context.root : program.cwd,
+            env: childEnv,
+            // Preserve the legacy task's pipe/file input in every execution mode.
+            stdin: 'inherit',
+            output: sink,
+            // Legacy concurrent children merge stderr into their per-account log.
+            stderrOutput: mode === 'conc' ? undefined : stderrOutput,
+            timeoutMs,
+            ...(timeoutMarker ? { timeoutControl: { marker: timeoutMarker } } : {}),
+            signal: options.signal,
+          },
+        );
+      } finally {
+        if (timeoutDirectory) await fs.rm(timeoutDirectory, { recursive: true, force: true });
+      }
     };
     const results =
       mode === 'conc'
@@ -444,7 +456,7 @@ export async function executeTask(
         : [await invoke(mode === 'desi' ? accounts : undefined)];
     exitCode = results.find((result) => result.code !== 0)?.code ?? 0;
     timedOut = results.some((result) => result.timedOut);
-    if (!sharedShell) {
+    if (!sharedShell || results.some((result) => result.timedOut && !result.cleanupStarted)) {
       // JS/Python pre-task hooks run inside the preloader; after hooks run once per task.
       const afterEnv: NodeJS.ProcessEnv = {
         ...env,
