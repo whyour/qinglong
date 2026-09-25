@@ -212,8 +212,9 @@ let restoreEntrypoints;
     }),
   );
 })()
-  .catch((error) => {
-    console.error(error.message);
+  .catch(() => {
+    // Assertions can embed environment values or subprocess output in their message.
+    console.error('Disposable panel integration failed; inspect the failing scenario locally.');
     process.exitCode = 1;
   })
   .finally(async () => {

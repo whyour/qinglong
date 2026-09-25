@@ -17,7 +17,8 @@ test('legacy Shell and TS resolve executable paths after selecting the working d
   fs.symlinkSync(process.execPath, path.join(root, 'bin/node'));
   fs.writeFileSync(path.join(root, 'bin/pnpm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   fs.writeFileSync(path.join(root, 'static/build/token.js'), 'process.stdout.write("fixture")');
-  fs.writeFileSync(path.join(root, 'data/config/config.sh'), 'no_tee=true\n');
+  fs.writeFileSync(path.join(root, 'data/config/config.sh'),
+    'no_tee=true\nmy_task() { printf "%s\\n" "$PWD" "$@" > "$TRACE"; }\n');
   fs.writeFileSync(path.join(root, 'data/config/crontab.list'), '');
   const script = '#!/bin/sh\nprintf "%s\\n" "$PWD" "$@" > "$TRACE"\n';
   for (const file of ['data/scripts/bin/tool', 'data/scripts/bin/tool.exe', 'data/scripts/custom/tool', 'bin/path-tool'])
@@ -29,6 +30,8 @@ test('legacy Shell and TS resolve executable paths after selecting the working d
     [path.join(root, 'data/scripts/bin/tool'), '', 'bin'],
     ['bin/tool', 'custom', 'custom'],
     ['path-tool', '', ''],
+    ['my_task', '', ''],
+    ['my_task', 'custom', 'custom'],
   ];
   for (const [program, workDir, directory] of cases) {
     for (const [label, command, prefix] of [
@@ -46,4 +49,16 @@ test('legacy Shell and TS resolve executable paths after selecting the working d
         `${path.join(root, 'data/scripts', directory)}\nfirst\ntwo words\n`, `${label}/${program}`);
     }
   }
+  // A builtin has no executable file. Function arguments must remain literal.
+  for (const args of [[':', 'unused'], ['my_task', '$(touch INJECTED)', '; exit 9']]) {
+    const result = spawnSync(process.execPath,
+      [path.resolve(__dirname, '../../dist/runner.js'), '--root', root, '--json', ...args], {
+        env: { PATH: `${path.join(root, 'bin')}:/usr/bin:/bin`, TRACE: path.join(root, 'literal.trace') },
+        encoding: 'utf8', timeout: 15000,
+      });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  assert.equal(fs.readFileSync(path.join(root, 'literal.trace'), 'utf8'),
+    `${path.join(root, 'data/scripts')}\n$(touch INJECTED)\n; exit 9\n`);
+  assert.equal(fs.existsSync(path.join(root, 'data/scripts/INJECTED')), false);
 });

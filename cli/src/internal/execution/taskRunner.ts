@@ -176,13 +176,17 @@ async function prepareProgram(
       languagePreload,
       shellScript,
     };
+  const executable =
+    index < 0 && resolveBasename && first.includes('/')
+      ? path.resolve(cwd, path.basename(first))
+      : first;
   return {
-    program:
-      program ??
-      (index < 0 && resolveBasename && first.includes('/')
-        ? path.resolve(cwd, path.basename(first))
-        : first),
-    args: program ? adjusted : adjusted.slice(1),
+    program: program ?? 'bash',
+    // Bash resolves exported user functions and builtins as well as PATH commands.
+    // Keep command/arguments as argv data, never interpolate or eval them.
+    args: program
+      ? adjusted
+      : ['--noprofile', '--norc', '-c', '"$@"', 'ql-command', executable, ...adjusted.slice(1)],
     cwd,
     languagePreload,
     shellScript,
