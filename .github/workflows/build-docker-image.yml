@@ -474,7 +474,7 @@ jobs:
 
   publish:
     if: ${{ github.repository == 'whyour/qinglong' && github.ref == 'refs/heads/master' }}
-    needs: [build-alpine, build-debian]
+    needs: [build-alpine, build-debian, build-alpine310, build-debian310]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -504,4 +504,17 @@ jobs:
           package-manager-cache: false
 
       - name: Publish npm package with OIDC
-        run: npm publish --access public --registry=https://registry.npmjs.org
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=$(node -p 'require("./package.json").name')
+          version=$(node -p 'require("./package.json").version')
+          if npm view "$name@$version" version --json --registry=https://registry.npmjs.org > "$RUNNER_TEMP/npm-version.json" 2> "$RUNNER_TEMP/npm-version-error.log"; then
+            jq -e --arg version "$version" '. == $version' "$RUNNER_TEMP/npm-version.json" > /dev/null
+            echo "::notice::$name@$version is already published; skipping npm publication for this image rebuild."
+          elif jq -e '.error.code == "E404"' "$RUNNER_TEMP/npm-version.json" > /dev/null; then
+            npm publish --access public --registry=https://registry.npmjs.org
+          else
+            echo '::error::Could not check the published npm version; refusing to publish.'
+            exit 1
+          fi

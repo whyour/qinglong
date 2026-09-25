@@ -2,7 +2,9 @@
 # full Debian build matrix, including arm/v7, ppc64le, and s390x.
 FROM node:20-bookworm-slim AS nodebuilder
 
-FROM python:3.10-slim-bookworm AS builder
+# Keep the full release matrix, including s390x, on the same immutable base.
+# The floating 3.10-slim-bookworm tag no longer includes s390x.
+FROM python:3.10.19-slim-bookworm@sha256:23f63358922e79a794f71be8f3723c84e5ccca9638af3f74456dc73d6184499e AS builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
 COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
@@ -14,7 +16,7 @@ RUN set -x && \
   cd /tmp/build && \
   pnpm install --prod --frozen-lockfile
 
-FROM python:3.10-slim-bookworm
+FROM python:3.10.19-slim-bookworm@sha256:23f63358922e79a794f71be8f3723c84e5ccca9638af3f74456dc73d6184499e
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
