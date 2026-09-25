@@ -56,12 +56,20 @@ const CronLogModal = ({
     }`;
     request
       .get(`${baseUrl}${pagination}`)
-      .then(({ code, data, logStatus, nextOffset }) => {
+      .then(({ code, data, logStatus, nextOffset, total }) => {
         if (code !== 200 || localStorage.getItem("logCron") !== uniqPath) {
           return;
         }
 
-        const hasNext = logStatus === "running";
+        const isRunning = logStatus === "running";
+        // A completed process can still have multiple unread chunks. Drain
+        // them before stopping, without presenting it as a running task.
+        const hasUnread =
+          typeof nextOffset === "number" &&
+          typeof total === "number" &&
+          nextOffset > (offset ?? 0) &&
+          nextOffset < total;
+        const hasNext = isRunning || hasUnread;
         const chunk = (data as string) || "";
         let log = isFirst ? chunk : `${valueRef.current}${chunk}`;
         if (!log && !hasNext) {
@@ -75,13 +83,16 @@ const CronLogModal = ({
         if (typeof nextOffset === "number") {
           logOffsetRef.current = nextOffset;
         }
-        setExecuting(hasNext);
+        setExecuting(isRunning);
 
         if (chunk || !hasNext) {
           autoScroll();
         }
         if (hasNext) {
-          pollTimerRef.current = setTimeout(() => getCronLog(), 2000);
+          pollTimerRef.current = setTimeout(
+            () => getCronLog(),
+            hasUnread ? 0 : 2000,
+          );
         }
       })
       .finally(() => {
