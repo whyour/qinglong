@@ -177,7 +177,11 @@ async function prepareProgram(
       shellScript,
     };
   return {
-    program: program ?? first,
+    program:
+      program ??
+      (index < 0 && resolveBasename && first.includes('/')
+        ? path.resolve(cwd, path.basename(first))
+        : first),
     args: program ? adjusted : adjusted.slice(1),
     cwd,
     languagePreload,
