@@ -121,6 +121,7 @@ async function prepareProgram(
   cwd: string;
   languagePreload: boolean;
   shellScript: boolean;
+  shellCommand: boolean;
 }> {
   const extensions = /\.(?:js|mjs|py|pyc|sh|ts)$/;
   const first = argv[0]!;
@@ -175,6 +176,7 @@ async function prepareProgram(
       cwd,
       languagePreload,
       shellScript,
+      shellCommand: false,
     };
   const executable =
     index < 0 && resolveBasename && first.includes('/')
@@ -190,6 +192,7 @@ async function prepareProgram(
     cwd,
     languagePreload,
     shellScript,
+    shellCommand: !program,
   };
 }
 
@@ -292,9 +295,9 @@ export async function executeTask(
         ),
       ),
     );
-    const program = await prepareProgram(context, options.argv);
+    let program = await prepareProgram(context, options.argv);
     const sharedShell =
-      program.shellScript &&
+      (program.shellScript || program.shellCommand) &&
       (!options.mode || ['normal', 'now', 'desi'].includes(options.mode));
     let env = await taskDependencyEnvironment(context);
     // The panel preloads own generated environment variables and language hooks.
@@ -333,6 +336,7 @@ export async function executeTask(
           stderrOutput,
         },
       );
+      program = await prepareProgram({ ...context, env }, options.argv);
     }
     const mode = options.mode ?? 'normal';
     let accounts: number[] = [];
@@ -411,13 +415,13 @@ export async function executeTask(
         sharedShell
           ? shellSessionArguments(
               context,
-              program.args[5]!,
               options.argv,
               options.scriptArgs ?? [],
+              program.shellCommand,
             )
           : [...program.args, ...(options.scriptArgs ?? [])],
         {
-          cwd: program.cwd,
+          cwd: sharedShell ? context.root : program.cwd,
           env: childEnv,
           // Preserve the legacy task's pipe/file input in every execution mode.
           stdin: 'inherit',

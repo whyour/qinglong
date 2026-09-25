@@ -61,4 +61,31 @@ test('legacy Shell and TS resolve executable paths after selecting the working d
   assert.equal(fs.readFileSync(path.join(root, 'literal.trace'), 'utf8'),
     `${path.join(root, 'data/scripts')}\n$(touch INJECTED)\n; exit 9\n`);
   assert.equal(fs.existsSync(path.join(root, 'data/scripts/INJECTED')), false);
+  fs.writeFileSync(path.join(root, 'data/config/config.sh'),
+    'no_tee=true\nSTATE=before\nmy_task() { export STATE=after; return 7; }\n');
+  fs.writeFileSync(path.join(root, 'data/config/task_after.sh'),
+    'printf "%s:%s" "$STATE" "$_task_exit_code" > "$TRACE.after"\n');
+  for (const dir of ['', 'custom'])
+    fs.writeFileSync(path.join(root, 'data/scripts', dir, 'show.sh'),
+      'printf "%s" "$PWD" > "$TRACE"\n');
+  for (const scenario of ['function-state', 'hook-directory']) {
+    fs.writeFileSync(path.join(root, 'data/config/task_before.sh'),
+      scenario === 'hook-directory' ? 'work_dir=custom\n' : '');
+    const args = scenario === 'function-state' ? ['my_task'] : ['show.sh', 'now'];
+    for (const [label, command, prefix] of [
+      ['shell', '/bin/bash', [path.join(root, 'shell/task.sh')]],
+      ['ts', process.execPath, [path.resolve(__dirname, '../../dist/runner.js'), '--root', root]],
+    ]) {
+      const trace = path.join(root, `${scenario}-${label}`);
+      const result = spawnSync(command, [...prefix, ...args], {
+        env: { PATH: `${path.join(root, 'bin')}:/usr/bin:/bin`, QL_DIR: root, TRACE: trace },
+        encoding: 'utf8', timeout: 15000,
+      });
+      assert.equal(result.status, scenario === 'function-state' && label === 'ts' ? 7 : 0, result.stderr);
+      if (scenario === 'function-state')
+        assert.equal(fs.readFileSync(`${trace}.after`, 'utf8'), 'after:7');
+      else
+        assert.equal(fs.readFileSync(trace, 'utf8'), path.join(root, 'data/scripts/custom'));
+    }
+  }
 });
