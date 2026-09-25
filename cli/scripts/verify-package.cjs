@@ -30,7 +30,9 @@ try {
       { cwd: root },
     ),
   )[0];
-  assert.ok(manifest.files.some((file) => file.path === 'docs/migration.md'));
+  for (const name of ['README.md', 'README.en.md', 'LICENSE', 'dist/licenses/commander-LICENSE'])
+    assert.ok(manifest.files.some((file) => file.path === name), name);
+  assert.ok(manifest.files.every((file) => /^(dist\/|skills\/|README(?:\.en)?\.md$|LICENSE$|package\.json$)/.test(file.path)));
   assert.ok(
     manifest.files.some((file) => file.path === 'skills/qinglong-cli/SKILL.md'),
   );
@@ -81,6 +83,12 @@ try {
     });
     assert.match(output, /Usage:|用法|usage/i);
     entries.push(name);
+  }
+  // CI uploads the exact archive whose isolated installation passed above.
+  if (process.env.QL_CLI_PACKAGE_OUTPUT) {
+    const output = path.resolve(process.env.QL_CLI_PACKAGE_OUTPUT);
+    fs.mkdirSync(output, { recursive: true });
+    fs.copyFileSync(path.join(temp, manifest.filename), path.join(output, manifest.filename));
   }
   process.stdout.write(
     JSON.stringify(

@@ -1,0 +1,62 @@
+name: CLI package
+
+on:
+  pull_request:
+    paths:
+      - 'cli/**'
+      - 'shell/**'
+      - 'back/loaders/deps.ts'
+      - 'package.json'
+      - '.github/workflows/cli-package.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'cli/**'
+      - 'shell/**'
+      - 'back/loaders/deps.ts'
+      - 'package.json'
+      - '.github/workflows/cli-package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.12.0', '24']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: cli/package-lock.json
+      - name: Install test interpreters and tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bash ca-certificates curl git jq perl procps python3 unzip zip
+          npm install --global --ignore-scripts --no-audit --no-fund ts-node@10.9.2 typescript@5.2.2
+      - run: npm ci --prefix cli --no-audit --no-fund
+      - run: npm run check:cli
+      - run: npm run test:cli
+      - name: Verify offline package installation
+        env:
+          QL_CLI_PACKAGE_OUTPUT: ${{ runner.temp }}/cli-package
+        run: node cli/scripts/verify-package.cjs
+      - name: Upload verified npm archive
+        if: matrix.node == '24'
+        uses: actions/upload-artifact@v6
+        with:
+          name: qinglong-cli-${{ github.sha }}
+          path: ${{ runner.temp }}/cli-package/*.tgz
+          if-no-files-found: error
+          retention-days: 14

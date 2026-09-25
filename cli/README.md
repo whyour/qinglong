@@ -15,7 +15,7 @@ ql --help
 npm exec --package=@qinglong/cli -- ql --help
 ```
 
-本分支准备 npm 交付，尚未发布到 registry；发布前可从源码执行 `npm ci --prefix cli`，再进入 `cli` 目录执行 `npm pack` 安装本地产物，详见[交付说明](docs/deployment.md)。远程 API 管理只需要 Node；本机执行和运维还需要面板文件、对应解释器与系统工具。面板镜像可集成同一 npm 产物并随面板发布，仓库内 Dockerfile 仅用于内部测试。
+本分支准备 npm 交付，尚未发布到 registry；发布前可从源码执行 `npm ci --prefix cli`，再进入 `cli` 目录执行 `npm pack` 安装本地产物。远程 API 管理只需要 Node；本机执行和运维还需要面板文件、对应解释器与系统工具。面板镜像可集成同一 npm 产物并随面板发布。
 
 ## 统一入口
 
@@ -39,7 +39,7 @@ ql dev release --root /repo --json
 
 ## 命令边界
 
-完整 Shell 迁移按能力归属拆分，详见 [命令范围](docs/command-scope.md) 与 [迁移验收表](docs/migration.md)。
+本机执行与运维通过统一命令树分组；用户配置和 hook 继续使用 Bash。
 
 | 入口 | 职责 | 当前状态 |
 | --- | --- | --- |
@@ -106,23 +106,21 @@ ID 必须为正整数，运行/停止一次操作一个任务。2.x 没有为此
 
 日志是该任务最新日志，可能属于先前运行；`completed` 不代表成功。`--tail` 在客户端截取，不减少服务端读取量或网络传输量。日志与任务字段不自动脱敏，应按需读取并避免向聊天中暴露敏感信息。
 
-## Skill 与评测
+## Skill 与测试
 
 配套 Skill 随独立安装包分发，位于包内 `skills/qinglong-cli`（源码路径 `cli/skills/qinglong-cli`）。复制到所用 Agent 的 skills 目录，并在首次使用时提供编译产物的绝对路径；Skill 不存放凭据，也不替代服务端权限。
 
 ```sh
 npm run check:cli
 npm run test:cli
-node cli/scripts/benchmark.cjs
-node cli/scripts/benchmark-legacy.cjs
 node cli/scripts/verify-package.cjs
 ```
 
-常规测试使用隔离凭据和回环 HTTP 服务；另有独立临时官方面板容器验收，记录见 [评测证据](docs/evaluation.md)。覆盖命令、2.x 请求格式、刷新、错误流、禁止重试、配置权限以及独立产物运行。
+常规测试使用隔离凭据和回环 HTTP 服务。覆盖命令、2.x 请求格式、刷新、错误流、禁止重试、配置权限以及独立产物运行。
 
 当前测试还覆盖入口隔离、本机脚本参数与退出码、超时、日志清理和 Git 同步失败保留旧文件。执行器 `--json` 将脚本输出写 stderr，stdout 只保留结果，退出状态保留脚本退出码。
 
-2.x Shell 能力迁移与可替换性验收已完成，原 Shell 与生产默认入口保留。当前实现覆盖任务执行、内部订阅同步、维护、升级、宿主机和容器启动；真实面板、跨版本升级、Alpine/OpenRC 与 Debian/systemd 重启、三平台回归及独立安装证据见 [验收审计](docs/acceptance-status.md)。切换使用文档中的显式选择机制，面板进程入口通过 QL_CLI_ROOT 显式选择；全局安装包会注册 ql/task 名称。
+2.x Shell 能力迁移与可替换性验收已完成，原 Shell 与生产默认入口保留。当前实现覆盖任务执行、内部订阅同步、维护、升级、宿主机和容器启动。切换使用文档中的显式选择机制，面板进程入口通过 QL_CLI_ROOT 显式选择；全局安装包会注册 ql/task 名称。
 
 本机运维提供 `repair-config`、`update --mirror github|gitee [--download-only]` 和 `reload --target services|system|data`，使用 `node cli/dist/admin.js <命令> --root <安装目录>`。升级/重载会改动本机安装，已通过真实 Linux 进程恢复与官方面板 2.19.0 → 2.20.1 暂存文件替换验收，保留账号、任务及配置；公网升级归档下载与版本选择仍是独立验证范围。`--download-only` 输出并记录完整暂存目录，不停止服务；之后执行 `reload --target system`（旧参数为 `ql-compat reload system`）会使用该记录。失败的后续下载不覆盖上次可用记录。
 
@@ -132,7 +130,7 @@ node cli/scripts/verify-package.cjs
 
 开发发布使用 `node cli/dist/developer.js release --root /仓库绝对路径 --json` 查看计划；明确执行时增加 `--apply --commit <计划中的完整提交SHA>`。默认目标为 origin/master，可用 `--remote`、`--branch` 指定。发布会上传 CDN 元数据并替换目标分支和当前版本标签，详见迁移文档中的副作用与兼容差异。
 
-`qinglong-cli` 对应原 `qinglong` 无参数启动，`qinglong-cli reload` 对应旧重载形式；可通过 QL_DIR/QL_DATA_DIR 或显式目录选项指定安装。评测镜像提供 `qinglong` 别名，独立包使用 `qinglong-cli` 避免覆盖原命令。
+`qinglong-cli` 对应原 `qinglong` 无参数启动，`qinglong-cli reload` 对应旧重载形式；可通过 QL_DIR/QL_DATA_DIR 或显式目录选项指定安装。独立包使用 `qinglong-cli` 避免覆盖原命令。
 
 `ql start --root /安装目录 --data-dir /存储路径/data` 承接本机安装与启动；增加 `--reload` 可跳过依赖安装、可选 Bot/extra 和开机注册。它操作真实系统包与 nginx/PM2 服务，已在官方 2.20.1 镜像绕过旧启动脚本完成首次启动验收；另已在预装 Node/Python 运行时的 Alpine/OpenRC 与 Debian 12/systemd 虚拟机验证真实安装、内核重启及保留任务的自动分钟触发；不包含运行时本身的安装，也不代表所有发行版已验证。
 
@@ -164,18 +162,17 @@ QL_DIR=/ql ql-compat repo <url> <include> <exclude> <dependencies> <branch> <ext
 
 容器内首次启动可使用 `ql start --root /ql --data-dir /ql/data --no-startup`，显式跳过不适用的系统开机注册；依赖准备、服务启动和 PM2 进程清单保存仍执行。默认不加此选项时继续执行 `pm2 startup`，失败会返回错误。结果中的 `startup` 区分 `registered`、`skipped` 和 `not-requested`。
 
-### 内部面板集成测试
-
-仅供维护者使用的 [2.x 内部评测镜像构建入口](docs/deployment.md)，将 CLI、文档和 Skill 打包到 `/opt/qinglong-cli`，并带入本仓库的 2.x 命令选择加载器。构建先执行 `npm run build:cli` 和 `node cli/scripts/build-panel-loader.cjs`，再用 `cli/docker/Dockerfile.panel`。它保留基础镜像的 Shell 文件及容器启动入口；现有生产 Dockerfile 不变。该镜像用于显式切换和验证，完整容器启动迁移证据见验收审计。
-
 配置了 `QL_DIR` 或传入 `--root` 时，`ql task exec` 不带脚本参数会显示帮助及脚本目录顶层的 JS 脚本列表（排除 `sendNotify.js`），并从文本提取 `new Env(...)` 活动名称。加 `--json` 可读取 `data.scripts`；显式 `--help` 只显示帮助，不读取脚本或执行配置。
 
 ## 耗时如何比较
 
 `ql` 的面板管理操作包含认证（必要时）与 HTTP 往返；`ql update/check/reload` 等运维操作在本机执行，耗时取决于实际维护工作。`ql task run` 返回请求已接受，本机任务执行器 `ql task exec` 则等待脚本结束，所以两者返回时间不是同一个指标。订阅 run 的返回也不代表拉取完成。
 
-旧 Shell 与 TS 执行器的同任务耗时另行比较，见 [耗时实测 / Timing measurements](docs/timing.md)。`benchmark.cjs` 只测空 Node 与帮助启动；`benchmark-legacy.cjs` 测相同隔离脚本在两种执行器下的完整耗时，不读取真实面板配置。
-
 本机配置桥使用 Bash 与 `/usr/bin/env -0` 读取导出的环境，在当前 Node 进程解析 NUL 分隔数据，不再额外启动 Node 做序列化。已验证 macOS、Debian（GNU env）及 Alpine（BusyBox env）；其他平台需提供兼容的 env 命令。
 
-框架选型与最新性能对比见 [CLI 框架评测](docs/cli-framework.md)，包含 Commander、CAC、Yargs 和现有实现，以及 Commander 打包后的结果。
+
+## CI npm 产物
+
+CLI package 工作流在相关 PR、develop 推送及手动触发时运行，在 Node 22.12 和 24 上检查类型、构建并测试。Node 24 任务打包后进行离线安装，验证全部九个入口，再将验证过的 `.tgz` 上传为 GitHub Actions artifact；不自动发布到 npm registry。
+
+在工作流运行页下载 `qinglong-cli-<commit>`，解压后执行 `npm install -g ./qinglong-cli-0.1.0.tgz`。安装产物不需要构建工具。

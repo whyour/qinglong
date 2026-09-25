@@ -15,7 +15,7 @@ ql --help
 npm exec --package=@qinglong/cli -- ql --help
 ```
 
-This branch prepares npm distribution; it does not publish the package. Before publication, run `npm ci --prefix cli`, then run `npm pack` inside `cli` and install that local archive; see the [deployment guide](docs/deployment.md). API management needs only Node; local operations additionally need the panel files and relevant interpreters/system tools. Panel images may integrate the same npm artifact into their normal release. Dockerfiles in this directory are internal test fixtures.
+This branch prepares npm distribution; it does not publish the package. Before publication, run `npm ci --prefix cli`, then run `npm pack` inside `cli` and install that local archive. API management needs only Node; local operations additionally need the panel files and relevant interpreters/system tools. Panel images may integrate the same npm artifact into their normal release.
 
 ## Unified entry
 
@@ -49,7 +49,7 @@ ql dev release --root /repo --json
 | `qinglong-cli` / `dist/startup.js` | Legacy no-argument `qinglong` startup and `reload` |
 | `ql dev` / `dist/developer.js` | Developer release plans, CDN metadata and branch/tag publication |
 
-Public subscription management uses panel subscription IDs. Legacy repo/raw arguments belong to the internal worker. Installation and repair belong to local maintenance; release operations belong to the developer tool. See the [command scope](docs/command-scope.md) and [migration checklist](docs/migration.md) (Chinese).
+Public subscription management uses panel subscription IDs. Legacy repo/raw arguments belong to the internal worker. Installation and repair belong to local maintenance; release operations belong to the developer tool.
 
 ## Build and run
 
@@ -122,7 +122,7 @@ Local operations include `repair-config`, `update --mirror github|gitee [--downl
 
 `check` retains the legacy **repair** behavior: it installs global tools and panel dependencies, restores configuration and notification files, then diagnoses and reloads services. It is not a read-only command. JSON includes health observations before/after reload and bounded PM2 log tails (up to 300 lines and 256 KiB each), without automatic redaction.
 
-`bot` prepares dependencies and the optional Bot repository, reads `BotRepoUrl`, preserves existing `bot.json` and starts the Bot. Supported systems are Alpine, Debian and Ubuntu Linux. Actual Alpine package/pip installation and Python process isolation were tested using a test Bot, without connecting to Telegram. Dependencies are installed from a pip requirements file; see migration notes for compatibility differences.
+`bot` prepares dependencies and the optional Bot repository, reads `BotRepoUrl`, preserves existing `bot.json` and starts the Bot. Supported systems are Alpine, Debian and Ubuntu Linux. Actual Alpine package/pip installation and Python process isolation were tested using a test Bot, without connecting to Telegram. Dependencies are installed from a pip requirements file.
 
 `start` performs local installation and service startup. `--reload` skips dependency installation, optional Bot/extra steps and boot registration. Node/Python runtimes must already be installed. Tests cover the official 2.20.1 container and actual Alpine/OpenRC and Debian 12/systemd boots, including retained scheduled tasks; they do not establish support for every distribution.
 
@@ -150,13 +150,11 @@ Panels containing this change to `back/loaders/deps.ts` can set `QL_CLI_ROOT=/ab
 
 Unset the variable and restart the panel to restore original Shell links. Installing the npm package alone does not switch commands. Invalid/unreadable paths or missing entries produce startup-link errors rather than silently falling back. Original Shell files remain available. Migration acceptance is complete; production publication has not been performed.
 
-The internal-only [panel integration test image](docs/deployment.md) packages the CLI, documentation and Skill into `/opt/qinglong-cli` with the 2.x selection loader. Build the CLI and run `node cli/scripts/build-panel-loader.cjs` before using `cli/docker/Dockerfile.panel`. Production Dockerfiles are unchanged.
-
 All executable entries support English help through `QL_LANG=en`; Chinese is the default. Command/option names and JSON keys are stable across languages. Task and maintenance execution messages use the same language setting. Help reads process environment only, without loading panel configuration.
 
 ## Developer releases
 
-Inspect a plan with `node cli/dist/developer.js release --root /absolute/repository --json`. To execute, add `--apply --commit <full-planned-commit-SHA>`. The default destination is `origin/master`; override with `--remote` and `--branch`. Publishing uploads CDN metadata and replaces the target branch and current version tag. Tests use temporary Git repositories; no actual release was published. See migration notes before using this operation.
+Inspect a plan with `node cli/dist/developer.js release --root /absolute/repository --json`. To execute, add `--apply --commit <full-planned-commit-SHA>`. The default destination is `origin/master`; override with `--remote` and `--branch`. Publishing uploads CDN metadata and replaces the target branch and current version tag. Tests use temporary Git repositories; no actual release was published.
 
 ## Skill and validation
 
@@ -165,19 +163,20 @@ The standalone package includes `skills/qinglong-cli` (source: `cli/skills/qingl
 ```sh
 npm run check:cli
 npm run test:cli
-node cli/scripts/benchmark.cjs
-node cli/scripts/benchmark-legacy.cjs
 node cli/scripts/verify-package.cjs
 ```
 
-Tests cover isolated API behavior, authentication refresh, errors, no automatic retries, credential permissions, standalone packaging, entry isolation, script arguments/exit codes, timeouts, log cleanup and preserving files after failed synchronization. Additional acceptance covers real panels, 2.19.0 → 2.20.1 upgrades, host reboot/scheduling and three-platform regression. See [evaluation evidence](docs/evaluation.md) and [acceptance audit](docs/acceptance-status.md) (Chinese).
+Tests cover isolated API behavior, authentication refresh, errors, no automatic retries, credential permissions, standalone packaging, entry isolation, script arguments/exit codes, timeouts, log cleanup and preserving files after failed synchronization. Additional acceptance covers real panels, 2.19.0 → 2.20.1 upgrades, host reboot/scheduling and three-platform regression.
 
 ## Comparing elapsed time
 
 `ql` panel-management operations include authentication when needed and HTTP round trips. Maintenance commands such as `ql update/check/reload` run locally, so their duration depends on the operation. `ql task run` returns when the request is accepted, while `ql task exec` waits for the script to finish; those return times measure different things. Subscription run acceptance likewise does not mean fetching is complete.
 
-For the original Shell versus TypeScript executor comparison, see [timing measurements](docs/timing.md) (Chinese and English). `benchmark.cjs` measures empty Node versus CLI help startup only. `benchmark-legacy.cjs` measures the same isolated task through both executors without reading real panel configuration.
-
 The local configuration bridge uses Bash and `/usr/bin/env -0` to capture exported environment data. The current Node process parses NUL-separated records without starting another Node process for serialization. Validated on macOS, Debian (GNU env) and Alpine (BusyBox env); other platforms require a compatible env executable.
 
-See the [CLI framework evaluation](docs/cli-framework.md) for current-parser, Commander, CAC and Yargs measurements, including bundled Commander.
+
+## CI npm package
+
+The CLI package workflow runs for relevant pull requests, pushes to develop and manual dispatch. It checks types, builds and tests on Node 22.12 and 24. The Node 24 job packs and installs the archive offline, checks all nine entries, and uploads the verified `.tgz` as a GitHub Actions artifact. It does not publish to the npm registry.
+
+Download `qinglong-cli-<commit>` from the workflow run and install its archive with `npm install -g ./qinglong-cli-0.1.0.tgz`. No build tools are needed when installing it.
