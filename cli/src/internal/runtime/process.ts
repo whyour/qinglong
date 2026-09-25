@@ -7,6 +7,7 @@ import { commandSignal, operationSignal } from './cancellation';
 import { shellOptionPrelude } from '../execution/shellOptions';
 
 export interface ProcessOptions {
+  stdin?: 'inherit' | 'ignore';
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
@@ -92,8 +93,8 @@ export async function runProcess(
       detached: process.platform !== 'win32',
       stdio:
         options.captureFd === 3
-          ? ['ignore', 'pipe', 'pipe', 'pipe']
-          : ['ignore', 'pipe', 'pipe'],
+          ? [options.stdin ?? 'ignore', 'pipe', 'pipe', 'pipe']
+          : [options.stdin ?? 'ignore', 'pipe', 'pipe'],
     });
     const chunks: Buffer[] = [];
     let bytes = 0;

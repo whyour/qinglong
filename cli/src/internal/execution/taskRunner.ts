@@ -411,6 +411,8 @@ export async function executeTask(
         {
           cwd: program.cwd,
           env: childEnv,
+          // Preserve the legacy task's pipe/file input in every execution mode.
+          stdin: 'inherit',
           output: sink,
           // Legacy concurrent children merge stderr into their per-account log.
           stderrOutput: mode === 'conc' ? undefined : stderrOutput,
