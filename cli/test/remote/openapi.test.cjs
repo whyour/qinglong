@@ -46,6 +46,18 @@ async function fixture(t) {
 }
 function success(result) { assert.equal(result.code, 0, result.err); return JSON.parse(result.out); }
 
+test('dashboard record sends execution statistics and rejects a missing body before HTTP', async t => {
+  const f = await fixture(t);
+  const payload = { ref_id: 7, code: 0, elapsed: 1.5 };
+  success(await f.run(['dashboard', 'record', '--data', '-'], JSON.stringify(payload)));
+  assert.equal(f.requests.length, 1);
+  assert.equal(f.requests[0].method, 'POST');
+  assert.equal(f.requests[0].url, '/panel/open/dashboard/record');
+  assert.deepEqual(JSON.parse(f.requests[0].body), payload);
+  assert.equal((await f.run(['dashboard', 'record'])).code, 2);
+  assert.equal(f.requests.length, 1);
+});
+
 test('OpenAPI catalogue covers every active registered backend route; retired 410 routes are explicit', async () => {
   const root = path.resolve(__dirname, '../../../back/api');
   const expected = [];

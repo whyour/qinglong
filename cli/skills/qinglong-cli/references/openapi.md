@@ -176,7 +176,7 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql system config-panel-title ` | PUT | `system/config/panel-title` | --data, --query |
 | `ql system config-global-ssh-key ` | PUT | `system/config/global-ssh-key` | --data, --query |
 | `ql system config-dependence-clean ` | PUT | `system/config/dependence-clean` | --data, --query |
-| `ql dashboard record ` | POST | `dashboard/record` | --query |
+| `ql dashboard record ` | POST | `dashboard/record` | --data, --query |
 | `ql dashboard overview ` | GET | `dashboard/overview` | --query |
 | `ql dashboard trend ` | GET | `dashboard/trend` | --query |
 | `ql dashboard top-time ` | GET | `dashboard/top-time` | --query |
