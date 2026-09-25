@@ -18,7 +18,7 @@ ql --help
 npm exec --package=@whyour/qinglong-cli -- ql --help
 ```
 
-本分支尚未发布 npm 包。发布前从源码执行 `npm ci --prefix cli`、`npm run build:cli`，在 cli 目录执行 `npm pack`，然后安装本地 tgz。全局安装会占用 `ql` 名称；已有面板的机器建议使用独立 npm prefix 或直接执行 `node /absolute/path/to/cli/dist/npm/ql.js`。
+也可以从源码构建：执行 `npm ci --prefix cli`、`npm run build:cli`，在 cli 目录执行 `npm pack`，然后安装本地 tgz。全局安装会占用 `ql` 名称；已有面板的机器建议使用独立 npm prefix 或直接执行 `node /absolute/path/to/cli/dist/npm/ql.js`。
 
 ```sh
 ql login --url https://ql.example.com

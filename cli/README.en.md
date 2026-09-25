@@ -18,7 +18,7 @@ ql --help
 npm exec --package=@whyour/qinglong-cli -- ql --help
 ```
 
-This branch has not published the package. Build with `npm ci --prefix cli` and `npm run build:cli`, then run `npm pack` in cli and install the local tgz. Global installation occupies the `ql` name. On a panel host use a separate npm prefix or `node /absolute/path/to/cli/dist/npm/ql.js`.
+To build from source, use `npm ci --prefix cli` and `npm run build:cli`, then run `npm pack` in cli and install the local tgz. Global installation occupies the `ql` name. On a panel host use a separate npm prefix or `node /absolute/path/to/cli/dist/npm/ql.js`.
 
 ```sh
 ql login --url https://ql.example.com

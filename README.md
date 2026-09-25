@@ -36,6 +36,7 @@ Timed task management platform supporting Python3, JavaScript, Shell, Typescript
 - 支持系统级通知
 - 支持暗黑模式
 - 支持手机端操作
+- 支持通过 [远程 CLI 与 Agent Skill](#远程-cli-与-agent-skill) 管理面板
 
 ## 版本
 
@@ -83,9 +84,26 @@ npm i @whyour/qinglong
 
 ## 远程 CLI 与 Agent Skill
 
-独立 `@whyour/qinglong-cli` 使用 `ql` 管理远程 OpenAPI，支持任务/订阅增删改、应用、环境变量等资源。认证支持应用 Client ID/Secret 登录和环境变量 QL_URL/QL_ACCESS_TOKEN 直接令牌两种方式。当前分支尚未发布 npm 包，源码构建及安装方式见 [CLI 中文说明](cli/README.md)（[English](cli/README.en.md)）。
+使用独立 npm 包 [@whyour/qinglong-cli](https://www.npmjs.com/package/@whyour/qinglong-cli)，可以从本机终端或自动化流程管理远程青龙面板。支持任务与订阅的创建、修改、运行和日志查看，以及应用、环境变量、脚本、配置、依赖等 OpenAPI 资源；JSON 输出便于脚本和 AI Agent 使用。
 
-[远程管理 Skill](cli/skills/qinglong-cli/SKILL.md) 包含认证流程和完整命令参考。本机执行、reload/reset 等使用 [面板内部工具](cli/LOCAL.md) 及 [内部 Skill](cli/skills/qinglong-local/SKILL.md)，不随独立 npm 包分发。
+需要 Node.js >=22.12，推荐 Node.js 24。安装后使用 `ql` 命令：
+
+```bash
+npm install -g @whyour/qinglong-cli
+ql login --url https://ql.example.com
+ql auth status --json
+ql task list --json
+ql subscription list --json
+ql --help
+```
+
+在面板「系统设置 → 应用设置」创建应用并授予所需权限，登录时按提示输入 Client ID/Secret；也支持通过 `QL_URL` 和 `QL_ACCESS_TOKEN` 使用已有令牌。各命令支持 `--help`，`QL_LANG=en` 可切换英文帮助。
+
+npm CLI 用于远程管理。面板内置 `ql` 同样使用这个命令名，已有面板的机器请使用独立安装目录，避免覆盖内置命令。本机脚本执行和运维见 [面板内部工具](cli/LOCAL.md)。
+
+[CLI 中文说明](cli/README.md) · [English guide](cli/README.en.md) · [完整命令参考](cli/skills/qinglong-cli/references/openapi.md)
+
+包内附带 [远程管理 Skill](cli/skills/qinglong-cli/SKILL.md)，涵盖认证、命令选择和操作结果检查，可供 AI Agent 使用。本机执行与运维另见 [内部 Skill](cli/skills/qinglong-local/SKILL.md)。
 
 ## 开发
 
