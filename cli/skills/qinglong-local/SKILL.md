@@ -7,7 +7,7 @@ description: Run scripts, synchronize repo/raw subscriptions, and maintain or re
 
 These tools are part of the panel build and are not shipped in `@qinglong/cli`. Identify the target panel host/container, installation and data directories first. Run there using `node /absolute/path/to/built/cli/dist/ql.js`, or a verified panel-selected `ql` wrapper; call this `<cli>`. Verify its `--help` exposes local operations. Never assume a workstation's npm `ql` is this entry.
 
-For Docker, execute inside the intended container using `docker exec` and its selected absolute entry. For native installations, run on the panel host. Account reset and service operations must target that running installation, not an unrelated host with a copied/mounted data directory. Remote API login does not select the local target.
+For Docker, execute inside the intended container using `docker exec` and its selected absolute entry. For native installations, run on the panel host. Account reset and service operations must target that running installation, not an unrelated host with a copied/mounted data directory. Remote API login does not select the local target. This entry rejects remote commands and never reads saved remote credentials. `ql local` is only an alias for maintenance and repo/raw, not a task namespace; execute scripts with `ql task exec`.
 
 Read the relevant reference before proceeding:
 

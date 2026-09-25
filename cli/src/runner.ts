@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { runnerOptions } from './framework/runnerDefinition';
 import { standaloneHelp } from './i18n/standalone';
 import { translate } from './i18n';
 import { parseFlags, isArgumentError } from './framework/options';
@@ -12,19 +13,15 @@ export function parseExecution(args: string[]): {
   values: Record<string, string | boolean | undefined>;
   execution?: ExecutionOptions;
 } {
-  const schema = {
-    root: { type: 'string' },
-    'data-dir': { type: 'string' },
-    timeout: { type: 'string', short: 'm' },
-    log: { type: 'boolean', short: 'l' },
-    json: { type: 'boolean' },
-    help: { type: 'boolean', short: 'h' },
-  } as const;
+  const schema = runnerOptions;
   let parsed: ReturnType<typeof parseFlags>;
   try {
     // Commander stops parsing at the first positional argument. Everything
     // from the script onward belongs to the legacy runner, including flags.
-    parsed = parseFlags(args, schema, { passThrough:true, rejectDuplicates:false });
+    parsed = parseFlags(args, schema, {
+      passThrough: true,
+      rejectDuplicates: false,
+    });
   } catch (error) {
     if (!isArgumentError(error)) throw error;
     fail(translate(process.env, '任务执行器选项无效。'), 2);

@@ -2,6 +2,9 @@
 
 **简体中文** | [English](README.en.md)
 
+
+npm 与面板内部入口都叫 `ql`，但使用独立的 Commander 命令树：npm 入口只调用远程 API，内部入口只运行本机工具。使用前确认可执行文件的绝对路径和 `--help`；安装 npm 包不会迁移内置 Shell 命令。
+
 `@qinglong/cli` 是独立 npm 包，覆盖当前 develop 的有效 OpenAPI，只注册一个 `ql` 命令。它不包含脚本执行器或本机运维实现；`task exec`、`repo/raw`、`reload/update/reset*` 等属于面板内部工具，不随 npm 包分发。开发发布也不属于 CLI 范围。
 
 ## 安装与使用

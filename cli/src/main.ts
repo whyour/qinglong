@@ -1,5 +1,4 @@
 import { invoke } from './invoke';
-import { dispatch } from './framework/dispatch';
 import type { CommandSurface } from './framework/registry';
 
 export async function main(
@@ -7,8 +6,12 @@ export async function main(
   surface: CommandSurface = 'public',
   signal?: AbortSignal,
 ): Promise<number> {
-  const interrupted = signal
-    ? await import('./local/cancellation')
-    : undefined;
-  return invoke(args, surface, dispatch, signal, () => interrupted?.interruptedCode(signal!));
+  const interrupted = signal ? await import('./local/cancellation') : undefined;
+  const dispatch =
+    surface === 'public'
+      ? (await import('./framework/remoteDispatch')).dispatchRemote
+      : (await import('./framework/dispatch')).dispatch;
+  return invoke(args, surface, dispatch, signal, () =>
+    interrupted?.interruptedCode(signal!),
+  );
 }

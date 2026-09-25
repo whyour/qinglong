@@ -2,6 +2,9 @@
 
 **简体中文** | [English](LOCAL.en.md)
 
+
+npm 与面板内部入口都叫 `ql`，但使用独立的 Commander 命令树：npm 入口只调用远程 API，内部入口只运行本机工具。使用前确认可执行文件的绝对路径和 `--help`；安装 npm 包不会迁移内置 Shell 命令。
+
 这些工具随面板构建交付，不包含在 `@qinglong/cli` npm 包中。要求 Node >=22.12；用户配置和 hook 保持 Bash，任务还需要对应解释器。开发发布命令已移除，原 `shell/pub.sh` 保留供发布流程使用。
 
 ```sh
@@ -27,7 +30,7 @@ node cli/dist/ql.js reload --root /ql
 
 `ql local <命令>` 保留为兼容写法。`update false` 等价于 `--download-only`，`reload system/data/services` 映射到 `--target`。维护选项 `--root`、`--data-dir`、`--json` 必须放在 `--` 前。密码位置参数会出现在进程参数中，使用本人可信终端，不向聊天发送密码。
 
-执行器选项必须放在脚本前；`now` 跳过延迟，`conc`/`desi` 支持账号选择，`--` 后参数透传。设置 QL_DIR 后，无参数 `ql task` 或 `task` 显示 JS 脚本清单；显式 `--help` 不读取配置。`--json` 将脚本输出写 stderr、最终结果写 stdout，并保留脚本退出码。内部仍兼容 API task 操作；同名脚本使用显式 `task exec`。
+执行器选项必须放在脚本前；`now` 跳过延迟，`conc`/`desi` 支持账号选择，`--` 后参数透传。设置 QL_DIR 后，无参数 `ql task` 或 `task` 显示 JS 脚本清单；显式 `--help` 不读取配置。`--json` 将脚本输出写 stderr、最终结果写 stdout，并保留脚本退出码。内部入口拒绝远程 API 命令，不读取远程认证配置。远程管理使用独立 npm 入口；与 API 动作同名的脚本使用显式 `task exec`。
 
 repo/raw 沿用位置参数，使用 QL_DIR/QL_DATA_DIR，不接受 --root/--json；筛选采用本机 `grep -E` 的 POSIX ERE，需 Git/curl 等系统工具。配置桥使用 Bash 和支持 `-0` 的 env。
 

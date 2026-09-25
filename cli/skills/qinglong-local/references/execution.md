@@ -15,7 +15,7 @@ CLI options precede the script:
 
 - Normal execution retains configured delay; `now` skips it. `conc` runs selected accounts concurrently; `desi` selects accounts for designated execution. Confirm the configured variable name and account ranges; avoid printing values.
 - `--` ends runner mode/account arguments and passes the remaining arguments to the user script. `--root`, `--data-dir`, `--json`, `-m/--timeout`, `-l/--log` belong before the script. Local script arguments resembling flags must not be reinterpreted as management commands.
-- `task <script>` and `<cli> task <script>` are shorthands. Prefer explicit `task exec` to avoid collisions with reserved API verbs.
+- `task <script>` and `<cli> task <script>` are shorthands. Remote API verbs are rejected before reading credentials or starting a script. Use explicit `task exec` for scripts with those names.
 - With `QL_DIR` set, `task` or `<cli> task` with no operation lists available JS scripts without executing them. Use `task exec --root /ql --json` to list an explicit installation. `--help` shows usage without loading configuration.
 - JSON mode sends script output to stderr and a final result to stdout. Preserve nonzero script exits, timeout and signal outcomes; successful process launch is not successful execution. Local script logs may contain secrets.
 

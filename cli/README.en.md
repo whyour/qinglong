@@ -2,6 +2,9 @@
 
 [简体中文](README.md) | **English**
 
+
+The npm and panel-internal entries both use the name `ql`, but have separate Commander command trees. The npm entry only calls remote APIs; the internal entry only runs local tools. Verify the absolute executable path and `--help` before use. Installing the npm package does not migrate the built-in Shell commands.
+
 `@qinglong/cli` is a standalone npm client for the panel's open API. It registers only `ql`, for the currently supported OpenAPI resources. Local execution, repo/raw workers, reload/update/account recovery belong to the panel's internal tools and are excluded from npm. Development publishing is outside both command sets.
 
 ## Installation and commands

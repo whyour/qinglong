@@ -2,6 +2,9 @@
 
 [简体中文](LOCAL.md) | **English**
 
+
+The npm and panel-internal entries both use the name `ql`, but have separate Commander command trees. The npm entry only calls remote APIs; the internal entry only runs local tools. Verify the absolute executable path and `--help` before use. Installing the npm package does not migrate the built-in Shell commands.
+
 These tools ship with panel builds and are excluded from the @qinglong/cli npm package. Node >=22.12 is required; user configuration/hooks remain Bash and scripts need their interpreters. Development publishing was removed from the CLI; shell/pub.sh remains available to release workflows.
 
 ```sh
@@ -25,7 +28,7 @@ Run on the actual panel host or inside its container. For Docker use `docker exe
 
 `ql local <command>` remains compatible. `update false` means --download-only; reload system/data/services maps to --target. Place maintenance --root, --data-dir and --json before --. Password values appear in process arguments: use the owner's trusted terminal and never request passwords in chat.
 
-Runner options precede the script. now skips delay; conc/desi select accounts; -- passes subsequent arguments through. With QL_DIR set, bare ql task or task lists JS scripts. Explicit --help does not read configuration. JSON mode sends script output to stderr and the final result to stdout, retaining the script exit code. Internal API task actions remain compatible; use task exec for scripts with reserved names.
+Runner options precede the script. now skips delay; conc/desi select accounts; -- passes subsequent arguments through. With QL_DIR set, bare ql task or task lists JS scripts. Explicit --help does not read configuration. JSON mode sends script output to stderr and the final result to stdout, retaining the script exit code. The internal entry rejects remote API commands and does not read remote credentials. Use the separate npm entry for remote management; use task exec for scripts with reserved API action names.
 
 repo/raw retain positional arguments and QL_DIR/QL_DATA_DIR, without --root/--json. Filtering uses native grep -E POSIX ERE; Git/curl and other operation-specific tools are required. The configuration bridge uses Bash and env supporting -0.
 

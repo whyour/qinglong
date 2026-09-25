@@ -1,6 +1,7 @@
 import { openCommands } from './openCommands';
 import { openOperations } from '../framework/openOperations';
 import { helpText } from '../i18n/help';
+import { quietCommand, addFlags } from './options';
 export interface OptionSpec {
   type: 'string' | 'boolean';
   short?: string;
@@ -45,7 +46,9 @@ export const commands: readonly CommandSpec[] = [
         type: 'string',
         description: 'Permission to check',
         default: 'crons',
-        choices: [...new Set(openOperations.map(op => op.path.split('/')[0]!))].filter(scope => !['auth', 'update'].includes(scope)),
+        choices: [
+          ...new Set(openOperations.map((op) => op.path.split('/')[0]!)),
+        ].filter((scope) => !['auth', 'update'].includes(scope)),
       },
     },
   },
@@ -267,50 +270,44 @@ export function helpFor(
           (surface === 'local' ? item.local : !item.local) &&
           (!group || item.name.startsWith(`${group} `)),
       );
-  const binary = 'ql';
   const displayName = (name: string) =>
     surface === 'local' ? name.replace(/^local /, '') : name;
-  const lines = [
-    'QingLong 2.x CLI',
-    '',
-    spec
-      ? `${helpText('Usage:')} ${binary} ${displayName(spec.name)} ${
-          spec.arguments ?? ''
-        } [options]`
-      : `${helpText('Usage:')} ${binary} ${group ?? '<command>'} [options]`,
-    '',
-    ...selected.map(
-      (item) =>
-        `  ${(displayName(item.name) + ' ' + (item.arguments ?? '')).padEnd(
-          30,
-        )} ${helpText(item.summary)}`,
-    ),
-  ];
+  const program = quietCommand(
+    spec ? `ql ${displayName(spec.name)}` : `ql${group ? ' ' + group : ''}`,
+  );
+  program.description('QingLong 2.x CLI');
+  if (spec) {
+    if (spec.arguments) program.arguments(spec.arguments);
+    program.description(helpText(spec.summary));
+  } else {
+    for (const item of selected) {
+      const child = quietCommand(displayName(item.name)).description(
+        helpText(item.summary),
+      );
+      if (item.arguments) child.arguments(item.arguments);
+      program.addCommand(child);
+    }
+  }
   const options = {
     ...globalOptions,
     ...(spec?.local ? localOptions : {}),
     ...spec?.options,
   };
-  lines.push(
-    '',
-    helpText('Options:'),
-    ...Object.entries(options).map(
-      ([name, option]) =>
-        `  ${`${option.short ? `-${option.short}, ` : ''}--${name}${
-          option.type === 'string' ? ' <value>' : ''
-        }`.padEnd(27)} ${helpText(option.description)}${
-          option.default !== undefined
-            ? ` (${helpText('default:')} ${option.default})`
-            : ''
-        }`,
+  addFlags(
+    program,
+    Object.fromEntries(
+      Object.entries(options).map(([name, option]) => [
+        name,
+        { ...option, description: helpText(option.description) },
+      ]),
     ),
   );
-  if (!spec)
-    lines.push(
-      '',
-      surface === 'public'
-        ? helpText('Alias: login = auth login.')
-        : helpText('Local operator commands require an installed panel.'),
+  return program
+    .helpInformation()
+    .replace(/^Usage:/m, helpText('Usage:'))
+    .replace(/^Options:/m, helpText('Options:'))
+    .replace(
+      /^Commands:/m,
+      process.env.QL_LANG === 'en' ? 'Commands:' : '命令：',
     );
-  return lines.join('\n');
 }
