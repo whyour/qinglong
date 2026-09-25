@@ -56,8 +56,8 @@ export function runnerHelp(env: NodeJS.ProcessEnv): string {
     ),
   );
   const notes = english
-    ? 'task is shorthand for ql task. Omit the script to list available JS scripts.\nCLI options precede the script; -- passes script arguments through.\nModes: <script> now; <script> conc|desi <variable> [account-ranges...].\nRemote task actions require the separate @qinglong/cli npm entry. Use task exec for scripts with reserved API action names.'
-    : 'task 是 ql task 的简写。不指定脚本时列出可用 JS 脚本。\nCLI 选项放在脚本之前；-- 后的参数原样传给脚本。\n模式：<script> now；<script> conc|desi <variable> [account-ranges...]。\n远程任务操作使用独立的 @qinglong/cli npm 入口；同名脚本使用 task exec。';
+    ? 'task is shorthand for ql task. Omit the script to list available JS scripts.\nCLI options precede the script; -- passes script arguments through.\nModes: <script> now; <script> conc|desi <variable> [account-ranges...].\nRemote task actions require the separate @whyour/qinglong-cli npm entry. Use task exec for scripts with reserved API action names.'
+    : 'task 是 ql task 的简写。不指定脚本时列出可用 JS 脚本。\nCLI 选项放在脚本之前；-- 后的参数原样传给脚本。\n模式：<script> now；<script> conc|desi <variable> [account-ranges...]。\n远程任务操作使用独立的 @whyour/qinglong-cli npm 入口；同名脚本使用 task exec。';
   return (
     command
       .helpInformation()

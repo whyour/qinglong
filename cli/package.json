@@ -1,5 +1,5 @@
 {
-  "name": "@qinglong/cli",
+  "name": "@whyour/qinglong-cli",
   "version": "0.1.0",
   "description": "Authenticated remote management CLI for QingLong 2.x",
   "type": "commonjs",

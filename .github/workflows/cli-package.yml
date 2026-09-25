@@ -100,7 +100,7 @@ jobs:
           fi
           archive="${archives[0]}"
           metadata=$(tar -xOf "$archive" package/package.json)
-          name=$(jq -er '.name | select(. == "@qinglong/cli")' <<< "$metadata")
+          name=$(jq -er '.name | select(. == "@whyour/qinglong-cli")' <<< "$metadata")
           version=$(jq -er '.version | select(type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' <<< "$metadata")
           if npm view "$name@$version" version --json --registry=https://registry.npmjs.org > version.json 2> version-error.log; then
             jq -e --arg version "$version" '. == $version' version.json > /dev/null
@@ -111,7 +111,7 @@ jobs:
             exit 1
           fi
           if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo '::error::NPM_TOKEN is required to publish @qinglong/cli.'
+            echo '::error::NPM_TOKEN is required to publish @whyour/qinglong-cli.'
             exit 1
           fi
           npm publish "./$archive" --access public --tag latest --ignore-scripts --registry=https://registry.npmjs.org

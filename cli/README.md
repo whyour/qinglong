@@ -5,17 +5,17 @@
 
 npm 与面板内部入口都叫 `ql`，但使用独立的 Commander 命令树：npm 入口只调用远程 API，内部入口只运行本机工具。使用前确认可执行文件的绝对路径和 `--help`；安装 npm 包不会迁移内置 Shell 命令。
 
-`@qinglong/cli` 是独立 npm 包，覆盖当前 develop 的有效 OpenAPI，只注册一个 `ql` 命令。它不包含脚本执行器或本机运维实现；`task exec`、`repo/raw`、`reload/update/reset*` 等属于面板内部工具，不随 npm 包分发。开发发布也不属于 CLI 范围。
+`@whyour/qinglong-cli` 是独立 npm 包，覆盖当前 develop 的有效 OpenAPI，只注册一个 `ql` 命令。它不包含脚本执行器或本机运维实现；`task exec`、`repo/raw`、`reload/update/reset*` 等属于面板内部工具，不随 npm 包分发。开发发布也不属于 CLI 范围。
 
 ## 安装与使用
 
 要求 Node >=22.12，推荐 Node 24。Commander 在构建时打包，无额外运行时 npm 依赖，不单独发布 CLI 镜像。
 
 ```sh
-npm install -g @qinglong/cli
+npm install -g @whyour/qinglong-cli
 ql --help
 # 临时使用，不覆盖面板已有的 ql
-npm exec --package=@qinglong/cli -- ql --help
+npm exec --package=@whyour/qinglong-cli -- ql --help
 ```
 
 本分支尚未发布 npm 包。发布前从源码执行 `npm ci --prefix cli`、`npm run build:cli`，在 cli 目录执行 `npm pack`，然后安装本地 tgz。全局安装会占用 `ql` 名称；已有面板的机器建议使用独立 npm prefix 或直接执行 `node /absolute/path/to/cli/dist/npm/ql.js`。
@@ -130,7 +130,7 @@ node cli/scripts/verify-package.cjs
 
 测试覆盖请求格式、认证刷新、输出、错误、禁止自动重试、权限和独立安装。打包验证会离线安装 tgz，并确认唯一入口是 `ql`，本机命令不可调用。
 
-CLI package 工作流在相关 PR、develop/master 推送和手动触发时执行 Node 22.12/24 类型检查、构建及测试。Node 24 上传通过离线安装验证的 `qinglong-cli-<commit>` artifact。两个矩阵任务成功后，master 推送会将这份已验证的 tgz 发布到 npm 的 latest 标签，复用 Docker 工作流的 `NPM_TOKEN` Secret。手动运行需选择 master 并勾选 publish；PR、develop 和 fork 不发布。Token 需要拥有 `@qinglong/cli` 发布权限。
+CLI package 工作流在相关 PR、develop/master 推送和手动触发时执行 Node 22.12/24 类型检查、构建及测试。Node 24 上传通过离线安装验证的 `qinglong-cli-<commit>` artifact。两个矩阵任务成功后，master 推送会将这份已验证的 tgz 发布到 npm 的 latest 标签，复用 Docker 工作流的 `NPM_TOKEN` Secret。手动运行需选择 master 并勾选 publish；PR、develop 和 fork 不发布。Token 需要拥有 `@whyour/qinglong-cli` 发布权限。
 
 CLI 版本独立维护在 cli/package.json 和 cli/package-lock.json。发布改动前执行 `npm version patch --prefix cli --no-git-tag-version`（也可用 minor/major），提交这两个文件。已发布的版本会提示并跳过；registry 查询失败则停止发布。该流程仅发布 X.Y.Z 稳定版本，不重新构建产物或执行包生命周期脚本。
 

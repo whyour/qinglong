@@ -5,17 +5,17 @@
 
 The npm and panel-internal entries both use the name `ql`, but have separate Commander command trees. The npm entry only calls remote APIs; the internal entry only runs local tools. Verify the absolute executable path and `--help` before use. Installing the npm package does not migrate the built-in Shell commands.
 
-`@qinglong/cli` is a standalone npm client for the panel's open API. It registers only `ql`, for the currently supported OpenAPI resources. Local execution, repo/raw workers, reload/update/account recovery belong to the panel's internal tools and are excluded from npm. Development publishing is outside both command sets.
+`@whyour/qinglong-cli` is a standalone npm client for the panel's open API. It registers only `ql`, for the currently supported OpenAPI resources. Local execution, repo/raw workers, reload/update/account recovery belong to the panel's internal tools and are excluded from npm. Development publishing is outside both command sets.
 
 ## Installation and commands
 
 Requires Node >=22.12; Node 24 is recommended. Commander is bundled with no additional runtime npm dependencies. There is no standalone CLI image.
 
 ```sh
-npm install -g @qinglong/cli
+npm install -g @whyour/qinglong-cli
 ql --help
 # Temporary use without replacing an existing panel ql
-npm exec --package=@qinglong/cli -- ql --help
+npm exec --package=@whyour/qinglong-cli -- ql --help
 ```
 
 This branch has not published the package. Build with `npm ci --prefix cli` and `npm run build:cli`, then run `npm pack` in cli and install the local tgz. Global installation occupies the `ql` name. On a panel host use a separate npm prefix or `node /absolute/path/to/cli/dist/npm/ql.js`.
@@ -130,7 +130,7 @@ node cli/scripts/verify-package.cjs
 
 Tests cover requests, token refresh, output, errors, no automatic retries, permissions and isolated installation. Package verification installs the archive offline, verifies the sole ql executable and rejects local commands.
 
-The CLI package workflow checks, builds and tests Node 22.12/24 on relevant PRs, develop/master pushes and manual runs. Node 24 uploads the archive verified by offline installation as `qinglong-cli-<commit>`. After both matrix jobs succeed, master pushes publish that exact archive to npm as latest, using the same NPM_TOKEN secret as the Docker workflow. Manual runs publish only when run on master with publish enabled; PRs, develop and forks never publish. The token needs publish permission for @qinglong/cli.
+The CLI package workflow checks, builds and tests Node 22.12/24 on relevant PRs, develop/master pushes and manual runs. Node 24 uploads the archive verified by offline installation as `qinglong-cli-<commit>`. After both matrix jobs succeed, master pushes publish that exact archive to npm as latest, using the same NPM_TOKEN secret as the Docker workflow. Manual runs publish only when run on master with publish enabled; PRs, develop and forks never publish. The token needs publish permission for @whyour/qinglong-cli.
 
 The CLI has an independent stable version in cli/package.json and cli/package-lock.json. Before releasing changes, run `npm version patch --prefix cli --no-git-tag-version` (or minor/major) and commit both files. Existing versions are skipped with a notice; registry failures stop publication. Only stable X.Y.Z versions are published by this workflow. Publication does not rebuild the verified archive or run package lifecycle scripts.
 

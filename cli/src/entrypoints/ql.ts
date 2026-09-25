@@ -108,16 +108,16 @@ function groupHelp(group: 'root' | 'task' | 'local'): string {
       .replace(/^Options:/m, english ? 'Options:' : '选项：')
       .replace(/^Commands:/m, english ? 'Commands:' : '命令：') +
     (english
-      ? '\nLocal tools only. Remote management uses the separate @qinglong/cli npm entry. ql local remains a maintenance alias.\n'
-      : '\n仅操作本机；远程管理使用独立的 @qinglong/cli npm 入口。ql local 保留为运维兼容别名。\n')
+      ? '\nLocal tools only. Remote management uses the separate @whyour/qinglong-cli npm entry. ql local remains a maintenance alias.\n'
+      : '\n仅操作本机；远程管理使用独立的 @whyour/qinglong-cli npm 入口。ql local 保留为运维兼容别名。\n')
   );
 }
 
 function internalOnly(args: string[]): number {
   const message =
     process.env.QL_LANG === 'en'
-      ? 'Unknown or remote command. This entry only operates the local panel; use the separate @qinglong/cli entry for remote management. Use task exec for scripts named like API actions.'
-      : '未知命令或远程命令。此入口仅操作本机面板；远程管理请使用独立的 @qinglong/cli 入口。同名脚本请使用 task exec。';
+      ? 'Unknown or remote command. This entry only operates the local panel; use the separate @whyour/qinglong-cli entry for remote management. Use task exec for scripts named like API actions.'
+      : '未知命令或远程命令。此入口仅操作本机面板；远程管理请使用独立的 @whyour/qinglong-cli 入口。同名脚本请使用 task exec。';
   process.stderr.write(
     (args.includes('--json') ? JSON.stringify({ code: 2, message }) : message) +
       '\n',

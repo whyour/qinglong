@@ -5,7 +5,7 @@ description: Manage all currently supported QingLong 2.x OpenAPI resources throu
 
 # QingLong remote management
 
-Verify `ql --help --json` identifies the remote npm CLI; alternatively use `node /absolute/path/to/cli/dist/npm/ql.js`. The panel-internal executable also uses the name `ql` but rejects remote management. Resolve the executable path as well as help; do not assume the first `ql` on PATH is the npm entry. Call the verified entry `<cli>`. Node >=22.12 is required.
+The remote npm package is `@whyour/qinglong-cli` (`npm install -g @whyour/qinglong-cli`). Verify `ql --help --json` identifies the remote npm CLI; alternatively use `node /absolute/path/to/cli/dist/npm/ql.js`. The panel-internal executable also uses the name `ql` but rejects remote management. Resolve the executable path as well as help; do not assume the first `ql` on PATH is the npm entry. Call the verified entry `<cli>`. Node >=22.12 is required.
 
 First select the credential source and target. Both QL_URL and QL_ACCESS_TOKEN mean direct-token mode, which overrides saved application configuration and does not refresh or persist the token. Do not run login merely because there is no saved config when a direct token is already supplied. For protected commands, only one of those variables is an error; do not silently switch modes. Otherwise reuse saved application credentials or use login with Client ID/Secret. Read [panel.md](references/panel.md#authentication) for authentication, precedence, scope checks, owner login/2FA and logout semantics. Verify auth status's data.url and scopeChecked against the requested target; never print secrets.
 

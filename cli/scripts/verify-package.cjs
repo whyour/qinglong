@@ -58,7 +58,7 @@ try {
     ],
     { cwd: temp },
   );
-  const installed = path.join(prefix, 'node_modules/@qinglong/cli');
+  const installed = path.join(prefix, 'node_modules/@whyour/qinglong-cli');
   const metadata = JSON.parse(
     fs.readFileSync(path.join(installed, 'package.json'), 'utf8'),
   );

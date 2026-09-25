@@ -5,7 +5,7 @@
 
 The npm and panel-internal entries both use the name `ql`, but have separate Commander command trees. The npm entry only calls remote APIs; the internal entry only runs local tools. Verify the absolute executable path and `--help` before use. Installing the npm package does not migrate the built-in Shell commands.
 
-These tools ship with panel builds and are excluded from the @qinglong/cli npm package. Node >=22.12 is required; user configuration/hooks remain Bash and scripts need their interpreters. Development publishing was removed from the CLI; shell/pub.sh remains available to release workflows.
+These tools ship with panel builds and are excluded from the @whyour/qinglong-cli npm package. Node >=22.12 is required; user configuration/hooks remain Bash and scripts need their interpreters. Development publishing was removed from the CLI; shell/pub.sh remains available to release workflows.
 
 ```sh
 npm ci --prefix cli

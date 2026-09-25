@@ -83,7 +83,7 @@ npm i @whyour/qinglong
 
 ## 远程 CLI 与 Agent Skill
 
-独立 `@qinglong/cli` 使用 `ql` 管理远程 OpenAPI，支持任务/订阅增删改、应用、环境变量等资源。认证支持应用 Client ID/Secret 登录和环境变量 QL_URL/QL_ACCESS_TOKEN 直接令牌两种方式。当前分支尚未发布 npm 包，源码构建及安装方式见 [CLI 中文说明](cli/README.md)（[English](cli/README.en.md)）。
+独立 `@whyour/qinglong-cli` 使用 `ql` 管理远程 OpenAPI，支持任务/订阅增删改、应用、环境变量等资源。认证支持应用 Client ID/Secret 登录和环境变量 QL_URL/QL_ACCESS_TOKEN 直接令牌两种方式。当前分支尚未发布 npm 包，源码构建及安装方式见 [CLI 中文说明](cli/README.md)（[English](cli/README.en.md)）。
 
 [远程管理 Skill](cli/skills/qinglong-cli/SKILL.md) 包含认证流程和完整命令参考。本机执行、reload/reset 等使用 [面板内部工具](cli/LOCAL.md) 及 [内部 Skill](cli/skills/qinglong-local/SKILL.md)，不随独立 npm 包分发。
 

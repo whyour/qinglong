@@ -5,7 +5,7 @@
 
 npm 与面板内部入口都叫 `ql`，但使用独立的 Commander 命令树：npm 入口只调用远程 API，内部入口只运行本机工具。使用前确认可执行文件的绝对路径和 `--help`；安装 npm 包不会迁移内置 Shell 命令。
 
-这些工具随面板构建交付，不包含在 `@qinglong/cli` npm 包中。要求 Node >=22.12；用户配置和 hook 保持 Bash，任务还需要对应解释器。开发发布命令已移除，原 `shell/pub.sh` 保留供发布流程使用。
+这些工具随面板构建交付，不包含在 `@whyour/qinglong-cli` npm 包中。要求 Node >=22.12；用户配置和 hook 保持 Bash，任务还需要对应解释器。开发发布命令已移除，原 `shell/pub.sh` 保留供发布流程使用。
 
 ```sh
 npm ci --prefix cli

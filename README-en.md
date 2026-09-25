@@ -81,7 +81,7 @@ npm i @whyour/qinglong
 
 ## Remote CLI and Agent Skill
 
-The standalone `@qinglong/cli` uses `ql` to manage remote OpenAPI resources, including task/subscription CRUD, applications and environment variables. Authentication supports application Client ID/Secret login or direct tokens through QL_URL/QL_ACCESS_TOKEN. This branch has not published the npm package; see the [CLI guide](cli/README.en.md) ([简体中文](cli/README.md)) for source builds and installation.
+The standalone `@whyour/qinglong-cli` uses `ql` to manage remote OpenAPI resources, including task/subscription CRUD, applications and environment variables. Authentication supports application Client ID/Secret login or direct tokens through QL_URL/QL_ACCESS_TOKEN. This branch has not published the npm package; see the [CLI guide](cli/README.en.md) ([简体中文](cli/README.md)) for source builds and installation.
 
 The [remote management skill](cli/skills/qinglong-cli/SKILL.md) covers authentication and the full command reference. Local execution, reload/reset and other host operations use the [panel-internal tools](cli/LOCAL.en.md) and [internal skill](cli/skills/qinglong-local/SKILL.md), excluded from the standalone npm package.
 
