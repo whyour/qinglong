@@ -1,4 +1,25 @@
 const chinese: Record<string, string> = {
+  'Query object as JSON, @file or - for stdin': '查询参数 JSON；支持 @文件或 - 从 stdin 读取',
+  'Request body as JSON, @file or - for stdin': '请求体 JSON；支持 @文件或 - 从 stdin 读取',
+  'Request timeout in seconds': '请求超时秒数（默认 30，最多 3600）',
+  'Local file to upload': '要上传的本机文件',
+  'Save response to a new local file': '响应保存到新文件（不覆盖已有文件）',
+  'Resource name': '资源名称',
+  'Command executed by the remote panel': '由远程面板执行的命令',
+  'Cron schedule': '定时规则',
+  'Comma-separated application permissions': '应用权限，用逗号分隔',
+  'Explicitly include application credentials in output': '显式输出应用密钥（默认隐藏）',
+  'Call a registered OpenAPI route': '调用已登记的 OpenAPI 路由',
+  'List supported OpenAPI routes and commands': '列出支持的 OpenAPI 路由和对应命令',
+  'Subscription type': '订阅类型：public-repo/private-repo/file',
+  'Subscription url': '订阅地址',
+  'Subscription alias': '订阅别名',
+  'Subscription schedule': '订阅定时规则',
+  'Subscription schedule-type': '订阅定时类型：crontab/interval',
+  'Subscription branch': '订阅分支',
+  'Subscription whitelist': '订阅包含规则',
+  'Subscription blacklist': '订阅排除规则',
+
   'Skip OS boot registration (for containers)': '跳过系统开机注册（用于容器）',
   'Authenticate with a remote panel application': '使用远程面板应用凭据登录',
   'Panel URL including optional base path': '面板地址，可包含基础路径',
@@ -72,5 +93,7 @@ export function helpText(
   text: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
+  if (env.QL_LANG !== 'en' && /^(GET|POST|PUT|DELETE) \/open\//.test(text))
+    return `远程 API：${text}`;
   return env.QL_LANG === 'en' ? text : chinese[text] ?? text;
 }

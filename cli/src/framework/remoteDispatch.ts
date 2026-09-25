@@ -1,10 +1,17 @@
+import { openCommands } from './openCommands';
 import type { ApiResponse, LogResponse } from '../types';
 import type { Invocation } from '../arguments';
 import { fail } from '../errors';
 import { translate } from '../i18n';
 
-export async function dispatchRemote(command: Invocation): Promise<ApiResponse<unknown> | LogResponse> {
+export async function dispatchRemote(
+  command: Invocation,
+): Promise<ApiResponse<unknown> | LogResponse> {
   const { name, values, positionals } = command;
+  if (openCommands.some((op) => op.name === name)) {
+    const { openCommand } = await import('../commands/open');
+    return openCommand(command);
+  }
   if (name.startsWith('auth ')) {
     const { auth } = await import('../commands/auth');
     if (name === 'auth login')
@@ -13,7 +20,7 @@ export async function dispatchRemote(command: Invocation): Promise<ApiResponse<u
       ? auth({ kind: 'logout' })
       : auth({
           kind: 'status',
-          scope: values.scope as 'crons' | 'subscriptions',
+          scope: values.scope as string,
         });
   }
   if (name.startsWith('task ')) {

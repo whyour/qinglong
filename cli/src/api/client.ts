@@ -1,3 +1,4 @@
+import { saveResponse } from './download';
 import { translate } from '../i18n';
 import { CliError, fail } from '../errors';
 import type { Credentials, Session, StoredConfig } from '../types';
@@ -7,8 +8,11 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'PUT';
-  body?: number[];
+  method?: 'GET' | 'PUT' | 'POST' | 'DELETE';
+  body?: unknown;
+  output?: string;
+  text?: boolean;
+  timeoutMs?: number;
   authenticated?: boolean;
 }
 
@@ -18,14 +22,14 @@ export async function request(
   options: RequestOptions = {},
 ): Promise<Record<string, unknown>> {
   const { method = 'GET', body, authenticated = true } = options;
-  const subscription = endpoint.split(/[/?]/, 1)[0] === 'subscriptions';
-  const resource = translate(process.env, subscription ? '订阅' : '任务');
+  const scope = endpoint.split(/[/?]/, 1)[0]!;
+  const subscription = scope === 'subscriptions';
+  const resource =
+    scope === 'crons' || subscription
+      ? translate(process.env, subscription ? '订阅' : '任务')
+      : scope;
   const credentialsHint = authenticated
-    ? translate(
-        process.env,
-        '应用凭据和 %s 权限',
-        subscription ? 'subscriptions' : 'crons',
-      )
+    ? translate(process.env, '应用凭据和 %s 权限', scope)
     : translate(process.env, '应用凭据');
   let response: Response;
   let result: unknown;
@@ -33,18 +37,25 @@ export async function request(
     response = await fetch(`${config.url}/open/${endpoint}`, {
       method,
       redirect: 'error',
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(options.timeoutMs ?? 30000),
       headers: {
         ...(authenticated ? { Authorization: `Bearer ${config.token}` } : {}),
-        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(body !== undefined && !(body instanceof FormData)
+          ? { 'Content-Type': 'application/json' }
+          : {}),
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body:
+        body instanceof FormData
+          ? body
+          : body !== undefined
+          ? JSON.stringify(body)
+          : undefined,
     });
     // Check HTTP status before decoding (proxies may return HTML on denial).
     if (!response.ok) {
       await response.body?.cancel();
       const suffix =
-        method === 'PUT' && response.status >= 500
+        method !== 'GET' && response.status >= 500
           ? translate(
               process.env,
               ' 执行结果可能未知，请先检查%s状态再考虑重试。',
@@ -62,12 +73,23 @@ export async function request(
         [401, 403].includes(response.status) ? 3 : 1,
       );
     }
+    if (
+      options.output &&
+      (response.headers.get('content-disposition')?.startsWith('attachment') ||
+        !response.headers.get('content-type')?.includes('application/json'))
+    )
+      return await saveResponse(response, options.output);
+    if (
+      options.text &&
+      !response.headers.get('content-type')?.includes('application/json')
+    )
+      return { code: 200, data: await response.text() };
     result = await response.json();
   } catch (error) {
     // Never expose a fetch error, URL or server error that may include secrets.
     if (error instanceof CliError) throw error;
     fail(
-      method === 'PUT'
+      method !== 'GET'
         ? translate(
             process.env,
             '请求失败或响应无效，执行结果未知。请先检查%s状态再考虑重试。',
@@ -79,6 +101,8 @@ export async function request(
           ),
     );
   }
+  if (endpoint.split('?')[0] === 'user/login' && isRecord(result) && result.code === 420)
+    fail(translate(process.env, '需要双因素验证，请调用 user two-factor-login。'), 3);
   if (!isRecord(result) || result.code !== 200) {
     const status =
       isRecord(result) && typeof result.code === 'number'
@@ -94,6 +118,8 @@ export async function request(
       status === 401 || status === 403 ? 3 : 1,
     );
   }
+  if (options.output)
+    fail(translate(process.env, '接口返回 JSON，未保存下载文件。'));
   return result;
 }
 

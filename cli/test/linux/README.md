@@ -7,6 +7,7 @@ docker build -t qinglong-cli-test:node22-debian cli/test/linux
 docker run --rm --network none \
   --mount type=bind,src="$(pwd)/cli",dst=/workspace/cli,readonly \
   --mount type=bind,src="$(pwd)/shell",dst=/workspace/shell,readonly \
+  --mount type=bind,src="$(pwd)/back/api",dst=/workspace/back/api,readonly \
   --workdir /workspace qinglong-cli-test:node22-debian
 ```
 
@@ -23,6 +24,7 @@ docker build -f cli/test/linux/Dockerfile.alpine -t qinglong-cli-test:node24-alp
 docker run --rm --network none \
   --mount type=bind,src="$(pwd)/cli",dst=/workspace/cli,readonly \
   --mount type=bind,src="$(pwd)/shell",dst=/workspace/shell,readonly \
+  --mount type=bind,src="$(pwd)/back/api",dst=/workspace/back/api,readonly \
   --workdir /workspace qinglong-cli-test:node24-alpine
 ```
 
@@ -156,3 +158,7 @@ Use the image's ordinary seeded data volume. An empty tmpfs or host bind mount o
 `host-boot.cjs` runs only as root with QL_HOST_INTEGRATION=1 inside a disposable Alpine/OpenRC or Debian/systemd VM. Prepare a 2.x panel distribution plus the CLI, with Bash/Node/npm/Python/pip prerequisite runtimes. Run the actual `ql-local-cli start --root /ql` and require a successful registration result. Copy the test directory alongside the CLI dist directory, then run `node test/linux/host-boot.cjs before`, reboot the guest, and run the same script with `after` once SSH returns. Never run this on a production host.
 
 The before phase verifies live nginx/crond, creates a minute-scheduled task and saves the kernel boot ID in a private fixture state file. The after phase checks OpenRC or systemd service state, requires a different boot ID, checks the stored task command and waits up to ninety seconds for a task log containing the new boot ID. It does not call the task run API. Success removes the task, script and state. On failure, retain the isolated guest for diagnosis or destroy it; do not cite PM2-only recovery as proof of nginx/cron recovery. The task fixture and script paths are under /ql, and the guest state file is /var/lib/ql-host-fixture.json.
+
+## Remote OpenAPI CRUD gate
+
+`openapi.cjs` requires a separate fresh official panel and `QL_PANEL_INTEGRATION=1`; it refuses initialized panels. Mount cli read-only at /candidate/cli, run the official image without published ports or production data, then execute `docker exec -e QL_PANEL_INTEGRATION=1 <container> node /candidate/cli/test/linux/openapi.cjs`. It creates temporary owner/application credentials without printing them and verifies task/subscription/app/env CRUD, app secret rotation, script/config writes and reads, and log/dependency reads through the npm bundle. It does not execute system updates, data import, real dependency installation or every dashboard/user mutation. Always remove the disposable container and anonymous volumes with `docker rm -fv <container>`.

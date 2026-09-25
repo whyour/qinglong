@@ -38,7 +38,7 @@ export interface LogResponse extends ApiResponse<string> {
 export type Command =
   | { kind: 'help' }
   | { kind: 'login'; url: string }
-  | { kind: 'status'; scope?: 'crons' | 'subscriptions' }
+  | { kind: 'status'; scope?: string }
   | { kind: 'logout' }
   | { kind: 'list'; search?: string; page: number; size: number }
   | { kind: 'get'; id: number }

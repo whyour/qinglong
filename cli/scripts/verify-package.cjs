@@ -66,7 +66,7 @@ try {
   assert.equal(metadata.bin['ql-dev-cli'], undefined);
   assert.ok(!manifest.files.some(file => /^dist\/developer(?:\/|\.)/.test(file.path)));
   assert.deepEqual(metadata.bin, { ql: 'dist/npm/ql.js' });
-  for (const reference of ['panel.md'])
+  for (const reference of ['panel.md', 'openapi.md'])
     assert.ok(fs.existsSync(path.join(installed, 'skills/qinglong-cli/references', reference)));
 
   assert.equal(

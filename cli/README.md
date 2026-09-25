@@ -2,7 +2,7 @@
 
 **简体中文** | [English](README.en.md)
 
-`@qinglong/cli` 是独立 npm 包，通过面板开放 API 管理任务和订阅，只注册一个 `ql` 命令。它不包含脚本执行器或本机运维实现；`task exec`、`repo/raw`、`reload/update/reset*` 等属于面板内部工具，不随 npm 包分发。开发发布也不属于 CLI 范围。
+`@qinglong/cli` 是独立 npm 包，覆盖当前 develop 的有效 OpenAPI，只注册一个 `ql` 命令。它不包含脚本执行器或本机运维实现；`task exec`、`repo/raw`、`reload/update/reset*` 等属于面板内部工具，不随 npm 包分发。开发发布也不属于 CLI 范围。
 
 ## 安装与使用
 
@@ -86,3 +86,21 @@ CLI package 工作流在相关 PR、develop 推送和手动触发时执行 Node 
 本机执行、订阅同步和运维随面板源码/构建交付，使用完整内部 `dist` 与独立 `qinglong-local` Skill；源码说明见 `cli/LOCAL.md` 和 `cli/LOCAL.en.md`。npm 包不能用作 `QL_CLI_ROOT`。账号恢复、服务重载必须在实际面板宿主机或容器中执行；Docker 使用 `docker exec` 调用容器内选定入口。
 
 API `task run` 返回请求接受，本机执行器等待脚本结束，二者耗时不能直接对比。Shell 迁移性能应比较相同配置和脚本下的内部 TS 执行器与原 Shell；远程 API 操作没有对应的旧 Shell 管理命令。
+
+## 全量 OpenAPI 管理
+
+现在还支持任务/订阅创建、修改、删除，应用管理与密钥重置，以及环境变量、配置、脚本、日志、依赖、系统、仪表盘和用户管理。`ql api routes --json` 列出全部 143 条有效路由；3 条已下线文件读取接口不包含在内。新增命令在 [完整双语参考](skills/qinglong-cli/references/openapi.md) 中逐项列出，路由覆盖由 CI 与后端代码核对。
+
+```sh
+ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
+ql subscription create --type public-repo --url https://example.com/repo.git --alias demo --schedule-type crontab --schedule '0 0 * * *' --json
+ql app create --name agent --scopes crons,subscriptions --show-secrets --json
+ql env create --data @envs.json --json
+ql api request PUT /open/crons/run --data '[12,13]' --json
+```
+
+请求体使用 --data JSON/@file/-，查询使用 --query，上传 --file，下载 --output。新命令支持 --timeout 秒数；旧命令行为保留，完整参数可用 api request。下载不覆盖现有文件，应用密钥默认隐藏，明确加 --show-secrets 才输出。新增资源通常保留原始返回字段，注意环境、配置和会话信息可能敏感。
+
+应用管理需要 apps 权限，面板 UI 没有列出所有后端 scope。授权的面板会话可通过环境变量 QL_URL 与 QL_ACCESS_TOKEN 同时注入；优先于本地配置，不保存或自动刷新，logout 也不能清除父进程环境。匿名登录/初始化接口需 QL_URL。应用凭据不会自动提权；旧面板不存在的新接口会返回错误。
+
+远程 `ql system ...` 调用面板 API；本机 reload/reset 等仍不在 npm 包中。不要将远程 API 覆盖理解为本机运维重新混入包。

@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | **English**
 
-`@qinglong/cli` is a standalone npm client for the panel's open API. It registers only `ql`, for authentication, tasks and subscriptions. Local execution, repo/raw workers, reload/update/account recovery belong to the panel's internal tools and are excluded from npm. Development publishing is outside both command sets.
+`@qinglong/cli` is a standalone npm client for the panel's open API. It registers only `ql`, for the currently supported OpenAPI resources. Local execution, repo/raw workers, reload/update/account recovery belong to the panel's internal tools and are excluded from npm. Development publishing is outside both command sets.
 
 ## Installation and commands
 
@@ -86,3 +86,21 @@ The CLI package workflow runs type checking, builds and tests on Node 22.12/24 f
 Local execution, subscription synchronization and maintenance ship with panel source/builds, using the full internal dist tree and a separate `qinglong-local` skill. See `cli/LOCAL.md` and `cli/LOCAL.en.md` in the source checkout. An npm installation is not a valid QL_CLI_ROOT. Recovery/reload must run on the actual panel host or inside its container, using docker exec for Docker installations.
 
 API task run returns acceptance; a local runner waits for script completion. Their elapsed times are different measurements. Compare the internal TS runner against Shell using identical configuration/scripts; remote API management has no equivalent old Shell management command.
+
+## Complete OpenAPI management
+
+The CLI also supports task/subscription CRUD, application and secret management, environment variables, configuration, scripts, logs, dependencies, system, dashboard and user APIs. `ql api routes --json` lists all 143 active routes; three retired file-reading endpoints are excluded. CI compares the catalogue against backend routes. See the [complete bilingual reference](skills/qinglong-cli/references/openapi.md) for every command and payload.
+
+```sh
+ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
+ql subscription create --type public-repo --url https://example.com/repo.git --alias demo --schedule-type crontab --schedule '0 0 * * *' --json
+ql app create --name agent --scopes crons,subscriptions --show-secrets --json
+ql env create --data @envs.json --json
+ql api request PUT /open/crons/run --data '[12,13]' --json
+```
+
+Use --data JSON/@file/- for bodies, --query for query objects, --file for uploads and --output for downloads. New commands support --timeout seconds. Existing command contracts remain; raw API requests expose all fields and batch operations. Downloads do not overwrite files. App secrets require --show-secrets; other raw resources may contain sensitive data.
+
+Application management needs apps permission, which the current UI does not list among its scopes. Authorized owner sessions can be supplied with QL_URL and QL_ACCESS_TOKEN together; these override saved configuration, are not persisted/refreshed and cannot be cleared from the parent environment by logout. Anonymous login/init routes require QL_URL. Application credentials never escalate automatically; older panels may lack newer endpoints.
+
+Remote ql system commands call the target panel API. Local reload/reset tools remain excluded from npm.

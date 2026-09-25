@@ -1,5 +1,8 @@
 // Migrated from shell/lang/en.sh; the original remains for differential evaluation.
 export const english: Record<string, string> = {
+  '需要双因素验证，请调用 user two-factor-login。': 'Two-factor authentication required; use user two-factor-login.',
+  'QL_URL 和 QL_ACCESS_TOKEN 必须同时提供。': 'Provide QL_URL and QL_ACCESS_TOKEN together.',
+  '接口返回 JSON，未保存下载文件。': 'The endpoint returned JSON; no download was saved.',
   '已选择的 CLI 安装路径必须为绝对路径。':
     'The selected CLI installation path must be absolute.',
   '保留 CLI 入口仅支持已确认的 2.x 升级载荷。':

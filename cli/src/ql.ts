@@ -4,7 +4,7 @@ import { routeCommands } from './framework/router';
 import { commands, helpFor } from './framework/registry';
 import { standaloneHelp } from './i18n/standalone';
 
-const remoteTaskActions = new Set(['list', 'get', 'run', 'stop', 'logs']);
+const remoteTaskActions = new Set(commands.filter(command => !command.local && command.name.startsWith('task ')).map(command => command.name.slice(5)));
 const operatorActions = new Set(
   commands.filter(command => command.local).map(command => command.name.slice(6)),
 );
@@ -36,8 +36,8 @@ function groupHelp(group: 'root' | 'task' | 'local'): string {
   if (group === 'task')
     return helpFor(undefined, 'task') + '\n\n' + standaloneHelp('runner') + '\n' +
       (english
-        ? 'task is shorthand for ql task. Reserved API actions: list/get/run/stop/logs. Use ql task exec <script> for a script with one of these names.'
-        : 'task 是 ql task 的简写。list/get/run/stop/logs 保留为 API 操作；同名脚本使用 ql task exec <script>。');
+        ? 'task is shorthand for ql task. API actions are listed above. Use ql task exec <script> for a script with a reserved action name.'
+        : 'task 是 ql task 的简写。以上动作名保留为 API 操作；同名脚本使用 ql task exec <script>。');
   if (group === 'local')
     return helpFor(undefined, undefined, 'local') + '\n\n' + standaloneHelp('worker');
   return (english ? 'Usage: ql <command> [options]\n' : '用法：ql <命令> [选项]\n') +

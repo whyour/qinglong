@@ -1,4 +1,11 @@
-import { quietCommand, addFlags, flagValues, isArgumentError, assertOptionValues } from './framework/options';
+import { openCommands } from './framework/openCommands';
+import {
+  quietCommand,
+  addFlags,
+  flagValues,
+  isArgumentError,
+  assertOptionValues,
+} from './framework/options';
 import type { CommandSpec } from './framework/registry';
 import { fail } from './errors';
 import { translate } from './i18n';
@@ -57,16 +64,25 @@ export function parse(
   let values: Invocation['values'] = {};
   let positionals: string[] = [];
   const groups = new Map<string, ReturnType<typeof quietCommand>>();
-  for (const item of commands.filter(item => surface === 'local' ? item.local : !item.local)) {
+  for (const item of commands.filter((item) =>
+    surface === 'local' ? item.local : !item.local,
+  )) {
     const [parentName, action] = item.name.split(' ');
     if (!groups.has(parentName!)) {
       const parent = quietCommand(parentName!).enablePositionalOptions();
       addFlags(parent, globalOptions);
-      parent.action(() => { group = parentName; values = flagValues(parent, globalOptions); });
+      parent.action(() => {
+        group = parentName;
+        values = flagValues(parent, globalOptions);
+      });
       root.addCommand(parent);
       groups.set(parentName!, parent);
     }
-    const schema = { ...globalOptions, ...(item.local ? localOptions : {}), ...item.options };
+    const schema = {
+      ...globalOptions,
+      ...(item.local ? localOptions : {}),
+      ...item.options,
+    };
     const command = quietCommand(action!).argument('[arguments...]');
     addFlags(command, schema);
     command.action(() => {
@@ -77,23 +93,42 @@ export function parse(
       const parentValues = flagValues(groups.get(parentName!)!, globalOptions);
       for (const key of ['json', 'help']) {
         if (parentValues[key] && values[key])
-          fail(translate(process.env, '选项重复，请运行 %s --help。', entry), 2);
+          fail(
+            translate(process.env, '选项重复，请运行 %s --help。', entry),
+            2,
+          );
         if (parentValues[key]) values[key] = parentValues[key];
       }
     });
     groups.get(parentName!)!.addCommand(command);
   }
   try {
-    assertOptionValues(input, Object.assign({}, globalOptions, localOptions, ...commands.map(item => item.options)));
-    root.parse(input, { from:'user' });
+    assertOptionValues(
+      input,
+      Object.assign(
+        {},
+        globalOptions,
+        localOptions,
+        ...commands.map((item) => item.options),
+      ),
+    );
+    root.parse(input, { from: 'user' });
   } catch (error) {
     if (!isArgumentError(error)) throw error;
     const code = (error as { code: string }).code;
-    const unknown = code === 'commander.unknownCommand' ||
+    const unknown =
+      code === 'commander.unknownCommand' ||
       (code === 'commander.excessArguments' && !spec);
-    fail(translate(process.env, unknown
-      ? '未知命令，请运行 %s --help。'
-      : '选项未知或缺少选项值，请运行 %s --help。', entry), 2);
+    fail(
+      translate(
+        process.env,
+        unknown
+          ? '未知命令，请运行 %s --help。'
+          : '选项未知或缺少选项值，请运行 %s --help。',
+        entry,
+      ),
+      2,
+    );
   }
   const inherited = flagValues(root, globalOptions);
   for (const key of ['json', 'help']) {
@@ -102,9 +137,16 @@ export function parse(
     if (inherited[key]) values[key] = inherited[key];
   }
   const helpOnly = !spec;
-  const schema = { ...globalOptions, ...(spec?.local ? localOptions : {}), ...spec?.options };
+  const schema = {
+    ...globalOptions,
+    ...(spec?.local ? localOptions : {}),
+    ...spec?.options,
+  };
   const result: Invocation = {
-    name: spec?.name ?? 'help', positionals, values, json: values.json === true,
+    name: spec?.name ?? 'help',
+    positionals,
+    values,
+    json: values.json === true,
   };
   if (helpOnly || values.help)
     return { ...result, help: helpFor(spec, group, surface) };
@@ -121,9 +163,14 @@ export function parse(
     if (option.integer && typeof values[name] === 'string')
       integer(values[name] as string, option.integer.min, option.integer.max);
   }
-  if (result.name.startsWith('task ') && result.name !== 'task list')
+  if (
+    !openCommands.some((op) => op.name === result.name) &&
+    result.name.startsWith('task ') &&
+    result.name !== 'task list'
+  )
     integer(result.positionals[0]!);
   if (
+    !openCommands.some((op) => op.name === result.name) &&
     result.name.startsWith('subscription ') &&
     result.name !== 'subscription list'
   )

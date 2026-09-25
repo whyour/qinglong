@@ -5,6 +5,7 @@ on:
     paths:
       - 'cli/**'
       - 'shell/**'
+      - 'back/api/**'
       - 'back/loaders/deps.ts'
       - 'package.json'
       - '.github/workflows/cli-package.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'cli/**'
       - 'shell/**'
+      - 'back/api/**'
       - 'back/loaders/deps.ts'
       - 'package.json'
       - '.github/workflows/cli-package.yml'

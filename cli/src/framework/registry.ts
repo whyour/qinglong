@@ -1,3 +1,5 @@
+import { openCommands } from './openCommands';
+import { openOperations } from '../framework/openOperations';
 import { helpText } from '../i18n/help';
 export interface OptionSpec {
   type: 'string' | 'boolean';
@@ -23,6 +25,7 @@ export type CommandSurface = 'public' | 'local';
 
 const positiveId = '<id>';
 export const commands: readonly CommandSpec[] = [
+  ...openCommands,
   {
     name: 'auth login',
     summary: 'Authenticate with a remote panel application',
@@ -42,7 +45,7 @@ export const commands: readonly CommandSpec[] = [
         type: 'string',
         description: 'Permission to check',
         default: 'crons',
-        choices: ['crons', 'subscriptions'],
+        choices: [...new Set(openOperations.map(op => op.path.split('/')[0]!))].filter(scope => !['auth', 'update'].includes(scope)),
       },
     },
   },

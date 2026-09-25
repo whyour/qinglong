@@ -49,6 +49,20 @@ export async function promptCredential(
 }
 
 export async function session(): Promise<Session> {
+  if (process.env.QL_ACCESS_TOKEN || process.env.QL_URL) {
+    if (!process.env.QL_ACCESS_TOKEN || !process.env.QL_URL)
+      fail(
+        translate(process.env, 'QL_URL 和 QL_ACCESS_TOKEN 必须同时提供。'),
+        2,
+      );
+    return {
+      url: panelUrl(process.env.QL_URL),
+      token: process.env.QL_ACCESS_TOKEN,
+      clientId: '',
+      clientSecret: '',
+      expiration: 0,
+    };
+  }
   const config = readConfig();
   if (
     config.token &&
@@ -88,7 +102,13 @@ export async function auth(
   const scope = command.scope ?? 'crons';
   await request(
     config,
-    scope === 'crons' ? 'crons?page=1&size=1' : 'subscriptions',
+    (
+      {
+        crons: 'crons?page=1&size=1',
+        configs: 'configs/files',
+        dashboard: 'dashboard/overview',
+      } as Record<string, string>
+    )[scope] ?? scope,
   );
   return {
     code: 200,
