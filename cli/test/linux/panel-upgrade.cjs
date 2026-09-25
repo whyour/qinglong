@@ -1,9 +1,9 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
-const { createContext } = require('../../dist/local/context');
-const { installPanelDependencies } = require('../../dist/local/operator');
-const { reloadPanel } = require('../../dist/local/upgrade');
+const { createContext } = require('../../dist/internal/runtime/context');
+const { installPanelDependencies } = require('../../dist/internal/maintenance/operator');
+const { reloadPanel } = require('../../dist/internal/maintenance/upgrade');
 assert.equal(process.env.QL_PANEL_INTEGRATION, '1');
 (async () => {
   let token;

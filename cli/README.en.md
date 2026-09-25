@@ -137,3 +137,18 @@ The CLI package workflow runs type checking, builds and tests on Node 22.12/24 f
 Local execution, subscription synchronization and maintenance ship with panel source/builds, using the full internal dist tree and a separate `qinglong-local` skill. See `cli/LOCAL.md` and `cli/LOCAL.en.md` in the source checkout. An npm installation is not a valid QL_CLI_ROOT. Recovery/reload must run on the actual panel host or inside its container, using docker exec for Docker installations.
 
 API task run returns acceptance; a local runner waits for script completion. Their elapsed times are different measurements. Compare the internal TS runner against Shell using identical configuration/scripts; remote API management has no equivalent old Shell management command.
+
+## Source layout
+
+```text
+src/
+  entrypoints/     # Executable composition
+  remote/          # commands / api / auth
+  internal/        # commands / execution / subscription / maintenance / runtime / integration
+  compatibility/   # Legacy entry and argument adapters
+  shared/          # cli / i18n / response types and errors
+```
+
+Shared code cannot import business modules. Remote and internal modules may only import their own area and shared code; integration tests enforce these boundaries. Each surface owns its command registry, passed into the shared Commander parser.
+
+Tests follow the same areas under test/. `npm run test:cli` (repository root) or `npm test` (cli/) discovers the standard suites; test/linux remains an explicitly invoked container integration suite. scripts/entrypoints.cjs preserves existing dist executable paths and dist/local/entrypoints.js and cronEntrypoint.js. Moving sources does not require changing QL_CLI_ROOT or cron commands.

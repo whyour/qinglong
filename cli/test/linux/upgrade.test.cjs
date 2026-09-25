@@ -4,9 +4,9 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { fork } = require('node:child_process');
-const { createContext } = require('../../dist/local/context');
-const { startPanel, stopPanel } = require('../../dist/local/operator');
-const { runProcess } = require('../../dist/local/process');
+const { createContext } = require('../../dist/internal/runtime/context');
+const { startPanel, stopPanel } = require('../../dist/internal/maintenance/operator');
+const { runProcess } = require('../../dist/internal/runtime/process');
 
 test(
   'interrupted replacement stops the real new service and restores the old HTTP backend',

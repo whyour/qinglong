@@ -3,12 +3,12 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { createContext } = require('../../dist/local/context');
+const { createContext } = require('../../dist/internal/runtime/context');
 const {
   installAndStartBot,
   launchBot,
   stopBot,
-} = require('../../dist/local/bot');
+} = require('../../dist/internal/maintenance/bot');
 assert.equal(process.env.QL_PANEL_INTEGRATION, '1');
 (async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-bot-online-'));

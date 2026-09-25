@@ -19,7 +19,7 @@
   "scripts": {
     "build": "node scripts/build.cjs",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test test/*.test.cjs",
+    "test": "npm run build && node scripts/test.cjs",
     "prepack": "npm run build"
   },
   "devDependencies": {

@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const { execFileSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
-const { createContext } = require('../../dist/local/context');
-const { LocalApi } = require('../../dist/local/api');
+const { createContext } = require('../../dist/internal/runtime/context');
+const { LocalApi } = require('../../dist/internal/runtime/api');
 
 (async () => {
   assert.equal(process.env.QL_HOST_INTEGRATION, '1');

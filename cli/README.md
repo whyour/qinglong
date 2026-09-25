@@ -137,3 +137,18 @@ CLI package 工作流在相关 PR、develop 推送和手动触发时执行 Node 
 本机执行、订阅同步和运维随面板源码/构建交付，使用完整内部 `dist` 与独立 `qinglong-local` Skill；源码说明见 `cli/LOCAL.md` 和 `cli/LOCAL.en.md`。npm 包不能用作 `QL_CLI_ROOT`。账号恢复、服务重载必须在实际面板宿主机或容器中执行；Docker 使用 `docker exec` 调用容器内选定入口。
 
 API `task run` 返回请求接受，本机执行器等待脚本结束，二者耗时不能直接对比。Shell 迁移性能应比较相同配置和脚本下的内部 TS 执行器与原 Shell；远程 API 操作没有对应的旧 Shell 管理命令。
+
+## 源码结构
+
+```text
+src/
+  entrypoints/     # 可执行入口组装
+  remote/          # commands / api / auth
+  internal/        # commands / execution / subscription / maintenance / runtime / integration
+  compatibility/   # 旧入口和参数适配
+  shared/          # cli / i18n / 响应类型与错误
+```
+
+shared 不能引用业务模块；remote 与 internal 只能引用各自区域及 shared，集成测试检查这些依赖边界。两套业务注册表分别注入共享 Commander 解析器。
+
+测试按同样的区域分组。仓库根目录 `npm run test:cli` 或 cli/ 下 `npm test` 自动发现标准测试；test/linux 保持为显式执行的容器集成测试。scripts/entrypoints.cjs 保留现有 dist 可执行入口，以及 dist/local/entrypoints.js、cronEntrypoint.js；移动源码不要求修改 QL_CLI_ROOT 或 cron 命令。

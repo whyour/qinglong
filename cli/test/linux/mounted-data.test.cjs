@@ -3,9 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { createContext } = require('../../dist/local/context');
-const { startPanel, stopPanel } = require('../../dist/local/operator');
-const { reloadPanel } = require('../../dist/local/upgrade');
+const { createContext } = require('../../dist/internal/runtime/context');
+const { startPanel, stopPanel } = require('../../dist/internal/maintenance/operator');
+const { reloadPanel } = require('../../dist/internal/maintenance/upgrade');
 
 test(
   'data reload preserves a real mount root while replacing contents and restarting the backend',

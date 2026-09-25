@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { createContext } = require('../../dist/local/context');
-const { bootstrapPanel } = require('../../dist/local/bootstrap');
-const { stopPanel } = require('../../dist/local/operator');
-const { runProcess } = require('../../dist/local/process');
+const { createContext } = require('../../dist/internal/runtime/context');
+const { bootstrapPanel } = require('../../dist/internal/maintenance/bootstrap');
+const { stopPanel } = require('../../dist/internal/maintenance/operator');
+const { runProcess } = require('../../dist/internal/runtime/process');
 
 test(
   'real PM2 and nginx bootstrap reload serves requests and replaces configuration',

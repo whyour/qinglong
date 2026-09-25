@@ -6,5 +6,6 @@ RUN apt-get update \
 # Match the repository's current TS execution fixture; no host node_modules mount.
 RUN npm install -g --ignore-scripts --no-audit --no-fund ts-node@10.9.2 typescript@5.2.2 \
     && npm cache clean --force
+ENV NODE_PATH=/usr/local/lib/node_modules
 WORKDIR /workspace
-CMD ["sh", "-c", "node --test cli/test/*.test.cjs && node cli/scripts/verify-package.cjs"]
+CMD ["sh", "-c", "node cli/scripts/test.cjs && node cli/scripts/verify-package.cjs"]

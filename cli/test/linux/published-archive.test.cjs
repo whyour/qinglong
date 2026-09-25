@@ -4,10 +4,10 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { createHash } = require('node:crypto');
-const { createContext } = require('../../dist/local/context');
-const operator = require('../../dist/local/operator');
-const { stageUpgrade } = require('../../dist/local/upgrade');
-const { cancellableOperation } = require('../../dist/local/cancellation');
+const { createContext } = require('../../dist/internal/runtime/context');
+const operator = require('../../dist/internal/maintenance/operator');
+const { stageUpgrade } = require('../../dist/internal/maintenance/upgrade');
+const { cancellableOperation } = require('../../dist/internal/runtime/cancellation');
 
 test(
   'published master archives pass actual HTTPS download and staging validation',

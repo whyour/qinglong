@@ -1,13 +1,13 @@
 process.channel.ref();
 // Child fixture: real service startup pauses at a deterministic cancellation boundary.
-const { createContext } = require('../../dist/local/context');
-const { replaceAndReload } = require('../../dist/local/upgrade');
-const { startPanel, stopPanel } = require('../../dist/local/operator');
+const { createContext } = require('../../dist/internal/runtime/context');
+const { replaceAndReload } = require('../../dist/internal/maintenance/upgrade');
+const { startPanel, stopPanel } = require('../../dist/internal/maintenance/operator');
 const {
   withCommandCancellation,
   cancellableOperation,
   interruptedCode,
-} = require('../../dist/local/cancellation');
+} = require('../../dist/internal/runtime/cancellation');
 const path = require('node:path');
 const context = createContext({ root: process.env.TEST_ROOT }, process.env);
 let starts = 0;

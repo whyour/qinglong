@@ -4,10 +4,10 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { setTimeout: delay } = require('node:timers/promises');
-const { createContext } = require('../../dist/local/context');
-const { runContainer } = require('../../dist/local/containerRuntime');
-const { launchStartupHook } = require('../../dist/local/bootstrap');
-const { launchBot } = require('../../dist/local/bot');
+const { createContext } = require('../../dist/internal/runtime/context');
+const { runContainer } = require('../../dist/internal/runtime/containerRuntime');
+const { launchStartupHook } = require('../../dist/internal/maintenance/bootstrap');
+const { launchBot } = require('../../dist/internal/maintenance/bot');
 
 const live = (pid) => {
   try {

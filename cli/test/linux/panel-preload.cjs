@@ -4,8 +4,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
-const { createContext } = require('../../dist/local/context');
-const { LocalApi } = require('../../dist/local/api');
+const { createContext } = require('../../dist/internal/runtime/context');
+const { LocalApi } = require('../../dist/internal/runtime/api');
 
 (async () => {
   assert.equal(process.env.QL_PANEL_INTEGRATION, '1');
