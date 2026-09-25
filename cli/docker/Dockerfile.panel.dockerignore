@@ -1,0 +1,16 @@
+**
+!cli/
+!cli/dist/
+!cli/dist/**
+!cli/package.json
+!cli/README.md
+!cli/README.en.md
+!cli/docs/
+!cli/docs/**
+!cli/skills/
+!cli/skills/**
+!cli/docker/
+!cli/docker/Dockerfile.panel
+!cli/docker/Dockerfile.panel.dockerignore
+!cli/docker/build/
+!cli/docker/build/deps.js

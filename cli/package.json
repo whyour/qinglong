@@ -1,0 +1,39 @@
+{
+  "name": "@qinglong/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone QingLong 2.x API CLI evaluation build",
+  "type": "commonjs",
+  "bin": {
+    "ql": "dist/ql.js",
+    "task": "dist/task.js",
+    "qinglong-cli": "dist/startup.js",
+    "ql-cli": "dist/index.js",
+    "ql-local-cli": "dist/admin.js",
+    "ql-dev-cli": "dist/developer.js",
+    "ql-task-cli": "dist/runner.js",
+    "ql-subscription-worker": "dist/subscription-worker.js",
+    "ql-compat": "dist/compat.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "skills",
+    "README.md",
+    "README.en.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.cjs"
+  },
+  "devDependencies": {
+    "commander": "15.0.0",
+    "esbuild": "0.28.2",
+    "typescript": "5.2.2",
+    "@types/node": "22.19.0"
+  }
+}

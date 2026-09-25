@@ -1,0 +1,113 @@
+{
+  "duplicate": {
+    "native": {
+      "status": 1,
+      "result": null
+    },
+    "commander": {
+      "status": 0,
+      "result": {
+        "name": "task list",
+        "values": {
+          "page": "2",
+          "size": "50"
+        },
+        "positionals": []
+      }
+    },
+    "cac": {
+      "status": 1,
+      "result": null
+    },
+    "yargs": {
+      "status": 1,
+      "result": null
+    }
+  },
+  "unknown": {
+    "native": {
+      "status": 1,
+      "result": null
+    },
+    "commander": {
+      "status": 1,
+      "result": null
+    },
+    "cac": {
+      "status": 1,
+      "result": null
+    },
+    "yargs": {
+      "status": 1,
+      "result": null
+    }
+  },
+  "extra": {
+    "native": {
+      "status": 1,
+      "result": null
+    },
+    "commander": {
+      "status": 1,
+      "result": null
+    },
+    "cac": {
+      "status": 1,
+      "result": null
+    },
+    "yargs": {
+      "status": 1,
+      "result": null
+    }
+  },
+  "numericString": {
+    "native": {
+      "status": 0,
+      "result": {
+        "name": "task list",
+        "values": {
+          "search": "00123",
+          "page": "1",
+          "size": "50"
+        },
+        "positionals": []
+      }
+    },
+    "commander": {
+      "status": 0,
+      "result": {
+        "name": "task list",
+        "values": {
+          "search": "00123",
+          "page": "1",
+          "size": "50"
+        },
+        "positionals": []
+      }
+    },
+    "cac": {
+      "status": 0,
+      "result": {
+        "name": "task list",
+        "values": {
+          "search": "123",
+          "page": "1",
+          "size": "50"
+        },
+        "positionals": []
+      }
+    },
+    "yargs": {
+      "status": 0,
+      "result": {
+        "name": "task list",
+        "values": {
+          "search": "00123",
+          "page": "1",
+          "size": "50"
+        },
+        "positionals": []
+      }
+    }
+  }
+}

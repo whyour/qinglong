@@ -1,0 +1,8 @@
+FROM qinglong-cli-test:node22-debian
+RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d \
+    && chmod +x /usr/sbin/policy-rc.d \
+    && apt-get update && apt-get install -y --no-install-recommends nginx \
+    && rm -rf /var/lib/apt/lists/*
+RUN npm install -g --ignore-scripts --no-audit --no-fund pm2@5.4.3 \
+    && npm cache clean --force
+CMD ["node", "--test", "cli/test/linux/services.test.cjs"]

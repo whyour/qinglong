@@ -1,0 +1,100 @@
+{
+  "node": "v24.18.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "samples": 15,
+  "warmupsPerScenario": 2,
+  "method": "Alternating fresh processes; same Shell script, config, hooks and log settings. Stub pnpm probe/token helper; no task ID or API reporting. Wall time includes process startup and cleanup. Not API, download, upgrade or scheduler throughput.",
+  "results": [
+    {
+      "delaySeconds": 0,
+      "shell": {
+        "medianMs": 143.55,
+        "p95Ms": 148.21,
+        "samplesMs": [
+          144.03,
+          143.55,
+          143.31,
+          147.79,
+          141.66,
+          143.25,
+          143.2,
+          140.93,
+          142.68,
+          148.21,
+          144.09,
+          146.11,
+          143.82,
+          143.71,
+          139.4
+        ]
+      },
+      "typescript": {
+        "medianMs": 169.86,
+        "p95Ms": 175.13,
+        "samplesMs": [
+          170.87,
+          165.59,
+          171.14,
+          169.59,
+          170.34,
+          169,
+          170.4,
+          168.68,
+          171.45,
+          169.86,
+          175.13,
+          166.85,
+          167.36,
+          172.73,
+          169.47
+        ]
+      }
+    },
+    {
+      "delaySeconds": 1,
+      "shell": {
+        "medianMs": 1195.74,
+        "p95Ms": 1250.21,
+        "samplesMs": [
+          1191.34,
+          1206.2,
+          1194.47,
+          1204.81,
+          1192.85,
+          1190.76,
+          1250.21,
+          1216.19,
+          1204.43,
+          1207.82,
+          1193.11,
+          1195.74,
+          1190.74,
+          1213.48,
+          1190.34
+        ]
+      },
+      "typescript": {
+        "medianMs": 1217.4,
+        "p95Ms": 1234.85,
+        "samplesMs": [
+          1217.4,
+          1223.25,
+          1206.49,
+          1224.57,
+          1190.84,
+          1234.85,
+          1206.12,
+          1228.82,
+          1209.62,
+          1218.22,
+          1218.13,
+          1217.42,
+          1205.8,
+          1187.04,
+          1209.2
+        ]
+      }
+    }
+  ]
+}

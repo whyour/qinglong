@@ -1,0 +1,100 @@
+{
+  "node": "v24.18.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "samples": 15,
+  "warmupsPerScenario": 2,
+  "method": "Alternating fresh processes; same Shell script, config, hooks and log settings. Stub pnpm probe/token helper; no task ID or API reporting. Wall time includes process startup and cleanup. Not API, download, upgrade or scheduler throughput.",
+  "results": [
+    {
+      "delaySeconds": 0,
+      "shell": {
+        "medianMs": 143.64,
+        "p95Ms": 147.83,
+        "samplesMs": [
+          144.66,
+          142.45,
+          144.43,
+          143.64,
+          147.83,
+          146.75,
+          143.53,
+          145.54,
+          143.55,
+          143.05,
+          143.6,
+          145.67,
+          142.57,
+          144.36,
+          143.25
+        ]
+      },
+      "typescript": {
+        "medianMs": 106.62,
+        "p95Ms": 109.15,
+        "samplesMs": [
+          108.78,
+          105.38,
+          108.1,
+          106.17,
+          107.58,
+          106.43,
+          107,
+          109.15,
+          106.05,
+          105.78,
+          104.81,
+          108.28,
+          106.76,
+          105.58,
+          106.62
+        ]
+      }
+    },
+    {
+      "delaySeconds": 1,
+      "shell": {
+        "medianMs": 1197.93,
+        "p95Ms": 1208.85,
+        "samplesMs": [
+          1190.17,
+          1208.85,
+          1191.63,
+          1192.71,
+          1193.43,
+          1197.95,
+          1186.13,
+          1200.73,
+          1198.17,
+          1200.12,
+          1195.56,
+          1197.93,
+          1173.8,
+          1204.54,
+          1201.1
+        ]
+      },
+      "typescript": {
+        "medianMs": 1150.68,
+        "p95Ms": 1164.98,
+        "samplesMs": [
+          1141.67,
+          1163.13,
+          1144.9,
+          1153.66,
+          1150.68,
+          1154.16,
+          1145.88,
+          1159.16,
+          1144.76,
+          1137.45,
+          1164.98,
+          1160.48,
+          1144.51,
+          1151.29,
+          1149.37
+        ]
+      }
+    }
+  ]
+}

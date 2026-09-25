@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "cac": "7.0.0",
+    "commander": "15.0.0",
+    "yargs": "18.2.0"
+  }
+}
