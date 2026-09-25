@@ -163,11 +163,11 @@ export const english: Record<string, string> = {
     'API request rejected (code %s). Check %s.',
   'CLI 配置必须是当前用户拥有的私有普通文件（0600）。':
     'CLI config must be an owned private regular file (0600).',
-  'CLI 配置无效，请运行 ql-cli login。':
-    'Invalid CLI config. Run ql-cli login.',
-  '尚未登录，请运行 ql-cli login。': 'Not logged in. Run ql-cli login.',
-  '无法读取 CLI 配置，请检查文件权限并运行 ql-cli login。':
-    'Cannot read CLI config. Check file permissions and run ql-cli login.',
+  'CLI 配置无效，请运行 ql login。':
+    'Invalid CLI config. Run ql login.',
+  '尚未登录，请运行 ql login。': 'Not logged in. Run ql login.',
+  '无法读取 CLI 配置，请检查文件权限并运行 ql login。':
+    'Cannot read CLI config. Check file permissions and run ql login.',
   '请输入有效的面板 URL。': 'A valid panel URL is required.',
   '请使用不含凭据、查询参数或片段的 HTTP(S) 面板 URL。':
     'Use an HTTP(S) panel URL without credentials, query or fragment.',

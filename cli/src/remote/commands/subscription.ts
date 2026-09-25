@@ -78,7 +78,7 @@ export async function subscription(
     return {
       code: 200,
       data: lines.slice(-count).join('\n'),
-      truncated: lines.length > count,
+      truncated: result.truncated === true || lines.length > count,
     };
   }
   if (!['run', 'stop', 'enable', 'disable'].includes(action))

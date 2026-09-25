@@ -36,7 +36,7 @@ export function readConfig(): StoredConfig {
     }
     const config: unknown = JSON.parse(fs.readFileSync(fd, 'utf8'));
     if (!config || typeof config !== 'object')
-      fail(translate(process.env, 'CLI 配置无效，请运行 ql-cli login。'));
+      fail(translate(process.env, 'CLI 配置无效，请运行 ql login。'));
     const value = config as Record<string, unknown>;
     if (
       typeof value.url !== 'string' ||
@@ -45,7 +45,7 @@ export function readConfig(): StoredConfig {
       typeof value.clientSecret !== 'string' ||
       !value.clientSecret.trim()
     ) {
-      fail(translate(process.env, 'CLI 配置无效，请运行 ql-cli login。'));
+      fail(translate(process.env, 'CLI 配置无效，请运行 ql login。'));
     }
     return {
       url: panelUrl(value.url),
@@ -57,12 +57,12 @@ export function readConfig(): StoredConfig {
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-      fail(translate(process.env, '尚未登录，请运行 ql-cli login。'), 3);
+      fail(translate(process.env, '尚未登录，请运行 ql login。'), 3);
     if (error instanceof CliError) throw error;
     return fail(
       translate(
         process.env,
-        '无法读取 CLI 配置，请检查文件权限并运行 ql-cli login。',
+        '无法读取 CLI 配置，请检查文件权限并运行 ql login。',
       ),
     );
   } finally {

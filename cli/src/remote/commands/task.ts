@@ -62,7 +62,7 @@ export async function task(
       code: 200,
       data: lines.slice(-command.tail).join('\n'),
       logStatus: result.logStatus as string | undefined,
-      truncated: lines.length > command.tail,
+      truncated: result.truncated === true || lines.length > command.tail,
     };
   }
   await request(config, `crons/${command.kind}`, {
