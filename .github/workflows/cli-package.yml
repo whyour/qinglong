@@ -77,10 +77,14 @@ jobs:
        (github.event_name == 'workflow_dispatch' && inputs.publish))
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
+          package-manager-cache: false
           registry-url: https://registry.npmjs.org
       - uses: actions/download-artifact@v7
         with:
@@ -88,8 +92,6 @@ jobs:
           path: cli-package
       - name: Publish verified npm archive
         shell: bash
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -108,10 +110,6 @@ jobs:
             exit 0
           elif ! jq -e '.error.code == "E404"' version.json > /dev/null; then
             echo '::error::Could not check the published CLI version; refusing to publish.'
-            exit 1
-          fi
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo '::error::NPM_TOKEN is required to publish @whyour/qinglong-cli.'
             exit 1
           fi
           npm publish "./$archive" --access public --tag latest --ignore-scripts --registry=https://registry.npmjs.org

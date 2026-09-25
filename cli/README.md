@@ -130,7 +130,7 @@ node cli/scripts/verify-package.cjs
 
 测试覆盖请求格式、认证刷新、输出、错误、禁止自动重试、权限和独立安装。打包验证会离线安装 tgz，并确认唯一入口是 `ql`，本机命令不可调用。
 
-CLI package 工作流在相关 PR、develop/master 推送和手动触发时执行 Node 22.12/24 类型检查、构建及测试。Node 24 上传通过离线安装验证的 `qinglong-cli-<commit>` artifact。两个矩阵任务成功后，master 推送会将这份已验证的 tgz 发布到 npm 的 latest 标签，复用 Docker 工作流的 `NPM_TOKEN` Secret。手动运行需选择 master 并勾选 publish；PR、develop 和 fork 不发布。Token 需要拥有 `@whyour/qinglong-cli` 发布权限。
+CLI package 工作流在相关 PR、develop/master 推送和手动触发时执行 Node 22.12/24 类型检查、构建及测试。Node 24 上传通过离线安装验证的 `qinglong-cli-<commit>` artifact。两个矩阵任务成功后，master 推送会将这份已验证的 tgz 发布到 npm 的 latest 标签，通过 GitHub Actions OIDC 可信发布，无需 `NPM_TOKEN` Secret。手动运行需选择 master 并勾选 publish；PR、develop 和 fork 不发布。npm 的 Trusted Publisher 需绑定仓库 `whyour/qinglong` 和工作流 `cli-package.yml`，允许 `npm publish`；面板包 `@whyour/qinglong` 单独绑定 `build-docker-image.yml`。发布 job 使用 Node 24，并仅在该 job 授予 `id-token: write`。新包需先完成首次发布，再配置对应包的可信发布关系。
 
 CLI 版本独立维护在 cli/package.json 和 cli/package-lock.json。发布改动前执行 `npm version patch --prefix cli --no-git-tag-version`（也可用 minor/major），提交这两个文件。已发布的版本会提示并跳过；registry 查询失败则停止发布。该流程仅发布 X.Y.Z 稳定版本，不重新构建产物或执行包生命周期脚本。
 

@@ -473,9 +473,12 @@ jobs:
           cache-to: type=registry,ref=whyour/qinglong:cache-debian-python3.10,mode=max
 
   publish:
-    if: ${{ github.ref_name == 'master' }}
+    if: ${{ github.repository == 'whyour/qinglong' && github.ref == 'refs/heads/master' }}
     needs: [build-alpine, build-debian]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v3
@@ -493,7 +496,12 @@ jobs:
           pnpm build:front
           pnpm build:back
 
-      - name: publish npm package
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
-          npm publish
+      - name: Set up Node for trusted publishing
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Publish npm package with OIDC
+        run: npm publish --access public --registry=https://registry.npmjs.org
