@@ -201,6 +201,12 @@ export async function runProcess(
     child.stderr!.on('data', (chunk: Buffer) =>
       emit(chunk, options.stderrOutput ?? options.output),
     );
+    child.once('exit', () => {
+      // close waits for inherited pipes. Once the Shell and its cleanup have
+      // exited, stop surviving descendants before waiting for those pipes.
+      if (terminating && process.platform !== 'win32')
+        signalGroup(child, 'SIGKILL');
+    });
     child.once('close', (code, signal) => {
       // Descendants may close their pipes but ignore the first signal. Do not
       // cancel escalation and leave them running when the leader closes early.

@@ -102,7 +102,8 @@ export function createContext(
 }
 
 // This bridge interprets user configuration only; it never sources product shell/*.sh.
-// fd 3 separates environment data from arbitrary user stdout/stderr.
+// Move the parent transport from fd 3 to an internal descriptor before user
+// configuration can reuse fd 3 (or fd 9 for a lock).
 export async function sourceEnvironment(
   env: NodeJS.ProcessEnv,
   files: string[],
@@ -114,7 +115,8 @@ export async function sourceEnvironment(
     stderrOutput?: (chunk: Buffer) => void;
   } = {},
 ): Promise<NodeJS.ProcessEnv> {
-  const script = `__ql_env="$1"; __ql_files="$2"; __ql_command="$3"; shift 3
+  const script = `exec 19>&3 3>&-
+__ql_env="$1"; __ql_files="$2"; __ql_command="$3"; shift 3
 set -a
 while IFS= read -r __ql_file; do
   if [ -f "$__ql_file" ]; then . "$__ql_file" "$@"; fi
@@ -126,7 +128,7 @@ while read -r __ql_builtin __ql_state __ql_option; do
     __ql_shopts="\${__ql_shopts:+$__ql_shopts:}$__ql_option"
   fi
 done < <(shopt -p)
-__ql_shellopts="$SHELLOPTS" __ql_bashopts="$__ql_shopts" "$__ql_env" -0 >&3
+__ql_shellopts="$SHELLOPTS" __ql_bashopts="$__ql_shopts" "$__ql_env" -0 >&19
 `;
   const execution = await runProcess(
     'bash',

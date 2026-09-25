@@ -27,3 +27,12 @@ test('environment transport does not execute a Node runtime from user configurat
   assert.equal(env.NODE_OPTIONS, '--this-option-does-not-exist');
   assert.equal(env.PATH, '/nonexistent');
 });
+
+for (const redirect of ['exec 3>/dev/null 9>/dev/null', 'exec 3>&-']) {
+  test(`environment transport survives user descriptors: ${redirect}`, async () => {
+    const env = await sourceEnvironment({ PATH: process.env.PATH }, [], [], {
+      command: `${redirect}; export FIXTURE_VALUE=present`,
+    });
+    assert.equal(env.FIXTURE_VALUE, 'present');
+  });
+}

@@ -16,10 +16,14 @@ export function shellSessionArguments(
 __ql_env=$1; __ql_before=$2; __ql_after=$3; __ql_command=$4; __ql_index=$5; __ql_count=$6; __ql_timeout=$7; shift 7
 __ql_hook_args=( "\${@:1:__ql_count}" ); shift "$__ql_count"
 __ql_script_args=( "$@" )
+# Reserve an internal descriptor before sourcing user code. In particular, fd 3
+# and fd 9 remain available for user redirections and locks. Bash 3 also supports
+# this numeric descriptor, unlike Bash 4's dynamic descriptor syntax.
+if [ -n "$__ql_timeout" ]; then exec 19>&3 3>&-; fi
 __ql_after_started=false
 __ql_run_after() {
   __ql_after_started=true
-  if [ -n "$__ql_timeout" ]; then printf A >&3; fi
+  if [ -n "$__ql_timeout" ]; then printf A >&19; fi
   if [ "$__ql_nounset" = true ]; then set -u; fi
   export NODE_PATH="\${PREV_NODE_PATH:-}"
   unset QL_NODE_GLOBAL_PATH
@@ -62,7 +66,7 @@ if [ -n "$__ql_timeout" ]; then
   # Preserve a user-owned EXIT trap. If it prevents our cleanup, the parent
   # performs the fallback after the process group has stopped.
   if [ -z "$(trap -p EXIT)" ]; then trap '__ql_timeout_exit' EXIT; fi
-  printf T >&3
+  printf T >&19
 fi
 if [ "$__ql_command" = true ]; then
   "\${__ql_args[@]}" "\${__ql_script_args[@]}"
