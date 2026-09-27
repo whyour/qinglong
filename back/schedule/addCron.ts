@@ -1,6 +1,6 @@
 import { ServerUnaryCall, sendUnaryData, status } from '@grpc/grpc-js';
 import { AddCronRequest, AddCronResponse } from '../protos/cron';
-import nodeSchedule from 'node-schedule';
+import { createCronJob, CronJob } from '../shared/cronScheduler';
 import { isValidCronSchedule } from '../shared/cronSchedule';
 import { scheduleStacks } from './data';
 import { runCron } from '../shared/runCron';
@@ -24,11 +24,7 @@ const addCron = (
 
     if (!isValidCronField(schedule)) {
       validationErrors.push(
-        tf(
-          '任务ID %s: 无效的 cron 表达式 "%s"',
-          String(id),
-          schedule,
-        ),
+        tf('任务ID %s: 无效的 cron 表达式 "%s"', String(id), schedule),
       );
     }
 
@@ -56,79 +52,58 @@ const addCron = (
     return;
   }
 
-  // Recovery replaces the whole snapshot, including deletions and disabled jobs.
-  // Validation above must finish before touching the previous schedule.
-  if (call.request.replace) {
-    for (const jobs of scheduleStacks.values()) {
-      for (const job of jobs) job?.cancel();
+  // Prepare stopped jobs first: construction errors must preserve the old snapshot.
+  const prepared = new Map<string, CronJob[]>();
+  try {
+    for (const item of call.request.crons) {
+      const jobs: CronJob[] = [];
+      prepared.get(item.id)?.forEach((job) => job.cancel());
+      prepared.set(item.id, jobs);
+      for (const schedule of [
+        item.schedule,
+        ...(item.extra_schedules || []).map((x) => x.schedule),
+      ]) {
+        jobs.push(
+          createCronJob(
+            schedule,
+            async () => {
+              Logger.info('[schedule][准备运行任务] 命令: %s', item.command);
+              await runCron(item.command, item);
+            },
+            {
+              name: `${item.id}: ${item.name || ''}`,
+              logger: Logger,
+              start: false,
+            },
+          ),
+        );
+      }
     }
-    scheduleStacks.clear();
+  } catch (error) {
+    for (const jobs of prepared.values()) jobs.forEach((job) => job.cancel());
+    const err: any = new Error(
+      error instanceof Error ? error.message : String(error),
+    );
+    err.code = status.INVALID_ARGUMENT;
+    err.details = err.message;
+    callback(err, null);
+    return;
   }
 
-  // ===== 第二遍：注册所有任务 =====
-  for (const item of call.request.crons) {
-    const { id, schedule, command, extra_schedules, name } = item;
-
-    // 取消该 id 已有的旧任务
-    if (scheduleStacks.has(id)) {
-      scheduleStacks.get(id)?.forEach((x) => x.cancel());
-    }
-
+  if (call.request.replace) {
+    for (const jobs of scheduleStacks.values())
+      jobs.forEach((job) => job?.cancel());
+    scheduleStacks.clear();
+  }
+  for (const [id, jobs] of prepared) {
+    scheduleStacks.get(id)?.forEach((job) => job.cancel());
+    scheduleStacks.set(id, jobs);
+    jobs.forEach((job) => job.start());
     Logger.info(
-      '[schedule][创建定时任务] 任务ID: %s, 名称: %s, cron: %s, 执行命令: %s',
+      '[schedule][创建定时任务] 任务ID: %s, 规则数: %s',
       id,
-      name,
-      schedule,
-      command,
+      jobs.length,
     );
-
-    if (extra_schedules?.length) {
-      extra_schedules.forEach((x) => {
-        Logger.info(
-          '[schedule][创建定时任务] 任务ID: %s, 名称: %s, cron: %s, 执行命令: %s',
-          id,
-          name,
-          x.schedule,
-          command,
-        );
-      });
-    }
-
-    const mainJob = nodeSchedule.scheduleJob(id, schedule, async () => {
-      Logger.info(`[schedule][准备运行任务] 命令: ${command}`);
-      runCron(command, item);
-    });
-
-    if (!mainJob) {
-      Logger.warn(
-        '[schedule][创建定时任务] scheduleJob 返回 null（不符合预期，已通过预校验）: 任务ID: %s, cron: %s',
-        id,
-        schedule,
-      );
-    }
-
-    const extraJobs = extra_schedules?.length
-      ? extra_schedules.map((x) => {
-          const job = nodeSchedule.scheduleJob(id, x.schedule, async () => {
-            Logger.info(`[schedule][准备运行任务] 命令: ${command}`);
-            runCron(command, item);
-          });
-          if (!job) {
-            Logger.warn(
-              '[schedule][创建定时任务] scheduleJob 返回 null（不符合预期，已通过预校验）: 任务ID: %s, cron: %s',
-              id,
-              x.schedule,
-            );
-          }
-          return job;
-        })
-      : [];
-
-    // 过滤 null（兜底保护，正常情况下预校验已拦截）
-    const jobs = [mainJob, ...extraJobs].filter((x) => x != null);
-    if (jobs.length > 0) {
-      scheduleStacks.set(id, jobs);
-    }
   }
 
   callback(null, null);

@@ -4,6 +4,8 @@ const { format } = require('node:util');
 const load = require('../helpers/load-security-module.cjs');
 const { SchedulerReadiness } = require('../../back/shared/schedulerReadiness');
 
+const { getTasks } = require('node-cron');
+
 const legacySchedules = [
   '* * * * *',
   '*/5  * * * *',
@@ -54,8 +56,11 @@ test('legacy main and extra schedules restore real jobs and healthy readiness', 
   assert.equal(stacks.size, crons.length);
   for (const jobs of stacks.values()) {
     assert.equal(jobs.length, 2);
-    assert.ok(jobs.every((job) => job.nextInvocation()));
+    assert.ok(jobs.every((job) => typeof job.cancel === 'function'));
   }
+  const nativeJobs = [...getTasks().values()];
+  assert.equal(nativeJobs.length, crons.length * 2);
+  assert.ok(nativeJobs.every((job) => job.getStatus() !== 'stopped'));
   const previousJobs = [...stacks.values()].flat();
   for (const schedule of ['@bogus', '0 /5 * * * ?', '0 70 * * * ?']) {
     for (const invalid of [
@@ -64,7 +69,8 @@ test('legacy main and extra schedules restore real jobs and healthy readiness', 
     ]) {
       await assert.rejects(register([invalid]), (error) => error.code === 3);
       assert.deepEqual([...stacks.values()].flat(), previousJobs);
-      assert.ok(previousJobs.every((job) => job.nextInvocation()));
+      assert.deepEqual([...getTasks().values()], nativeJobs);
+      assert.ok(nativeJobs.every((job) => job.getStatus() !== 'stopped'));
     }
   }
 });

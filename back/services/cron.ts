@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { getInvalidCronSchedules } from '../shared/cronSchedule';
+import { getInvalidCronSchedules, isValidCronSchedule } from '../shared/cronSchedule';
 import {
   withSchedulerMutation,
   schedulerRegistrationError,
@@ -14,7 +14,6 @@ import {
 } from '../data/runningInstance';
 import { exec, execSync } from 'child_process';
 import fs from 'fs/promises';
-import CronExpressionParser from 'cron-parser';
 import {
   getFileContentByName,
   fileExist,
@@ -47,12 +46,20 @@ export default class CronService {
 
   private isNodeCron(cron: Crontab) {
     const { schedule, extra_schedules } = cron;
+    const fields = schedule?.trim().split(/\s+/) || [];
     // System crontab only receives portable numeric five-field expressions.
-    // Extended syntax, macros and legacy shorthand belong to node-schedule.
+    // Extended syntax, macros and legacy shorthand use the Node scheduler.
     return (
-      schedule?.trim().split(/\s+/).length !== 5 ||
+      fields.length !== 5 ||
       /[^\d\s*,/\-]/.test(schedule || '') ||
-      Boolean(extra_schedules?.length)
+      Boolean(extra_schedules?.length) ||
+      // BusyBox treats N/step as a single value and doesn't support Sunday=7.
+      fields.some((field) => field.split(',').some((part) => /^\d+\//.test(part))) ||
+      fields[4].includes('7') ||
+      // BusyBox steps DOM from zero; its full-range day/week wildcard
+      // handling also differs from the legacy Node parser's OR semantics.
+      fields[2].includes('/') ||
+      (fields[2] !== '*' && fields[4] !== '*')
     );
   }
 
@@ -1057,7 +1064,7 @@ export default class CronService {
         if (
           command &&
           schedule &&
-          CronExpressionParser.parse(schedule).hasNext()
+          isValidCronSchedule(schedule)
         ) {
           const name = namePrefix + '_' + index;
 

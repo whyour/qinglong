@@ -13,7 +13,7 @@ const delCron = (
         '[schedule][取消定时任务] 任务ID: %s',
         id,
       );
-      // 过滤掉 nodeSchedule.scheduleJob() 对无效表达式返回的 null，
+      // 防御性过滤历史调度栈中的空任务，
       // 否则对 null 调 cancel() 会让整个取消流程抛出 UNKNOWN 错误，
       // 进而导致 HTTP 端的 remove() 跳过 setCrontab()，造成 crontab.list 残留。
       scheduleStacks.get(id)?.filter((x) => x != null).forEach((x) => {

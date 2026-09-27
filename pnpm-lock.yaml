@@ -42,9 +42,6 @@ dependencies:
   cron-parser:
     specifier: ^5.4.0
     version: 5.4.0
-  cron-parser-v4:
-    specifier: npm:cron-parser@4.9.0
-    version: /cron-parser@4.9.0
   cross-spawn:
     specifier: ^7.0.6
     version: 7.0.6
@@ -96,9 +93,9 @@ dependencies:
   multer:
     specifier: 2.1.1
     version: 2.1.1
-  node-schedule:
-    specifier: ^2.1.0
-    version: 2.1.1
+  node-cron:
+    specifier: 4.6.0
+    version: 4.6.0
   nodemailer:
     specifier: ^8.0.1
     version: 8.0.1
@@ -203,9 +200,6 @@ devDependencies:
   '@types/node':
     specifier: ^17.0.21
     version: 17.0.45
-  '@types/node-schedule':
-    specifier: ^1.3.2
-    version: 1.3.2
   '@types/nodemailer':
     specifier: ^6.4.4
     version: 6.4.17
@@ -4516,12 +4510,6 @@ packages:
       '@types/express': 4.17.21
     dev: true
 
-  /@types/node-schedule@1.3.2:
-    resolution: {integrity: sha512-Y0CqdAr+lCpArT8CJJjJq4U2v8Bb5e7ru2nV/NhDdaptCMCRdOL3Y7tAhen39HluQMaIKWvPbDuiFBUQpg7Srw==}
-    dependencies:
-      '@types/node': 17.0.45
-    dev: true
-
   /@types/node@17.0.45:
     resolution: {integrity: sha512-w+tIMs3rq2afQdsPJlODhoUEKzFP1ayaoyl1CcnwtIlsVe7K7bA1NGm4s3PraqTLlXnbIN84zuBlxBWo1u9BLw==}
 
@@ -7045,13 +7033,6 @@ packages:
   /crelt@1.0.6:
     resolution: {integrity: sha512-VQ2MBenTq1fWZUH9DJNGti7kKv6EeAuYr3cLwxUWhIu1baTaXh4Ib5W2CqHVqib4/MqbYGJqiL3Zb8GJZr3l4g==}
     dev: true
-
-  /cron-parser@4.9.0:
-    resolution: {integrity: sha512-p0SaNjrHOnQeR8/VnfGbmg9te2kfyYSQ7Sc/j/6DtPL3JQvKxmjO9TSjNFpujqV3vEYYBvNNvXSxzyksBWAx1Q==}
-    engines: {node: '>=12.0.0'}
-    dependencies:
-      luxon: 3.5.0
-    dev: false
 
   /cron-parser@5.4.0:
     resolution: {integrity: sha512-HxYB8vTvnQFx4dLsZpGRa0uHp6X3qIzS3ZJgJ9v6l/5TJMgeWQbLkR5yiJ5hOxGbc9+jCADDnydIe15ReLZnJA==}
@@ -10445,10 +10426,6 @@ packages:
       triple-beam: 1.4.1
     dev: false
 
-  /long-timeout@0.1.1:
-    resolution: {integrity: sha512-BFRuQUqc7x2NWxfJBCyUrN8iYUYznzL9JROmRz1gZ6KlOIgmoD+njPVbb+VNn2nGMKggMsK79iUNErillsrx7w==}
-    dev: false
-
   /long@5.2.3:
     resolution: {integrity: sha512-lcHwpNoggQTObv5apGNCTdJrO69eHOZMi4BNC+rTLER8iHAqGrUVeLh/irVIM7zTw2bOXA8T6uNPeujwOLg/2Q==}
     dev: false
@@ -10481,11 +10458,6 @@ packages:
     dependencies:
       yallist: 4.0.0
     dev: true
-
-  /luxon@3.5.0:
-    resolution: {integrity: sha512-rh+Zjr6DNfUYR3bPwJEnuwDdqMbxZW7LOQfUN4B54+Cl+0o5zaU9RJ6bcidfDtC1cWCZXQ+nvX8bf6bAji37QQ==}
-    engines: {node: '>=12'}
-    dev: false
 
   /luxon@3.7.2:
     resolution: {integrity: sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==}
@@ -10849,6 +10821,11 @@ packages:
     resolution: {integrity: sha512-73sE9+3UaLYYFmDsFZnqCInzPyh3MqIwZO9cw58yIqAZhONrrabrYyYe3TuIqtIiOuTXVhsGau8hcrhhwSsDIQ==}
     dev: false
 
+  /node-cron@4.6.0:
+    resolution: {integrity: sha512-Si/bzYiKRHOB8/a99T2+SDGN582ONDMSTlJr5oCkT6GtnqPjZ2s10eoQRYkW9ZHwjVxONL+W8Fb+qR0AHMQsdg==}
+    engines: {node: '>=20'}
+    dev: false
+
   /node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
@@ -10962,15 +10939,6 @@ packages:
   /node-releases@2.0.18:
     resolution: {integrity: sha512-d9VeXT4SJ7ZeOqGX6R5EM022wpL+eWPooLI+5UpWn2jCT1aosUQEhQP214x33Wkwx3JQMvIm+tIoVOdodFS40g==}
     dev: true
-
-  /node-schedule@2.1.1:
-    resolution: {integrity: sha512-OXdegQq03OmXEjt2hZP33W2YPs/E5BcFQks46+G2gAxs4gHOIVD1u7EqlYLYSKsaIpyKCK9Gbk0ta1/gjRSMRQ==}
-    engines: {node: '>=6'}
-    dependencies:
-      cron-parser: 4.9.0
-      long-timeout: 0.1.1
-      sorted-array-functions: 1.3.0
-    dev: false
 
   /nodemailer@8.0.1:
     resolution: {integrity: sha512-5kcldIXmaEjZcHR6F28IKGSgpmZHaF1IXLWFTG+Xh3S+Cce4MiakLtWY+PlBU69fLbRa8HlaGIrC/QolUpHkhg==}
@@ -14179,10 +14147,6 @@ packages:
       is-plain-obj: 4.1.0
       sort-object-keys: 1.1.3
     dev: true
-
-  /sorted-array-functions@1.3.0:
-    resolution: {integrity: sha512-2sqgzeFlid6N4Z2fUQ1cvFmTOLRi/sEDzSQ0OKYchqgoPmQBVyM3959qYx3fpS6Esef80KjmpgPeEr028dP3OA==}
-    dev: false
 
   /source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}

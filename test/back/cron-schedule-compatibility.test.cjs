@@ -1,41 +1,69 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const nodeSchedule = require('node-schedule');
 const { isValidCronSchedule } = require('../../back/shared/cronSchedule');
+const { createCronJob } = require('../../back/shared/cronScheduler');
+const legacy = require('../fixtures/legacy-cron.json');
+const logger = { warn() {}, error() {} };
+const flush = () => new Promise(setImmediate);
 
-test('validation agrees with the actual scheduler across legacy cron syntax', () => {
-  const candidates = new Set([
-    '*', '0', '?', '0 0', '0 0 *', '0 0 * *',
-    '@yearly', '@annually', '@monthly', '@weekly', '@daily', '@midnight',
-    '@hourly', '@secondly', '@minutely', '@weekdays', '@weekends', '@reboot',
-    '0 0 1 1 * 2027', '0 0 0 L * *', '0 0 0 * * 5L',
-    '0 0 0 * * MON#2', '0 0 12 LW * *', '0 0 12 15W * *',
-    '0 0 0 ? * MON', '0 0/30 * * * ?', '0 /5 * * * *',
-  ]);
-  const fields = [
-    ['*', '?', '/5', '*/5', '0/5', '0', '01', '1-5', '1,3', '5-1', 'H', 'H/5', 'H(0-10)', 'L'],
-    ['*', '?', '/5', '*/5', '0/5', '0', '01', '1-5', '1,3', '5-1', 'H', 'H/5', 'H(0-10)', 'L'],
-    ['*', '?', '/2', '*/2', '0/2', '0', '01', '1-5', '1,3', '23-2', 'H', 'L'],
-    ['*', '?', '/2', '*/2', '1/2', '1', '01', '1-5', '1,3', 'L', 'L-1', 'LW', '15W', 'H'],
-    ['*', '?', '/2', '*/2', '1/2', '1', '01', '1-5', '1,3', 'JAN', 'jan', 'JAN-MAR', 'DEC-FEB', 'H'],
-    ['*', '?', '/2', '*/2', '0/2', '0', '7', '01', '1-5', '1,3', 'MON', 'mon', 'MON-FRI', 'FRI-MON', '5L', 'L', 'MON#2', '1#5', 'H'],
-  ];
-  fields.forEach((options, index) => options.forEach((field) => {
-    const values = ['0', '0', '0', '*', '*', '*'];
-    values[index] = field;
-    candidates.add(values.join(' '));
-  }));
-  for (const value of [...candidates]) {
-    if (value.split(' ').length === 6) {
-      candidates.add(` ${value} `);
-      candidates.add(value.split(' ').slice(1).join(' '));
+test('validation preserves legacy syntax except the explicitly added macros', () => {
+  const addedMacros = new Set(['@annually', '@midnight', '@minutely']);
+  assert.ok(legacy.validation.length > 250);
+  for (const { schedule, accepted } of legacy.validation) {
+    assert.equal(isValidCronSchedule(schedule), accepted || addedMacros.has(schedule), schedule);
+  }
+});
+
+for (const sample of legacy.times) {
+  test(`calendar compatibility: ${sample.schedule} from ${sample.currentDate}`, async (t) => {
+    const previousTZ = process.env.TZ;
+    process.env.TZ = 'UTC';
+    t.after(() => { if (previousTZ === undefined) delete process.env.TZ; else process.env.TZ = previousTZ; });
+    t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: new Date(sample.currentDate) });
+    const actual = [];
+    const job = createCronJob(sample.schedule, (date) => actual.push(date.toISOString()), { name: 'calendar', logger });
+    t.after(() => job.cancel());
+    for (const expected of sample.next) {
+      t.mock.timers.tick(new Date(expected).getTime() - Date.now());
+      await flush();
     }
-  }
-  for (const value of candidates) {
-    const job = nodeSchedule.scheduleJob(value, () => {});
-    const accepted = Boolean(job);
-    job?.cancel();
-    assert.equal(isValidCronSchedule(value), accepted, value);
-  }
-  assert.ok(candidates.size > 250);
+    assert.deepEqual(actual, sample.next);
+  });
+}
+
+test('late callbacks catch up exactly once and cancellation destroys native tasks', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: new Date('2026-09-27T00:00:00Z') });
+  const native = require('node-cron');
+  const before = native.getTasks().size;
+  const dates = [], warnings = [];
+  const job = createCronJob('* * * * * *', (date) => dates.push(date.getTime()), {
+    name: 'late', logger: { warn: (...args) => warnings.push(args), error() {} },
+  });
+  t.after(() => job.cancel());
+  t.mock.timers.tick(8000);
+  await flush();
+  assert.equal(dates.length, 8);
+  assert.equal(new Set(dates).size, 8);
+  assert.ok(warnings.length > 0);
+  job.cancel();
+  t.mock.timers.tick(5000);
+  await flush();
+  assert.equal(dates.length, 8);
+  assert.equal(native.getTasks().size, before);
+});
+
+test('callback rejection is logged and future executions continue', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: new Date('2026-09-27T00:00:00Z') });
+  const errors = [];
+  let count = 0;
+  const job = createCronJob('* * * * * *', async () => { count++; throw Error('callback failed'); }, {
+    name: 'failure', logger: { warn() {}, error: (...args) => errors.push(args) },
+  });
+  t.after(() => job.cancel());
+  t.mock.timers.tick(1000);
+  await flush();
+  t.mock.timers.tick(1000);
+  await flush();
+  assert.equal(count, 2);
+  assert.equal(errors.length, 2);
 });

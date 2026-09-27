@@ -41,8 +41,10 @@ test('recovery reconciles a surviving scheduler after missed deletes and disable
   );
   const { addCron } = load('back/schedule/addCron.ts', {
     './data': { scheduleStacks: stacks },
-    'node-schedule': {
-      scheduleJob: (id) => ({ cancel: () => cancelled.push(id) }),
+    '../shared/cronScheduler': {
+      createCronJob: (_schedule, _callback, options) => ({
+        start() {}, cancel: () => cancelled.push(options.name.split(':')[0]),
+      }),
     },
     '../shared/runCron': {},
     '../loaders/logger': { info() {}, warn() {} },
