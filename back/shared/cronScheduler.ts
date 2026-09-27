@@ -9,7 +9,6 @@ interface SchedulerLogger {
 export interface CronJob {
   start(): void;
   cancel(): void;
-  nextInvocation(): Date | null;
 }
 
 // node-cron owns timers and calendar calculation; Qinglong owns execution
@@ -83,15 +82,6 @@ export function createCronJob(
       if (cancelled) return;
       cancelled = true;
       tasks.forEach((task) => task.destroy());
-    },
-    nextInvocation() {
-      if (cancelled) return null;
-      const dates = tasks
-        .map((task) => task.getNextRun())
-        .filter((date): date is Date => date !== null);
-      return dates.length
-        ? new Date(Math.min(...dates.map((date) => date.getTime())))
-        : null;
     },
   };
   if (options.start !== false) job.start();

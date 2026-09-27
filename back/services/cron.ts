@@ -46,12 +46,20 @@ export default class CronService {
 
   private isNodeCron(cron: Crontab) {
     const { schedule, extra_schedules } = cron;
+    const fields = schedule?.trim().split(/\s+/) || [];
     // System crontab only receives portable numeric five-field expressions.
     // Extended syntax, macros and legacy shorthand use the Node scheduler.
     return (
-      schedule?.trim().split(/\s+/).length !== 5 ||
+      fields.length !== 5 ||
       /[^\d\s*,/\-]/.test(schedule || '') ||
-      Boolean(extra_schedules?.length)
+      Boolean(extra_schedules?.length) ||
+      // BusyBox treats N/step as a single value and doesn't support Sunday=7.
+      fields.some((field) => field.split(',').some((part) => /^\d+\//.test(part))) ||
+      fields[4].includes('7') ||
+      // BusyBox steps DOM from zero; its full-range day/week wildcard
+      // handling also differs from the legacy Node parser's OR semantics.
+      fields[2].includes('/') ||
+      (fields[2] !== '*' && fields[4] !== '*')
     );
   }
 

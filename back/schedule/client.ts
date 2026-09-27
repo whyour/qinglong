@@ -67,11 +67,17 @@ class Client {
     replace = false
   ): Promise<AddCronResponse> {
     await this.waitForReady(2000);
+    // Include every rule in a recovery snapshot, but bound a stuck worker.
+    const ruleCount = request.reduce(
+      (count, item) => count + 1 + (item.extra_schedules?.length || 0),
+      0,
+    );
+    const registrationTimeoutMs = Math.min(120000, 5000 + ruleCount * 5);
     return new Promise((resolve, reject) => {
       this.client.addCron(
         { crons: request, replace },
         new Metadata(),
-        { deadline: Date.now() + 5000 },
+        { deadline: Date.now() + registrationTimeoutMs },
         (err, res) => {
           if (err) {
             if (err.code === status.UNAVAILABLE || err.code === status.DEADLINE_EXCEEDED) {

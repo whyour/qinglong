@@ -25,6 +25,14 @@ test('system and node modes route extended cron once and keep portable rules in 
     const rows = [
       { id: 'plain', schedule: '*/5 0-23 * * 1,3' },
       { id: 'spaces', schedule: '  0\t0 * * *  ' },
+      { id: 'numeric-step', schedule: '0/5 * * * *' },
+      { id: 'sunday-seven', schedule: '0 0 * * 7' },
+      { id: 'day-step', schedule: '0 0 */2 * *' },
+      { id: 'restricted-days', schedule: '0 0 1-31 * 1' },
+      { id: 'restricted-week', schedule: '0 0 1 * 0-6' },
+      { id: 'annually', schedule: '@annually' },
+      { id: 'midnight', schedule: '@midnight' },
+      { id: 'minutely', schedule: '@minutely' },
       { id: 'seconds', schedule: '0 0 * * * *' },
       { id: 'question', schedule: '0 0 * * ?' },
       { id: 'last', schedule: '0 0 L * *' },
@@ -43,7 +51,7 @@ test('system and node modes route extended cron once and keep portable rules in 
     }
     await service.setCrontab({ data: rows, total: rows.length });
     assert.equal(installs, mode === 'system' ? 1 : 0);
-    for (const id of ['seconds', 'question', 'last', 'nth', 'named', 'macro', 'short', 'extra', 'once', 'boot']) {
+    for (const id of ['numeric-step', 'sunday-seven', 'day-step', 'restricted-days', 'restricted-week', 'annually', 'midnight', 'minutely', 'seconds', 'question', 'last', 'nth', 'named', 'macro', 'short', 'extra', 'once', 'boot']) {
       const line = file.split('\n').find((line) => line.endsWith(`task ${id}.js`));
       assert.ok(line.startsWith('# '), `${mode}: ${id} cannot also run from system crontab`);
     }

@@ -4,19 +4,25 @@ const load = require('../helpers/load-security-module.cjs');
 const { createCronJob } = require('../../back/shared/cronScheduler');
 const logger = { info() {}, warn() {}, error() {} };
 
-test('native calendar skips nonexistent spring time and duplicate fall hour', (t) => {
+test('native calendar skips nonexistent spring time and duplicate fall hour', async (t) => {
   const previous = process.env.TZ;
   process.env.TZ = 'America/New_York';
   t.after(() => { if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous; });
   t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: new Date('2026-03-08T05:00:00Z') });
-  const spring = createCronJob('0 30 2 * * *', () => {}, { name: 'spring', logger });
+  const springRuns = [];
+  const spring = createCronJob('0 30 2 * * *', (date) => springRuns.push(date.toISOString()), { name: 'spring', logger });
   t.after(() => spring.cancel());
-  assert.equal(spring.nextInvocation().toISOString(), '2026-03-09T06:30:00.000Z');
+  t.mock.timers.tick(new Date('2026-03-09T06:30:00Z') - Date.now());
+  await new Promise(setImmediate);
+  assert.deepEqual(springRuns, ['2026-03-09T06:30:00.000Z']);
   spring.cancel();
   t.mock.timers.setTime(new Date('2026-11-01T05:30:00Z').getTime());
-  const fall = createCronJob('0 30 1 * * *', () => {}, { name: 'fall', logger });
+  const fallRuns = [];
+  const fall = createCronJob('0 30 1 * * *', (date) => fallRuns.push(date.toISOString()), { name: 'fall', logger });
   t.after(() => fall.cancel());
-  assert.equal(fall.nextInvocation().toISOString(), '2026-11-02T06:30:00.000Z');
+  t.mock.timers.tick(new Date('2026-11-02T06:30:00Z') - Date.now());
+  await new Promise(setImmediate);
+  assert.deepEqual(fallRuns, ['2026-11-02T06:30:00.000Z']);
 });
 
 test('construction failure cleans staged jobs and preserves the running snapshot', async () => {
