@@ -4,10 +4,13 @@ import { ScheduleType } from '../interface/schedule';
 
 const aliases: Record<string, string> = {
   '@yearly': '0 0 0 1 1 *',
+  '@annually': '0 0 0 1 1 *',
   '@monthly': '0 0 0 1 * *',
   '@weekly': '0 0 0 * * 0',
   '@daily': '0 0 0 * * *',
+  '@midnight': '0 0 0 * * *',
   '@hourly': '0 0 * * * *',
+  '@minutely': '0 * * * * *',
 };
 
 export interface CronSchedule {
@@ -21,7 +24,7 @@ export interface CronSchedule {
 const scheduleCache = new Map<string, CronSchedule>();
 
 // Canonicalize legacy shorthand, aliases, names and numeric-start steps before
-// node-cron sees them. Keep the old accepted syntax boundary (no H or bare /N).
+// node-cron sees them. Extend legacy aliases explicitly; reject H and bare /N.
 export function parseCronSchedule(schedule: unknown): CronSchedule {
   if (typeof schedule !== 'string' || !schedule.trim()) {
     throw new Error('Invalid cron schedule');

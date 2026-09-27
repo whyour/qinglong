@@ -6,10 +6,11 @@ const legacy = require('../fixtures/legacy-cron.json');
 const logger = { warn() {}, error() {} };
 const flush = () => new Promise(setImmediate);
 
-test('validation preserves the captured legacy syntax boundary', () => {
+test('validation preserves legacy syntax except the explicitly added macros', () => {
+  const addedMacros = new Set(['@annually', '@midnight', '@minutely']);
   assert.ok(legacy.validation.length > 250);
   for (const { schedule, accepted } of legacy.validation) {
-    assert.equal(isValidCronSchedule(schedule), accepted, schedule);
+    assert.equal(isValidCronSchedule(schedule), accepted || addedMacros.has(schedule), schedule);
   }
 });
 
