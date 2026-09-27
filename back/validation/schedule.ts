@@ -17,11 +17,6 @@ const validateSchedule = (value: string, helpers: any) => {
   if (/\s\/\d/.test(value) || /^\/\d/.test(value)) {
     return helpers.error('any.invalid');
   }
-  // 检测 ? 字符：Quartz cron 语法，node-schedule 在大多数字段上返回 null
-  if (/\?/.test(value)) {
-    return helpers.error('any.invalid');
-  }
-
   try {
     if (CronExpressionParser.parse(value).hasNext()) {
       return value;

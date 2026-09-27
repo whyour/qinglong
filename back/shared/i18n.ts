@@ -142,10 +142,10 @@ const messages: Record<string, Record<string, string>> = {
       'Scheduler registration failed, task update rolled back',
     '调度器注册失败，任务启用已回滚':
       'Scheduler registration failed, task enable rolled back',
-    '任务ID %s: 无效的 cron 表达式 "%s"（不支持裸 /N 步长和 ? 字符）':
-      'Task ID %s: invalid cron expression "%s" (bare /N steps and ? character not supported)',
-    '任务ID %s (extra_schedule): 无效的 cron 表达式 "%s"（不支持裸 /N 步长和 ? 字符）':
-      'Task ID %s (extra_schedule): invalid cron expression "%s" (bare /N steps and ? character not supported)',
+    '任务ID %s: 无效的 cron 表达式 "%s"':
+      'Task ID %s: invalid cron expression "%s"',
+    '任务ID %s (extra_schedule): 无效的 cron 表达式 "%s"':
+      'Task ID %s (extra_schedule): invalid cron expression "%s"',
   },
 };
 

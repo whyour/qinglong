@@ -1,6 +1,7 @@
 import { ServerUnaryCall, sendUnaryData, status } from '@grpc/grpc-js';
 import { AddCronRequest, AddCronResponse } from '../protos/cron';
 import nodeSchedule from 'node-schedule';
+import CronExpressionParser from 'cron-parser';
 import { scheduleStacks } from './data';
 import { runCron } from '../shared/runCron';
 import Logger from '../loaders/logger';
@@ -17,12 +18,13 @@ const isValidCronField = (cron: string): boolean => {
   if (/\s\/\d/.test(cron) || /^\/\d/.test(cron)) {
     return false;
   }
-  // 检测 ? 字符：Quartz cron 语法，node-schedule 在大多数位置返回 null
-  // cron-parser 接受但 node-schedule 拒绝，提前拦截
-  if (/\?/.test(cron)) {
+  // 日期和星期字段的 ? 是合法通配符。解析完整表达式，避免将单独的
+  // ? 等无效规则放行后，在替换恢复快照时清除已有任务。
+  try {
+    return CronExpressionParser.parse(cron).hasNext();
+  } catch {
     return false;
   }
-  return true;
 };
 
 const addCron = (
@@ -38,7 +40,7 @@ const addCron = (
     if (!isValidCronField(schedule)) {
       validationErrors.push(
         tf(
-          '任务ID %s: 无效的 cron 表达式 "%s"（不支持裸 /N 步长和 ? 字符）',
+          '任务ID %s: 无效的 cron 表达式 "%s"',
           String(id),
           schedule,
         ),
@@ -50,7 +52,7 @@ const addCron = (
         if (!isValidCronField(x.schedule)) {
           validationErrors.push(
             tf(
-              '任务ID %s (extra_schedule): 无效的 cron 表达式 "%s"（不支持裸 /N 步长和 ? 字符）',
+              '任务ID %s (extra_schedule): 无效的 cron 表达式 "%s"',
               String(id),
               x.schedule,
             ),

@@ -1102,7 +1102,7 @@ export default class CronService {
         await cronClient.addCron(regularCrons, requireScheduler);
       } catch (error: any) {
         this.logger.warn(
-          '[crontab] Failed to register cron job in scheduler:',
+          '[crontab] Failed to register cron job in scheduler: %s',
           error?.message || error,
         );
         if (requireScheduler) throw error;

@@ -110,7 +110,7 @@ t() {
   fi
   [[ -z $msg ]] && msg="$key"
   # shellcheck disable=SC2059
-  printf "$msg\n" "$@"
+  printf -- "$msg\n" "$@"
 }
 
 set_proxy() {
