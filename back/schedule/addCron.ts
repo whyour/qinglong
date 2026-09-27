@@ -1,30 +1,15 @@
 import { ServerUnaryCall, sendUnaryData, status } from '@grpc/grpc-js';
 import { AddCronRequest, AddCronResponse } from '../protos/cron';
 import nodeSchedule from 'node-schedule';
-import CronExpressionParser from 'cron-parser';
+import { isValidCronSchedule } from '../shared/cronSchedule';
 import { scheduleStacks } from './data';
 import { runCron } from '../shared/runCron';
 import Logger from '../loaders/logger';
 import { tf } from '../shared/i18n';
 
-/**
- * 预校验 cron 表达式，检测 node-schedule 会拒绝但 cron-parser 会接受的 pattern。
- * node-schedule 对 bare /N（字段以 / 开头，如前无星号/数字前缀的 /6）返回 null，
- * 提前拦截避免走 scheduleJob 后才发现无效。
- */
+// Validate the entire batch before replacing any existing jobs.
 const isValidCronField = (cron: string): boolean => {
-  // 检测 bare /N 模式：字段以 / 开头如 "/6"，或空格后紧跟 "/6"
-  // node-schedule 会对这种字段返回 null
-  if (/\s\/\d/.test(cron) || /^\/\d/.test(cron)) {
-    return false;
-  }
-  // 日期和星期字段的 ? 是合法通配符。解析完整表达式，避免将单独的
-  // ? 等无效规则放行后，在替换恢复快照时清除已有任务。
-  try {
-    return CronExpressionParser.parse(cron).hasNext();
-  } catch {
-    return false;
-  }
+  return isValidCronSchedule(cron);
 };
 
 const addCron = (

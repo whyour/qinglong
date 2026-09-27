@@ -1,8 +1,9 @@
 version: 2.22.0
 changeLogLink: https://github.com/whyour/qinglong/blob/master/docs/releases/2.22.0.md
-publishTime: 2026-09-27 1615
+publishTime: 2026-09-27 1643
 changeLog: |
   修复更新后含 ? 的历史定时规则导致面板 503，以及 ql check 的 printf 报错（#3078）
+  无效任务不再阻止面板启动；统一调度表达式校验并修复扩展规则的调度器分配
   1. 新增独立远程 CLI，覆盖任务、订阅、环境变量、配置、脚本等 OpenAPI
   2. 新增可选面板内部 TypeScript 工具，默认保留 Shell 入口
   3. 仪表盘支持查看今日成功和失败任务明细

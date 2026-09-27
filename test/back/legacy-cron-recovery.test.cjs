@@ -22,7 +22,7 @@ test('API accepts legacy question-mark schedules but rejects malformed cron', ()
   for (const schedule of [...legacySchedules, '@once', '@boot']) {
     assert.equal(scheduleSchema.validate(schedule).error, undefined, schedule);
   }
-  for (const schedule of ['?', '0 /5 * * * ?', '0 70 * * * ?', 'not a cron']) {
+  for (const schedule of ['@bogus', '0 /5 * * * ?', '0 70 * * * ?', 'not a cron']) {
     assert.ok(scheduleSchema.validate(schedule).error, schedule);
   }
 });
@@ -57,7 +57,7 @@ test('legacy main and extra schedules restore real jobs and healthy readiness', 
     assert.ok(jobs.every((job) => job.nextInvocation()));
   }
   const previousJobs = [...stacks.values()].flat();
-  for (const schedule of ['?', '0 /5 * * * ?', '0 70 * * * ?']) {
+  for (const schedule of ['@bogus', '0 /5 * * * ?', '0 70 * * * ?']) {
     for (const invalid of [
       { ...crons[0], schedule },
       { ...crons[0], extra_schedules: [{ schedule }] },

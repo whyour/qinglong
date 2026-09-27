@@ -42,6 +42,9 @@ dependencies:
   cron-parser:
     specifier: ^5.4.0
     version: 5.4.0
+  cron-parser-v4:
+    specifier: npm:cron-parser@4.9.0
+    version: /cron-parser@4.9.0
   cross-spawn:
     specifier: ^7.0.6
     version: 7.0.6

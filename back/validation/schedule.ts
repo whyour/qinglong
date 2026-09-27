@@ -1,5 +1,5 @@
 import { Joi } from 'celebrate';
-import CronExpressionParser from 'cron-parser';
+import { isValidCronSchedule } from '../shared/cronSchedule';
 import { ScheduleType } from '../interface/schedule';
 import path from 'path';
 import config from '../config';
@@ -12,18 +12,7 @@ const validateSchedule = (value: string, helpers: any) => {
     return value;
   }
 
-  // 检测裸 /N 模式：cron-parser 会接受，但 node-schedule 会返回 null
-  // 提前拦截，避免任务入库后调度器注册失败
-  if (/\s\/\d/.test(value) || /^\/\d/.test(value)) {
-    return helpers.error('any.invalid');
-  }
-  try {
-    if (CronExpressionParser.parse(value).hasNext()) {
-      return value;
-    }
-  } catch (e) {
-    return helpers.error('any.invalid');
-  }
+  if (isValidCronSchedule(value)) return value;
   return helpers.error('any.invalid');
 };
 

@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { getInvalidCronSchedules } from '../shared/cronSchedule';
 import {
   withSchedulerMutation,
   schedulerRegistrationError,
@@ -46,10 +47,13 @@ export default class CronService {
 
   private isNodeCron(cron: Crontab) {
     const { schedule, extra_schedules } = cron;
-    if (Number(schedule?.split(/ +/).length) > 5 || extra_schedules?.length) {
-      return true;
-    }
-    return false;
+    // System crontab only receives portable numeric five-field expressions.
+    // Extended syntax, macros and legacy shorthand belong to node-schedule.
+    return (
+      schedule?.trim().split(/\s+/).length !== 5 ||
+      /[^\d\s*,/\-]/.test(schedule || '') ||
+      Boolean(extra_schedules?.length)
+    );
   }
 
   private get schedulerMode(): 'system' | 'node' {
@@ -1075,6 +1079,20 @@ export default class CronService {
   public async autosave_crontab(requireScheduler = false) {
     return withSchedulerMutation(async () => {
       const tabs = await this.crontabs();
+      // A bad persisted rule must not block startup or all other schedules.
+      // Keep the DB row editable; omit it from both runtime scheduler snapshots.
+      tabs.data = tabs.data.filter((doc) => {
+        if (doc.isDisabled === 1) return true;
+        const invalidSchedules = getInvalidCronSchedules(doc);
+        if (invalidSchedules.length === 0) return true;
+        this.logger.warn(
+          '[crontab] Skipping task with invalid schedule (id=%s, name=%s): %s',
+          doc.id,
+          doc.name || '',
+          JSON.stringify(invalidSchedules),
+        );
+        return false;
+      });
       const regularCrons = tabs.data
         .filter(
           (x) =>
