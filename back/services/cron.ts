@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { getInvalidCronSchedules } from '../shared/cronSchedule';
+import { getInvalidCronSchedules, isValidCronSchedule } from '../shared/cronSchedule';
 import {
   withSchedulerMutation,
   schedulerRegistrationError,
@@ -14,7 +14,6 @@ import {
 } from '../data/runningInstance';
 import { exec, execSync } from 'child_process';
 import fs from 'fs/promises';
-import CronExpressionParser from 'cron-parser';
 import {
   getFileContentByName,
   fileExist,
@@ -48,7 +47,7 @@ export default class CronService {
   private isNodeCron(cron: Crontab) {
     const { schedule, extra_schedules } = cron;
     // System crontab only receives portable numeric five-field expressions.
-    // Extended syntax, macros and legacy shorthand belong to node-schedule.
+    // Extended syntax, macros and legacy shorthand use the Node scheduler.
     return (
       schedule?.trim().split(/\s+/).length !== 5 ||
       /[^\d\s*,/\-]/.test(schedule || '') ||
@@ -1057,7 +1056,7 @@ export default class CronService {
         if (
           command &&
           schedule &&
-          CronExpressionParser.parse(schedule).hasNext()
+          isValidCronSchedule(schedule)
         ) {
           const name = namePrefix + '_' + index;
 

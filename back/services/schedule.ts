@@ -1,6 +1,6 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import nodeSchedule from 'node-schedule';
+import { createCronJob, CronJob } from '../shared/cronScheduler';
 import { ChildProcessWithoutNullStreams } from 'child_process';
 import {
   ToadScheduler,
@@ -11,7 +11,11 @@ import {
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
 import { spawn } from 'cross-spawn';
-import { observeChildProcess, asError, ProcessResult } from '../shared/childProcess';
+import {
+  observeChildProcess,
+  asError,
+  ProcessResult,
+} from '../shared/childProcess';
 
 export interface ScheduleTaskType {
   id?: number;
@@ -38,7 +42,7 @@ export interface TaskCallbacks {
 
 @Service()
 export default class ScheduleService {
-  private scheduleStacks = new Map<string, nodeSchedule.Job>();
+  private scheduleStacks = new Map<string, CronJob>();
 
   private intervalSchedule = new ToadScheduler();
 
@@ -159,18 +163,33 @@ export default class ScheduleService {
       command,
     );
 
-    this.scheduleStacks.set(
-      _id,
-      nodeSchedule.scheduleJob(_id, schedule, async () => {
-        this.runTask(command, callbacks, {
-          name,
+    if (schedule) {
+      try {
+        const job = createCronJob(
           schedule,
-          command,
-          id: _id,
-          runOrigin,
-        });
-      }),
-    );
+          () =>
+            this.runTask(command, callbacks, {
+              name,
+              schedule,
+              command,
+              id: _id,
+              runOrigin,
+            }),
+          { name: `${_id}: ${name || ''}`, logger: this.logger, start: false },
+        );
+        this.scheduleStacks.get(_id)?.cancel();
+        this.scheduleStacks.set(_id, job);
+        job.start();
+      } catch (error) {
+        // A persisted invalid subscription must not become an unhandled startup rejection.
+        this.logger.warn(
+          '[panel][跳过无效定时任务] 任务ID: %s, cron: %s, 错误: %s',
+          _id,
+          schedule,
+          asError(error).message,
+        );
+      }
+    }
 
     if (runImmediately) {
       this.runTask(command, callbacks, {
