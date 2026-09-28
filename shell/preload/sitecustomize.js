@@ -159,9 +159,13 @@ try {
 
   run();
 
-  const { sendNotify } = require('./__ql_notify__.js');
   global.QLAPI = {
-    notify: sendNotify,
+    notify(...args) {
+      // Keep notification dependencies out of ordinary script startup.
+      // require caches the module after the first notification.
+      const { sendNotify } = require('./__ql_notify__.js');
+      return sendNotify.apply(this, args);
+    },
     ...client,
   };
 } catch (error) {

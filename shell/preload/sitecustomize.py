@@ -129,10 +129,12 @@ try:
 
     run()
 
-    from __ql_notify__ import send
-
     class BaseApi(Client):
         def notify(self, *args, **kwargs):
+            # Most scripts never send a notification. Python caches this
+            # module after the first call, including its channel dependencies.
+            from __ql_notify__ import send
+
             return send(*args, **kwargs)
 
     QLAPI = BaseApi()
