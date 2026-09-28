@@ -18,6 +18,12 @@ single_hanle() {
   exit 1
 }
 
+run_shell_script() {
+  # Preserve inherited variables/functions, but contain exit, exec and shell
+  # options so the task wrapper can run after hooks and report completion.
+  ( . "$@" )
+}
+
 define_program() {
   local file_param=$1
   if [[ $file_param == *.js ]] || [[ $file_param == *.mjs ]]; then
@@ -25,7 +31,7 @@ define_program() {
   elif [[ $file_param == *.py ]] || [[ $file_param == *.pyc ]]; then
     which_program="python3"
   elif [[ $file_param == *.sh ]]; then
-    which_program="."
+    which_program="run_shell_script"
   elif [[ $file_param == *.ts ]]; then
     which_program="ts-node-transpile-only"
   else

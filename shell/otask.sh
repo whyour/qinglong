@@ -84,7 +84,9 @@ env_str_to_array() {
 }
 
 clear_non_sh_env() {
-  if [[ $file_param != *.sh ]]; then
+  # Only automatic Node/Python preloads reconstruct the generated environment.
+  # Explicit interpreters and other commands must keep the shell-loaded values.
+  if [[ $isJsOrPythonFile == 'true' ]]; then
     clear_env
   fi
 }

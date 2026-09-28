@@ -24,7 +24,7 @@ order remain available. This caches the dependency directory, not its contents.
 | `task script.py` / `.pyc` | Python preload imports generated environment, runs the shell/command before hooks, imports `task_before.py`, then applies account selection | `QLAPI.notify(...)` imports `__ql_notify__` on first call |
 | `task script.js` / `.mjs` / `.ts` | Node preload imports generated environment, runs shell/command before hooks, requires `task_before.js`, then applies account selection | `QLAPI.notify(...)` requires `__ql_notify__.js` on first call |
 | `task script.sh` | Shell sources the generated environment and runs shell before hooks | No automatic Python/Node notification module |
-| Explicit interpreter or other command, e.g. `task python3 script.py` | Existing generic-command path uses shell environment/before hooks; it does not automatically install the Python/Node preload | No automatic notification module unless configured by the caller |
+| Explicit interpreter or other command, e.g. `task python3 script.py` | Retains generated environment and shell before-hook exports; it does not automatically install the Python/Node preload | No automatic notification module unless configured by the caller |
 
 TypeScript uses `ts-node-transpile-only`; MJS uses the same Node preload plus the
 ESM loader. There are no separate built-in Ruby, Go, Java or PHP preload modules.
@@ -37,6 +37,13 @@ starts a child shell/Python to capture that environment; Node's preload starts a
 child shell/Node. Node also still loads its gRPC client eagerly. These are remaining
 startup costs, not work performed by the cron library, and are not removed by this
 change.
+
+Shell scripts run in a child shell that inherits the wrapper's environment and
+before-hook functions. This lets the wrapper run its after hooks and report the
+exit status even when a script calls `exit`, replaces itself with `exec`, or fails
+under `set -e`. The script's own EXIT trap still runs in the child. Changes made
+inside the script (variables, working directory, functions and shell options)
+do not propagate back to the wrapper or its after hooks.
 
 ## Lazy notifications
 
