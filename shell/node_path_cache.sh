@@ -65,7 +65,9 @@ ql_read_node_path_cache() {
 # the caller's descriptors. A crashed refresher releases the kernel lock.
 ql_refresh_node_global_path() (
   local cache="$1" key="$2" now result previous_umask
-  local lock="${cache}.lock"
+  # Keep one persistent lock per owner. Removing per-key lock files could
+  # split concurrent waiters across different inodes during cache cleanup.
+  local lock="${dir_tmp}/pnpm-root-${EUID}.lock"
   previous_umask=$(umask)
   umask 077
   if type -P flock &>/dev/null && mkdir -p -- "$dir_tmp" 2>/dev/null; then
@@ -93,6 +95,10 @@ ql_refresh_node_global_path() (
 
   # Private lock creation must not change pnpm's inherited creation mask.
   umask "$previous_umask"
+  # Warm lookups never scan the directory. Retire old environment records on
+  # refresh, while preserving the shared lock and unrelated cache files.
+  find "$dir_tmp" -maxdepth 1 -type f -user "$EUID" \
+    -name "pnpm-root-${EUID}-*.cache" -mmin +60 -delete 2>/dev/null || true
   now=${EPOCHSECONDS:-$(date +%s)}
   result=$(pnpm root -g 9>&- 2>/dev/null) || return $?
   # Never cache failed, empty, multiline or non-absolute answers.
@@ -119,8 +125,10 @@ ql_get_node_global_path() {
   fi
 
   local key cache
-  cache="${dir_tmp}/pnpm-root-${EUID}.cache"
   key=$(ql_node_path_cache_key) || { pnpm root -g 2>/dev/null; return $?; }
+  # Node and crond may have different working directories/configuration.
+  # Preserve both discoveries instead of evicting each other on every run.
+  cache="${dir_tmp}/pnpm-root-${EUID}-${key// /-}.cache"
   if ql_read_node_path_cache "$cache" "$key"; then
     return 0
   fi

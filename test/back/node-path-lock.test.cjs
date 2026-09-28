@@ -51,7 +51,11 @@ function fixture(t) {
     fs.existsSync(env.CALLS)
       ? fs.readFileSync(env.CALLS, 'utf8').trim().split('\n').length
       : 0;
-  const cache = path.join(env.dir_tmp, `pnpm-root-${process.getuid()}.cache`);
+  const key = run({}, '. "$HELPER"; ql_node_path_cache_key').stdout.trim();
+  const cache = path.join(
+    env.dir_tmp,
+    `pnpm-root-${process.getuid()}-${key.replace(' ', '-')}.cache`,
+  );
   return {
     root,
     bin,
@@ -61,7 +65,7 @@ function fixture(t) {
     asyncRun,
     count,
     cache,
-    lock: cache + '.lock',
+    lock: path.join(env.dir_tmp, `pnpm-root-${process.getuid()}.lock`),
   };
 }
 function check(r, output = '/test/global/node_modules') {
