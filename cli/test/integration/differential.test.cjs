@@ -7,7 +7,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 const { createContext, sourceEnvironment } = require('../../dist/internal/runtime/context');
 const { executeTask } = require('../../dist/internal/execution/taskRunner');
 
-test('unmodified legacy Shell and TS agree on shell hook state and account modes', async (t) => {
+test('Shell and CLI agree on isolated script state and account modes', async (t) => {
   const root = await fs.realpath(
     await fs.mkdtemp(path.join(os.tmpdir(), 'ql-differential-')),
   );
@@ -110,13 +110,13 @@ test('unmodified legacy Shell and TS agree on shell hook state and account modes
     async () => {
       const cases = [
         { name: 'return', script: 'return 7', code: 7, legacy: 0, after: true },
-        { name: 'exit', script: 'exit 7', code: 7, legacy: 7, after: false },
+        { name: 'exit', script: 'exit 7', code: 7, legacy: 0, after: true },
         {
           name: 'errexit',
           script: 'set -e; false',
           code: 1,
-          legacy: 1,
-          after: false,
+          legacy: 0,
+          after: true,
         },
         {
           name: 'trap-return',
@@ -130,8 +130,8 @@ test('unmodified legacy Shell and TS agree on shell hook state and account modes
           name: 'trap-exit',
           script: 'trap \'printf "exit-trap\\n" >> "$TRACE"\' EXIT; exit 7',
           code: 7,
-          legacy: 7,
-          after: false,
+          legacy: 0,
+          after: true,
           trap: true,
         },
       ];
@@ -174,8 +174,8 @@ test('unmodified legacy Shell and TS agree on shell hook state and account modes
         assert.equal(result.exitCode, item.code, item.name);
         const expected = [
           'before',
-          ...(item.after ? [`after:${item.code}`] : []),
           ...(item.trap ? ['exit-trap'] : []),
+          ...(item.after ? [`after:${item.code}`] : []),
         ];
         for (const file of [legacyTrace, modernTrace])
           assert.deepEqual(

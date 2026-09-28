@@ -70,10 +70,26 @@ if [ -n "$__ql_timeout" ]; then
 fi
 if [ "$__ql_command" = true ]; then
   "\${__ql_args[@]}" "\${__ql_script_args[@]}"
+  _task_exit_code=$?
 else
-  . "\${__ql_args[0]}" "\${__ql_script_args[@]}"
+  # Match task.sh: keep script exit/exec/options inside a child shell while
+  # retaining before-hook variables and functions for the script.
+  # Keep the supervisor alive until the child's signal/EXIT traps finish, but
+  # do not turn user cancellation into an ordinary completion with after hooks.
+  __ql_saved_signals=$(trap -p INT TERM HUP QUIT ALRM TSTP)
+  __ql_cancel_code=''
+  trap '__ql_cancel_code=$((128 + $(kill -l INT)))' INT
+  trap '__ql_cancel_code=$((128 + $(kill -l TERM)))' TERM
+  trap '__ql_cancel_code=$((128 + $(kill -l HUP)))' HUP
+  trap '__ql_cancel_code=$((128 + $(kill -l QUIT)))' QUIT
+  trap '__ql_cancel_code=$((128 + $(kill -l ALRM)))' ALRM
+  trap '__ql_cancel_code=$((128 + $(kill -l TSTP)))' TSTP
+  ( . "\${__ql_args[0]}" "\${__ql_script_args[@]}" )
+  _task_exit_code=$?
+  trap - INT TERM HUP QUIT ALRM TSTP
+  eval "$__ql_saved_signals"
+  if [ -n "$__ql_cancel_code" ] && ! [ -f "$__ql_timeout" ]; then exit "$__ql_cancel_code"; fi
 fi
-_task_exit_code=$?
 if [ -n "$__ql_timeout" ] && [ -f "$__ql_timeout" ]; then _task_exit_code=124; fi
 __ql_run_after
 exit "$_task_exit_code"

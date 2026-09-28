@@ -445,7 +445,7 @@ test('hook exports reach scripts and after hooks share shell state with inline c
   assert.match(log, /hook:before:inline:after:7/);
 });
 
-test('ordinary shell tasks share unexported variables and functions across before script and after hooks', async (t) => {
+test('shell tasks inherit before-hook state without leaking script state into after hooks', async (t) => {
   const { executeTask } = require('../../dist/internal/execution/taskRunner');
   const root = sandbox(t);
   const context = createContext(
@@ -464,7 +464,7 @@ test('ordinary shell tasks share unexported variables and functions across befor
   );
   fs.writeFileSync(
     context.paths.file_task_after,
-    'script_function\nprintf "after:%s:%s:%s\\n" "$before_value" "$script_value" "$_task_exit_code"\n',
+    'if declare -F script_function >/dev/null; then exit 99; fi\nprintf "after:%s:%s:%s\\n" "$before_value" "${script_value-unset}" "$_task_exit_code"\n',
   );
   const result = await executeTask(context, {
     argv: ['shared.sh'],
@@ -478,7 +478,7 @@ test('ordinary shell tasks share unexported variables and functions across befor
   );
   assert.match(
     log,
-    /before:private\narg:space value\nscript:changed\nafter:private:changed:7/,
+    /before:private\narg:space value\nafter:private:unset:7/,
   );
 });
 
@@ -681,7 +681,7 @@ test('designated shell accounts retain hook functions and script state in a shar
     path.join(context.paths.dir_log, result.logPath),
     'utf8',
   );
-  assert.match(log, /selected:third&first\nafter:third&first:from_script:4/);
+  assert.match(log, /selected:third&first\nafter:third&first::4/);
 });
 
 test('lifecycle reports share execution identity and statistics survive a rejected final status', async (t) => {
