@@ -59,3 +59,20 @@ resolved.
 Provider initialization, including provider configuration reads, now happens at
 first use. A script's explicit `import __ql_notify__`, `require(...)`, or independent
 notification helper still loads that module immediately.
+
+## Task timeouts
+
+`task -m DURATION ...` also applies to sourced Shell scripts. The timeout worker
+inherits before-hook variables, arrays and functions without serializing them.
+At the deadline, the worker's process group receives TERM, followed by KILL after
+0.5 seconds, so ordinary child processes cannot continue after the timeout.
+Explicit interpreters and other commands use the same mechanism. Processes that
+intentionally create a separate session/process group are outside this boundary.
+The wrapper records status 124 and runs its after hook; concurrent account mode
+retains its existing aggregate status behavior. Zero disables the timeout.
+
+Cron executions waiting for a concurrency slot retain their schedule revision.
+Disabling, deleting or replacing that revision prevents its queued executions
+from starting when a slot becomes available. Already running executions retain
+the existing stop behavior. Invalidated callbacks do not count against a new
+revision's limit of five pending/running executions.

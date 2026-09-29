@@ -68,7 +68,11 @@ const addCron = (
             schedule,
             async () => {
               Logger.info('[schedule][准备运行任务] 命令: %s', item.command);
-              await runCron(item.command, item);
+              await runCron(
+                item.command,
+                item,
+                () => scheduleStacks.get(item.id) === jobs,
+              );
             },
             {
               name: `${item.id}: ${item.name || ''}`,

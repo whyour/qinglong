@@ -50,11 +50,9 @@ class TaskLimit {
             Buffer.from(tlsConfig.clientCert),
           )
         : credentials.createInsecure();
-      this._client = new ApiClient(
-        `localhost:${config.grpcPort}`,
-        creds,
-        { 'grpc.enable_http_proxy': 0 },
-      );
+      this._client = new ApiClient(`localhost:${config.grpcPort}`, creds, {
+        'grpc.enable_http_proxy': 0,
+      });
     }
     return this._client;
   }
@@ -113,12 +111,15 @@ class TaskLimit {
     }
   }
 
-  public removeQueuedCron(id: string) {
+  public removeQueuedCron(id: string, completed?: ICronFn<any>) {
     if (this.queuedCrons.has(id)) {
       const runs = this.queuedCrons.get(id);
       if (runs && runs.length > 0) {
-        runs.pop();
-        this.queuedCrons.set(id, runs);
+        const remaining = completed
+          ? runs.filter((run) => run !== completed)
+          : runs.slice(0, -1);
+        if (remaining.length) this.queuedCrons.set(id, remaining);
+        else this.queuedCrons.delete(id);
       }
     }
   }
@@ -143,9 +144,15 @@ class TaskLimit {
     cron: TCron,
     fn: ICronFn<T>,
     options?: Partial<QueueAddOptions>,
+    isCurrent: () => boolean = () => true,
   ): Promise<T | void> {
+    if (!isCurrent()) return;
     fn.cron = cron;
-    let runs = this.queuedCrons.get(cron.id);
+    fn.isCurrent = isCurrent;
+    // Invalidated snapshots must not consume the new revision's repeat budget.
+    const runs = this.queuedCrons
+      .get(cron.id)
+      ?.filter((run) => run.isCurrent?.() !== false);
     const result = runs?.length ? [...runs, fn] : [fn];
     const repeatTimes = this.repeatCronNotifyMap.get(cron.id) || 0;
     if (result?.length > 5) {

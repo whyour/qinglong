@@ -164,7 +164,7 @@ run_normal() {
   if [[ $isJsOrPythonFile == 'false' ]]; then
     clear_non_sh_env
   fi
-  $timeoutCmd $which_program $file_param "${script_params[@]}"
+  run_task_command $which_program $file_param "${script_params[@]}"
 }
 
 handle_env_split() {
@@ -203,7 +203,7 @@ run_concurrent() {
       export "${env_param}=${array[$i - 1]}"
       clear_non_sh_env
     fi
-    eval envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
+    eval envParam="${env_param}" numParam="${i}" run_task_command $which_program $file_param "${script_params[@]}" &>$single_log_path &
   done
 
   wait
@@ -243,7 +243,7 @@ run_designated() {
 
   enter_script_workdir
 
-  envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
+  envParam="${env_param}" numParam="${num_param}" run_task_command $which_program $file_param "${script_params[@]}"
 }
 
 ## 运行其他命令
@@ -299,7 +299,7 @@ run_else() {
   fi
 
   clear_non_sh_env
-  $timeoutCmd $which_program $file_param "$@"
+  run_task_command $which_program $file_param "$@"
 }
 
 check_file() {
@@ -336,10 +336,6 @@ check_nounset() {
 
 main() {
   if [[ $1 == *.js ]] || [[ $1 == *.mjs ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
-    if [[ $1 == *.sh ]]; then
-      timeoutCmd=""
-    fi
-
     case $# in
     1)
       run_normal "$1"

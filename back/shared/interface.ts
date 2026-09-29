@@ -18,6 +18,7 @@ export interface IDependencyFn<T> {
 export interface ICronFn<T> {
   (): Promise<T>;
   cron?: TCron;
+  isCurrent?: () => boolean;
 }
 
 export interface ISchedule {

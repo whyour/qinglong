@@ -10,7 +10,7 @@ test('legacy Shell and TS resolve executable paths after selecting the working d
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const dir of ['shell/preload', 'shell/lang', 'data/config', 'data/scripts/bin', 'data/scripts/custom', 'data/log', 'static/build', 'bin'])
     fs.mkdirSync(path.join(root, dir), { recursive: true });
-  for (const name of ['task.sh', 'otask.sh', 'share.sh', 'api.sh', 'env.sh'])
+  for (const name of ['task.sh', 'task-timeout.sh', 'otask.sh', 'share.sh', 'api.sh', 'env.sh'])
     fs.copyFileSync(path.resolve(__dirname, '../../../shell', name), path.join(root, 'shell', name));
   for (const name of ['zh.sh', 'en.sh'])
     fs.copyFileSync(path.resolve(__dirname, '../../../shell/lang', name), path.join(root, 'shell/lang', name));

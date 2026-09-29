@@ -31,7 +31,7 @@ test('Shell and CLI agree on isolated script state and account modes', async (t)
     path.join(root, 'static/build'),
   ])
     await fs.mkdir(directory, { recursive: true });
-  for (const name of ['task.sh', 'otask.sh', 'share.sh', 'api.sh', 'env.sh'])
+  for (const name of ['task.sh', 'task-timeout.sh', 'otask.sh', 'share.sh', 'api.sh', 'env.sh'])
     await fs.copyFile(
       path.resolve(__dirname, '../../../shell', name),
       path.join(context.paths.dir_shell, name),
@@ -355,6 +355,7 @@ t() { :; }
 sleep() { printf DELAYED; }
 enter_script_workdir() { :; }
 run_else() { :; }
+run_task_command() { "$@"; }
 which_program=true
 main "$@"
 `,

@@ -8,14 +8,22 @@ import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
 import dayjs from 'dayjs';
 import { observeChildProcess, asError } from './childProcess';
 
-export function runCron(cmd: string, cron: ICron): Promise<number | void> {
-  return taskLimit.runWithCronLimit(cron, async () => {
+export function runCron(
+  cmd: string,
+  cron: ICron,
+  isCurrent: () => boolean = () => true,
+): Promise<number | void> {
+  const execute = async () => {
     try {
+      if (!isCurrent()) return;
       // Check if the cron is already running and stop it (only if multiple instances are not allowed)
       try {
         const existingCron = await CrontabModel.findOne({
           where: { id: Number(cron.id) },
         });
+
+        // A mutation may commit while this queued run is reading the database.
+        if (!isCurrent() || !existingCron || existingCron.isDisabled) return;
 
         // Default to single instance mode (0) for backward compatibility
         const allowSingleInstances =
@@ -56,6 +64,8 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
         throw error;
       }
 
+      // In particular, invalidation can happen while stopping a previous run.
+      if (!isCurrent()) return;
       Logger.info(
         `[schedule][开始执行任务] 参数 ${JSON.stringify({
           ...cron,
@@ -94,7 +104,8 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
         asError(error).message,
       );
     } finally {
-      taskLimit.removeQueuedCron(cron.id);
+      taskLimit.removeQueuedCron(cron.id, execute);
     }
-  });
+  };
+  return taskLimit.runWithCronLimit(cron, execute, undefined, isCurrent);
 }

@@ -12,6 +12,7 @@ function extract(file, name) {
   return text.slice(start, text.indexOf('\n}', start) + 2);
 }
 const helpers = [
+  fs.readFileSync('shell/task-timeout.sh', 'utf8'),
   ...['handle_task_start', 'handle_task_end', 'run_task_before', 'run_task_after', 'get_env_array', 'clear_env'].map(n => extract('shell/share.sh', n)),
   ...['run_shell_script', 'define_program', 'format_params'].map(n => extract('shell/task.sh', n)),
 ].join('\n');
@@ -24,7 +25,7 @@ function fixture(t) {
   write('env.sh', 'export QA_PANEL="alpha&beta&gamma"\n');
   write('before.sh', 'export QA_BEFORE=ready\nqa_function() { printf "HOOK_FUNCTION\\n"; }\n');
   write('after.sh', 'printf "AFTER:%s:%s\\n" "$QA_PANEL" "$QA_BEFORE" >> "$QA_ROOT/events"\n');
-  const run = (args) => {
+  const run = (args, timeout = '') => {
     const r = spawnSync('/bin/bash', ['-c', helpers + `
       dir_scripts=$QA_ROOT; dir_shell=$QA_ROOT; dir_dep=$QA_ROOT
       file_env=$QA_ROOT/env.sh; file_task_before=$QA_ROOT/before.sh; file_task_after=$QA_ROOT/after.sh
@@ -40,7 +41,7 @@ function fixture(t) {
       format_params "$@"; define_program "${'${task_shell_params[@]}'}"
       . "$QA_TASK_SOURCE"
       printf 'WRAPPER_FINISHED\\n' >> "$QA_ROOT/events"
-    `, 'fixture', ...args], { cwd: root, env: { ...process.env, QA_ROOT: root, QA_TASK_SOURCE: taskSource }, encoding: 'utf8', timeout: 10000 });
+    `, 'fixture', ...args], { cwd: root, env: { ...process.env, command_timeout_time: timeout, QA_ROOT: root, QA_TASK_SOURCE: taskSource }, encoding: 'utf8', timeout: 10000 });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     return { stdout: r.stdout, events: fs.readFileSync(path.join(root, 'events'), 'utf8').trim().split('\n') };
   };
@@ -115,5 +116,79 @@ for (const mode of ['desi', 'conc']) {
     assert.ok(r.events.includes(`AFTER:${mode === 'desi' ? 'beta&gamma' : 'gamma'}:ready`));
     assert.equal(r.events.filter(x => x === 'STATUS:1:0').length, 1);
     assert.equal(r.events.filter(x => x.startsWith('AFTER:')).length, 1);
+  });
+}
+
+for (const [label, args] of [
+  ['sourced shell', ['probe.sh', '--', 'space value']],
+  ['explicit bash', ['bash', 'probe.sh', 'space value']],
+]) {
+  test(`${label} timeout stops descendants and finalizes once with 124`, t => {
+    const f = fixture(t);
+    f.write('before.sh', 'export QA_BEFORE=ready\nprivate_value=private\nprivate_array=(one "two words")\nqa_function() { printf "HOOK_FUNCTION\\n"; }\n');
+    f.write('probe.sh', `[[ "$QA_PANEL" == 'alpha&beta&gamma' && "$QA_BEFORE" == ready && "$1" == 'space value' ]] || exit 91\n${label === 'sourced shell' ? '[[ "$private_value" = private && "${private_array[1]}" = "two words" ]] || exit 92\nqa_function\n' : ''}trap 'echo EXIT_TRAP' EXIT\nsleep 3\necho SHOULD_NOT_RUN\n`);
+    const before = Date.now();
+    const r = f.run(args, '0.2s');
+    assert.ok(Date.now() - before < 2500, r.stdout);
+    assert.doesNotMatch(r.stdout, /SHOULD_NOT_RUN/);
+    assert.match(r.stdout, /EXIT_TRAP/);
+    assert.deepEqual(r.events, ['STATUS:0:', 'AFTER:alpha&beta&gamma:ready', 'STATUS:1:124', 'STAT:124', 'WRAPPER_FINISHED']);
+  });
+}
+
+test('timeout escalates when a shell and its children ignore TERM', t => {
+  const f = fixture(t);
+  f.write('probe.sh', 'trap "" TERM\nsleep 3\necho SHOULD_NOT_RUN\n');
+  const before = Date.now();
+  const r = f.run(['probe.sh'], '0.1');
+  assert.ok(Date.now() - before < 2500);
+  assert.doesNotMatch(r.stdout, /SHOULD_NOT_RUN/);
+  assert.ok(r.events.includes('STATUS:1:124'));
+});
+
+test('completed timed tasks keep their exit code and do not wait for the timer', t => {
+  const f = fixture(t);
+  f.write('probe.sh', 'exit 7\n');
+  const before = Date.now();
+  const r = f.run(['probe.sh'], '1h');
+  assert.ok(Date.now() - before < 1500);
+  assert.ok(r.events.includes('STATUS:1:7'));
+});
+
+test('zero disables the deadline and invalid durations never start the script', t => {
+  const f = fixture(t);
+  f.write('probe.sh', 'echo DID_RUN\n');
+  assert.match(f.run(['probe.sh'], '0s').stdout, /DID_RUN/);
+  f.write('events', '');
+  const r = f.run(['probe.sh'], 'wrong');
+  assert.doesNotMatch(r.stdout, /DID_RUN/);
+  assert.ok(r.events.includes('STATUS:1:125'));
+});
+
+for (const [runtime, filename, body] of [
+  ['python3', 'timed.py', 'import time\nprint("STARTED", flush=True)\ntime.sleep(3)\nprint("SHOULD_NOT_RUN", flush=True)\n'],
+  ['node', 'timed.cjs', 'console.log("STARTED"); setTimeout(() => console.log("SHOULD_NOT_RUN"), 3000);\n'],
+]) {
+  test(`${runtime} timeout stops execution and reports 124`, t => {
+    const f = fixture(t);
+    f.write(filename, body);
+    const r = f.run([runtime, filename], '0.5s');
+    assert.match(r.stdout, /STARTED/);
+    assert.doesNotMatch(r.stdout, /SHOULD_NOT_RUN/);
+    assert.ok(r.events.includes('STATUS:1:124'));
+    assert.equal(r.events.filter(x => x.startsWith('AFTER:')).length, 1);
+  });
+}
+
+for (const mode of ['desi', 'conc']) {
+  test(`timed shell ${mode} preserves selected accounts and terminates every worker`, t => {
+    const f = fixture(t);
+    f.write('probe.sh', 'echo "ACCOUNT=$QA_PANEL"\nsleep 3\necho SHOULD_NOT_RUN\n');
+    const r = f.run(['probe.sh', mode, 'QA_PANEL', '2-3'], '0.2s');
+    assert.match(r.stdout, mode === 'desi' ? /ACCOUNT=beta&gamma/ : /ACCOUNT=beta\nACCOUNT=gamma/);
+    assert.doesNotMatch(r.stdout, /SHOULD_NOT_RUN/);
+    assert.equal(r.events.filter(x => x.startsWith('AFTER:')).length, 1);
+    // Concurrent mode retains its existing aggregate wait status behavior.
+    assert.ok(r.events.includes(`STATUS:1:${mode === 'desi' ? 124 : 0}`));
   });
 }

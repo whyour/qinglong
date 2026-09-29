@@ -36,7 +36,7 @@ test(
       },
       '../loaders/logger': logger,
       '../data/cron': {
-        CrontabModel: { findOne: async () => null },
+        CrontabModel: { findOne: async () => ({ isDisabled: 0 }) },
         CrontabStatus: {},
       },
       '../data/runningInstance': {

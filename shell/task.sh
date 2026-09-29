@@ -3,6 +3,7 @@
 dir_shell=$QL_DIR/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
+. $dir_shell/task-timeout.sh
 
 trap 'single_hanle SIGINT'  INT
 trap 'single_hanle SIGTERM' TERM
@@ -112,11 +113,6 @@ format_params() {
     mtime_format="%Y-%m-%d %H:%M:%S.%3N"
   fi
   timeoutCmd=""
-  if [[ $command_timeout_time ]]; then
-    if type timeout &>/dev/null; then
-      timeoutCmd="timeout --foreground -s 2 -k 10s $command_timeout_time "
-    fi
-  fi
   # params=$(echo "$@" | sed -E 's/([^ ])&([^ ])/\1\\\&\2/g')
 
   # 分割 task 内置参数和脚本参数
