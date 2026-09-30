@@ -19,7 +19,7 @@ export default class ConfigService {
     const resolved = resolveFileAccess(
       scriptFile ? config.scriptPath : config.configPath,
       [scriptFile ? filePath.slice('data/scripts/'.length) : filePath],
-      config.blackFileList,
+      scriptFile ? [] : config.blackFileList,
     );
     if (!resolved) {
       return res.send({ code: 403, message: t('文件无法访问') });

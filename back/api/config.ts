@@ -4,7 +4,6 @@ import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
-import { join, basename } from 'path';
 import { SAMPLE_FILES } from '../config/const';
 import { t } from '../shared/i18n';
 import ConfigService from '../services/config';
@@ -74,15 +73,13 @@ export default (app: Router) => {
       try {
         const { name, content } = req.body;
         // Resolve path first to prevent traversal attacks
-        let basePath = config.configPath;
-        if (name.startsWith('data/scripts/')) {
-          basePath = join(config.rootPath, 'data/scripts');
-        }
+        const scriptFile = name.startsWith('data/scripts/');
+        const basePath = scriptFile ? config.scriptPath : config.configPath;
         const cleanName = name.replace(/^data\/scripts\//, '');
         const normalized = resolveFileAccess(
           basePath,
           [cleanName],
-          config.blackFileList,
+          scriptFile ? [] : config.blackFileList,
         );
         if (!normalized) {
           return res.send({ code: 403, message: t('文件无法访问') });
