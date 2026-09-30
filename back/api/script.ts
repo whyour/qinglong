@@ -17,7 +17,16 @@ const route = Router();
 function isPathAllowed(targetPath: string): boolean {
   const resolved = path.resolve(targetPath);
   return config.writePathList.some((x) =>
-    Boolean(resolveFileAccess(x, [resolved], config.blackFileList)),
+    Boolean(
+      resolveFileAccess(
+        x,
+        [resolved],
+        // Panel configuration secrets must not restrict user script filenames.
+        path.resolve(x) === path.resolve(config.configPath)
+          ? config.blackFileList
+          : [],
+      ),
+    ),
   );
 }
 
@@ -55,11 +64,7 @@ export default (app: Router) => {
         ];
         if (req.query.path) {
           if (
-            !resolveFileAccess(
-              config.scriptPath,
-              [req.query.path as string],
-              config.blackFileList,
-            )
+            !resolveFileAccess(config.scriptPath, [req.query.path as string])
           ) {
             return res.send({ code: 403, message: t('暂无权限') });
           }

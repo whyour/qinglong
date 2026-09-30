@@ -66,11 +66,7 @@ export default class ScriptService {
   }
 
   public checkFilePath(filePath: string, fileName: string) {
-    return resolveFileAccess(
-      config.scriptPath,
-      [filePath || '', fileName],
-      config.blackFileList,
-    );
+    return resolveFileAccess(config.scriptPath, [filePath || '', fileName]);
   }
 
   public async getFile(filePath: string, fileName: string) {
