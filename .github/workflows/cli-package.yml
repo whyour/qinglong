@@ -21,9 +21,13 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish the verified CLI package (master only)
+        description: Publish the verified CLI package (master stable / develop prerelease)
         type: boolean
         default: false
+      prerelease_version:
+        description: Develop only, e.g. 0.1.2-beta.0 (alpha/beta/rc)
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -52,6 +56,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends bash ca-certificates curl git jq perl procps python3 unzip zip
           npm install --global --ignore-scripts --no-audit --no-fund ts-node@10.9.2 typescript@5.2.2
+      - name: Set requested prerelease version before verification
+        if: github.event_name == 'workflow_dispatch' && inputs.prerelease_version != ''
+        working-directory: cli
+        env:
+          PRERELEASE_VERSION: ${{ inputs.prerelease_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/develop ||
+                ! "$PRERELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$ ]]; then
+            echo '::error::Prereleases require develop and an explicit alpha/beta/rc version.'
+            exit 1
+          fi
+          npm version "$PRERELEASE_VERSION" --no-git-tag-version --ignore-scripts
       - run: npm ci --prefix cli --no-audit --no-fund
       - run: npm run check:cli
       - run: npm run test:cli
@@ -72,9 +90,11 @@ jobs:
     needs: package
     if: >-
       github.repository == 'whyour/qinglong' &&
-      github.ref == 'refs/heads/master' &&
-      (github.event_name == 'push' ||
-       (github.event_name == 'workflow_dispatch' && inputs.publish))
+      ((github.ref == 'refs/heads/master' &&
+        (github.event_name == 'push' ||
+         (github.event_name == 'workflow_dispatch' && inputs.publish))) ||
+       (github.ref == 'refs/heads/develop' && github.event_name == 'workflow_dispatch' &&
+        inputs.publish && inputs.prerelease_version != ''))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -91,6 +111,8 @@ jobs:
           name: qinglong-cli-${{ github.sha }}
           path: cli-package
       - name: Publish verified npm archive
+        env:
+          PRERELEASE_VERSION: ${{ inputs.prerelease_version }}
         shell: bash
         run: |
           set -euo pipefail
@@ -103,13 +125,30 @@ jobs:
           archive="${archives[0]}"
           metadata=$(tar -xOf "$archive" package/package.json)
           name=$(jq -er '.name | select(. == "@whyour/qinglong-cli")' <<< "$metadata")
-          version=$(jq -er '.version | select(type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' <<< "$metadata")
+          version=$(jq -er '.version | select(type == "string")' <<< "$metadata")
+          if [[ "$GITHUB_REF" == refs/heads/develop ]]; then
+            if [[ "$version" != "$PRERELEASE_VERSION" ||
+                  ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$ ]]; then
+              echo '::error::Archive version does not match the requested prerelease.'
+              exit 1
+            fi
+            tag="${BASH_REMATCH[1]}"
+          elif [[ "$GITHUB_REF" == refs/heads/master && "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tag=latest
+          else
+            echo '::error::Refusing to publish this branch/version combination.'
+            exit 1
+          fi
           if npm view "$name@$version" version --json --registry=https://registry.npmjs.org > version.json 2> version-error.log; then
             jq -e --arg version "$version" '. == $version' version.json > /dev/null
+            if [[ "$tag" != latest ]]; then
+              echo '::error::Prerelease version already exists; choose a new version to test this build.'
+              exit 1
+            fi
             echo "::notice::$name@$version is already published; bump cli/package.json and its lockfile to release changes."
             exit 0
           elif ! jq -e '.error.code == "E404"' version.json > /dev/null; then
             echo '::error::Could not check the published CLI version; refusing to publish.'
             exit 1
           fi
-          npm publish "./$archive" --access public --tag latest --ignore-scripts --registry=https://registry.npmjs.org
+          npm publish "./$archive" --access public --tag "$tag" --ignore-scripts --registry=https://registry.npmjs.org
