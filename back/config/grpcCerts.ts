@@ -1,6 +1,5 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs/promises';
-import * as os from 'os';
 import path from 'path';
 import config from './index';
 import { fileExist } from './util';
@@ -24,71 +23,120 @@ const clientCertPath = path.join(certDir, 'client.crt');
 
 let cachedConfig: GrpcTlsConfig | null = null;
 
-function run(cmd: string, execOpts?: Record<string, unknown>): string {
-  const opts = { stdio: 'pipe', timeout: 30000, encoding: 'utf-8', ...execOpts } as any;
-  return (execSync(cmd, opts) as string).trim();
-}
-
-async function tmpFile(prefix: string): Promise<string> {
-  const dir = (await fileExist(certDir)) ? certDir : os.tmpdir();
-  await fs.mkdir(dir, { recursive: true });
-  return path.join(dir, `.${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}.pem`);
+function run(args: string[]): string {
+  return execFileSync('openssl', args, {
+    stdio: 'pipe',
+    timeout: 30000,
+    encoding: 'utf-8',
+  }).trim();
 }
 
 async function generateAllCerts(): Promise<GrpcTlsConfig> {
   Logger.info('[boot] Generating gRPC mTLS certificates...');
-
-  const caKeyTmp = await tmpFile('ca_key');
-  const caCertTmp = await tmpFile('ca_cert');
-  const serverKeyTmp = await tmpFile('server_key');
-  const serverCsrTmp = await tmpFile('server_csr');
-  const serverExtTmp = await tmpFile('server_ext');
-  const clientKeyTmp = await tmpFile('client_key');
-  const clientCsrTmp = await tmpFile('client_csr');
-  const clientExtTmp = await tmpFile('client_ext');
-  const srlTmp = path.join(path.dirname(caKeyTmp), '.grpc_ca.srl');
+  await fs.mkdir(certDir, { recursive: true, mode: 0o700 });
+  // Atomically reserve a private workspace for keys, CSRs and OpenSSL side files.
+  const workspace = await fs.mkdtemp(path.join(certDir, '.generate-'));
+  const caKeyTmp = path.join(workspace, 'ca.key');
+  const caCertTmp = path.join(workspace, 'ca.crt');
+  const serverKeyTmp = path.join(workspace, 'server.key');
+  const serverCsrTmp = path.join(workspace, 'server.csr');
+  const serverExtTmp = path.join(workspace, 'server.ext');
+  const clientKeyTmp = path.join(workspace, 'client.key');
+  const clientCsrTmp = path.join(workspace, 'client.csr');
+  const clientExtTmp = path.join(workspace, 'client.ext');
 
   const cleanup = async () => {
-    for (const f of [caKeyTmp, caCertTmp, serverKeyTmp, serverCsrTmp, serverExtTmp,
-      clientKeyTmp, clientCsrTmp, clientExtTmp, srlTmp]) {
-      try { await fs.unlink(f); } catch {}
-    }
+    await fs.rm(workspace, { recursive: true, force: true });
   };
 
   try {
-    // 1. CA（私钥直接存盘，证书写入临时文件供签发使用）
-    run(`openssl genrsa -out '${caKeyTmp}' 2048 2>/dev/null`);
-    run(`openssl req -new -x509 -days 3650 -key '${caKeyTmp}' -out '${caCertTmp}' -subj '/CN=qinglong-ca/O=qinglong/C=CN' 2>/dev/null`);
+    run(['genrsa', '-out', caKeyTmp, '2048']);
+    run([
+      'req',
+      '-new',
+      '-x509',
+      '-days',
+      '3650',
+      '-key',
+      caKeyTmp,
+      '-out',
+      caCertTmp,
+      '-subj',
+      '/CN=qinglong-ca/O=qinglong/C=CN',
+    ]);
     const caKey = await fs.readFile(caKeyTmp, 'utf-8');
     const caCert = await fs.readFile(caCertTmp, 'utf-8');
-    await fs.mkdir(certDir, { recursive: true });
     await fs.writeFile(caKeyPath, caKey, { mode: 0o600 });
 
-    // 2. 服务端
-    run(`openssl genrsa -out '${serverKeyTmp}' 2048 2>/dev/null`);
-    run(`openssl req -new -key '${serverKeyTmp}' -out '${serverCsrTmp}' -subj '/CN=grpc-server' 2>/dev/null`);
-    await fs.writeFile(serverExtTmp, 'subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1\n');
-    const serverCert = run(
-      `openssl x509 -req -days 3650 -in '${serverCsrTmp}' -CA '${caCertTmp}' -CAkey '${caKeyTmp}' -CAcreateserial -extfile '${serverExtTmp}' 2>/dev/null`,
+    run(['genrsa', '-out', serverKeyTmp, '2048']);
+    run([
+      'req',
+      '-new',
+      '-key',
+      serverKeyTmp,
+      '-out',
+      serverCsrTmp,
+      '-subj',
+      '/CN=grpc-server',
+    ]);
+    await fs.writeFile(
+      serverExtTmp,
+      'subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1\n',
     );
+    const serverCert = run([
+      'x509',
+      '-req',
+      '-days',
+      '3650',
+      '-in',
+      serverCsrTmp,
+      '-CA',
+      caCertTmp,
+      '-CAkey',
+      caKeyTmp,
+      '-CAserial',
+      path.join(workspace, 'ca.srl'),
+      '-CAcreateserial',
+      '-extfile',
+      serverExtTmp,
+    ]);
     const serverKey = await fs.readFile(serverKeyTmp, 'utf-8');
 
-    // 3. 客户端
-    run(`openssl genrsa -out '${clientKeyTmp}' 2048 2>/dev/null`);
-    run(`openssl req -new -key '${clientKeyTmp}' -out '${clientCsrTmp}' -subj '/CN=grpc-client' 2>/dev/null`);
+    run(['genrsa', '-out', clientKeyTmp, '2048']);
+    run([
+      'req',
+      '-new',
+      '-key',
+      clientKeyTmp,
+      '-out',
+      clientCsrTmp,
+      '-subj',
+      '/CN=grpc-client',
+    ]);
     await fs.writeFile(clientExtTmp, 'extendedKeyUsage=clientAuth\n');
-    const clientCert = run(
-      `openssl x509 -req -days 3650 -in '${clientCsrTmp}' -CA '${caCertTmp}' -CAkey '${caKeyTmp}' -CAcreateserial -extfile '${clientExtTmp}' 2>/dev/null`,
-    );
+    const clientCert = run([
+      'x509',
+      '-req',
+      '-days',
+      '3650',
+      '-in',
+      clientCsrTmp,
+      '-CA',
+      caCertTmp,
+      '-CAkey',
+      caKeyTmp,
+      '-CAserial',
+      path.join(workspace, 'ca.srl'),
+      '-CAcreateserial',
+      '-extfile',
+      clientExtTmp,
+    ]);
     const clientKey = await fs.readFile(clientKeyTmp, 'utf-8');
 
-    await cleanup();
     Logger.info('[boot] gRPC mTLS certificates generated successfully');
-
     return { caCert, serverCert, serverKey, clientCert, clientKey };
-  } catch (e) {
+  } finally {
     await cleanup();
-    throw e;
   }
 }
 

@@ -8,12 +8,8 @@ import { celebrate, Joi } from 'celebrate';
 import UserService from '../services/user';
 import { t } from '../shared/i18n';
 import { isDefaultAuthInfo } from '../shared/auth';
-import {
-  getUniqPath,
-  handleLogPath,
-  parseVersion,
-  promiseExec,
-} from '../config/util';
+import { getUniqPath, handleLogPath, parseVersion } from '../config/util';
+import { findCronId } from '../shared/cronCommand';
 import dayjs from 'dayjs';
 import multer from 'multer';
 import { logStreamManager } from '../shared/logStreamManager';
@@ -258,8 +254,13 @@ export default (app: Router) => {
       try {
         const systemService = Container.get(SystemService);
         const command = req.body.command;
-        const idStr = `cat ${config.crontabFile} | grep -E "${command}" | perl -pe "s|.*ID=(.*) ${command}.*|\\1|" | head -1 | awk -F " " '{print $1}' | xargs echo -n`;
-        let id = await promiseExec(idStr);
+        const crontab = await fs
+          .readFile(config.crontabFile, 'utf8')
+          .catch((e) => {
+            if (e.code === 'ENOENT') return '';
+            throw e;
+          });
+        const id = findCronId(crontab, command);
         const uniqPath = await getUniqPath(command, id);
         const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
         const logPath = `${uniqPath}/${logTime}.log`;
@@ -274,7 +275,9 @@ export default (app: Router) => {
             onEnd: async (cp, endTime, diff) => {
               // Close the stream after task completion
               try {
-                await logStreamManager.closeStream(await handleLogPath(logPath));
+                await logStreamManager.closeStream(
+                  await handleLogPath(logPath),
+                );
               } finally {
                 res.end();
               }

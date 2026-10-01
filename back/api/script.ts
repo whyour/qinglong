@@ -7,7 +7,7 @@ import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
-import path, { join, parse } from 'path';
+import path, { dirname, join, parse } from 'path';
 import ScriptService from '../services/script';
 import { t } from '../shared/i18n';
 import multer from 'multer';
@@ -200,7 +200,7 @@ export default (app: Router) => {
         if (!isPathAllowed(filePath) || !isPathAllowed(originFilePath)) {
           return res.send({ code: 403, message: t('暂无权限') });
         }
-        await fs.mkdir(path, { recursive: true });
+        await fs.mkdir(dirname(filePath), { recursive: true });
         const fileExists = await fileExist(filePath);
         if (fileExists) {
           await fs.copyFile(
@@ -373,12 +373,21 @@ export default (app: Router) => {
         if (!isPathAllowed(filePath)) {
           return res.send({ code: 403, message: t('暂无权限') });
         }
-        const logPath = join(config.logPath, path, `${name}.swap`);
+        const logPath = resolveFileAccess(config.logPath, [
+          path,
+          `${name}.swap`,
+        ]);
+        if (!logPath) {
+          return res.send({ code: 403, message: t('暂无权限') });
+        }
 
         const scriptService = Container.get(ScriptService);
         const result = await scriptService.stopScript(filePath, pid);
         setTimeout(() => {
-          rmPath(logPath);
+          const cleanupPath = resolveFileAccess(config.logPath, [logPath]);
+          if (cleanupPath) {
+            void rmPath(cleanupPath);
+          }
         }, 3000);
         res.send(result);
       } catch (e) {
