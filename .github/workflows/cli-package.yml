@@ -33,8 +33,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: cli-package-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  # Keep validation runs separate from releases; never interrupt a running release.
+  # Master push releases share the same group as manually requested releases.
+  group: >-
+    cli-package-${{ github.workflow }}-${{ github.ref }}-${{
+      ((github.event_name == 'workflow_dispatch' && inputs.publish) ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/master')) && 'publish' || 'check' }}
+  cancel-in-progress: >-
+    ${{ github.ref != 'refs/heads/master' &&
+        !(github.event_name == 'workflow_dispatch' && inputs.publish) }}
 
 jobs:
   package:
