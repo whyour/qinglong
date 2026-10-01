@@ -1,4 +1,7 @@
 import { spawn } from 'cross-spawn';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { shellQuote } from '../shared/shellQuote';
 import { Response } from 'express';
 import fs from 'fs';
 import { Agent, request } from 'undici';
@@ -139,7 +142,7 @@ export default class SystemService {
     if (info.dependenceProxy) {
       await fs.promises.writeFile(
         config.dependenceProxyFile,
-        `export http_proxy="${info.dependenceProxy}"\nexport https_proxy="${info.dependenceProxy}"`,
+        `export http_proxy=${shellQuote(info.dependenceProxy)}\nexport https_proxy=${shellQuote(info.dependenceProxy)}`,
       );
     } else {
       await fs.promises.rm(config.dependenceProxyFile);
@@ -155,7 +158,7 @@ export default class SystemService {
     });
     let cmd = 'pnpm config delete registry';
     if (info.nodeMirror) {
-      cmd = `pnpm config set registry ${info.nodeMirror}`;
+      cmd = `pnpm config set registry ${shellQuote(info.nodeMirror)}`;
     }
     let command = `cd && ${cmd}`;
     const docs = await DependenceModel.findAll({
@@ -204,7 +207,7 @@ export default class SystemService {
     });
     let cmd = 'pip config unset global.index-url';
     if (info.pythonMirror) {
-      cmd = `pip3 config set global.index-url ${info.pythonMirror}`;
+      cmd = `pip3 config set global.index-url ${shellQuote(info.pythonMirror)}`;
     }
     await promiseExec(cmd);
     return { code: 200, data: info };
@@ -357,7 +360,10 @@ export default class SystemService {
   }
 
   public async reloadSystem(target?: 'system' | 'data') {
-    const cmd = `real_time=true ql reload ${target || ''}`;
+    if (target && !['system', 'data'].includes(target)) {
+      return { code: 400, message: t('参数错误') };
+    }
+    const cmd = `real_time=true ql reload ${shellQuote(target || '')}`;
     const cp = spawn(cmd, {
       shell: '/bin/bash',
       detached: true,
@@ -438,11 +444,15 @@ export default class SystemService {
       if (type && type.length) {
         dataDirs = dataDirs.concat(type.filter((x) => x !== 'base'));
       }
-      const dataPaths = dataDirs.map((dir) => `data/${dir}`);
-      await promiseExec(
-        `cd ${config.dataPath} && cd ../ && tar -zcvf ${config.dataTgzFile
-        } ${dataPaths.join(' ')}`,
-      );
+      const allowed = new Set(['db', 'upload', 'config', 'scripts', 'log', 'deps',
+        'syslog', 'dep_cache', 'raw', 'repo', 'ssh.d']);
+      if (dataDirs.some((dir) => !allowed.has(dir))) {
+        return res.status(400).send({ code: 400, message: t('参数错误') });
+      }
+      const dataPaths = [...new Set(dataDirs)].map((dir) => `data/${dir}`);
+      await promisify(execFile)('tar', ['-zcf', config.dataTgzFile, '--', ...dataPaths], {
+        cwd: path.dirname(config.dataPath),
+      });
       res.download(config.dataTgzFile);
     } catch (error: any) {
       return res.send({ code: 400, message: error.message });
@@ -565,7 +575,7 @@ export default class SystemService {
     try {
       await fs.promises.writeFile(
         config.langEnvFile,
-        `export QL_LANG='${lang}'\n`,
+        `export QL_LANG=${shellQuote(lang)}\n`,
       );
     } catch (error) {
       this.logger.error(`Failed to write lang_env.sh: ${error}`);

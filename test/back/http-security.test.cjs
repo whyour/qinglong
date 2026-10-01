@@ -49,6 +49,12 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       tokens: [{ value: 'config-app', expiration: Date.now() / 1000 + 3600 }],
     },
     {
+      scopes: ['configs', 'scripts'],
+      tokens: [
+        { value: 'script-config-app', expiration: Date.now() / 1000 + 3600 },
+      ],
+    },
+    {
       scopes: ['envs'],
       tokens: [{ value: 'env-app', expiration: Date.now() / 1000 + 3600 }],
     },
@@ -209,5 +215,50 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       })
     ).status,
     400,
+  );
+  const scriptName = 'data/scripts/test.js';
+  for (const prefix of ['/open', '/panel/open']) {
+    const denied = await request(
+      `${prefix}/configs/save`,
+      'config-app',
+      'POST',
+      {
+        name: scriptName,
+        content: 'overwrite',
+      },
+    );
+    assert.equal(denied.status, 401);
+    assert.equal(fs.existsSync(path.join(tmp, 'scripts/test.js')), false);
+  }
+  assert.equal(
+    (
+      await request('/open/configs/save', 'script-config-app', 'POST', {
+        name: scriptName,
+        content: 'authorized script',
+      })
+    ).body.code,
+    200,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(tmp, 'scripts/test.js'), 'utf8'),
+    'authorized script',
+  );
+  assert.equal(
+    (
+      await request('/open/configs/save', 'config-app', 'POST', {
+        name: 'normal.txt',
+        content: 'normal config',
+      })
+    ).body.code,
+    200,
+  );
+  assert.equal(
+    (
+      await request('/api/configs/save', valid, 'POST', {
+        name: scriptName,
+        content: 'owner script',
+      })
+    ).body.code,
+    200,
   );
 });
