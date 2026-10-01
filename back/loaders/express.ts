@@ -14,6 +14,7 @@ import { AuthInfo } from '../data/system';
 import path from 'path';
 import { t } from '../shared/i18n';
 import { AppScope } from '../data/open';
+import uniqueConstraintError from '../middlewares/uniqueConstraintError';
 import protectedPathCase from '../middlewares/protectedPathCase';
 
 function resolveTrustProxy(value = process.env.QL_TRUST_PROXY) {
@@ -190,6 +191,7 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(errors());
+  app.use(uniqueConstraintError);
 
   app.use(
     (

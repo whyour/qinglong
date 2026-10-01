@@ -151,6 +151,12 @@ export const english: Record<string, string> = {
   应用凭据: 'application credentials',
   '应用凭据和 %s 权限': 'application credentials and %s permission',
   未知: 'unknown',
+  '请检查%s。': 'Check %s.',
+  '资源冲突，请检查重复的名称或值。': 'Resource conflict; check for duplicate names or values.',
+  '服务端错误，请检查服务状态和日志。': 'Server error; check service status and logs.',
+  '请求未成功，请检查请求参数和服务日志。': 'Request unsuccessful; check request parameters and service logs.',
+  'API 请求失败（%s %s）。%s%s': 'API request failed (%s %s). %s%s',
+
   ' 执行结果可能未知，请先检查%s状态再考虑重试。':
     ' Execution outcome may be unknown; check %s status before retrying.',
   'API 请求被拒绝（HTTP %s），请检查%s。%s':

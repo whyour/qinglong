@@ -54,7 +54,7 @@ test('API diagnostics preserve resource scope, uncertainty, codes and secret sup
                 language === 'en' ? /outcome.*unknown/ : /结果.*未知/,
               );
             }
-            if (failure !== 'network') {
+            if (failure === 'permission' || failure === 'api') {
               assert.ok(
                 error.message.includes(
                   endpoint.startsWith('subscriptions')
@@ -87,5 +87,56 @@ test('API diagnostics preserve resource scope, uncertainty, codes and secret sup
       authenticate(config),
       language === 'en' ? /Invalid authentication response/ : /认证响应无效/,
     );
+  }
+});
+
+test('HTTP and body errors distinguish conflicts, authentication and server failures without leaking bodies', async (t) => {
+  const previous = process.env.QL_LANG;
+  t.after(() => {
+    if (previous === undefined) delete process.env.QL_LANG;
+    else process.env.QL_LANG = previous;
+  });
+  for (const language of ['en', 'zh']) {
+    process.env.QL_LANG = language;
+    for (const kind of ['HTTP', 'code'])
+      for (const status of [400, 401, 403, 409, 500, 503])
+        for (const method of ['GET', 'PUT']) {
+          t.mock.method(
+            global,
+            'fetch',
+            async () =>
+              new Response(
+                JSON.stringify({ code: status, message: 'secret-value' }),
+                { status: kind === 'HTTP' ? status : 200 },
+              ),
+          );
+          await assert.rejects(
+            request(
+              { url: 'https://fixture.invalid', token: 'secret-token' },
+              'envs',
+              { method },
+            ),
+            (error) => {
+              assert.equal(error.exitCode, [401, 403].includes(status) ? 3 : 1);
+              assert.match(error.message, new RegExp(`${kind} ${status}`));
+              assert.doesNotMatch(error.message, /secret-|fixture/);
+              if ([401, 403].includes(status))
+                assert.match(error.message, /credentials|凭据/);
+              else
+                assert.doesNotMatch(
+                  error.message,
+                  /credentials|permission|凭据|权限/,
+                );
+              if (status === 409) assert.match(error.message, /conflict|冲突/);
+              if (status >= 500)
+                assert.match(error.message, /Server error|服务端错误/);
+              if (status >= 500 && method === 'PUT')
+                assert.match(error.message, /unknown|未知/);
+              else assert.doesNotMatch(error.message, /unknown|未知/);
+              return true;
+            },
+          );
+          t.mock.restoreAll();
+        }
   }
 });

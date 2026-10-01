@@ -53,23 +53,12 @@ export async function request(
     // Check HTTP status before decoding (proxies may return HTML on denial).
     if (!response.ok) {
       await response.body?.cancel();
-      const suffix =
-        method !== 'GET' && response.status >= 500
-          ? translate(
-              process.env,
-              ' 执行结果可能未知，请先检查%s状态再考虑重试。',
-              resource,
-            )
-          : '';
-      fail(
-        translate(
-          process.env,
-          'API 请求被拒绝（HTTP %s），请检查%s。%s',
-          response.status,
-          credentialsHint,
-          suffix,
-        ),
-        [401, 403].includes(response.status) ? 3 : 1,
+      rejectResponse(
+        response.status,
+        'HTTP',
+        method,
+        resource,
+        credentialsHint,
       );
     }
     if (
@@ -100,26 +89,61 @@ export async function request(
           ),
     );
   }
-  if (endpoint.split('?')[0] === 'user/login' && isRecord(result) && result.code === 420)
-    fail(translate(process.env, '需要双因素验证，请调用 user two-factor-login。'), 3);
+  if (
+    endpoint.split('?')[0] === 'user/login' &&
+    isRecord(result) &&
+    result.code === 420
+  )
+    fail(
+      translate(process.env, '需要双因素验证，请调用 user two-factor-login。'),
+      3,
+    );
   if (!isRecord(result) || result.code !== 200) {
     const status =
       isRecord(result) && typeof result.code === 'number'
         ? result.code
         : undefined;
-    fail(
-      translate(
-        process.env,
-        'API 请求被拒绝（code %s），请检查%s。',
-        status ?? translate(process.env, '未知'),
-        credentialsHint,
-      ),
-      status === 401 || status === 403 ? 3 : 1,
-    );
+    rejectResponse(status, 'code', method, resource, credentialsHint);
   }
   if (options.output)
     fail(translate(process.env, '接口返回 JSON，未保存下载文件。'));
   return result;
+}
+
+function rejectResponse(
+  status: number | undefined,
+  kind: 'HTTP' | 'code',
+  method: string,
+  resource: string,
+  credentialsHint: string,
+): never {
+  const denied = status === 401 || status === 403;
+  const reason = denied
+    ? translate(process.env, '请检查%s。', credentialsHint)
+    : status === 409
+    ? translate(process.env, '资源冲突，请检查重复的名称或值。')
+    : status !== undefined && status >= 500
+    ? translate(process.env, '服务端错误，请检查服务状态和日志。')
+    : translate(process.env, '请求未成功，请检查请求参数和服务日志。');
+  const suffix =
+    method !== 'GET' && (status === undefined || status >= 500)
+      ? translate(
+          process.env,
+          ' 执行结果可能未知，请先检查%s状态再考虑重试。',
+          resource,
+        )
+      : '';
+  fail(
+    translate(
+      process.env,
+      'API 请求失败（%s %s）。%s%s',
+      kind,
+      status ?? translate(process.env, '未知'),
+      reason,
+      suffix,
+    ),
+    denied ? 3 : 1,
+  );
 }
 
 export async function authenticate(config: Credentials): Promise<Session> {

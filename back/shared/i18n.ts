@@ -3,6 +3,7 @@ import { shareStore } from './store';
 const messages: Record<string, Record<string, string>> = {
   zh: {},
   en: {
+    '资源已存在，请检查重复的名称或值': 'Resource already exists; check for duplicate names or values',
     '暂无权限': 'Access denied',
     '参数错误': 'Invalid parameter',
     '参数不正确': 'Invalid parameter',
