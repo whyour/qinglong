@@ -1,3 +1,4 @@
+require('reflect-metadata');
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const fs = require('node:fs/promises');
@@ -5,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const express = require('express');
 const { errors } = require('celebrate');
+const { Container } = require('typedi');
 const load = require('../helpers/load-security-module.cjs');
 const { resolveFileAccess } = load(
   path.join(__dirname, '../../back/shared/fileAccess.ts'),
@@ -29,7 +31,7 @@ test('script routes save, list, preview and restore, with validation and conflic
       return resolveFileAccess(scripts, [dir || '', name]);
     }
   }
-  const api = load(path.join(__dirname, '../../back/api/script.ts'), {
+  const mocks = {
     '../config': { default: config, __esModule: true },
     'fs/promises': {
       ...fs,
@@ -54,7 +56,30 @@ test('script routes save, list, preview and restore, with validation and conflic
     },
     '../services/script': { default: ScriptService, __esModule: true },
     '../shared/i18n': { t: (value) => value },
-    typedi: { Container: { get: () => new ScriptService() } },
+  };
+  const cache = new Map();
+  const api = load(
+    path.join(__dirname, '../../back/api/script.ts'),
+    mocks,
+    cache,
+  );
+  const { default: ScriptHistoryService } = load(
+    path.join(__dirname, '../../back/services/scriptHistory.ts'),
+    mocks,
+    cache,
+  );
+  Container.set(ScriptService, new ScriptService());
+  t.after(() => {
+    Container.remove(ScriptHistoryService);
+    Container.remove(ScriptService);
+  });
+  assert.ok(Container.has(ScriptHistoryService));
+  const historyService = Container.get(ScriptHistoryService);
+  assert.strictEqual(Container.get(ScriptHistoryService), historyService);
+  // An empty history read must not create storage or other persistent resources.
+  assert.deepEqual((await historyService.list('', 'test.js')).versions, []);
+  await assert.rejects(fs.stat(path.join(root, 'script-history')), {
+    code: 'ENOENT',
   });
   const app = express();
   app.use(express.json({ limit: '50mb' }));

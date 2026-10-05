@@ -9,11 +9,11 @@ import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
 import path, { join, parse } from 'path';
 import ScriptService from '../services/script';
+import ScriptHistoryService from '../services/scriptHistory';
 import { t } from '../shared/i18n';
 import multer from 'multer';
 import { writeFileWithLock } from '../shared/utils';
 import {
-  ScriptHistory,
   ScriptHistoryError,
   HistoryUnavailableError,
 } from '../shared/scriptHistory';
@@ -120,12 +120,6 @@ export default (app: Router) => {
     },
   );
 
-  const historyService = () =>
-    new ScriptHistory(
-      config.scriptPath,
-      join(config.dataPath, 'script-history'),
-      config.blackFileList,
-    );
   const historyError = (error: unknown, res: Response, next: NextFunction) => {
     if (error instanceof ScriptHistoryError) {
       return res.status(error.status).send({
@@ -148,7 +142,8 @@ export default (app: Router) => {
     celebrate({ query: Joi.object(historyQuery).unknown(true) }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const data = await historyService().list(
+        const service = Container.get(ScriptHistoryService);
+        const data = await service.list(
           (req.query.path as string) || '',
           req.query.filename as string,
         );
@@ -168,7 +163,8 @@ export default (app: Router) => {
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const data = await historyService().detail(
+        const service = Container.get(ScriptHistoryService);
+        const data = await service.detail(
           (req.query.path as string) || '',
           req.query.filename as string,
           req.query.id as string,
@@ -191,12 +187,8 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { path = '', filename, id, expectedHash } = req.body;
-        const data = await historyService().restore(
-          path,
-          filename,
-          id,
-          expectedHash,
-        );
+        const service = Container.get(ScriptHistoryService);
+        const data = await service.restore(path, filename, id, expectedHash);
         res.send({ code: 200, data });
       } catch (error) {
         historyError(error, res, next);
@@ -304,7 +296,8 @@ export default (app: Router) => {
               join(config.bakPath, originFilename.replace(/\//g, '')),
             );
           }
-          const data = await historyService().save(path, filename, content, {
+          const service = Container.get(ScriptHistoryService);
+          const data = await service.save(path, filename, content, {
             skipHistory: req.body.skipHistory,
             expectedHash: req.body.expectedHash,
           });
@@ -357,15 +350,11 @@ export default (app: Router) => {
             message: t('暂无权限'),
           });
         }
-        const data = await historyService().save(
-          path || '',
-          filename,
-          content,
-          {
-            skipHistory: req.body.skipHistory,
-            expectedHash: req.body.expectedHash,
-          },
-        );
+        const service = Container.get(ScriptHistoryService);
+        const data = await service.save(path || '', filename, content, {
+          skipHistory: req.body.skipHistory,
+          expectedHash: req.body.expectedHash,
+        });
         return res.send({ code: 200, data });
       } catch (e) {
         return historyError(e, res, next);
