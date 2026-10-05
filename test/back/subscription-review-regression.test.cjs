@@ -418,3 +418,130 @@ test('force deletion supports historical nested aliases while preserving outside
   assert.equal(fs.readFileSync(path.join(outside, 'file'), 'utf8'), 'keep');
   assert.equal(paths.getSubscriptionSshAlias('仓库-main'), '仓库-main');
 });
+
+function cancellationFixture(t, subscriptions) {
+  const root = temporary(t);
+  const events = [];
+  const docs = subscriptions.map((value) => {
+    const doc = { ...value };
+    doc.get = () => ({ ...doc });
+    return doc;
+  });
+  const Subscription = load(path.resolve('back/services/subscription.ts'), {
+    '../config': { scriptPath: root, repoPath: root },
+    '../data/subscription': {
+      SubscriptionModel: {
+        findAll: async ({ where }) =>
+          docs.filter((doc) => where.id.includes(doc.id)),
+        destroy: async ({ where }) => events.push(['destroy', where.id]),
+        update: async (value, { where }) => {
+          for (const doc of docs) {
+            if (where.id.includes(doc.id)) Object.assign(doc, value);
+          }
+        },
+      },
+    },
+    '../data/cron': {},
+    '../config/util': { rmPath: async () => events.push(['removeFile']) },
+    '../config/const': {},
+    '../shared/i18n': { t: (x) => x, tf: (x) => x },
+    '../shared/pLimit': {},
+    './schedule': {},
+    './sock': {},
+    './sshKey': {},
+    './cron': {},
+  }).default;
+  const schedule = {
+    cancelCronTask: (doc) => events.push(['cancelCron', doc.id]),
+    cancelIntervalTask: (doc) => events.push(['cancelInterval', doc.id]),
+    createCronTask: async (doc, callbacks, immediately) =>
+      events.push(['createCron', doc.command, immediately]),
+    createIntervalTask: async (doc, interval, immediately) =>
+      events.push(['createInterval', doc.command, interval, immediately]),
+  };
+  const service = new Subscription({}, schedule, {}, {}, {});
+  service.setSshConfig = async () => {};
+  return { service, docs, events };
+}
+
+test('ordinary deletion cancels invalid historical SSH subscriptions by ID', async (t) => {
+  for (const schedule_type of ['crontab', 'interval']) {
+    const f = cancellationFixture(t, [
+      {
+        ...privateSubscription('../outside'),
+        schedule_type,
+        interval_schedule: { type: 'hours', value: 1 },
+      },
+    ]);
+    await f.service.remove([1], { force: false });
+    assert.deepEqual(f.events, [
+      [schedule_type === 'crontab' ? 'cancelCron' : 'cancelInterval', 1],
+      ['destroy', [1]],
+    ]);
+  }
+});
+
+test('invalid historical SSH rows do not block mixed batch deletion or disabling', async (t) => {
+  const docs = [
+    { ...privateSubscription('healthy', 1), schedule_type: 'crontab' },
+    { ...privateSubscription('../outside', 2), schedule_type: 'crontab' },
+    {
+      ...privateSubscription('old alias', 3),
+      schedule_type: 'interval',
+      interval_schedule: { type: 'hours', value: 1 },
+    },
+  ];
+  const cancellations = [
+    ['cancelCron', 1],
+    ['cancelCron', 2],
+    ['cancelInterval', 3],
+  ];
+  const removed = cancellationFixture(t, docs);
+  await removed.service.remove([1, 2, 3], {});
+  assert.deepEqual(removed.events, [...cancellations, ['destroy', [1, 2, 3]]]);
+  const disabled = cancellationFixture(t, docs);
+  await disabled.service.disabled([1, 2, 3]);
+  assert.deepEqual(disabled.events, cancellations);
+  assert.ok(disabled.docs.every((doc) => doc.is_disabled === 1));
+});
+
+test('cancellation bypass leaves alias validation for creation and forced deletion intact', async (t) => {
+  const doc = {
+    ...privateSubscription('../outside'),
+    schedule_type: 'crontab',
+  };
+  const f = cancellationFixture(t, [doc]);
+  await assert.rejects(f.service.handleTask(doc), /Invalid subscription alias/);
+  await assert.rejects(f.service.create(doc), /Invalid subscription alias/);
+  await assert.rejects(f.service.enabled([1]), /Invalid subscription alias/);
+  await assert.rejects(
+    f.service.remove([1], { force: true }),
+    /Invalid subscription alias/,
+  );
+  assert.deepEqual(f.events, []);
+});
+
+test('valid subscription scheduling still creates quoted commands for both schedule types', async (t) => {
+  for (const schedule_type of ['crontab', 'interval']) {
+    const doc = {
+      ...privateSubscription('owner_repo_feature/foo'),
+      schedule_type,
+      interval_schedule: { type: 'hours', value: 1 },
+    };
+    const f = cancellationFixture(t, [doc]);
+    await f.service.handleTask(doc, true, true);
+    const command = formatCommand(doc);
+    assert.deepEqual(
+      f.events,
+      schedule_type === 'crontab'
+        ? [
+            ['cancelCron', 1],
+            ['createCron', command, true],
+          ]
+        : [
+            ['cancelInterval', 1],
+            ['createInterval', command, { hours: 1 }, true],
+          ],
+    );
+  }
+});

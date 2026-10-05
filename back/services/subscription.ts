@@ -93,9 +93,11 @@ export default class SubscriptionService {
     needCreate = true,
     runImmediately = false,
   ) {
-    const { url } = formatUrl(doc);
-
-    doc.command = formatCommand(doc, url as string);
+    // Cancelling by ID must also work for invalid historical subscriptions.
+    if (needCreate) {
+      const { url } = formatUrl(doc);
+      doc.command = formatCommand(doc, url as string);
+    }
 
     if (doc.schedule_type === 'crontab') {
       this.scheduleService.cancelCronTask(doc as any);
