@@ -1,6 +1,7 @@
 import { Subscription } from '../data/subscription';
 import isNil from 'lodash/isNil';
 import { shellQuote } from '../shared/shellQuote';
+import { getSubscriptionSshAlias } from '../shared/subscriptionPath';
 
 export function formatUrl(doc: Subscription) {
   let url = doc.url;
@@ -8,7 +9,7 @@ export function formatUrl(doc: Subscription) {
   if (doc.type === 'private-repo') {
     if (doc.pull_type === 'ssh-key') {
       host = doc.url!.replace(/.*\@([^\:]+)\:.*/, '$1');
-      url = doc.url!.replace(host, doc.alias);
+      url = doc.url!.replace(host, getSubscriptionSshAlias(doc.alias));
     } else {
       host = doc.url!.replace(/.*\:\/\/([^\/]+)\/.*/, '$1');
       const { username, password } = doc.pull_option as any;

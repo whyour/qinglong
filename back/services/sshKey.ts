@@ -8,7 +8,10 @@ import { formatUrl } from '../config/subscription';
 import config from '../config';
 import { fileExist, rmPath } from '../config/util';
 import { writeFileWithLock } from '../shared/utils';
-import { resolveSubscriptionPath } from '../shared/subscriptionPath';
+import {
+  getSubscriptionSshAlias,
+  resolveSubscriptionPath,
+} from '../shared/subscriptionPath';
 
 @Service()
 export default class SshKeyService {
@@ -103,6 +106,7 @@ export default class SshKeyService {
     host: string,
     proxy?: string,
   ): Promise<void> {
+    alias = getSubscriptionSshAlias(alias);
     await this.generatePrivateKeyFile(alias, key);
     await this.generateSingleSshConfig(alias, host, proxy);
   }
@@ -112,6 +116,7 @@ export default class SshKeyService {
     host: string,
     proxy?: string,
   ): Promise<void> {
+    alias = getSubscriptionSshAlias(alias);
     await this.removePrivateKeyFile(alias);
     await this.removeSshConfig(alias);
   }
@@ -119,15 +124,19 @@ export default class SshKeyService {
   public async setSshConfig(docs: Subscription[]) {
     for (const doc of docs) {
       if (doc.type === 'private-repo' && doc.pull_type === 'ssh-key') {
-        const { alias, proxy } = doc;
-        const { host } = formatUrl(doc);
-        await this.removePrivateKeyFile(alias);
-        await this.removeSshConfig(alias);
-        await this.generatePrivateKeyFile(
-          alias,
-          (doc.pull_option as any).private_key,
-        );
-        await this.generateSingleSshConfig(alias, host, proxy);
+        try {
+          const alias = getSubscriptionSshAlias(doc.alias);
+          const { host } = formatUrl(doc);
+          await this.removePrivateKeyFile(alias);
+          await this.removeSshConfig(alias);
+          await this.generatePrivateKeyFile(
+            alias,
+            (doc.pull_option as any).private_key,
+          );
+          await this.generateSingleSshConfig(alias, host, doc.proxy);
+        } catch (error) {
+          this.logger.warn('跳过订阅 %s 的无效 SSH 配置: %s', doc.id, error);
+        }
       }
     }
   }

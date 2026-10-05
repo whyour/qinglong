@@ -7,6 +7,8 @@ import config from '../config';
 import { fileExist } from '../config/util';
 import { join } from 'path';
 import { t } from '../shared/i18n';
+import Logger from './logger';
+import { assertSubscriptionAlias } from '../shared/subscriptionPath';
 
 export default async () => {
   const systemService = Container.get(SystemService);
@@ -70,6 +72,12 @@ export default async () => {
   await subscriptionService.setSshConfig();
   const subs = await subscriptionService.list();
   for (const sub of subs) {
-    subscriptionService.handleTask(sub.get({ plain: true }), !sub.is_disabled);
+    try {
+      const doc = sub.get({ plain: true });
+      assertSubscriptionAlias(doc.alias);
+      await subscriptionService.handleTask(doc, !sub.is_disabled);
+    } catch (error) {
+      Logger.warn('跳过订阅 %s 的无效定时配置: %s', sub.id, error);
+    }
   }
 };
