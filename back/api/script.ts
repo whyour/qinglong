@@ -287,10 +287,20 @@ export default (app: Router) => {
           fileExists &&
           resolveFileAccess(config.scriptPath, [filePath], config.blackFileList)
         ) {
+          let removeSource = filename !== originFilename;
+          if (removeSource) {
+            const [originRealPath, targetRealPath] = await Promise.all([
+              fs.realpath(originFilePath),
+              fs.realpath(filePath),
+            ]);
+            // Aliases of one script are an in-place save. Removing the source
+            // would also remove the destination behind a target symlink.
+            removeSource = originRealPath !== targetRealPath;
+          }
           // Save-as removes the source after committing the destination. Keep
           // its original content too: destination history only protects the
           // file being overwritten, not the source being deleted.
-          if (filename !== originFilename) {
+          if (removeSource) {
             await fs.copyFile(
               originFilePath,
               join(config.bakPath, originFilename.replace(/\//g, '')),
@@ -301,7 +311,7 @@ export default (app: Router) => {
             skipHistory: req.body.skipHistory,
             expectedHash: req.body.expectedHash,
           });
-          if (filename !== originFilename) await rmPath(originFilePath);
+          if (removeSource) await rmPath(originFilePath);
           return res.send({ code: 200, data });
         }
         if (fileExists) {

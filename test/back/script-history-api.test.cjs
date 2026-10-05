@@ -201,6 +201,63 @@ test('script routes save, list, preview and restore, with validation and conflic
       'small',
     );
   }
+  for (const scenario of ['target-link', 'source-link', 'normalized-path']) {
+    await t.test(
+      `save-as preserves aliases of the same file: ${scenario}`,
+      async () => {
+        const sourceName = `${scenario}-source.js`;
+        const aliasName = `${scenario}-alias.js`;
+        const sourcePath = path.join(scripts, sourceName);
+        await fs.writeFile(sourcePath, 'source-original');
+        if (scenario !== 'normalized-path')
+          await fs.symlink(sourceName, path.join(scripts, aliasName));
+        const filename =
+          scenario === 'target-link'
+            ? aliasName
+            : scenario === 'normalized-path'
+            ? `./${sourceName}`
+            : sourceName;
+        const originFilename =
+          scenario === 'source-link' ? aliasName : sourceName;
+        const saved = await call(
+          '/scripts',
+          { filename, originFilename, path: '', content: 'source-edited' },
+          'POST',
+        );
+        assert.equal(saved.status, 200);
+        assert.equal(saved.body.code, 200);
+        assert.equal(await fs.readFile(sourcePath, 'utf8'), 'source-edited');
+        assert.equal(
+          await fs.readFile(path.join(scripts, filename), 'utf8'),
+          'source-edited',
+        );
+        if (scenario !== 'normalized-path') {
+          assert.equal(
+            await fs.readlink(path.join(scripts, aliasName)),
+            sourceName,
+          );
+          const sourceHistory = await call(
+            `/scripts/history?filename=${sourceName}`,
+          );
+          const aliasHistory = await call(
+            `/scripts/history?filename=${aliasName}`,
+          );
+          assert.deepEqual(aliasHistory.body.data, sourceHistory.body.data);
+        }
+        const list = await call(
+          `/scripts/history?filename=${encodeURIComponent(filename)}`,
+        );
+        assert.equal(list.body.data.versions.length, 1);
+        const preview = await call(
+          `/scripts/history/detail?filename=${encodeURIComponent(
+            filename,
+          )}&id=${list.body.data.versions[0].id}`,
+        );
+        assert.equal(preview.body.data.version.content, 'source-original');
+        assert.equal(preview.body.data.current, 'source-edited');
+      },
+    );
+  }
   await t.test(
     'save-as backs up the source and retains destination history before removing the source',
     async () => {
