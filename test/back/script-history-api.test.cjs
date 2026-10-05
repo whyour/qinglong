@@ -18,9 +18,12 @@ test('script routes save, list, preview and restore, with validation and conflic
   const config = {
     scriptPath: scripts,
     dataPath: root,
+    bakPath: path.join(root, 'bak'),
     blackFileList: ['auth.json'],
     writePathList: [scripts],
   };
+  await fs.mkdir(config.bakPath);
+  let failure = '';
   class ScriptService {
     checkFilePath(dir, name) {
       return resolveFileAccess(scripts, [dir || '', name]);
@@ -28,7 +31,21 @@ test('script routes save, list, preview and restore, with validation and conflic
   }
   const api = load(path.join(__dirname, '../../back/api/script.ts'), {
     '../config': { default: config, __esModule: true },
+    'fs/promises': {
+      ...fs,
+      copyFile: async (from, to) => {
+        if (failure === 'backup' && path.dirname(to) === config.bakPath)
+          throw Object.assign(new Error('backup denied'), { code: 'EACCES' });
+        return fs.copyFile(from, to);
+      },
+      writeFile: async (file, ...args) => {
+        if (failure === 'history' && String(file).endsWith('.pending.tmp'))
+          throw Object.assign(new Error('history full'), { code: 'ENOSPC' });
+        return fs.writeFile(file, ...args);
+      },
+    },
     '../config/util': {
+      rmPath: (file) => fs.rm(file, { force: true, recursive: true }),
       fileExist: async (file) =>
         fs.access(file).then(
           () => true,
@@ -157,6 +174,86 @@ test('script routes save, list, preview and restore, with validation and conflic
     assert.equal(
       await fs.readFile(path.join(scripts, 'large.js'), 'utf8'),
       'small',
+    );
+  }
+  await t.test(
+    'save-as backs up the source and retains destination history before removing the source',
+    async () => {
+      await fs.writeFile(path.join(scripts, 'source.js'), 'source-original');
+      await fs.writeFile(
+        path.join(scripts, 'destination.js'),
+        'destination-original',
+      );
+      const saved = await call(
+        '/scripts',
+        {
+          filename: 'destination.js',
+          originFilename: 'source.js',
+          path: '',
+          content: 'source-edited',
+        },
+        'POST',
+      );
+      assert.equal(saved.status, 200);
+      await assert.rejects(fs.access(path.join(scripts, 'source.js')), {
+        code: 'ENOENT',
+      });
+      assert.equal(
+        await fs.readFile(path.join(config.bakPath, 'source.js'), 'utf8'),
+        'source-original',
+      );
+      assert.equal(
+        await fs.readFile(path.join(scripts, 'destination.js'), 'utf8'),
+        'source-edited',
+      );
+      const list = await call('/scripts/history?filename=destination.js');
+      const preview = await call(
+        `/scripts/history/detail?filename=destination.js&id=${list.body.data.versions[0].id}`,
+      );
+      assert.equal(preview.body.data.version.content, 'destination-original');
+    },
+  );
+  for (const step of ['backup', 'history']) {
+    await t.test(
+      `save-as ${step} failure preserves both original scripts`,
+      async () => {
+        const sourceName = `${step}-source.js`,
+          destinationName = `${step}-destination.js`;
+        await fs.writeFile(path.join(scripts, sourceName), 'source-original');
+        await fs.writeFile(
+          path.join(scripts, destinationName),
+          'destination-original',
+        );
+        failure = step;
+        try {
+          const saved = await call(
+            '/scripts',
+            {
+              filename: destinationName,
+              originFilename: sourceName,
+              path: '',
+              content: 'source-edited',
+            },
+            'POST',
+          );
+          assert.equal(saved.status, 500);
+          assert.equal(
+            await fs.readFile(path.join(scripts, sourceName), 'utf8'),
+            'source-original',
+          );
+          assert.equal(
+            await fs.readFile(path.join(scripts, destinationName), 'utf8'),
+            'destination-original',
+          );
+          assert.equal(
+            (await call(`/scripts/history?filename=${destinationName}`)).body
+              .data.versions.length,
+            0,
+          );
+        } finally {
+          failure = '';
+        }
+      },
     );
   }
 });

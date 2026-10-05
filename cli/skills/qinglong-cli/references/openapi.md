@@ -1,8 +1,8 @@
 # OpenAPI 全量参考 / Complete OpenAPI reference
 
-CLI 对应当前 develop 的 143 条有效路由。通过 `ql api routes --json` 查看方法、路径、对应命令、位置参数、请求体与上传字段；CLI 测试与 back/api 路由逐项核对。GET configs/:file、scripts/:file、logs/:file 已返回 410，改用 detail 命令，不再暴露旧入口。旧版面板可能没有新路由，以服务端响应为准。
+CLI 对应本版本后端的 146 条有效路由。通过 `ql api routes --json` 查看方法、路径、对应命令、位置参数、请求体与上传字段；CLI 测试与 back/api 路由逐项核对。GET configs/:file、scripts/:file、logs/:file 已返回 410，改用 detail 命令，不再暴露旧入口。旧版面板可能没有新路由，以服务端响应为准。
 
-The catalogue covers 143 active routes in the current develop backend. `ql api routes --json` lists methods, paths, commands, positional parameters, bodies and upload fields. A route-coverage test detects drift. Three retired GET :file routes return 410; use detail-based commands. Older panel versions may not implement newer routes.
+The catalogue covers 146 active routes in the current backend. `ql api routes --json` lists methods, paths, commands, positional parameters, bodies and upload fields. A route-coverage test detects drift. Three retired GET :file routes return 410; use detail-based commands. Older panel versions may not implement newer routes.
 
 ## 认证与权限 / Authentication and permissions
 
@@ -46,6 +46,9 @@ ql env create --data @envs.json --json
 ql env update 8 --data '{"name":"EXAMPLE","value":"value"}' --json
 ql script create --file ./demo.js --data '{"filename":"demo.js","path":""}' --json
 ql script get --query '{"file":"demo.js","path":""}' --json
+ql script history-list --query '{"filename":"demo.js","path":""}' --json
+ql script history-detail --query '{"filename":"demo.js","path":"","id":"VERSION_UUID"}' --json
+ql script history-restore --data '{"filename":"demo.js","path":"","id":"VERSION_UUID","expectedHash":"CURRENT_SHA256"}' --json
 ql config save --data '{"name":"example.sh","content":"# example"}' --json
 ql config get --query '{"path":"example.sh"}' --json
 ql log download --data '{"filename":"example.log","path":"example"}' --output ./example.log --json
@@ -133,6 +136,9 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql config save ` | POST | `configs/save` | --data, --query |
 | `ql script list ` | GET | `scripts` | --query |
 | `ql script get ` | GET | `scripts/detail` | --query |
+| `ql script history-list ` | GET | `scripts/history` | --query |
+| `ql script history-detail ` | GET | `scripts/history/detail` | --query |
+| `ql script history-restore ` | PUT | `scripts/history/restore` | --data, --query |
 | `ql script create ` | POST | `scripts` | --data, --file (file), --query |
 | `ql script update ` | PUT | `scripts` | --data, --file (file), --query |
 | `ql script delete ` | DELETE | `scripts` | --data, --query |

@@ -295,6 +295,15 @@ export default (app: Router) => {
           fileExists &&
           resolveFileAccess(config.scriptPath, [filePath], config.blackFileList)
         ) {
+          // Save-as removes the source after committing the destination. Keep
+          // its original content too: destination history only protects the
+          // file being overwritten, not the source being deleted.
+          if (filename !== originFilename) {
+            await fs.copyFile(
+              originFilePath,
+              join(config.bakPath, originFilename.replace(/\//g, '')),
+            );
+          }
           const data = await historyService().save(path, filename, content, {
             skipHistory: req.body.skipHistory,
             expectedHash: req.body.expectedHash,
