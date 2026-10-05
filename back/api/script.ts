@@ -12,6 +12,11 @@ import ScriptService from '../services/script';
 import { t } from '../shared/i18n';
 import multer from 'multer';
 import { writeFileWithLock } from '../shared/utils';
+import {
+  ScriptHistory,
+  ScriptHistoryError,
+  HistoryUnavailableError,
+} from '../shared/scriptHistory';
 const route = Router();
 
 function isPathAllowed(targetPath: string): boolean {
@@ -115,6 +120,90 @@ export default (app: Router) => {
     },
   );
 
+  const historyService = () =>
+    new ScriptHistory(
+      config.scriptPath,
+      join(config.dataPath, 'script-history'),
+      config.blackFileList,
+    );
+  const historyError = (error: unknown, res: Response, next: NextFunction) => {
+    if (error instanceof ScriptHistoryError) {
+      return res.status(error.status).send({
+        code: error.status,
+        message: t(error.message),
+        ...(error instanceof HistoryUnavailableError
+          ? { historyUnavailable: true, currentHash: error.currentHash }
+          : {}),
+      });
+    }
+    return next(error);
+  };
+  const historyQuery = {
+    filename: Joi.string().required(),
+    path: Joi.string().optional().allow(''),
+  };
+
+  route.get(
+    '/history',
+    celebrate({ query: Joi.object(historyQuery).unknown(true) }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const data = await historyService().list(
+          (req.query.path as string) || '',
+          req.query.filename as string,
+        );
+        res.send({ code: 200, data });
+      } catch (error) {
+        historyError(error, res, next);
+      }
+    },
+  );
+  route.get(
+    '/history/detail',
+    celebrate({
+      query: Joi.object({
+        ...historyQuery,
+        id: Joi.string().uuid().required(),
+      }).unknown(true),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const data = await historyService().detail(
+          (req.query.path as string) || '',
+          req.query.filename as string,
+          req.query.id as string,
+        );
+        res.send({ code: 200, data });
+      } catch (error) {
+        historyError(error, res, next);
+      }
+    },
+  );
+  route.put(
+    '/history/restore',
+    celebrate({
+      body: Joi.object({
+        ...historyQuery,
+        id: Joi.string().uuid().required(),
+        expectedHash: Joi.string().hex().length(64).required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { path = '', filename, id, expectedHash } = req.body;
+        const data = await historyService().restore(
+          path,
+          filename,
+          id,
+          expectedHash,
+        );
+        res.send({ code: 200, data });
+      } catch (error) {
+        historyError(error, res, next);
+      }
+    },
+  );
+
   route.get('/:file', (req: Request, res: Response) => {
     return res.send({
       code: 410,
@@ -136,6 +225,11 @@ export default (app: Router) => {
         filename: Joi.string().required(),
         path: Joi.string().optional().allow(''),
         content: Joi.string().optional().allow(''),
+        skipHistory: Joi.boolean().optional(),
+        expectedHash: Joi.string()
+          .hex()
+          .length(64)
+          .when('skipHistory', { is: true, then: Joi.required() }),
         originFilename: Joi.string().optional().allow(''),
         directory: Joi.string().optional().allow(''),
         file: Joi.string().optional().allow(''),
@@ -197,6 +291,17 @@ export default (app: Router) => {
         }
         await fs.mkdir(path, { recursive: true });
         const fileExists = await fileExist(filePath);
+        if (
+          fileExists &&
+          resolveFileAccess(config.scriptPath, [filePath], config.blackFileList)
+        ) {
+          const data = await historyService().save(path, filename, content, {
+            skipHistory: req.body.skipHistory,
+            expectedHash: req.body.expectedHash,
+          });
+          if (filename !== originFilename) await rmPath(originFilePath);
+          return res.send({ code: 200, data });
+        }
         if (fileExists) {
           await fs.copyFile(
             originFilePath,
@@ -209,7 +314,7 @@ export default (app: Router) => {
         await writeFileWithLock(filePath, content);
         return res.send({ code: 200 });
       } catch (e) {
-        return next(e);
+        return historyError(e, res, next);
       }
     },
   );
@@ -221,6 +326,11 @@ export default (app: Router) => {
         filename: Joi.string().required(),
         path: Joi.string().optional().allow(''),
         content: Joi.string().required().allow(''),
+        skipHistory: Joi.boolean().optional(),
+        expectedHash: Joi.string()
+          .hex()
+          .length(64)
+          .when('skipHistory', { is: true, then: Joi.required() }),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -238,10 +348,18 @@ export default (app: Router) => {
             message: t('暂无权限'),
           });
         }
-        await writeFileWithLock(filePath, content);
-        return res.send({ code: 200 });
+        const data = await historyService().save(
+          path || '',
+          filename,
+          content,
+          {
+            skipHistory: req.body.skipHistory,
+            expectedHash: req.body.expectedHash,
+          },
+        );
+        return res.send({ code: 200, data });
       } catch (e) {
-        return next(e);
+        return historyError(e, res, next);
       }
     },
   );

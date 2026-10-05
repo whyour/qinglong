@@ -4,7 +4,7 @@ import path from 'path';
 import { writeFile, open, chmod } from 'fs/promises';
 import { fileExist } from '../config/util';
 
-function getUniqueLockPath(filePath: string) {
+export function getUniqueLockPath(filePath: string) {
   const sanitizedPath = filePath
     .replace(/[<>:"/\\|?*]/g, '_')
     .replace(/^_/, '');

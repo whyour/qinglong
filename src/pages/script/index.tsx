@@ -10,6 +10,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   EllipsisOutlined,
+  HistoryOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
@@ -40,6 +41,8 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import intl from 'react-intl-universal';
 import SplitPane from 'react-split-pane';
 import EditModal from './editModal';
+import HistoryDrawer from './historyDrawer';
+import { saveWithHistory } from './saveWithHistory';
 import EditScriptNameModal from './editNameModal';
 import styles from './index.module.less';
 import RenameModal from './renameModal';
@@ -65,6 +68,26 @@ const Script = () => {
   const [currentNode, setCurrentNode] = useState<any>();
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const [showMonaco, setShowMonaco] = useState(true);
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const savedContentRef = useRef('');
+  const currentKeyRef = useRef(currentNode?.key);
+  currentKeyRef.current = currentNode?.key;
+
+  useEffect(() => {
+    setHistoryVisible(false);
+  }, [currentNode?.key]);
+
+  const hasUnsavedChanges = () => {
+    const content =
+      !isPhone && editorRef.current ? editorRef.current.getValue() : value;
+    return (
+      isEditing &&
+      content.replace(/\r\n/g, '\n') !==
+        savedContentRef.current.replace(/\r\n/g, '\n')
+    );
+  };
 
   const handleIsEditing = (filename: string, value: boolean) => {
     setIsEditing(value && canPreviewInMonaco(filename));
@@ -89,10 +112,11 @@ const Script = () => {
       .get(
         `${config.apiPrefix}scripts/detail?file=${encodeURIComponent(
           node.title,
-        )}&path=${node.parent || ''}`,
+        )}&path=${encodeURIComponent(node.parent || '')}`,
       )
       .then(({ code, data }) => {
-        if (code === 200) {
+        if (code === 200 && currentKeyRef.current === node.key) {
+          savedContentRef.current = data;
           setValue(data);
           if (options.callback) {
             options.callback();
@@ -179,7 +203,7 @@ const Script = () => {
       const currentContent = editorRef.current
         ? editorRef.current.getValue().replace(/\r\n/g, '\n')
         : value;
-      const originalContent = value.replace(/\r\n/g, '\n');
+      const originalContent = savedContentRef.current.replace(/\r\n/g, '\n');
 
       if (currentContent !== originalContent && isEditing) {
         Modal.confirm({
@@ -247,42 +271,36 @@ const Script = () => {
     getDetail(currentNode);
   };
 
-  const saveFile = () => {
-    Modal.confirm({
-      title: intl.get('确认保存'),
-      content: (
-        <>
-          {intl.get('确认保存文件')}
-          <Text style={{ wordBreak: 'break-all' }} type="warning">
-            {' '}
-            {currentNode.title}
-          </Text>
-          {intl.get('，保存后不可恢复')}
-        </>
-      ),
-      onOk() {
-        const content = editorRef.current
-          ? editorRef.current.getValue().replace(/\r\n/g, '\n')
-          : value;
-        return new Promise((resolve, reject) => {
-          request
-            .put(`${config.apiPrefix}scripts`, {
-              filename: currentNode.title,
-              path: currentNode.parent || '',
-              content,
-            })
-            .then(({ code, data }) => {
-              if (code === 200) {
-                message.success(intl.get('保存成功'));
-                setValue(content);
-                handleIsEditing(currentNode.title, false);
-              }
-              resolve(null);
-            })
-            .catch((e) => reject(e));
-        });
-      },
-    });
+  const saveFile = async () => {
+    if (savingRef.current || !currentNode) return;
+    const node = currentNode;
+    const content =
+      !isPhone && editorRef.current
+        ? editorRef.current.getValue().replace(/\r\n/g, '\n')
+        : value;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      const result = await saveWithHistory(
+        'put',
+        `${config.apiPrefix}scripts`,
+        {
+          filename: node.title,
+          path: node.parent || '',
+          content,
+        },
+      );
+      if (result?.code === 200 && currentKeyRef.current === node.key) {
+        savedContentRef.current = content;
+        setValue(content);
+        handleIsEditing(node.title, false);
+      }
+    } catch {
+      // The shared HTTP handler presents the server's error; keep the draft.
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   const deleteFile = () => {
@@ -548,8 +566,20 @@ const Script = () => {
         </>
       }
       loading={loading}
-      extra={
-        isPhone
+      extra={[
+        ...(currentNode?.type === 'file' && showMonaco
+          ? [
+              <Button
+                key="history"
+                icon={<HistoryOutlined />}
+                disabled={saving}
+                onClick={() => setHistoryVisible(true)}
+              >
+                {!isPhone && intl.get('历史版本')}
+              </Button>,
+            ]
+          : []),
+        ...(isPhone
           ? [
               <TreeSelect
                 treeExpandAction="click"
@@ -562,7 +592,7 @@ const Script = () => {
                 treeNodeFilterProp="title"
                 showSearch
                 allowClear
-                onSelect={onSelect}
+                onSelect={(key, node) => onTreeSelect([key], { node })}
               />,
               <Dropdown menu={menu} trigger={['click']}>
                 <Button type="primary" icon={<EllipsisOutlined />} />
@@ -570,7 +600,7 @@ const Script = () => {
             ]
           : isEditing
           ? [
-              <Button type="primary" onClick={saveFile}>
+              <Button type="primary" onClick={saveFile} loading={saving}>
                 {intl.get('保存')}
               </Button>,
               <Button type="primary" onClick={cancelEdit}>
@@ -625,12 +655,29 @@ const Script = () => {
               >
                 {intl.get('调试')}
               </Button>,
-            ]
-      }
+            ]),
+      ]}
       header={{
         style: headerStyle,
       }}
     >
+      {historyVisible && currentNode && (
+        <HistoryDrawer
+          key={currentNode.key}
+          filename={currentNode.title}
+          directory={currentNode.parent || ''}
+          isPhone={isPhone}
+          theme={theme}
+          language={mode}
+          hasUnsavedChanges={hasUnsavedChanges}
+          onClose={() => setHistoryVisible(false)}
+          onRestored={(content) => {
+            savedContentRef.current = content;
+            setValue(content);
+            setIsEditing(false);
+          }}
+        />
+      )}
       <div className={`${styles['log-container']} log-container`}>
         {!isPhone && (
           /*// @ts-ignore*/
@@ -682,7 +729,7 @@ const Script = () => {
                 value={value}
                 theme={theme}
                 options={{
-                  readOnly: !isEditing,
+                  readOnly: !isEditing || saving,
                   fontSize: 12,
                   lineNumbersMinChars: 3,
                   glyphMargin: false,
@@ -704,7 +751,7 @@ const Script = () => {
               mode ? [langs[mode as keyof typeof langs]()] : undefined
             }
             theme={theme.includes('dark') ? 'dark' : 'light'}
-            readOnly={!isEditing}
+            readOnly={!isEditing || saving}
             onChange={(value) => {
               setValue(value);
             }}
