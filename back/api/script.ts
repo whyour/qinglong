@@ -7,7 +7,7 @@ import { Logger } from 'winston';
 import config from '../config';
 import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
-import path, { dirname, join, parse } from 'path';
+import path, { dirname, join, parse, resolve, sep } from 'path';
 import ScriptService from '../services/script';
 import { t } from '../shared/i18n';
 import multer from 'multer';
@@ -200,7 +200,22 @@ export default (app: Router) => {
         if (!isPathAllowed(filePath) || !isPathAllowed(originFilePath)) {
           return res.send({ code: 403, message: t('暂无权限') });
         }
-        await fs.mkdir(dirname(filePath), { recursive: true });
+        // Check the canonical parent directly at the directory creation boundary.
+        const parentPath = resolve(dirname(filePath));
+        let parentCreated = false;
+        for (const writableRoot of config.writePathList) {
+          const root = resolve(writableRoot);
+          const rootPrefix = root.endsWith(sep) ? root : root + sep;
+          if (parentPath !== root && !parentPath.startsWith(rootPrefix)) {
+            continue;
+          }
+          await fs.mkdir(parentPath, { recursive: true });
+          parentCreated = true;
+          break;
+        }
+        if (!parentCreated) {
+          return res.send({ code: 403, message: t('暂无权限') });
+        }
         const fileExists = await fileExist(filePath);
         if (fileExists) {
           await fs.copyFile(

@@ -98,6 +98,43 @@ test('script creation only creates the validated destination parent', async (t) 
   );
 });
 
+test('script creation supports root and nested parents in both writable directories', async (t) => {
+  const { config, invoke } = fixture(t);
+  for (const root of [config.scriptPath, config.configPath]) {
+    for (const filename of ['ordinary.js', 'nested/deeper/script.js']) {
+      assert.equal(
+        (await invoke('post', '/', {
+          path: root,
+          filename,
+          content: 'safe',
+        })).code,
+        200,
+      );
+      assert.equal(fs.readFileSync(path.join(root, filename), 'utf8'), 'safe');
+    }
+  }
+});
+
+test('script parent creation rejects sibling prefixes and external symlinks', async (t) => {
+  const { root, config, invoke } = fixture(t);
+  const sibling = config.scriptPath + '-sibling';
+  const outside = path.join(root, 'outside');
+  fs.mkdirSync(sibling);
+  fs.symlinkSync(outside, path.join(config.scriptPath, 'escape'));
+  for (const parent of [sibling, path.join(config.scriptPath, 'escape')]) {
+    assert.equal(
+      (await invoke('post', '/', {
+        path: parent,
+        filename: 'nested/poc.js',
+        content: 'blocked',
+      })).code,
+      403,
+    );
+  }
+  assert.equal(fs.existsSync(path.join(sibling, 'nested')), false);
+  assert.equal(fs.existsSync(path.join(outside, 'nested')), false);
+});
+
 test('stopping scripts rejects logs outside the log root before any side effect', async (t) => {
   const { root, config, stopped, invoke } = fixture(t);
   const callbacks = [];

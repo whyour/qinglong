@@ -133,10 +133,7 @@ test('SSH URL, key and configuration use the same stable name for nested aliases
     assert.equal(fs.readFileSync(key, 'utf8').trim(), 'fixture-key');
     assert.equal(fs.statSync(key).mode & 0o777, 0o400);
     assert.equal(fs.statSync(config).mode & 0o777, 0o600);
-    assert.match(
-      fs.readFileSync(config, 'utf8'),
-      new RegExp('^Host ' + name.replace(/[.+]/g, '\\$&') + '\n'),
-    );
+    assert.ok(fs.readFileSync(config, 'utf8').startsWith(`Host ${name}\n`));
     assert.equal(formatUrl(doc).url, `git@${name}:owner/repo.git`);
     const parsed = execFileSync('ssh', ['-G', '-F', config, name], {
       encoding: 'utf8',
