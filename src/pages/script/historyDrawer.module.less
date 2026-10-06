@@ -3,6 +3,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  :global(.ant-typography) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
   :global(.ant-btn) {
     flex-shrink: 0;
   }
@@ -21,7 +25,16 @@
 }
 @media (max-width: 600px) {
   .footer {
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    :global(.ant-btn) {
+      width: 100%;
+      height: auto;
+      min-height: 32px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
   }
   .labels {
     gap: 8px;
