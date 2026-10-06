@@ -72,14 +72,13 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const { name, content } = req.body;
-        // Resolve path first to prevent traversal attacks
-        const scriptFile = name.startsWith('data/scripts/');
-        const basePath = scriptFile ? config.scriptPath : config.configPath;
-        const cleanName = name.replace(/^data\/scripts\//, '');
+        if (name.startsWith('data/scripts/')) {
+          return res.send({ code: 403, message: t('文件无法访问') });
+        }
         const normalized = resolveFileAccess(
-          basePath,
-          [cleanName],
-          scriptFile ? [] : config.blackFileList,
+          config.configPath,
+          [name],
+          config.blackFileList,
         );
         if (!normalized) {
           return res.send({ code: 403, message: t('文件无法访问') });

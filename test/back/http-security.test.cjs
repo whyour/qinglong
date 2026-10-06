@@ -9,7 +9,7 @@ const load = require('../helpers/load-security-module.cjs');
 
 test('HTTP authentication protects init, scopes, expired sessions and config secrets', async (t) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-http-security-'));
-  for (const dir of ['config/grpc', 'scripts', 'upload', 'tmp'])
+  for (const dir of ['config/grpc', 'scripts', 'upload', 'tmp', 'bak'])
     fs.mkdirSync(path.join(tmp, dir), { recursive: true });
   fs.writeFileSync(path.join(tmp, 'config/grpc/client.key'), 'SENTINEL');
   fs.writeFileSync(path.join(tmp, 'config/normal.txt'), 'normal');
@@ -40,6 +40,8 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     scriptPath: path.join(tmp, 'scripts/'),
     uploadPath: path.join(tmp, 'upload'),
     tmpPath: path.join(tmp, 'tmp'),
+    bakPath: path.join(tmp, 'bak'),
+    writePathList: [path.join(tmp, 'scripts')],
     blackFileList: ['auth.json', 'grpc'],
     baseUrl: '/panel',
   };
@@ -53,6 +55,10 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       tokens: [
         { value: 'script-config-app', expiration: Date.now() / 1000 + 3600 },
       ],
+    },
+    {
+      scopes: ['scripts'],
+      tokens: [{ value: 'script-app', expiration: Date.now() / 1000 + 3600 }],
     },
     {
       scopes: ['envs'],
@@ -74,6 +80,8 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       getToken: (r) => (r.headers.authorization || '').replace(/^Bearer /, ''),
       getPlatform: () => 'desktop',
       getFileContentByName: (p) => fs.promises.readFile(p, 'utf8'),
+      fileExist: (p) => fs.existsSync(p),
+      rmPath: (p) => fs.promises.rm(p),
     },
     '../shared/i18n': { t: (x) => x },
     '../shared/store': {
@@ -81,6 +89,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     },
     '../config/serverEnv': { serveEnv: (_req, res) => res.end() },
     '../services/user': User,
+    '../services/script': class {},
     '../data/open': {},
     '../data/system': {},
     '../shared/utils': {
@@ -100,6 +109,9 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     const router = express.Router();
     load(path.join(__dirname, '../../back/api/user.ts'), mocks).default(router);
     load(path.join(__dirname, '../../back/api/config.ts'), mocks).default(
+      router,
+    );
+    load(path.join(__dirname, '../../back/api/script.ts'), mocks).default(
       router,
     );
     router.get('/envs', (_req, res) => res.json({ code: 200 }));
@@ -227,7 +239,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         content: 'overwrite',
       },
     );
-    assert.equal(denied.status, 401);
+    assert.equal(denied.body.code, 403);
     assert.equal(fs.existsSync(path.join(tmp, 'scripts/test.js')), false);
   }
   assert.equal(
@@ -237,11 +249,13 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         content: 'authorized script',
       })
     ).body.code,
-    200,
+    403,
   );
+  assert.equal(fs.existsSync(path.join(tmp, 'scripts/test.js')), false);
   assert.equal(
-    fs.readFileSync(path.join(tmp, 'scripts/test.js'), 'utf8'),
-    'authorized script',
+    (await request(`/open/configs/detail?path=${scriptName}`, 'config-app'))
+      .body.code,
+    403,
   );
   assert.equal(
     (
@@ -259,6 +273,30 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         content: 'owner script',
       })
     ).body.code,
-    200,
+    403,
   );
+  for (const prefix of ['/open', '/panel/open']) {
+    assert.equal(
+      (
+        await request(`${prefix}/scripts`, 'config-app', 'POST', {
+          filename: 'test.js',
+          content: 'unauthorized',
+        })
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
+        await request(`${prefix}/scripts`, 'script-app', 'POST', {
+          filename: 'test.js',
+          content: 'authorized script',
+        })
+      ).body.code,
+      200,
+    );
+    assert.equal(
+      fs.readFileSync(path.join(tmp, 'scripts/test.js'), 'utf8'),
+      'authorized script',
+    );
+  }
 });

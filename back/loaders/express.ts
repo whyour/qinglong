@@ -112,15 +112,7 @@ export default ({ app }: { app: Application }) => {
         const keyMatch = pathLower.match(/\/open\/([a-z]+)\/*/);
         const key = keyMatch && keyMatch[1];
 
-        const writesScript =
-          key === 'configs' && req.method === 'POST' &&
-          pathLower.replace(/\/+$/, '') === '/open/configs/save' &&
-          typeof req.body?.name === 'string' &&
-          req.body.name.startsWith('data/scripts/');
-        if (
-          !doc.scopes.includes(key as AppScope) ||
-          (writesScript && !doc.scopes.includes('scripts'))
-        ) {
+        if (!doc.scopes.includes(key as AppScope)) {
           const err = new UnauthorizedError('credentials_bad_scheme', {
             message: t('暂无权限'),
           });

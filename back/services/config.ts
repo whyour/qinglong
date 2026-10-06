@@ -12,14 +12,13 @@ export default class ConfigService {
 
   public async getFile(filePath: string, res: Response) {
     let content = '';
-    if (!filePath) {
+    if (!filePath || filePath.startsWith('data/scripts/')) {
       return res.send({ code: 403, message: t('文件无法访问') });
     }
-    const scriptFile = filePath.startsWith('data/scripts/');
     const resolved = resolveFileAccess(
-      scriptFile ? config.scriptPath : config.configPath,
-      [scriptFile ? filePath.slice('data/scripts/'.length) : filePath],
-      scriptFile ? [] : config.blackFileList,
+      config.configPath,
+      [filePath],
+      config.blackFileList,
     );
     if (!resolved) {
       return res.send({ code: 403, message: t('文件无法访问') });

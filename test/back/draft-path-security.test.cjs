@@ -228,6 +228,7 @@ test('draft configuration traversal and normalized secret names cannot write fil
         content: 'normal',
       })
     ).code,
-    200,
+    403,
   );
+  assert.equal(fs.existsSync(path.join(config.scriptPath, 'normal.js')), false);
 });

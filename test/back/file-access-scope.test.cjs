@@ -81,7 +81,7 @@ function api(name, service, mocks) {
 }
 
 for (const customData of [false, true]) {
-  test(`config script access scopes blacklist and uses the configured data directory (custom=${customData})`, async (t) => {
+  test(`config APIs reject script compatibility paths (custom=${customData})`, async (t) => {
     const { config, mocks, secret } = fixture(t, customData);
     const Config = load(path.resolve('back/services/config.ts'), mocks).default;
     mocks['../services/config'] = Config;
@@ -101,19 +101,12 @@ for (const customData of [false, true]) {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, 'initial');
       const name = `data/scripts/${filename}`;
-      assert.equal(
-        (await invoke('get', '/detail', { path: name })).data,
-        'initial',
-      );
+      assert.equal((await invoke('get', '/detail', { path: name })).code, 403);
       assert.equal(
         (await invoke('post', '/save', { name, content: 'updated' })).code,
-        200,
+        403,
       );
-      assert.equal(
-        (await invoke('get', '/detail', { path: name })).data,
-        'updated',
-      );
-      assert.equal(fs.readFileSync(file, 'utf8'), 'updated');
+      assert.equal(fs.readFileSync(file, 'utf8'), 'initial');
     }
     if (customData)
       assert.equal(
