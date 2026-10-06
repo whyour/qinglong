@@ -262,10 +262,9 @@ export default class EnvService {
             .map((x) => x.value)
             .join('&')
             .replace(/\\/g, '\\\\')}`;
-          js_env_string += `process.env.${key}=\`${_env_value.replace(
-            /\`/g,
-            '\\`',
-          )}\`;\n`;
+          js_env_string += `process.env[${JSON.stringify(key)}]=${JSON.stringify(
+            group.map((x) => x.value).join('&'),
+          )};\n`;
           py_env_string += `os.environ['${key}']='''${_env_value.replace(
             /\'/g,
             "\\'",

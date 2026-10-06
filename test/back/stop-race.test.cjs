@@ -1,9 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 const { Sequelize, DataTypes } = require('sequelize');
 const load = require('../helpers/load-security-module.cjs');
 async function fixture(t, onKill = async () => {}) {
+  const logPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-stop-log-'));
+  t.after(() => fs.rmSync(logPath, { recursive: true, force: true }));
   const db = new Sequelize({
     dialect: 'sqlite',
     storage: ':memory:',
@@ -41,7 +45,7 @@ async function fixture(t, onKill = async () => {}) {
   let service;
   const killed = [];
   const CronService = load(path.resolve('back/services/cron.ts'), {
-    '../config': {},
+    '../config': { logPath },
     '../data/cron': {
       CrontabModel: crons,
       CrontabStatus: { queued: 3, running: 0, idle: 1 },

@@ -20,7 +20,7 @@ import {
 } from '../config/util';
 import fs from 'fs/promises';
 import { FindOptions, Op } from 'sequelize';
-import path, { join } from 'path';
+import path from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
 import SockService from './sock';
@@ -30,6 +30,11 @@ import dayjs from 'dayjs';
 import { LOG_END_SYMBOL } from '../config/const';
 import { formatCommand, formatUrl } from '../config/subscription';
 import { CrontabModel } from '../data/cron';
+import {
+  assertSubscriptionAlias,
+  resolveSubscriptionPath,
+} from '../shared/subscriptionPath';
+import { resolveLogPath } from '../shared/logPath';
 import CrontabService from './cron';
 import taskLimit from '../shared/pLimit';
 import { logStreamManager } from '../shared/logStreamManager';
@@ -88,9 +93,11 @@ export default class SubscriptionService {
     needCreate = true,
     runImmediately = false,
   ) {
-    const { url } = formatUrl(doc);
-
-    doc.command = formatCommand(doc, url as string);
+    // Cancelling by ID must also work for invalid historical subscriptions.
+    if (needCreate) {
+      const { url } = formatUrl(doc);
+      doc.command = formatCommand(doc, url as string);
+    }
 
     if (doc.schedule_type === 'crontab') {
       this.scheduleService.cancelCronTask(doc as any);
@@ -222,6 +229,7 @@ export default class SubscriptionService {
   }
 
   public async create(payload: Subscription): Promise<Subscription> {
+    assertSubscriptionAlias(payload.alias);
     const tab = new Subscription(payload);
     const doc = await this.insert(tab);
     await this.handleTask(doc.get({ plain: true }));
@@ -234,12 +242,25 @@ export default class SubscriptionService {
   }
 
   public async update(payload: Subscription): Promise<Subscription> {
+    assertSubscriptionAlias(payload.alias);
     const doc = await this.getDb({ id: payload.id });
     const tab = new Subscription({ ...doc, ...payload });
     const newDoc = await this.updateDb(tab);
     await this.handleTask(newDoc, !newDoc.is_disabled);
+    await this.removeSshConfigForSubscription(doc);
     await this.setSshConfig();
     return newDoc;
+  }
+
+  private async removeSshConfigForSubscription(doc: Subscription) {
+    if (doc.type !== 'private-repo' || doc.pull_type !== 'ssh-key') return;
+    // Invalid historical rows must remain deletable without deriving unsafe paths.
+    try {
+      assertSubscriptionAlias(doc.alias);
+    } catch {
+      return;
+    }
+    await this.sshKeyService.removeSSHKey(doc.alias, '');
   }
 
   public async updateDb(payload: Subscription): Promise<Subscription> {
@@ -262,6 +283,7 @@ export default class SubscriptionService {
     last_running_time: number;
     last_execution_time: number;
   }) {
+    if (log_path) resolveLogPath(config.logPath, log_path);
     const options: any = {
       status,
       pid,
@@ -280,10 +302,20 @@ export default class SubscriptionService {
 
   public async remove(ids: number[], query: { force?: boolean }) {
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    // Validate all deletion targets before changing rows or removing any files.
+    if (query?.force === true) {
+      for (const doc of docs) {
+        resolveSubscriptionPath(config.scriptPath, doc.alias);
+        resolveSubscriptionPath(config.repoPath, doc.alias);
+      }
+    }
     for (const doc of docs) {
       await this.handleTask(doc.get({ plain: true }), false);
     }
     await SubscriptionModel.destroy({ where: { id: ids } });
+    for (const doc of docs) {
+      await this.removeSshConfigForSubscription(doc);
+    }
     await this.setSshConfig();
 
     if (query?.force === true) {
@@ -292,8 +324,8 @@ export default class SubscriptionService {
         await this.crontabService.remove(crons.map((x) => x.id!));
       }
       for (const doc of docs) {
-        const filePath = join(config.scriptPath, doc.alias);
-        const repoPath = join(config.repoPath, doc.alias);
+        const filePath = resolveSubscriptionPath(config.scriptPath, doc.alias);
+        const repoPath = resolveSubscriptionPath(config.repoPath, doc.alias);
         await rmPath(filePath);
         await rmPath(repoPath);
       }
@@ -399,7 +431,7 @@ export default class SubscriptionService {
 
     if (doc.log_path) {
       const relativeDir = path.dirname(`${doc.log_path}`);
-      const dir = path.resolve(config.logPath, relativeDir);
+      const dir = path.dirname(resolveLogPath(config.logPath, doc.log_path));
       const _exist = await fileExist(dir);
       if (_exist) {
         let files = await fs.readdir(dir);

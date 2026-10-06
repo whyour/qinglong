@@ -429,23 +429,19 @@ gen_list_repo() {
 
   cd ${repo_path}
 
-  local cmd="find ."
-  local index=0
-  if [[ $6 ]]; then
-    file_extensions="$6"
-    if [[ $file_extensions =~ "|" ]]; then
-      file_extensions=$(echo $file_extensions | sed 's/|/ /g')
+  local extension_string="${6:-$file_extensions}"
+  extension_string="${extension_string//|/ }"
+  extension_string="${extension_string//$'\n'/ }"
+  local -a extensions=() find_args=()
+  IFS=$' \t\n' read -r -a extensions <<< "$extension_string"
+  local extension
+  for extension in "${extensions[@]}"; do
+    if [[ ${#find_args[@]} -gt 0 ]]; then
+      find_args+=(-o)
     fi
-  fi
-  for extension in $file_extensions; do
-    if [[ $index -eq 0 ]]; then
-      cmd="${cmd} -name \"*.${extension}\""
-    else
-      cmd="${cmd} -o -name \"*.${extension}\""
-    fi
-    let index+=1
+    find_args+=(-name "*.${extension}")
   done
-  files=$(eval $cmd | sed 's/^..//')
+  files=$(find . "${find_args[@]}" | sed 's/^..//')
   if [[ $path ]]; then
     files=$(echo "$files" | egrep "$path")
   fi
@@ -458,7 +454,7 @@ gen_list_repo() {
 
   if [[ $dependence ]]; then
     cd ${repo_path}
-    results=$(eval $cmd | sed 's/^..//' | egrep "$dependence")
+    results=$(find . "${find_args[@]}" | sed 's/^..//' | egrep "$dependence")
     for _file in ${results}; do
       file_path=$(dirname $_file)
       make_dir "${dir_scripts}/${uniq_path}/${file_path}"

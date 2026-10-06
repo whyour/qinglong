@@ -48,7 +48,7 @@ function fixture(initial) {
     },
     '../shared/i18n': { t: (x) => x, tf: (x, y) => x.replace('%s', y) },
     '../shared/clientIp': {
-      getClientIp: () => '127.0.0.1',
+      getClientIp: (request) => request.socket.remoteAddress,
       normalizeClientIp: (x) => x,
     },
     ip2region: class {
@@ -245,4 +245,105 @@ test('default credentials with historical metadata still require initialization'
     200,
   );
   assert.equal(f.auth.token, '');
+});
+
+test('one source cannot lock out another or revive a persisted global lock', async () => {
+  const f = fixture({ ...initialized(), retries: 40, lastlogon: Date.now() });
+  const attacker = { ...req, socket: { remoteAddress: '192.0.2.1' } };
+  const owner = { ...req, socket: { remoteAddress: '192.0.2.2' } };
+  for (let i = 0; i < 3; i++) {
+    assert.equal(
+      (await f.user.login({ username: 'owner', password: 'wrong' }, attacker))
+        .code,
+      400,
+    );
+  }
+  assert.equal(
+    (
+      await f.user.login(
+        { username: 'owner', password: 'old-password' },
+        attacker,
+      )
+    ).code,
+    410,
+  );
+  assert.equal(
+    (await f.user.login({ username: 'owner', password: 'old-password' }, owner))
+      .code,
+    200,
+  );
+  // Another client's successful login does not reset the attacker's own budget.
+  assert.equal(
+    (await f.user.login({ username: 'owner', password: 'wrong' }, attacker))
+      .code,
+    410,
+  );
+  await f.user.resetAuthInfo({ retries: 0 });
+  assert.equal(
+    (
+      await f.user.login(
+        { username: 'owner', password: 'old-password' },
+        attacker,
+      )
+    ).code,
+    200,
+  );
+});
+
+test('TOTP guesses from another source do not lock the owner out', async () => {
+  const secret = authenticator.generateSecret();
+  const f = fixture({
+    ...initialized(),
+    twoFactorActivated: true,
+    twoFactorSecret: secret,
+  });
+  const attacker = { ...req, socket: { remoteAddress: '192.0.2.1' } };
+  const owner = { ...req, socket: { remoteAddress: '192.0.2.2' } };
+  await f.user.login({ username: 'owner', password: 'old-password' }, owner);
+  const good = authenticator.generate(secret);
+  const bad = good === '000000' ? '111111' : '000000';
+  for (let i = 0; i < 3; i++) {
+    assert.equal(
+      (
+        await f.user.twoFactorLogin(
+          { username: 'owner', password: 'old-password', code: bad },
+          attacker,
+        )
+      ).code,
+      430,
+    );
+  }
+  assert.equal(
+    (
+      await f.user.twoFactorLogin(
+        { username: 'owner', password: 'old-password', code: bad },
+        attacker,
+      )
+    ).code,
+    410,
+  );
+  assert.equal(
+    (
+      await f.user.twoFactorLogin(
+        { username: 'owner', password: 'old-password', code: good },
+        owner,
+      )
+    ).code,
+    200,
+  );
+});
+
+test('source backoff is capped and expires after inactivity', () => {
+  const { LoginThrottle } = load(path.resolve('back/shared/loginThrottle.ts'));
+  const throttle = new LoginThrottle();
+  let now = 1;
+  for (let i = 0; i < 20; i++) {
+    throttle.fail('attacker', now);
+    const wait = throttle.retryAfter('attacker', now);
+    assert.ok(wait <= 300);
+    now += (wait + 1) * 1000;
+  }
+  assert.equal(throttle.retryAfter('owner', now), 0);
+  assert.equal(throttle.retryAfter('attacker', now + 15 * 60 * 1000), 0);
+  assert.equal(throttle.fail('attacker', now + 15 * 60 * 1000), 1);
 });

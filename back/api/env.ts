@@ -1,24 +1,16 @@
 import { Joi, celebrate } from 'celebrate';
 import { NextFunction, Request, Response, Router } from 'express';
-import fs from 'fs';
 import multer from 'multer';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
-import config from '../config';
-import { safeJSONParse } from '../config/util';
 import { t } from '../shared/i18n';
 import EnvService from '../services/env';
 const route = Router();
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, config.scriptPath);
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname);
-  },
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
 });
-const upload = multer({ storage: storage });
 const labelSchema = Joi.array()
   .items(Joi.string().trim().required())
   .min(1)
@@ -282,12 +274,23 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const fileContent = await fs.promises.readFile(req!.file!.path, 'utf8');
-        const parseContent = safeJSONParse(fileContent);
+        let parseContent: unknown;
+        try {
+          parseContent = JSON.parse(req.file?.buffer.toString('utf8') || '');
+        } catch {
+          return res.status(400).send({ code: 400, message: t('参数错误') });
+        }
         const data = Array.isArray(parseContent)
           ? parseContent
           : [parseContent];
-        if (data.every((x) => x.name && x.value)) {
+        if (
+          data.length > 0 &&
+          data.every((x) =>
+            x && typeof x.name === 'string' &&
+            /^[a-zA-Z_][0-9a-zA-Z_]*$/.test(x.name) &&
+            typeof x.value === 'string' && x.value.length > 0,
+          )
+        ) {
           const result = await envService.create(
             data.map((x) => ({
               name: x.name,

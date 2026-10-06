@@ -7,6 +7,7 @@ import {
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
+import { resolveLogPath } from '../shared/logPath';
 import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
 import {
   RunningInstanceModel,
@@ -246,6 +247,9 @@ export default class CronService {
     last_execution_time: number;
     exit_code?: number;
   }) {
+    if (log_path && log_path !== '/dev/null') {
+      resolveLogPath(config.logPath, log_path);
+    }
     let options: any = {
       status,
       pid,
@@ -925,7 +929,9 @@ export default class CronService {
         truncated: false,
       };
     }
-    const absolutePath = path.resolve(config.logPath, `${doc.log_path}`);
+    const absolutePath = doc.log_path
+      ? resolveLogPath(config.logPath, doc.log_path)
+      : '';
     const logFileExist = doc.log_path && (await fileExist(absolutePath));
     if (logFileExist) {
       const chunk = await readLogChunk(`${absolutePath}`, options);
@@ -955,12 +961,12 @@ export default class CronService {
 
   public async logs(id: number) {
     const doc = await this.getDb({ id });
-    if (!doc || !doc.log_path) {
+    if (!doc || !doc.log_path || doc.log_path === '/dev/null') {
       return [];
     }
 
     const relativeDir = path.dirname(`${doc.log_path}`);
-    const dir = path.resolve(config.logPath, relativeDir);
+    const dir = path.dirname(resolveLogPath(config.logPath, doc.log_path));
     const dirExist = await fileExist(dir);
     if (dirExist) {
       let files = await fs.readdir(dir);

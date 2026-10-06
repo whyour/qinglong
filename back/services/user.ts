@@ -33,9 +33,11 @@ import {
   verifyPassword,
 } from '../shared/password';
 import { serializeAuthMutation } from '../shared/authMutation';
+import { LoginThrottle } from '../shared/loginThrottle';
 
 @Service()
 export default class UserService {
+  private loginThrottle = new LoginThrottle();
   @Inject((type) => NotificationService)
   private notificationService!: NotificationService;
 
@@ -106,11 +108,8 @@ export default class UserService {
       return { code: 403, message: t('该 IP 已被列入黑名单') };
     }
 
-    const retriesTime = Math.pow(3, retries) * 1000;
-    if (retries > 2 && timestamp - lastlogon < retriesTime) {
-      const waitTime = Math.ceil(
-        (retriesTime - (timestamp - lastlogon)) / 1000,
-      );
+    const waitTime = this.loginThrottle.retryAfter(ip, timestamp);
+    if (waitTime > 0) {
       return {
         code: 410,
         message: tf('失败次数过多，请%s秒后重试', waitTime),
@@ -133,6 +132,7 @@ export default class UserService {
     }
 
     if (passwordMatches) {
+      this.loginThrottle.reset(ip);
       const data = createRandomString(50, 100);
       const expiration = twoFactorActivated ? '60d' : '20d';
       let token = jwt.sign({ data }, config.jwt.secret, {
@@ -206,8 +206,9 @@ export default class UserService {
         },
       };
     } else {
+      const failures = this.loginThrottle.fail(ip, timestamp);
       await this.updateAuthInfo(content, {
-        retries: retries + 1,
+        retries: failures,
         lastlogon: timestamp,
         lastip: ip,
         lastaddr: address,
@@ -239,8 +240,8 @@ export default class UserService {
         },
       });
       this.getLoginLog();
-      if (retries > 2) {
-        const waitTime = Math.round(Math.pow(3, retries + 1));
+      if (failures > 3) {
+        const waitTime = this.loginThrottle.retryAfter(ip, timestamp);
         return {
           code: 410,
           message: tf('失败次数过多，请%s秒后重试', waitTime),
@@ -439,8 +440,8 @@ export default class UserService {
     const authInfo = await this.getAuthInfo();
     const { isTwoFactorChecking, twoFactorSecret } = authInfo;
     const now = Date.now();
-    const retries = authInfo.retries || 0;
-    if (retries > 2 && now - authInfo.lastlogon < Math.pow(3, retries) * 1000) {
+    const source = getClientIp(req);
+    if (this.loginThrottle.retryAfter(source, now) > 0) {
       return { code: 410, message: t('失败次数过多，请稍后重试') };
     }
     if (
@@ -472,9 +473,8 @@ export default class UserService {
           .join(' ');
       }
       await this.updateAuthInfo(authInfo, {
-        retries: retries + 1,
+        retries: this.loginThrottle.fail(source, now),
         lastlogon: now,
-        isTwoFactorChecking: retries + 1 < 5,
         lastip: ip,
         lastaddr: address,
         platform: req.platform,
@@ -690,5 +690,8 @@ export default class UserService {
       });
     }
     await this.updateAuthInfo(authInfo, payload);
+    if (retries === 0 || password !== undefined || username !== undefined) {
+      this.loginThrottle.clear();
+    }
   }
 }
