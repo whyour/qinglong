@@ -247,8 +247,20 @@ export default class SubscriptionService {
     const tab = new Subscription({ ...doc, ...payload });
     const newDoc = await this.updateDb(tab);
     await this.handleTask(newDoc, !newDoc.is_disabled);
+    await this.removeSshConfigForSubscription(doc);
     await this.setSshConfig();
     return newDoc;
+  }
+
+  private async removeSshConfigForSubscription(doc: Subscription) {
+    if (doc.type !== 'private-repo' || doc.pull_type !== 'ssh-key') return;
+    // Invalid historical rows must remain deletable without deriving unsafe paths.
+    try {
+      assertSubscriptionAlias(doc.alias);
+    } catch {
+      return;
+    }
+    await this.sshKeyService.removeSSHKey(doc.alias, '');
   }
 
   public async updateDb(payload: Subscription): Promise<Subscription> {
@@ -301,6 +313,9 @@ export default class SubscriptionService {
       await this.handleTask(doc.get({ plain: true }), false);
     }
     await SubscriptionModel.destroy({ where: { id: ids } });
+    for (const doc of docs) {
+      await this.removeSshConfigForSubscription(doc);
+    }
     await this.setSshConfig();
 
     if (query?.force === true) {

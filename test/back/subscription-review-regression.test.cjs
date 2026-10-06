@@ -456,10 +456,73 @@ function cancellationFixture(t, subscriptions) {
     createIntervalTask: async (doc, interval, immediately) =>
       events.push(['createInterval', doc.command, interval, immediately]),
   };
-  const service = new Subscription({}, schedule, {}, {}, {});
+  const service = new Subscription(
+    {}, schedule, {}, { removeSSHKey: async () => {} }, {},
+  );
   service.setSshConfig = async () => {};
   return { service, docs, events };
 }
+
+async function sshLifecycleFixture(t, initial) {
+  const root = temporary(t);
+  const ssh = sshService(root);
+  let docs = [{ ...initial, get() { return { ...this }; } }];
+  const SubscriptionService = load(path.resolve('back/services/subscription.ts'), {
+    '../config': { scriptPath: root, repoPath: root },
+    '../data/subscription': {
+      Subscription: class { constructor(value) { Object.assign(this, value); } },
+      SubscriptionModel: {
+        findAll: async () => docs,
+        destroy: async () => { docs = []; },
+      },
+    },
+    '../data/cron': { CrontabModel: { findAll: async () => [] } },
+    '../config/util': {
+      rmPath: (p) => fs.promises.rm(p, { recursive: true, force: true }),
+    },
+    '../config/const': {},
+    '../shared/i18n': { t: (x) => x, tf: (x) => x },
+    '../shared/pLimit': {},
+    './schedule': {}, './sock': {}, './sshKey': {}, './cron': {},
+  }).default;
+  const service = new SubscriptionService({}, {}, {}, ssh, {});
+  service.handleTask = async () => {};
+  service.getDb = async () => ({ ...docs[0] });
+  service.updateDb = async (value) => {
+    Object.assign(docs[0], value);
+    return { ...docs[0] };
+  };
+  await service.setSshConfig();
+  return { service, root };
+}
+
+test('editing an SSH subscription removes the old alias key and configuration', async (t) => {
+  const initial = privateSubscription('owner_repo_main');
+  const f = await sshLifecycleFixture(t, initial);
+  const alias = 'owner_repo_feature/中文';
+  await f.service.update({ ...initial, alias });
+  const mapped = paths.getSubscriptionSshAlias(alias);
+  assert.equal(fs.existsSync(path.join(f.root, initial.alias)), false);
+  assert.equal(fs.existsSync(path.join(f.root, initial.alias + '.config')), false);
+  assert.equal(fs.readFileSync(path.join(f.root, mapped), 'utf8').trim(), 'fixture-key');
+  assert.ok(fs.existsSync(path.join(f.root, mapped + '.config')));
+});
+
+test('switching an SSH subscription to a public repository removes obsolete credentials', async (t) => {
+  const initial = privateSubscription('owner_repo.config');
+  const f = await sshLifecycleFixture(t, initial);
+  await f.service.update({ ...initial, type: 'public-repo' });
+  assert.deepEqual(fs.readdirSync(f.root), []);
+});
+
+test('ordinary and forced subscription deletion remove the current SSH key and configuration', async (t) => {
+  for (const force of [false, true]) {
+    const initial = privateSubscription('owner_repo_feature/中文');
+    const f = await sshLifecycleFixture(t, initial);
+    await f.service.remove([initial.id], { force });
+    assert.deepEqual(fs.readdirSync(f.root), []);
+  }
+});
 
 test('ordinary deletion cancels invalid historical SSH subscriptions by ID', async (t) => {
   for (const schedule_type of ['crontab', 'interval']) {
