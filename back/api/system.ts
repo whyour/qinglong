@@ -13,6 +13,7 @@ import { findCronId } from '../shared/cronCommand';
 import dayjs from 'dayjs';
 import multer from 'multer';
 import { logStreamManager } from '../shared/logStreamManager';
+import { rateLimit } from 'express-rate-limit';
 
 const route = Router();
 const storage = multer.diskStorage({
@@ -245,6 +246,7 @@ export default (app: Router) => {
 
   route.put(
     '/command-run',
+    rateLimit({ windowMs: 60 * 1000, limit: 60 }),
     celebrate({
       body: Joi.object({
         command: Joi.string().required(),

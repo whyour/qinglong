@@ -100,6 +100,58 @@ test('command route does not execute input while looking up the cron id', async 
   assert.equal(seen[0].command, command);
 });
 
+test('command execution is limited before running across both API mounts', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-command-limit-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  let runs = 0;
+  const app = express();
+  app.use(express.json());
+  const router = express.Router();
+  load(path.resolve('back/api/system.ts'), {
+    '../config': { crontabFile: path.join(root, 'missing'), tmpPath: root },
+    '../services/system': {},
+    '../services/user': {},
+    '../shared/i18n': { t: (x) => x },
+    '../shared/logStreamManager': {
+      logStreamManager: { closeStream: async () => {} },
+    },
+    '../config/util': {
+      getUniqPath: async () => 'test',
+      handleLogPath: async () => path.join(root, 'unused.log'),
+    },
+    typedi: {
+      Container: {
+        get: () => ({
+          run: async (value, callbacks) => {
+            runs++;
+            await callbacks.onEnd();
+          },
+        }),
+      },
+    },
+  }).default(router);
+  app.use('/api', router);
+  app.use('/open', router);
+  const server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  for (let i = 0; i < 61; i++) {
+    const response = await fetch(
+      `${base}/${i % 2 ? 'api' : 'open'}/system/command-run`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: 'echo safe' }),
+      },
+    );
+    await response.text();
+    assert.equal(response.status, i < 60 ? 200 : 429, `request ${i + 1}`);
+  }
+  assert.equal(runs, 60);
+});
+
 test('anonymous token exchange is limited per source across both API mounts', async (t) => {
   let attempts = 0;
   const app = express();

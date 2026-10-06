@@ -206,10 +206,13 @@ export default (app: Router) => {
         for (const writableRoot of config.writePathList) {
           const root = resolve(writableRoot);
           const rootPrefix = root.endsWith(sep) ? root : root + sep;
-          if (parentPath !== root && !parentPath.startsWith(rootPrefix)) {
+          if (parentPath === root) {
+            await fs.mkdir(root, { recursive: true });
+          } else if (parentPath.startsWith(rootPrefix)) {
+            await fs.mkdir(parentPath, { recursive: true });
+          } else {
             continue;
           }
-          await fs.mkdir(parentPath, { recursive: true });
           parentCreated = true;
           break;
         }
