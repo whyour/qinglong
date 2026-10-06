@@ -1,0 +1,35 @@
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  :global(.ant-btn) {
+    flex-shrink: 0;
+  }
+}
+.labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  font-weight: 500;
+}
+.diff {
+  flex: 1;
+  min-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--ant-border-color-split, #d9d9d9);
+}
+@media (max-width: 600px) {
+  .footer {
+    align-items: flex-end;
+  }
+  .labels {
+    gap: 8px;
+    font-size: 12px;
+  }
+  .diff {
+    flex: none;
+    min-height: 200px;
+    border: 0;
+  }
+}

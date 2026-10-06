@@ -18,6 +18,7 @@ test('script file operations allow token.json while protecting panel configurati
   ])
     fs.mkdirSync(path.join(root, dir), { recursive: true });
   const config = {
+    dataPath: root,
     scriptPath: path.join(root, 'scripts'),
     configPath: path.join(root, 'config'),
     tmpPath: path.join(root, 'tmp'),
@@ -42,9 +43,6 @@ test('script file operations allow token.json while protecting panel configurati
       rmPath: (p) => fs.promises.rm(p, { recursive: true }),
       readDir: async () => [],
     },
-    '../shared/utils': {
-      writeFileWithLock: (p, content) => fs.promises.writeFile(p, content),
-    },
     '../shared/i18n': { t: (x) => x },
     './sock': {},
     './cron': {},
@@ -52,15 +50,28 @@ test('script file operations allow token.json while protecting panel configurati
     '../shared/pLimit': {},
     typedi: { Service: () => (x) => x, Inject: () => () => {} },
   };
+  const cache = new Map();
   const Script = load(
     path.join(__dirname, '../../back/services/script.ts'),
     mocks,
+    cache,
   ).default;
   const service = new Script();
   mocks['../services/script'] = Script;
-  mocks.typedi = { Container: { get: () => service } };
+  const History = load(
+    path.join(__dirname, '../../back/services/scriptHistory.ts'),
+    mocks,
+    cache,
+  ).default;
+  const history = new History();
+  mocks.typedi = {
+    ...mocks.typedi,
+    Container: { get: (type) => (type === History ? history : service) },
+  };
   const app = express.Router();
-  load(path.join(__dirname, '../../back/api/script.ts'), mocks).default(app);
+  load(path.join(__dirname, '../../back/api/script.ts'), mocks, cache).default(
+    app,
+  );
   const router = app.stack.find((layer) => layer.name === 'router').handle;
   const invoke = async (method, url, body = {}, query = {}, file) => {
     const route = router.stack.find(

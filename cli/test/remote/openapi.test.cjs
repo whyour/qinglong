@@ -58,6 +58,31 @@ test('dashboard record sends execution statistics and rejects a missing body bef
   assert.equal(f.requests.length, 1);
 });
 
+test('script history commands send exact query parameters and restore payloads', async t => {
+  const f = await fixture(t);
+  const identity = { filename: '中文 script.js', path: 'nested folder' };
+  const version = { ...identity, id: '32ec8b22-2c48-4bcf-85d4-b394198417ba' };
+  for (const [command, endpoint, query] of [
+    ['history-list', 'scripts/history', identity],
+    ['history-detail', 'scripts/history/detail', version],
+  ]) {
+    success(await f.run(['script', command, '--query', JSON.stringify(query)]));
+    const req = f.requests.at(-1), url = new URL(req.url, 'http://localhost');
+    assert.equal(req.method, 'GET');
+    assert.equal(url.pathname, '/panel/open/' + endpoint);
+    for (const [key, value] of Object.entries(query)) assert.equal(url.searchParams.get(key), value);
+    assert.equal(req.body, '');
+  }
+  const payload = { ...version, expectedHash: 'a'.repeat(64) };
+  success(await f.run(['script', 'history-restore', '--data', '-'], JSON.stringify(payload)));
+  assert.equal(f.requests.at(-1).method, 'PUT');
+  assert.equal(f.requests.at(-1).url, '/panel/open/scripts/history/restore');
+  assert.deepEqual(JSON.parse(f.requests.at(-1).body), payload);
+  const count = f.requests.length;
+  assert.equal((await f.run(['script', 'history-restore'])).code, 2);
+  assert.equal(f.requests.length, count, 'missing restore payload must not issue a request');
+});
+
 test('OpenAPI catalogue covers every active registered backend route; retired 410 routes are explicit', async () => {
   const root = path.resolve(__dirname, '../../../back/api');
   const expected = [];

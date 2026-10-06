@@ -9,9 +9,14 @@ import * as fs from 'fs/promises';
 import { celebrate, Joi } from 'celebrate';
 import path, { dirname, join, parse, resolve, sep } from 'path';
 import ScriptService from '../services/script';
+import ScriptHistoryService from '../services/scriptHistory';
 import { t } from '../shared/i18n';
 import multer from 'multer';
 import { writeFileWithLock } from '../shared/utils';
+import {
+  ScriptHistoryError,
+  HistoryUnavailableError,
+} from '../shared/scriptHistory';
 const route = Router();
 
 function isPathAllowed(targetPath: string): boolean {
@@ -120,6 +125,82 @@ export default (app: Router) => {
     },
   );
 
+  const historyError = (error: unknown, res: Response, next: NextFunction) => {
+    if (error instanceof ScriptHistoryError) {
+      return res.status(error.status).send({
+        code: error.status,
+        message: t(error.message),
+        ...(error instanceof HistoryUnavailableError
+          ? { historyUnavailable: true, currentHash: error.currentHash }
+          : {}),
+      });
+    }
+    return next(error);
+  };
+  const historyQuery = {
+    filename: Joi.string().required(),
+    path: Joi.string().optional().allow(''),
+  };
+
+  route.get(
+    '/history',
+    celebrate({ query: Joi.object(historyQuery).unknown(true) }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const service = Container.get(ScriptHistoryService);
+        const data = await service.list(
+          (req.query.path as string) || '',
+          req.query.filename as string,
+        );
+        res.send({ code: 200, data });
+      } catch (error) {
+        historyError(error, res, next);
+      }
+    },
+  );
+  route.get(
+    '/history/detail',
+    celebrate({
+      query: Joi.object({
+        ...historyQuery,
+        id: Joi.string().uuid().required(),
+      }).unknown(true),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const service = Container.get(ScriptHistoryService);
+        const data = await service.detail(
+          (req.query.path as string) || '',
+          req.query.filename as string,
+          req.query.id as string,
+        );
+        res.send({ code: 200, data });
+      } catch (error) {
+        historyError(error, res, next);
+      }
+    },
+  );
+  route.put(
+    '/history/restore',
+    celebrate({
+      body: Joi.object({
+        ...historyQuery,
+        id: Joi.string().uuid().required(),
+        expectedHash: Joi.string().hex().length(64).required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { path = '', filename, id, expectedHash } = req.body;
+        const service = Container.get(ScriptHistoryService);
+        const data = await service.restore(path, filename, id, expectedHash);
+        res.send({ code: 200, data });
+      } catch (error) {
+        historyError(error, res, next);
+      }
+    },
+  );
+
   route.get('/:file', (req: Request, res: Response) => {
     return res.send({
       code: 410,
@@ -141,6 +222,11 @@ export default (app: Router) => {
         filename: Joi.string().required(),
         path: Joi.string().optional().allow(''),
         content: Joi.string().optional().allow(''),
+        skipHistory: Joi.boolean().optional(),
+        expectedHash: Joi.string()
+          .hex()
+          .length(64)
+          .when('skipHistory', { is: true, then: Joi.required() }),
         originFilename: Joi.string().optional().allow(''),
         directory: Joi.string().optional().allow(''),
         file: Joi.string().optional().allow(''),
@@ -220,6 +306,34 @@ export default (app: Router) => {
           return res.send({ code: 403, message: t('暂无权限') });
         }
         const fileExists = await fileExist(filePath);
+        if (fileExists && resolveFileAccess(config.scriptPath, [filePath])) {
+          let removeSource = filename !== originFilename;
+          if (removeSource) {
+            const [originRealPath, targetRealPath] = await Promise.all([
+              fs.realpath(originFilePath),
+              fs.realpath(filePath),
+            ]);
+            // Aliases of one script are an in-place save. Removing the source
+            // would also remove the destination behind a target symlink.
+            removeSource = originRealPath !== targetRealPath;
+          }
+          // Save-as removes the source after committing the destination. Keep
+          // its original content too: destination history only protects the
+          // file being overwritten, not the source being deleted.
+          if (removeSource) {
+            await fs.copyFile(
+              originFilePath,
+              join(config.bakPath, originFilename.replace(/\//g, '')),
+            );
+          }
+          const service = Container.get(ScriptHistoryService);
+          const data = await service.save(path, filename, content, {
+            skipHistory: req.body.skipHistory,
+            expectedHash: req.body.expectedHash,
+          });
+          if (removeSource) await rmPath(originFilePath);
+          return res.send({ code: 200, data });
+        }
         if (fileExists) {
           await fs.copyFile(
             originFilePath,
@@ -232,7 +346,7 @@ export default (app: Router) => {
         await writeFileWithLock(filePath, content);
         return res.send({ code: 200 });
       } catch (e) {
-        return next(e);
+        return historyError(e, res, next);
       }
     },
   );
@@ -244,6 +358,11 @@ export default (app: Router) => {
         filename: Joi.string().required(),
         path: Joi.string().optional().allow(''),
         content: Joi.string().required().allow(''),
+        skipHistory: Joi.boolean().optional(),
+        expectedHash: Joi.string()
+          .hex()
+          .length(64)
+          .when('skipHistory', { is: true, then: Joi.required() }),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -261,10 +380,14 @@ export default (app: Router) => {
             message: t('暂无权限'),
           });
         }
-        await writeFileWithLock(filePath, content);
-        return res.send({ code: 200 });
+        const service = Container.get(ScriptHistoryService);
+        const data = await service.save(path || '', filename, content, {
+          skipHistory: req.body.skipHistory,
+          expectedHash: req.body.expectedHash,
+        });
+        return res.send({ code: 200, data });
       } catch (e) {
-        return next(e);
+        return historyError(e, res, next);
       }
     },
   );

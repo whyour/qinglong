@@ -42,6 +42,7 @@ function fixture(t, api = 'script') {
     '../config': config,
     '../config/const': {},
     '../services/script': {},
+    '../services/scriptHistory': {},
     '../services/config': {},
     '../shared/i18n': { t: (x) => x },
     typedi: { Container: { get: () => service } },
