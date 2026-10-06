@@ -23,10 +23,12 @@ test('script routes save, list, preview and restore, with validation and conflic
     dataPath: root,
     bakPath: path.join(root, 'bak'),
     blackFileList: ['auth.json'],
-    writePathList: [scripts],
+    writePathList: [scripts, path.join(root, 'config')],
   };
   await fs.mkdir(config.bakPath);
+  await fs.mkdir(config.configPath);
   let failure = '';
+  let beforeRealpath;
   class ScriptService {
     checkFilePath(dir, name) {
       return resolveFileAccess(scripts, [dir || '', name]);
@@ -36,6 +38,10 @@ test('script routes save, list, preview and restore, with validation and conflic
     '../config': { default: config, __esModule: true },
     'fs/promises': {
       ...fs,
+      realpath: async (file, ...args) => {
+        if (beforeRealpath) await beforeRealpath(file);
+        return fs.realpath(file, ...args);
+      },
       copyFile: async (from, to) => {
         if (failure === 'backup' && path.dirname(to) === config.bakPath)
           throw Object.assign(new Error('backup denied'), { code: 'EACCES' });
@@ -235,6 +241,176 @@ test('script routes save, list, preview and restore, with validation and conflic
       'small',
     );
   }
+  await t.test(
+    'save-as rejects paths outside writable roots before backup or history changes',
+    async () => {
+      const outside = path.join(root, 'outside');
+      const sibling = `${scripts}-sibling`;
+      for (const dir of [outside, sibling]) {
+        await fs.mkdir(dir);
+        await fs.writeFile(path.join(dir, 'source.js'), 'outside-source');
+        await fs.writeFile(path.join(dir, 'destination.js'), 'outside-target');
+      }
+      await fs.writeFile(
+        path.join(scripts, 'boundary-source.js'),
+        'safe-source',
+      );
+      await fs.writeFile(
+        path.join(scripts, 'boundary-target.js'),
+        'safe-target',
+      );
+      await fs.symlink(outside, path.join(scripts, 'outside-link'));
+      for (const escape of [
+        '../outside',
+        '../scripts-sibling',
+        'outside-link',
+      ]) {
+        for (const escapedSide of ['source', 'target']) {
+          const result = await call(
+            '/scripts',
+            {
+              filename:
+                escapedSide === 'target'
+                  ? `${escape}/destination.js`
+                  : 'boundary-target.js',
+              originFilename:
+                escapedSide === 'source'
+                  ? `${escape}/source.js`
+                  : 'boundary-source.js',
+              content: 'changed',
+            },
+            'POST',
+          );
+          assert.equal(result.body.code, 403);
+        }
+      }
+      assert.equal(
+        await fs.readFile(path.join(scripts, 'boundary-source.js'), 'utf8'),
+        'safe-source',
+      );
+      assert.equal(
+        await fs.readFile(path.join(scripts, 'boundary-target.js'), 'utf8'),
+        'safe-target',
+      );
+      for (const dir of [outside, sibling]) {
+        assert.equal(
+          await fs.readFile(path.join(dir, 'source.js'), 'utf8'),
+          'outside-source',
+        );
+        assert.equal(
+          await fs.readFile(path.join(dir, 'destination.js'), 'utf8'),
+          'outside-target',
+        );
+      }
+      assert.deepEqual(await fs.readdir(config.bakPath), []);
+      assert.equal(
+        (await call('/scripts/history?filename=boundary-target.js')).body.data
+          .versions.length,
+        0,
+      );
+    },
+  );
+  for (const swappedSide of ['source', 'target']) {
+    await t.test(
+      `save-as rejects a ${swappedSide} symlink changed during real-path resolution`,
+      async () => {
+        const source = path.join(scripts, `${swappedSide}-race-source.js`);
+        const destination = path.join(scripts, `${swappedSide}-race-target.js`);
+        const outside = path.join(root, `${swappedSide}-race-outside.js`);
+        await fs.writeFile(source, 'safe-source');
+        await fs.writeFile(destination, 'safe-target');
+        await fs.writeFile(outside, 'outside-sentinel');
+        const swapped = swappedSide === 'source' ? source : destination;
+        let swappedOnce = false;
+        beforeRealpath = async (file) => {
+          if (file === swapped && !swappedOnce) {
+            swappedOnce = true;
+            await fs.unlink(swapped);
+            await fs.symlink(outside, swapped);
+          }
+        };
+        try {
+          const result = await call(
+            '/scripts',
+            {
+              filename: path.basename(destination),
+              originFilename: path.basename(source),
+              content: 'changed',
+            },
+            'POST',
+          );
+          assert.equal(swappedOnce, true);
+          assert.equal(result.status, 403);
+          assert.equal(await fs.readFile(outside, 'utf8'), 'outside-sentinel');
+          assert.equal(
+            await fs.readFile(
+              swappedSide === 'source' ? destination : source,
+              'utf8',
+            ),
+            swappedSide === 'source' ? 'safe-target' : 'safe-source',
+          );
+          assert.deepEqual(await fs.readdir(config.bakPath), []);
+          await fs.unlink(swapped);
+          await fs.writeFile(
+            swapped,
+            swappedSide === 'source' ? 'safe-source' : 'safe-target',
+          );
+          assert.equal(
+            (
+              await call(
+                `/scripts/history?filename=${path.basename(destination)}`,
+              )
+            ).body.data.versions.length,
+            0,
+          );
+        } finally {
+          beforeRealpath = undefined;
+        }
+      },
+    );
+  }
+  await t.test(
+    'save-as rechecks configuration secret names after resolving a changed source link',
+    async () => {
+      const secret = path.join(config.configPath, 'auth.json');
+      const source = path.join(config.configPath, 'ordinary.js');
+      const destination = path.join(scripts, 'config-race-target.js');
+      await fs.writeFile(secret, 'config-secret');
+      await fs.writeFile(source, 'ordinary-config');
+      await fs.writeFile(destination, 'safe-target');
+      let swapped = false;
+      beforeRealpath = async (file) => {
+        if (file === source && !swapped) {
+          swapped = true;
+          await fs.unlink(source);
+          await fs.symlink(secret, source);
+        }
+      };
+      try {
+        const result = await call(
+          '/scripts',
+          {
+            filename: path.basename(destination),
+            originFilename: '../config/ordinary.js',
+            content: 'changed',
+          },
+          'POST',
+        );
+        assert.equal(swapped, true);
+        assert.equal(result.status, 403);
+        assert.equal(await fs.readFile(secret, 'utf8'), 'config-secret');
+        assert.equal(await fs.readFile(destination, 'utf8'), 'safe-target');
+        assert.deepEqual(await fs.readdir(config.bakPath), []);
+        assert.equal(
+          (await call('/scripts/history?filename=config-race-target.js')).body
+            .data.versions.length,
+          0,
+        );
+      } finally {
+        beforeRealpath = undefined;
+      }
+    },
+  );
   for (const scenario of ['target-link', 'source-link', 'normalized-path']) {
     await t.test(
       `save-as preserves aliases of the same file: ${scenario}`,

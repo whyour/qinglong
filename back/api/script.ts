@@ -35,6 +35,34 @@ function isPathAllowed(targetPath: string): boolean {
   );
 }
 
+async function existingWritableRealPath(targetPath: string): Promise<string> {
+  if (!isPathAllowed(targetPath)) {
+    throw new ScriptHistoryError(403, '暂无权限');
+  }
+  const resolved = resolve(targetPath);
+  for (const writableRoot of config.writePathList) {
+    const root = resolve(writableRoot);
+    const rootPrefix = root.endsWith(sep) ? root : root + sep;
+    // Keep an explicit normalized boundary check at the filesystem operation.
+    if (!resolved.startsWith(rootPrefix)) continue;
+    const realPath = await fs.realpath(resolved);
+    const realRoot = await fs.realpath(root);
+    const realRootPrefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
+    if (
+      !realPath.startsWith(realRootPrefix) ||
+      !resolveFileAccess(
+        realRoot,
+        [realPath],
+        root === resolve(config.configPath) ? config.blackFileList : [],
+      )
+    ) {
+      throw new ScriptHistoryError(403, '暂无权限');
+    }
+    return realPath;
+  }
+  throw new ScriptHistoryError(403, '暂无权限');
+}
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, config.tmpPath);
@@ -308,21 +336,23 @@ export default (app: Router) => {
         const fileExists = await fileExist(filePath);
         if (fileExists && resolveFileAccess(config.scriptPath, [filePath])) {
           let removeSource = filename !== originFilename;
+          let backupSource = '';
           if (removeSource) {
             const [originRealPath, targetRealPath] = await Promise.all([
-              fs.realpath(originFilePath),
-              fs.realpath(filePath),
+              existingWritableRealPath(originFilePath),
+              existingWritableRealPath(filePath),
             ]);
             // Aliases of one script are an in-place save. Removing the source
             // would also remove the destination behind a target symlink.
             removeSource = originRealPath !== targetRealPath;
+            backupSource = originRealPath;
           }
           // Save-as removes the source after committing the destination. Keep
           // its original content too: destination history only protects the
           // file being overwritten, not the source being deleted.
           if (removeSource) {
             await fs.copyFile(
-              originFilePath,
+              backupSource,
               join(config.bakPath, originFilename.replace(/\//g, '')),
             );
           }
