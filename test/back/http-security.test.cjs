@@ -36,6 +36,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     ),
     jwt: { secret },
     rootPath: tmp,
+    dataPath: tmp,
     configPath: path.join(tmp, 'config/'),
     scriptPath: path.join(tmp, 'scripts/'),
     uploadPath: path.join(tmp, 'upload'),
@@ -92,9 +93,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     '../services/script': class {},
     '../data/open': {},
     '../data/system': {},
-    '../shared/utils': {
-      writeFileWithLock: (p, content) => fs.promises.writeFile(p, content),
-    },
+    typedi: { Service: () => (x) => x },
   };
   const Config = load(path.join(__dirname, '../../back/services/config.ts'), {
     ...mocks,
@@ -102,8 +101,18 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
   }).default;
   const configService = new Config();
   mocks['../services/config'] = Config;
+  const historyCache = new Map();
+  const History = load(
+    path.join(__dirname, '../../back/services/scriptHistory.ts'),
+    mocks,
+    historyCache,
+  ).default;
+  const history = new History();
   mocks.typedi = {
-    Container: { get: (x) => (x === User ? user : configService) },
+    ...mocks.typedi,
+    Container: {
+      get: (x) => (x === User ? user : x === History ? history : configService),
+    },
   };
   mocks['../api'] = () => {
     const router = express.Router();
@@ -111,9 +120,11 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     load(path.join(__dirname, '../../back/api/config.ts'), mocks).default(
       router,
     );
-    load(path.join(__dirname, '../../back/api/script.ts'), mocks).default(
-      router,
-    );
+    load(
+      path.join(__dirname, '../../back/api/script.ts'),
+      mocks,
+      historyCache,
+    ).default(router);
     router.get('/envs', (_req, res) => res.json({ code: 200 }));
     return router;
   };

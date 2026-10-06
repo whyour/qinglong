@@ -275,6 +275,18 @@ export const openOperations: readonly OpenOperation[] = [
   { name: 'config save', method: 'POST', path: 'configs/save', body: 'json' },
   { name: 'script list', method: 'GET', path: 'scripts' },
   { name: 'script get', method: 'GET', path: 'scripts/detail' },
+  { name: 'script history-list', method: 'GET', path: 'scripts/history' },
+  {
+    name: 'script history-detail',
+    method: 'GET',
+    path: 'scripts/history/detail',
+  },
+  {
+    name: 'script history-restore',
+    method: 'PUT',
+    path: 'scripts/history/restore',
+    body: 'json',
+  },
   {
     name: 'script create',
     method: 'POST',
