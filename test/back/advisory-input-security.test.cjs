@@ -267,6 +267,7 @@ function systemService(config, overrides = {}) {
     },
     '../data/system': {},
     '../shared/pLimit': {},
+    '../schedule/client': {},
     '../shared/i18n': { ...translate, setLang() {} },
     './notify': {},
     './schedule': {},

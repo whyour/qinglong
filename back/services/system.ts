@@ -34,6 +34,8 @@ import {
   SystemModelInfo,
 } from '../data/system';
 import taskLimit from '../shared/pLimit';
+import cronClient from '../schedule/client';
+import { withSchedulerMutation } from '../shared/schedulerMutationLock';
 import NotificationService from './notify';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import SockService from './sock';
@@ -122,15 +124,29 @@ export default class SystemService {
   }
 
   public async updateCronConcurrency(info: SystemModelInfo) {
-    const oDoc = await this.getSystemConfig();
-    await this.updateAuthDb({
-      ...oDoc,
-      info: { ...oDoc.info, ...info },
-    });
-    if (info.cronConcurrency) {
-      await taskLimit.setCustomLimit(info.cronConcurrency);
+    const limit = info.cronConcurrency ?? 0;
+    if (!Number.isInteger(limit) || limit < 0 || limit > 2147483647) {
+      throw Object.assign(new Error(t('参数错误')), { status: 400 });
     }
-    return { code: 200, data: info };
+    return withSchedulerMutation(async () => {
+      const oDoc = await this.getSystemConfig();
+      await this.updateAuthDb({
+        ...oDoc,
+        info: { ...oDoc.info, ...info, cronConcurrency: limit },
+      });
+      await taskLimit.setCustomLimit(limit || Math.max(os.cpus().length, 4));
+      await cronClient.setConcurrency(limit);
+      return { code: 200, data: info };
+    });
+  }
+
+  public async restoreCronConcurrency() {
+    await withSchedulerMutation(async () => {
+      const doc = await this.getSystemConfig();
+      const limit = doc.info?.cronConcurrency ?? 0;
+      await taskLimit.setCustomLimit(limit || Math.max(os.cpus().length, 4));
+      await cronClient.setConcurrency(limit);
+    });
   }
 
   public async updateDependenceProxy(info: SystemModelInfo) {
@@ -445,9 +461,14 @@ export default class SystemService {
         dataDirs = dataDirs.concat(type.filter((x) => x !== 'base'));
       }
       const allowed = new Set(['db', 'upload', 'config', 'scripts', 'log', 'deps',
-        'syslog', 'dep_cache', 'raw', 'repo', 'ssh.d']);
+        'syslog', 'dep_cache', 'raw', 'repo', 'ssh.d', 'script-history']);
       if (dataDirs.some((dir) => !allowed.has(dir))) {
         return res.status(400).send({ code: 400, message: t('参数错误') });
+      }
+      if (dataDirs.includes('scripts')) dataDirs.push('script-history');
+      // History is created lazily; old/fresh installations must still export.
+      if (!fs.existsSync(path.join(config.dataPath, 'script-history'))) {
+        dataDirs = dataDirs.filter((dir) => dir !== 'script-history');
       }
       const dataPaths = [...new Set(dataDirs)].map((dir) => `data/${dir}`);
       await promisify(execFile)('tar', ['-zcf', config.dataTgzFile, '--', ...dataPaths], {

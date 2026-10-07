@@ -4,6 +4,7 @@ import { HealthService } from '../protos/health';
 import { ApiService } from '../protos/api';
 import { addCron } from '../schedule/addCron';
 import { delCron } from '../schedule/delCron';
+import { setConcurrency } from '../schedule/setConcurrency';
 import { check } from '../schedule/health';
 import * as Api from '../schedule/api';
 import Logger from '../loaders/logger';
@@ -27,7 +28,7 @@ export class GrpcServerService {
   async initialize() {
     try {
       this.server.addService(HealthService, { check });
-      this.server.addService(CronService, { addCron, delCron });
+      this.server.addService(CronService, { addCron, delCron, setConcurrency });
       this.server.addService(ApiService, Api);
 
       const tlsConfig = await initGrpcCerts();

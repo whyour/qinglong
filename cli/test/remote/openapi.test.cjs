@@ -211,3 +211,29 @@ test('owner two-factor challenge remains actionable without exposing server mess
   assert.equal(result.code, 3); assert.match(result.err, /two-factor-login/); assert.doesNotMatch(result.err, /SERVER-SECRET/);
   assert.equal(f.requests.length, 1); assert.equal(f.requests[0].headers.authorization, undefined);
 });
+
+test('node mirror configuration accepts the real empty response for named and raw API commands', async t => {
+  const f = await fixture(t);
+  f.reply((_req, res) => { res.writeHead(200, { 'content-type': 'application/octet-stream' }); res.end(); });
+  for (const args of [
+    ['system', 'config-node-mirror'],
+    ['api', 'request', 'PUT', '/open/system/config/node-mirror'],
+  ]) {
+    const reply = success(await f.run([...args, '--data', '{"nodeMirror":"https://registry.npmmirror.com"}']));
+    assert.equal(reply.code, 200);
+    assert.equal(f.requests.at(-1).method, 'PUT');
+    assert.equal(f.requests.at(-1).url, '/panel/open/system/config/node-mirror');
+  }
+  assert.equal(f.requests.length, 2, 'configuration writes must not be retried');
+});
+
+test('empty node mirror responses still reject authentication and server failures without retries', async t => {
+  const f = await fixture(t);
+  for (const status of [401, 403, 500]) {
+    f.reply((_req, res) => { res.writeHead(status, { 'content-type': 'application/octet-stream' }); res.end(); });
+    const result = await f.run(['system', 'config-node-mirror', '--data', '{}']);
+    assert.notEqual(result.code, 0);
+    assert.equal(result.out, '');
+  }
+  assert.equal(f.requests.length, 3);
+});

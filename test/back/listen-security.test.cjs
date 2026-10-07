@@ -48,6 +48,7 @@ for (const host of ['127.0.0.1', '::1', '192.0.2.1', '::']) {
       '../protos/api': { ApiService: {} },
       '../schedule/addCron': {},
       '../schedule/delCron': {},
+      '../schedule/setConcurrency': {},
       '../schedule/health': {},
       '../schedule/api': {},
       '../config/grpcCerts': {

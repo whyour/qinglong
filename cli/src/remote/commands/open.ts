@@ -241,7 +241,7 @@ export async function openCommand(
     body,
     authenticated: !op.anonymous,
     output: values.output as string | undefined,
-    text: op.path === 'system/log',
+    text: ['system/log', 'system/config/node-mirror'].includes(op.path),
     timeoutMs: values.timeout ? Number(values.timeout) * 1000 : undefined,
   });
   const data =

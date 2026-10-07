@@ -66,6 +66,7 @@ test('decoded SystemNotify requests reach WPUSH with explicit or saved configura
     '../data/dependence': {},
     '../data/system': {},
     '../shared/pLimit': {},
+    '../schedule/client': {},
     '../shared/i18n': { t: (x) => x },
     './notify': {},
     './schedule': {},

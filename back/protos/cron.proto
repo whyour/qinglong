@@ -5,6 +5,7 @@ package com.ql.cron;
 service Cron {
   rpc addCron(AddCronRequest) returns (AddCronResponse);
   rpc delCron(DeleteCronRequest) returns (DeleteCronResponse);
+  rpc setConcurrency(SetConcurrencyRequest) returns (AddCronResponse);
 }
 
 message ISchedule { string schedule = 1; }
@@ -27,3 +28,6 @@ message AddCronResponse {}
 message DeleteCronRequest { repeated string ids = 1; }
 
 message DeleteCronResponse {}
+
+// Zero restores the default limit.
+message SetConcurrencyRequest { int32 concurrency = 1; }

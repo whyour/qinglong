@@ -30,11 +30,14 @@ import dayjs from 'dayjs';
 import { LOG_END_SYMBOL } from '../config/const';
 import { formatCommand, formatUrl } from '../config/subscription';
 import { CrontabModel } from '../data/cron';
-import {
-  assertSubscriptionAlias,
-  resolveSubscriptionPath,
-} from '../shared/subscriptionPath';
+import { assertSubscriptionAlias } from '../shared/subscriptionPath';
 import { resolveLogPath } from '../shared/logPath';
+import {
+  getSubscriptionStorageCandidates,
+  isSubscriptionStorageName,
+  resolveSubscriptionStoragePath,
+} from '../shared/subscriptionStorage';
+import { withSubscriptionMutation } from '../shared/subscriptionMutationLock';
 import CrontabService from './cron';
 import taskLimit from '../shared/pLimit';
 import { logStreamManager } from '../shared/logStreamManager';
@@ -230,11 +233,13 @@ export default class SubscriptionService {
 
   public async create(payload: Subscription): Promise<Subscription> {
     assertSubscriptionAlias(payload.alias);
-    const tab = new Subscription(payload);
-    const doc = await this.insert(tab);
-    await this.handleTask(doc.get({ plain: true }));
-    await this.setSshConfig();
-    return doc;
+    return withSubscriptionMutation(async () => {
+      const tab = new Subscription(payload);
+      const doc = await this.insert(tab);
+      await this.handleTask(doc.get({ plain: true }));
+      await this.setSshConfig();
+      return doc;
+    });
   }
 
   public async insert(payload: Subscription): Promise<SubscriptionInstance> {
@@ -243,13 +248,15 @@ export default class SubscriptionService {
 
   public async update(payload: Subscription): Promise<Subscription> {
     assertSubscriptionAlias(payload.alias);
-    const doc = await this.getDb({ id: payload.id });
-    const tab = new Subscription({ ...doc, ...payload });
-    const newDoc = await this.updateDb(tab);
-    await this.handleTask(newDoc, !newDoc.is_disabled);
-    await this.removeSshConfigForSubscription(doc);
-    await this.setSshConfig();
-    return newDoc;
+    return withSubscriptionMutation(async () => {
+      const doc = await this.getDb({ id: payload.id });
+      const tab = new Subscription({ ...doc, ...payload });
+      const newDoc = await this.updateDb(tab);
+      await this.handleTask(newDoc, !newDoc.is_disabled);
+      await this.removeSshConfigForSubscription(doc);
+      await this.setSshConfig();
+      return newDoc;
+    });
   }
 
   private async removeSshConfigForSubscription(doc: Subscription) {
@@ -301,35 +308,71 @@ export default class SubscriptionService {
   }
 
   public async remove(ids: number[], query: { force?: boolean }) {
-    const docs = await SubscriptionModel.findAll({ where: { id: ids } });
-    // Validate all deletion targets before changing rows or removing any files.
-    if (query?.force === true) {
-      for (const doc of docs) {
-        resolveSubscriptionPath(config.scriptPath, doc.alias);
-        resolveSubscriptionPath(config.repoPath, doc.alias);
+    return withSubscriptionMutation(async () => {
+      const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+      const storagePaths: string[] = [];
+      const retainedPaths: string[] = [];
+      const collectPaths = (
+        doc: Subscription,
+        targets: string[],
+        deleting = false,
+      ) => {
+        for (const names of getSubscriptionStorageCandidates(doc)) {
+          // A URL accepted by one engine can produce an invalid name in another.
+          // Validate each candidate independently, retaining the safe candidate.
+          if (!Object.values(names).every(isSubscriptionStorageName)) continue;
+          const resolve = deleting ? resolveSubscriptionStoragePath : path.resolve;
+          const scriptPath = resolve(config.scriptPath, names.script);
+          if (scriptPath) targets.push(scriptPath);
+          if (names.repo) {
+            const repoPath = resolve(config.repoPath, names.repo);
+            if (repoPath) targets.push(repoPath);
+          }
+          if (names.raw) {
+            const rawPath = resolve(path.join(config.dataPath, 'raw'), names.raw);
+            if (rawPath) targets.push(rawPath);
+          }
+        }
+      };
+      // Validate all deletion targets before changing rows or removing any files.
+      if (query?.force === true) {
+        for (const doc of docs) {
+          assertSubscriptionAlias(doc.alias);
+          resolveSubscriptionStoragePath(config.scriptPath, doc.alias);
+          resolveSubscriptionStoragePath(config.repoPath, doc.alias);
+          collectPaths(doc, storagePaths, true);
+        }
+        const remaining = await SubscriptionModel.findAll({ where: {} });
+        for (const doc of remaining) {
+          if (!ids.includes(doc.id!)) collectPaths(doc, retainedPaths);
+        }
       }
-    }
-    for (const doc of docs) {
-      await this.handleTask(doc.get({ plain: true }), false);
-    }
-    await SubscriptionModel.destroy({ where: { id: ids } });
-    for (const doc of docs) {
-      await this.removeSshConfigForSubscription(doc);
-    }
-    await this.setSshConfig();
+      for (const doc of docs) {
+        await this.handleTask(doc.get({ plain: true }), false);
+      }
+      await SubscriptionModel.destroy({ where: { id: ids } });
+      for (const doc of docs) {
+        await this.removeSshConfigForSubscription(doc);
+      }
+      await this.setSshConfig();
 
-    if (query?.force === true) {
-      const crons = await CrontabModel.findAll({ where: { sub_id: ids } });
-      if (crons?.length) {
-        await this.crontabService.remove(crons.map((x) => x.id!));
+      if (query?.force === true) {
+        const crons = await CrontabModel.findAll({ where: { sub_id: ids } });
+        if (crons?.length) {
+          await this.crontabService.remove(crons.map((x) => x.id!));
+        }
+        for (const storagePath of new Set(storagePaths)) {
+          // rm is recursive: an ancestor must also be retained if a surviving
+          // subscription uses a nested branch, and vice versa.
+          const shared = retainedPaths.some((retained) =>
+            retained === storagePath ||
+            retained.startsWith(`${storagePath}${path.sep}`) ||
+            storagePath.startsWith(`${retained}${path.sep}`),
+          );
+          if (!shared) await rmPath(storagePath);
+        }
       }
-      for (const doc of docs) {
-        const filePath = resolveSubscriptionPath(config.scriptPath, doc.alias);
-        const repoPath = resolveSubscriptionPath(config.repoPath, doc.alias);
-        await rmPath(filePath);
-        await rmPath(repoPath);
-      }
-    }
+    });
   }
 
   public async getDb(

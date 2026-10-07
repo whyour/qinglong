@@ -59,6 +59,7 @@ test('clearing a dependency cache marks installed entries for reinstall', async 
     AuthDataType: {},
     SystemModel: {},
   });
+  stubModule('../../back/schedule/client', { __esModule: true, default: {} });
   stubModule('../../back/shared/pLimit', {
     __esModule: true,
     default: {},

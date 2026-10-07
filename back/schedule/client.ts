@@ -62,6 +62,25 @@ class Client {
     return this._client;
   }
 
+  async setConcurrency(concurrency: number): Promise<void> {
+    await this.waitForReady(2000);
+    return new Promise((resolve, reject) => {
+      this.client.setConcurrency(
+        { concurrency }, new Metadata(), { deadline: Date.now() + 5000 },
+        (err) => {
+          if (err) {
+            if (err.code === status.UNAVAILABLE || err.code === status.DEADLINE_EXCEEDED) {
+              this.readiness.invalidate();
+              Object.assign(err, { status: 503 });
+            }
+            return reject(err);
+          }
+          resolve();
+        },
+      );
+    });
+  }
+
   async addCron(
     request: AddCronRequest['crons'],
     replace = false

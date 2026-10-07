@@ -219,7 +219,7 @@ test('startup retains historical aliases and isolates bad rows and asynchronous 
 test('subscription create and update preserve branch aliases without rewriting records', async (t) => {
   const root = temporary(t);
   const Subscription = load(path.resolve('back/services/subscription.ts'), {
-    '../config': { logPath: root },
+    '../config': { logPath: root, scriptPath: root },
     '../data/subscription': {
       Subscription: class {
         constructor(value) {
@@ -429,7 +429,7 @@ function cancellationFixture(t, subscriptions) {
     '../data/subscription': {
       SubscriptionModel: {
         findAll: async ({ where }) =>
-          docs.filter((doc) => where.id.includes(doc.id)),
+          docs.filter((doc) => !where.id || where.id.includes(doc.id)),
         destroy: async ({ where }) => events.push(['destroy', where.id]),
         update: async (value, { where }) => {
           for (const doc of docs) {

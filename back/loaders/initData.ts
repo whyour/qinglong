@@ -237,7 +237,10 @@ export default async () => {
   } catch { }
 
   // 初始化保存一次ck和定时任务数据
-  cronClient.readiness.configure(() => cronService.autosave_crontab(true));
+  cronClient.readiness.configure(async () => {
+    await cronService.autosave_crontab(true);
+    await systemService.restoreCronConcurrency();
+  });
   await cronClient.readiness.recover();
 
   await envService.set_envs();
