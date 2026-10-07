@@ -8,12 +8,33 @@ import { checkedProcess } from '../runtime/process';
 import { operationSignal, withoutCancellation } from '../runtime/cancellation';
 import { installPanelDependencies, startPanel, stopPanel } from './operator';
 
+// The Bash image updater and local CLI must enforce the same build provenance.
+const artifacts = require('./upgradeArtifacts.cjs') as {
+  releaseBranch(env: NodeJS.ProcessEnv): string;
+  verifyUpgrade(source: string, staticRoot: string): Promise<unknown>;
+  waitForHealth(
+    env: NodeJS.ProcessEnv,
+    timeout?: number,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  withUpgradeLock<T>(tmp: string, operation: () => Promise<T>): Promise<T>;
+  stageUpgrade(options: {
+    root: string;
+    tmp: string;
+    env: NodeJS.ProcessEnv;
+    mirror: 'github' | 'gitee';
+    signal?: AbortSignal;
+    run(program: string, args: string[], capture?: boolean): Promise<unknown>;
+    install(source: string): Promise<void>;
+  }): Promise<{ source: string; static: string }>;
+  selectedUpgrade(
+    tmp: string,
+    branch: string,
+  ): Promise<{ source: string; static: string }>;
+};
+
 export function releaseBranch(context: LocalContext): string {
-  return ['develop', 'debian', 'debian-dev'].includes(
-    context.env.QL_BRANCH ?? '',
-  )
-    ? context.env.QL_BRANCH!
-    : 'master';
+  return artifacts.releaseBranch(context.env);
 }
 
 async function validateTree(
@@ -48,134 +69,27 @@ export async function stageUpgrade(
   context: LocalContext,
   mirror: 'github' | 'gitee',
 ): Promise<{ source: string; static: string }> {
-  await fs.mkdir(context.paths.dir_tmp!, { recursive: true });
-  const workspace = await fs.mkdtemp(
-    path.join(context.paths.dir_tmp!, 'upgrade-'),
+  return artifacts.withUpgradeLock(context.paths.dir_tmp!, () =>
+    artifacts.stageUpgrade({
+      root: context.root,
+      tmp: context.paths.dir_tmp!,
+      env: context.env,
+      mirror,
+      signal: operationSignal(),
+      run: (program, args, capture) =>
+        checkedProcess(program, args, { env: context.env, capture }),
+      install: (source) => installPanelDependencies(context, source),
+    }),
   );
-  const branch = releaseBranch(context);
-  try {
-    for (const repository of ['qinglong', 'qinglong-static']) {
-      const url =
-        mirror === 'github'
-          ? `https://github.com/whyour/${repository}/archive/refs/heads/${branch}.zip`
-          : `https://gitee.com/whyour/${repository}/repository/archive/${branch}.zip`;
-      const archive = path.join(workspace, `${repository}.zip`);
-      await checkedProcess(
-        'curl',
-        [
-          '--fail',
-          '--location',
-          '--proto',
-          '=https',
-          '--proto-redir',
-          '=https',
-          '--output',
-          archive,
-          url,
-        ],
-        { env: context.env },
-      );
-      const listing = await checkedProcess('unzip', ['-Z1', archive], {
-        env: context.env,
-        capture: true,
-      });
-      const expected = `${repository}-${branch}`;
-      for (const name of listing.stdout.split('\n').filter(Boolean)) {
-        if (
-          name.includes('\\') ||
-          name.includes('\r') ||
-          name.startsWith('/') ||
-          name.split('/').includes('..') ||
-          name.split('/')[0] !== expected
-        )
-          throw new Error(translate(context.env, '升级归档包含无效路径。'));
-      }
-      // Reject Unix symlinks before extraction, including links that could redirect
-      // a later archive entry outside the staging directory.
-      const modes = await checkedProcess('unzip', ['-Z', '-l', archive], {
-        env: context.env,
-        capture: true,
-      });
-      if (modes.stdout.split('\n').some((line) => /^l[rwx-]{9}\s/.test(line)))
-        throw new Error(translate(context.env, '升级归档包含符号链接。'));
-      await checkedProcess('unzip', ['-oq', archive, '-d', workspace], {
-        env: context.env,
-      });
-      await validateTree(path.join(workspace, expected), context.env);
-    }
-    const source = path.join(workspace, `qinglong-${branch}`);
-    const staticRoot = path.join(workspace, `qinglong-static-${branch}`);
-    await fs.access(path.join(staticRoot, 'build/app.js'));
-    const manifest = await fs.readFile(path.join(source, 'package.json'));
-    const existing = await fs.readFile(path.join(context.root, 'package.json'));
-    if (!manifest.equals(existing))
-      await installPanelDependencies(context, source);
-    // Publish a marker only after both archives and dependency installation succeed.
-    await fs.writeFile(
-      path.join(workspace, 'ready.json'),
-      JSON.stringify({ source, static: staticRoot }),
-      { flag: 'wx', mode: 0o600 },
-    );
-    const pointer = path.join(workspace, 'pointer.json');
-    await fs.writeFile(
-      pointer,
-      JSON.stringify({ directory: path.basename(workspace) }),
-      {
-        flag: 'wx',
-        mode: 0o600,
-      },
-    );
-    await fs.rename(
-      pointer,
-      path.join(context.paths.dir_tmp!, `upgrade-ready-${branch}.json`),
-    );
-    return { source, static: staticRoot };
-  } catch (error) {
-    await fs.rm(workspace, { recursive: true, force: true });
-    throw error;
-  }
 }
 
 async function selectedUpgrade(
   context: LocalContext,
 ): Promise<{ source: string; static: string }> {
-  const branch = releaseBranch(context);
-  const fallback = {
-    source: path.join(context.paths.dir_tmp!, `qinglong-${branch}`),
-    static: path.join(context.paths.dir_tmp!, `qinglong-static-${branch}`),
-  };
-  const pointer = await fs
-    .readFile(
-      path.join(context.paths.dir_tmp!, `upgrade-ready-${branch}.json`),
-      'utf8',
-    )
-    .catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return undefined;
-      throw error;
-    });
-  if (pointer === undefined) return fallback;
-  const directory: unknown = JSON.parse(pointer)?.directory;
-  if (
-    typeof directory !== 'string' ||
-    !/^upgrade-[A-Za-z0-9_-]+$/.test(directory)
-  )
-    throw new Error(translate(context.env, '暂存升级指针无效。'));
-  const workspace = path.join(context.paths.dir_tmp!, directory);
-  const selected = {
-    source: path.join(workspace, `qinglong-${branch}`),
-    static: path.join(workspace, `qinglong-static-${branch}`),
-  };
-  for (const location of [workspace, selected.source, selected.static]) {
-    const stat = await fs.lstat(location);
-    if (!stat.isDirectory() || stat.isSymbolicLink())
-      throw new Error(translate(context.env, '暂存升级目录无效。'));
-  }
-  const ready = JSON.parse(
-    await fs.readFile(path.join(workspace, 'ready.json'), 'utf8'),
+  return artifacts.selectedUpgrade(
+    context.paths.dir_tmp!,
+    releaseBranch(context),
   );
-  if (ready?.source !== selected.source || ready?.static !== selected.static)
-    throw new Error(translate(context.env, '暂存升级就绪记录与目录不匹配。'));
-  return selected;
 }
 
 export interface ReloadLifecycle {
@@ -345,8 +259,7 @@ export async function reloadPanel(
   const staticRoot = selected.static;
   await validateTree(source, context.env);
   await validateTree(staticRoot, context.env);
-  await fs.access(path.join(source, 'package.json'));
-  await fs.access(path.join(staticRoot, 'build/app.js'));
+  await artifacts.verifyUpgrade(source, staticRoot);
   const entries = await fs.readdir(source);
   const reserved = new Set(['data', '.tmp', 'static', '.git', '.env']);
   const relativeData = path.relative(context.root, context.data);
@@ -371,7 +284,16 @@ export async function reloadPanel(
   if (selection)
     replacements.push({ source: selection.source, target: selection.target });
   try {
-    return await replaceAndReload(context, replacements);
+    return await artifacts.withUpgradeLock(context.paths.dir_tmp!, () =>
+      replaceAndReload(context, replacements, {
+        stop: stopPanel,
+        start: async (ctx) => {
+          const service = await startPanel(ctx);
+          await artifacts.waitForHealth(ctx.env, 60000, operationSignal());
+          return service;
+        },
+      }),
+    );
   } finally {
     if (selection)
       await fs.rm(selection.directory, { recursive: true, force: true });

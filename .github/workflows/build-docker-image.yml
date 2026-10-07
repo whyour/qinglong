@@ -101,62 +101,51 @@ jobs:
         env:
           GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
           GITHUB_BRANCH: ${{ github.ref_name }}
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
         run: |
-          mkdir -p tmp
-          cd ./tmp
-          cp -rf ../static/* ./
-          git init -b ${GITHUB_BRANCH} && git add .
-          git config --local user.name 'github-actions[bot]'
-          git config --local user.email 'github-actions[bot]@users.noreply.github.com'
-          git commit --allow-empty -m "copy static at $(date +'%Y-%m-%d %H:%M:%S')"
-          git push --force --quiet "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" ${GITHUB_BRANCH}:${GITHUB_BRANCH}
+          bash scripts/publish-static.sh "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" "$GITHUB_BRANCH" "$GITHUB_REF_TYPE"
 
   static_gitlab:
     needs: build-static
     runs-on: ubuntu-latest
+    concurrency:
+      group: static-gitlab-${{ github.ref_name }}
+      cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v6
       - name: Push qinglong-static to GitLab
+        env:
+          STATIC_BRANCH: ${{ github.ref_name }}
+          STATIC_REF_TYPE: ${{ github.ref_type }}
+          MIRROR_SSH_KEY: ${{ secrets.GITLAB_SSH_PK }}
         run: |
-          set +e
+          set -euo pipefail
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.GITLAB_SSH_PK }}" > ~/.ssh/id_rsa
+          printf '%s\n' "$MIRROR_SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -T 10 gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
-          git clone --depth=1 --single-branch https://github.com/whyour/qinglong-static.git static-mirror
-          cd static-mirror
-          git remote add gitlab git@gitlab.com:whyour/qinglong-static.git 2>/dev/null
-          git push --force --all gitlab 2>&1 || echo "::warning::GitLab static push failed"
-          git push --force --tags gitlab 2>&1 || echo "::warning::GitLab static tags push failed"
+          bash scripts/sync-static.sh git@gitlab.com:whyour/qinglong-static.git "$STATIC_BRANCH" "$STATIC_REF_TYPE"
 
   static_gitee:
     needs: build-static
     runs-on: ubuntu-latest
+    concurrency:
+      group: static-gitee-${{ github.ref_name }}
+      cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v6
       - name: Push qinglong-static to Gitee
         env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          STATIC_BRANCH: ${{ github.ref_name }}
+          STATIC_REF_TYPE: ${{ github.ref_type }}
+          MIRROR_SSH_KEY: ${{ secrets.GITLAB_SSH_PK }}
         run: |
-          set +e
+          set -euo pipefail
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.GITLAB_SSH_PK }}" > ~/.ssh/id_rsa
+          printf '%s\n' "$MIRROR_SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -T 10 gitee.com >> ~/.ssh/known_hosts 2>/dev/null
-          git clone --depth=1 --single-branch https://github.com/whyour/qinglong-static.git static-mirror
-          cd static-mirror
-          git remote add gitee git@gitee.com:whyour/qinglong-static.git 2>/dev/null
-
-          if git push --force --all gitee 2>&1; then
-            echo "::notice::Gitee static push succeeded"
-          else
-            echo "::warning::Push failed, trying to create repo via API..."
-            curl -sS --connect-timeout 30 --max-time 60 \
-              -X POST "https://gitee.com/api/v5/user/repos" \
-              -H "Content-Type: application/json" \
-              -d '{"name":"qinglong-static","private":"false"}' \
-              "?access_token=$GITEE_TOKEN" 2>/dev/null
-            git push --force --all gitee 2>&1 && echo "::notice::Gitee static push succeeded after repo creation" || echo "::warning::Gitee static push failed after retry"
-          fi
-          git push --force --tags gitee 2>&1 || echo "::warning::Gitee static tags push failed"
+          bash scripts/sync-static.sh git@gitee.com:whyour/qinglong-static.git "$STATIC_BRANCH" "$STATIC_REF_TYPE"
 
   build-alpine:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}

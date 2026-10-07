@@ -6,10 +6,16 @@ const os = require('node:os');
 const { createContext } = require('../../dist/internal/runtime/context');
 const { reloadPanel } = require('../../dist/internal/maintenance/upgrade');
 const operator = require('../../dist/internal/maintenance/operator');
+const { writeManifest } = require('../../../test/helpers/upgrade-fixture.cjs');
 const selectedLoader =
   '// QL_CLI_ROOT dist/local/entrypoints.js dist/local/cronEntrypoint.js\n';
 
 async function fixture(t) {
+  t.mock.method(
+    require('../../dist/internal/maintenance/upgradeArtifacts.cjs'),
+    'waitForHealth',
+    async () => {},
+  );
   const base = await fs.mkdtemp(
     path.join(os.tmpdir(), 'ql-upgrade-selection-'),
   );
@@ -43,6 +49,7 @@ async function fixture(t) {
   await fs.writeFile(incoming, '// original released loader');
   await fs.writeFile(path.join(ctx.paths.dir_static, 'build/app.js'), 'old');
   await fs.writeFile(path.join(staticRoot, 'build/app.js'), 'new');
+  writeManifest(source, staticRoot);
   return { ctx, source, staticRoot, loader, incoming };
 }
 
@@ -103,4 +110,34 @@ test('unsupported target and unrecognized loader fail before service stop', asyn
   );
   assert.equal(stopped, false);
   assert.equal(await fs.readFile(f.loader, 'utf8'), 'unrecognized');
+});
+
+test('successful process start with failed health check rolls back the installed version', async (t) => {
+  const f = await fixture(t);
+  t.mock.method(operator, 'stopPanel', async () => {});
+  t.mock.method(operator, 'startPanel', async () => ({ manager: 'fixture' }));
+  let probes = 0;
+  t.mock.method(
+    require('../../dist/internal/maintenance/upgradeArtifacts.cjs'),
+    'waitForHealth',
+    async () => {
+      if (++probes === 1) throw new Error('health check failed');
+      assert.equal(
+        await fs.readFile(
+          path.join(f.ctx.paths.dir_static, 'build/app.js'),
+          'utf8',
+        ),
+        'old',
+      );
+    },
+  );
+  await assert.rejects(
+    reloadPanel(f.ctx, 'system', { source: f.source, static: f.staticRoot }),
+    /health check failed/,
+  );
+  assert.equal(probes, 2);
+  assert.equal(
+    await fs.readFile(path.join(f.ctx.root, 'package.json'), 'utf8'),
+    '{"version":"2.19.0"}',
+  );
 });

@@ -15,8 +15,17 @@ const {
   reloadPanel,
 } = require('../../dist/internal/maintenance/upgrade');
 const { parse } = require('../helpers/commands.cjs');
+const {
+  writeManifest,
+  sourceCommit,
+} = require('../../../test/helpers/upgrade-fixture.cjs');
 
 async function fixture(t) {
+  t.mock.method(
+    require('../../dist/internal/maintenance/upgradeArtifacts.cjs'),
+    'waitForHealth',
+    async () => {},
+  );
   const root = await fs.realpath(
     await fs.mkdtemp(path.join(os.tmpdir(), 'ql-operator-')),
   );
@@ -119,14 +128,27 @@ test('PM2 restarts retain configured ports without mutating legacy environment',
   ctx.env.CALLS = path.join(ctx.root, 'ports.jsonl');
   ctx.env.BACK_PORT = '5600';
   ctx.env.GRPC_PORT = '5400';
-  await stub(ctx, 'pm2', 'require("node:fs").appendFileSync(process.env.CALLS, JSON.stringify([process.env.BACK_PORT,process.env.GRPC_PORT])+"\\n");');
+  await stub(
+    ctx,
+    'pm2',
+    'require("node:fs").appendFileSync(process.env.CALLS, JSON.stringify([process.env.BACK_PORT,process.env.GRPC_PORT])+"\\n");',
+  );
   await startPanel(ctx);
   ctx.env.QlPort = '5799';
   ctx.env.QlGrpcPort = '5599';
   await startPanel(ctx);
-  assert.deepEqual((await fs.readFile(ctx.env.CALLS, 'utf8')).trim().split('\n').map(JSON.parse), [
-    ['5700', '5500'], ['5700', '5500'], ['5799', '5599'], ['5799', '5599'],
-  ]);
+  assert.deepEqual(
+    (await fs.readFile(ctx.env.CALLS, 'utf8'))
+      .trim()
+      .split('\n')
+      .map(JSON.parse),
+    [
+      ['5700', '5500'],
+      ['5700', '5500'],
+      ['5799', '5599'],
+      ['5799', '5599'],
+    ],
+  );
   assert.equal(ctx.env.BACK_PORT, '5600');
   assert.equal(ctx.env.GRPC_PORT, '5400');
 });
@@ -199,24 +221,41 @@ test('upgrade staging extracts both archives before publishing readiness and rej
   const payloads = path.join(ctx.root, 'payloads');
   const archives = path.join(ctx.root, 'archives');
   await fs.mkdir(archives);
-  await fs.mkdir(path.join(payloads, 'qinglong-master'), { recursive: true });
+  await fs.mkdir(path.join(payloads, `qinglong-${sourceCommit}`), {
+    recursive: true,
+  });
   await fs.mkdir(path.join(payloads, 'qinglong-static-master/build'), {
     recursive: true,
   });
   const manifest = '{"name":"fixture"}';
   await fs.writeFile(path.join(ctx.root, 'package.json'), manifest);
   await fs.writeFile(
-    path.join(payloads, 'qinglong-master/package.json'),
+    path.join(payloads, `qinglong-${sourceCommit}/package.json`),
     manifest,
   );
   await fs.writeFile(
     path.join(payloads, 'qinglong-static-master/build/app.js'),
     'console.log("fixture")',
   );
+  await fs.mkdir(path.join(payloads, `qinglong-${sourceCommit}/sample`));
+  await fs.writeFile(
+    path.join(payloads, `qinglong-${sourceCommit}/sample/config.sample.sh`),
+    'new sample',
+  );
+  writeManifest(
+    path.join(payloads, `qinglong-${sourceCommit}`),
+    path.join(payloads, 'qinglong-static-master'),
+  );
+  await fs.writeFile(path.join(ctx.root, 'pnpm-lock.yaml'), 'fixture lock\n');
+  await fs.mkdir(path.join(ctx.root, 'node_modules'));
   for (const repo of ['qinglong', 'qinglong-static'])
     execFileSync(
       '/usr/bin/zip',
-      ['-qry', path.join(archives, `${repo}.zip`), `${repo}-master`],
+      [
+        '-qry',
+        path.join(archives, `${repo}.zip`),
+        `${repo}-${repo === 'qinglong' ? sourceCommit : 'master'}`,
+      ],
       { cwd: payloads },
     );
   ctx.env.ARCHIVES = archives;
@@ -224,18 +263,6 @@ test('upgrade staging extracts both archives before publishing readiness and rej
     ctx,
     'curl',
     'const fs=require("node:fs"),p=require("node:path"),args=process.argv.slice(2),out=args[args.indexOf("--output")+1]; fs.copyFileSync(p.join(process.env.ARCHIVES,p.basename(out)),out);',
-  );
-  await fs.mkdir(path.join(payloads, 'qinglong-master/sample'), {
-    recursive: true,
-  });
-  await fs.writeFile(
-    path.join(payloads, 'qinglong-master/sample/config.sample.sh'),
-    'new sample',
-  );
-  execFileSync(
-    '/usr/bin/zip',
-    ['-qry', path.join(archives, 'qinglong.zip'), 'qinglong-master'],
-    { cwd: payloads },
   );
   const staged = await stageUpgrade(ctx, 'github');
   assert.equal(
@@ -249,15 +276,15 @@ test('upgrade staging extracts both archives before publishing readiness and rej
         'utf8',
       ),
     ),
-    staged,
+    { ...staged, sourceCommit, dependenciesChanged: false },
   );
   await fs.symlink(
     '../../outside',
-    path.join(payloads, 'qinglong-master/escape'),
+    path.join(payloads, `qinglong-${sourceCommit}/escape`),
   );
   execFileSync(
     '/usr/bin/zip',
-    ['-qry', path.join(archives, 'qinglong.zip'), 'qinglong-master'],
+    ['-qry', path.join(archives, 'qinglong.zip'), `qinglong-${sourceCommit}`],
     { cwd: payloads },
   );
   await assert.rejects(stageUpgrade(ctx, 'github'), /symlinks/);
@@ -728,7 +755,7 @@ test('invalid or incomplete staged pointers cannot stop the installed panel', as
     reloadPanel(ctx, 'system'),
     (error) =>
       error.code === 'ENOENT' &&
-      error.path === path.join(ctx.paths.dir_tmp, 'qinglong-master'),
+      error.path === path.join(ctx.paths.dir_tmp, 'upgrade-ready-master.json'),
   );
 });
 
@@ -783,6 +810,7 @@ test('system upgrade preserves installed dotenv bytes and permissions even when 
   );
   await fs.writeFile(path.join(staticRoot, 'build/app.js'), '');
   await fs.writeFile(path.join(source, '.env'), 'PORT=9999\nREPLACE_ME=true\n');
+  writeManifest(source, staticRoot);
   const target = path.join(ctx.root, '.env');
   const original = 'PORT=5700\nPRIVATE_VALUE=preserved\n';
   await fs.writeFile(target, original, { mode: 0o600 });
