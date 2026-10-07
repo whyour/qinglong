@@ -283,98 +283,44 @@ usage() {
 }
 
 reload_qinglong() {
-  echo -e "[reload_qinglong] deleting Triggered at $(date)" >>${dir_log}/reload.log
+  local reload_target="${1}"
+  if [[ "$reload_target" == 'system' ]]; then
+    QlPort="${ql_port:-${QlPort:-5700}}" QlBaseUrl="${ql_base_url:-${QlBaseUrl:-/}}" node "$dir_shell/upgrade.cjs" reload
+    return $?
+  fi
+
+  # Data import and a plain service restart retain their existing behavior.
+  echo -e "[reload_qinglong] deleting Triggered at $(date)" >>"${dir_log}/reload.log"
   sleep 3
   delete_pm2
-  echo -e "[reload_qinglong] deleted Triggered at $(date)" >>${dir_log}/reload.log
-
-  local reload_target="${1}"
-  local primary_branch="master"
-  if [[ "${QL_BRANCH}" == "develop" ]] || [[ "${QL_BRANCH}" == "debian" ]] || [[ "${QL_BRANCH}" == "debian-dev" ]]; then
-    primary_branch="${QL_BRANCH}"
-  fi
-
-  if [[ "$reload_target" == 'system' ]]; then
-    rm -rf ${dir_root}/back ${dir_root}/cli ${dir_root}/docker ${dir_root}/sample ${dir_root}/shell ${dir_root}/src
-    mv -f ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
-    rm -rf $dir_static/*
-    mv -f ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
-    cp -f $file_config_sample $dir_config/config.sample.sh
-  fi
-
   if [[ "$reload_target" == 'data' ]]; then
-    rm -rf ${dir_data}/*
-    mv -f ${dir_tmp}/data/* ${dir_data}/
+    rm -rf "${dir_data:?}"/*
+    mv -f "$dir_tmp"/data/* "$dir_data"/ || return $?
   fi
-  echo -e "[reload_qinglong] starting Triggered at $(date)" >>${dir_log}/reload.log
   reload_pm2
-  echo -e "[reload_qinglong] started Triggered at $(date)\n" >>${dir_log}/reload.log
 }
 
 ## 更新 qinglong
 update_qinglong() {
-  rm -rf ${dir_tmp}/*
   local mirror="gitee"
-  local downloadQLUrl="https://gitee.com/whyour/qinglong/repository/archive"
-  local downloadStaticUrl="https://gitee.com/whyour/qinglong-static/repository/archive"
-  local githubStatus=$(curl -s --noproxy "*" -m 2 -IL "https://google.com" | grep 200)
-  if [[ ! -z $githubStatus ]]; then
+  if curl --fail --silent --noproxy "*" --max-time 2 --head "https://github.com" >/dev/null; then
     mirror="github"
-    downloadQLUrl="https://github.com/whyour/qinglong/archive/refs/heads"
-    downloadStaticUrl="https://github.com/whyour/qinglong-static/archive/refs/heads"
   fi
-  t '使用 %s 源更新...\n' "${mirror}"
-
-  local primary_branch="master"
-  if [[ "${QL_BRANCH}" == "develop" ]] || [[ "${QL_BRANCH}" == "debian" ]] || [[ "${QL_BRANCH}" == "debian-dev" ]]; then
-    primary_branch="${QL_BRANCH}"
-  fi
-
-  wget -cqO "${dir_tmp}/ql.zip" "${downloadQLUrl}/${primary_branch}.zip"
-  exit_status=$?
-
-  if [[ $exit_status -eq 0 ]]; then
-    t '更新青龙源文件成功...\n'
-
-    unzip -oq ${dir_tmp}/ql.zip -d ${dir_tmp}
-
-    update_qinglong_static
-  else
-    t '更新青龙源文件失败，请检查网络...\n'
-  fi
+  t '使用 %s 源更新...\n' "$mirror"
+  QlPort="${ql_port:-${QlPort:-5700}}" QlBaseUrl="${ql_base_url:-${QlBaseUrl:-/}}" node "$dir_shell/upgrade.cjs" update "$mirror" "$needRestart"
 }
 
-update_qinglong_static() {
-  wget -cqO "${dir_tmp}/static.zip" "${downloadStaticUrl}/${primary_branch}.zip"
-  exit_status=$?
-
-  if [[ $exit_status -eq 0 ]]; then
-    t '更新青龙静态资源成功...\n'
-    unzip -oq ${dir_tmp}/static.zip -d ${dir_tmp}
-
-    check_update_dep
+# Preserve the updater's status through both tee and the final timing output.
+run_update_logged() (
+  set -o pipefail
+  if [[ "$real_time" == 'true' ]]; then
+    "$@"
+  elif [[ "$no_tee" == 'true' ]]; then
+    "$@" >>"$file_path" 2>&1
   else
-    t '更新青龙静态资源失败，请检查网络...\n'
+    "$@" 2>&1 | tee -a "$file_path"
   fi
-}
-
-check_update_dep() {
-  t '\n开始检测依赖...\n'
-  if [[ $(diff $dir_root/package.json ${dir_tmp}/qinglong-${primary_branch}/package.json) ]]; then
-    npm_install_2 "${dir_tmp}/qinglong-${primary_branch}"
-  fi
-
-  if [[ $exit_status -eq 0 ]]; then
-    t '\n依赖检测安装成功...\n'
-    t '更新包下载成功...\n'
-
-    if [[ "$needRestart" == 'true' ]]; then
-      reload_qinglong "system"
-    fi
-  else
-    t '\n依赖检测安装失败，请检查网络...\n'
-  fi
-}
+)
 
 ## 对比脚本
 diff_scripts() {
@@ -525,7 +471,7 @@ main() {
 
   if [[ "$p1" == "log" ]]; then
     show_service_logs "${@:2}"
-    return $?
+    return 0
   fi
 
   local log_dir="${p1}"
@@ -554,14 +500,17 @@ main() {
 
   [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
 
+  local command_status=0
   case $p1 in
   update)
     fix_config
     local needRestart=${p2:-"true"}
-    eval update_qinglong $cmd
+    run_update_logged update_qinglong
+    command_status=$?
     ;;
   reload)
-    eval reload_qinglong "$p2" $cmd
+    run_update_logged reload_qinglong "$p2"
+    command_status=$?
     ;;
   extra)
     eval run_extra_shell $cmd
@@ -620,9 +569,9 @@ main() {
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒　　　　　" $cmd
   fi
+  return "$command_status"
 }
 
 import_config "$@"
 main "$@"
-
-exit 0
+exit $?

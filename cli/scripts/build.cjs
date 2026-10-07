@@ -13,6 +13,10 @@ execFileSync(
   ],
   { stdio: 'inherit' },
 );
+fs.copyFileSync(
+  path.join(root, 'src/internal/maintenance/upgradeArtifacts.cjs'),
+  path.join(root, 'dist/internal/maintenance/upgradeArtifacts.cjs'),
+);
 require('esbuild').buildSync({
   entryPoints: [path.join(root, 'src/shared/cli/commander.ts')],
   outfile: path.join(root, 'dist/shared/cli/commander.js'),
@@ -45,7 +49,9 @@ const remote = require('esbuild').buildSync({
   metafile: true,
 });
 for (const input of Object.keys(remote.metafile.inputs)) {
-  if (/(?:^|[\\/])src[\\/](?:internal|compatibility|developer)[\\/]/.test(input))
+  if (
+    /(?:^|[\\/])src[\\/](?:internal|compatibility|developer)[\\/]/.test(input)
+  )
     throw new Error(
       'Local implementation leaked into remote npm bundle: ' + input,
     );
