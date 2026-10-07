@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       static_sync_only:
-        description: Only synchronize an existing GitHub static snapshot
+        description: Synchronize an existing static snapshot to GitLab and verify Gitee
         type: boolean
         default: false
       static_ref:
@@ -55,37 +55,6 @@ jobs:
           git remote add gitlab git@gitlab.com:whyour/qinglong.git 2>/dev/null
           git push --force --all gitlab 2>&1 || echo "::warning::GitLab push failed"
           git push --force --tags gitlab 2>&1 || echo "::warning::GitLab tags push failed"
-
-  code_gitee:
-    if: ${{ !inputs.static_sync_only }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Push to Gitee
-        env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-        run: |
-          set +e
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.GITLAB_SSH_PK }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -T 10 gitee.com >> ~/.ssh/known_hosts 2>/dev/null
-          git remote add gitee git@gitee.com:whyour/qinglong.git 2>/dev/null
-
-          if git push --force --all gitee 2>&1; then
-            echo "::notice::Gitee push --all succeeded"
-          else
-            echo "::warning::Push failed, trying to create repo via API..."
-            curl -sS --connect-timeout 30 --max-time 60 \
-              -X POST "https://gitee.com/api/v5/user/repos" \
-              -H "Content-Type: application/json" \
-              -d '{"name":"qinglong","private":"false"}' \
-              "?access_token=$GITEE_TOKEN" 2>/dev/null
-            git push --force --all gitee 2>&1 && echo "::notice::Gitee push succeeded after repo creation" || echo "::warning::Gitee push failed after retry"
-          fi
-          git push --force --tags gitee 2>&1 || echo "::warning::Gitee tags push failed"
 
   build-static:
     if: ${{ !inputs.static_sync_only }}
@@ -146,26 +115,42 @@ jobs:
           ssh-keyscan -T 10 gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
           bash scripts/sync-static.sh git@gitlab.com:whyour/qinglong-static.git "$STATIC_BRANCH" "$STATIC_REF_TYPE"
 
-  static_gitee:
+  verify-gitee-mirrors:
     needs: build-static
     runs-on: ubuntu-latest
-    concurrency:
-      group: static-gitee-${{ github.ref_name }}
-      cancel-in-progress: false
+    timeout-minutes: 14
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        repository: [qinglong, qinglong-static]
     steps:
       - uses: actions/checkout@v6
-      - name: Push qinglong-static to Gitee
+      # Gitee Pull mirrors and GitHub push webhooks own synchronization.
+      # Verification runs alongside Docker builds and needs no Gitee credentials.
+      - name: Wait for Gitee Pull mirror
+        if: ${{ matrix.repository == 'qinglong' }}
         env:
-          STATIC_BRANCH: ${{ github.ref_name }}
-          STATIC_REF_TYPE: ${{ github.ref_type }}
-          MIRROR_SSH_KEY: ${{ secrets.GITLAB_SSH_PK }}
+          GH_TOKEN: ${{ github.token }}
+          QL_MIRROR_NOTIFY_REPO: whyour/qinglong
+          MIRROR_REPOSITORY: ${{ matrix.repository }}
+          MIRROR_REF: ${{ github.ref_name }}
+          MIRROR_REF_TYPE: ${{ github.ref_type }}
+          QL_MIRROR_INCLUDE_VERSION_BRANCH: ${{ matrix.repository == 'qinglong-static' }}
+          QL_MIRROR_NOTIFY_ON_START: 'false'
         run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          printf '%s\n' "$MIRROR_SSH_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -T 10 gitee.com >> ~/.ssh/known_hosts 2>/dev/null
-          bash scripts/sync-static.sh git@gitee.com:whyour/qinglong-static.git "$STATIC_BRANCH" "$STATIC_REF_TYPE"
+          bash scripts/wait-for-mirror.sh "https://github.com/whyour/$MIRROR_REPOSITORY.git" "https://gitee.com/whyour/$MIRROR_REPOSITORY.git" "$MIRROR_REF" "$MIRROR_REF_TYPE"
+      - name: Notify and wait for Gitee static mirror
+        if: ${{ matrix.repository == 'qinglong-static' }}
+        env:
+          GH_TOKEN: ${{ secrets.API_TOKEN }}
+          QL_MIRROR_NOTIFY_REPO: whyour/qinglong-static
+          MIRROR_REF: ${{ github.ref_name }}
+          MIRROR_REF_TYPE: ${{ github.ref_type }}
+          QL_MIRROR_INCLUDE_VERSION_BRANCH: 'true'
+        run: |
+          bash scripts/wait-for-mirror.sh https://github.com/whyour/qinglong-static.git https://gitee.com/whyour/qinglong-static.git "$MIRROR_REF" "$MIRROR_REF_TYPE"
 
   sync-existing-static:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.static_sync_only }}
@@ -173,7 +158,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mirror: [gitlab, gitee]
+        mirror: [gitlab]
     concurrency:
       group: static-${{ matrix.mirror }}-${{ inputs.static_ref }}
       cancel-in-progress: false
@@ -192,6 +177,22 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -T 10 "$MIRROR_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           bash scripts/sync-static.sh "git@$MIRROR_HOST:whyour/qinglong-static.git" "$STATIC_REF" "$STATIC_REF_TYPE"
+
+  verify-existing-static-gitee:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.static_sync_only }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v6
+      - name: Wait for existing Gitee static snapshot
+        env:
+          GH_TOKEN: ${{ secrets.API_TOKEN }}
+          QL_MIRROR_NOTIFY_REPO: whyour/qinglong-static
+          MIRROR_REF: ${{ inputs.static_ref }}
+          MIRROR_REF_TYPE: ${{ inputs.static_ref_type }}
+          QL_MIRROR_INCLUDE_VERSION_BRANCH: 'true'
+        run: |
+          bash scripts/wait-for-mirror.sh https://github.com/whyour/qinglong-static.git https://gitee.com/whyour/qinglong-static.git "$MIRROR_REF" "$MIRROR_REF_TYPE"
 
   build-alpine:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}

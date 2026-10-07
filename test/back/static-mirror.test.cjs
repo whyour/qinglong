@@ -53,7 +53,7 @@ test('mirror jobs select the built branch, retain hidden artifacts and propagate
   const workflow = yaml.load(
     fs.readFileSync('.github/workflows/build-docker-image.yml', 'utf8'),
   );
-  for (const name of ['static_gitee', 'static_gitlab']) {
+  for (const name of ['static_gitlab']) {
     const job = workflow.jobs[name],
       step = job.steps.find((step) => step.run);
     assert.equal(job.needs, 'build-static');
@@ -156,18 +156,18 @@ test('static backfill uses existing snapshots and skips all source, build and im
   );
   const job = workflow.jobs['sync-existing-static'];
   assert.match(job.if, /workflow_dispatch.*inputs.static_sync_only/);
-  assert.deepEqual(job.strategy.matrix.mirror, ['gitlab', 'gitee']);
+  assert.deepEqual(job.strategy.matrix.mirror, ['gitlab']);
   const sync = job.steps.find((step) => step.run);
   assert.equal(sync.env.STATIC_REF, '${{ inputs.static_ref }}');
   assert.equal(sync.env.STATIC_REF_TYPE, '${{ inputs.static_ref_type }}');
   assert.match(sync.run, /bash scripts\/sync-static.sh/);
   assert.doesNotMatch(sync.run, /publish-static|docker|pub.sh/);
-  for (const name of ['validate', 'code_gitlab', 'code_gitee', 'build-static'])
+  for (const name of ['validate', 'code_gitlab', 'build-static'])
     assert.match(workflow.jobs[name].if, /!inputs.static_sync_only/);
   // Downstream jobs require the skipped build; none bypass dependency failures.
   for (const name of [
     'static_gitlab',
-    'static_gitee',
+    'verify-gitee-mirrors',
     'build-alpine',
     'build-debian',
     'build-alpine310',
