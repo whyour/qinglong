@@ -478,17 +478,24 @@ async function withLifecycleHooks(root, tmp, env, operation) {
     const snapshot = path.join(directory, 'lifecycle.sh');
     await fs.writeFile(
       snapshot,
-      `${helpers}\n${environment}\nimport_config\n`,
+      `${helpers}\n${environment}\nimport_config
+case "$1" in
+  stop) delete_pm2 ;;
+  start) reload_pm2 ;;
+  install) npm_install_2 "$2"; exit "$exit_status" ;;
+  *) printf '%s\\n' 'Unknown lifecycle operation' >&2; exit 2 ;;
+esac
+`,
       {
         flag: 'wx',
         mode: 0o600,
       },
     );
-    const hook = (body, args = [], signal) =>
+    const hook = (operation, args = [], signal) =>
       runProcess(
         env,
         'bash',
-        ['-c', `source "$1"; shift; ${body}`, 'upgrade', snapshot, ...args],
+        ['--', snapshot, operation, ...args],
         false,
         signal,
       );
@@ -521,9 +528,9 @@ async function main() {
     withLifecycleHooks(root, tmp, env, async (hook) => {
       const lifecycle = {
         signal: controller.signal,
-        stop: () => hook('delete_pm2'),
+        stop: () => hook('stop'),
         start: async (recover) => {
-          await hook('reload_pm2', [], recover ? undefined : controller.signal);
+          await hook('start', [], recover ? undefined : controller.signal);
           await waitForHealth(
             env,
             60000,
@@ -539,12 +546,7 @@ async function main() {
           mirror: process.argv[3],
           run,
           signal: controller.signal,
-          install: (source) =>
-            hook(
-              'npm_install_2 "$1"; exit "$exit_status"',
-              [source],
-              controller.signal,
-            ),
+          install: (source) => hook('install', [source], controller.signal),
         });
         console.log('更新包下载及校验成功...');
         if (process.argv[4] !== 'true') return;

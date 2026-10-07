@@ -37,13 +37,14 @@ async function assertStopped(pid) {
   assert.fail(`test process ${pid} is still running`);
 }
 
-async function fixture(t) {
-  const root = await fs.mkdtemp(
+async function fixture(t, directory) {
+  const base = await fs.mkdtemp(
     path.join(os.tmpdir(), 'ql-upgrade-lifecycle-'),
   );
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  t.after(() => fs.rm(base, { recursive: true, force: true }));
+  const root = directory ? path.join(base, directory) : base;
   const tmp = path.join(root, '.tmp');
-  await fs.mkdir(tmp);
+  await fs.mkdir(tmp, { recursive: true });
   await fs.mkdir(path.join(root, 'shell/lang'), { recursive: true });
   await fs.writeFile(path.join(root, 'shell/lang/zh.sh'), '');
   await fs.writeFile(
@@ -71,12 +72,8 @@ ${process.platform === 'darwin' ? 'pkill() { command pkill -a "$@"; }' : ''}
   await withUpgradeLock(f.tmp, () =>
     withLifecycleHooks(f.root, f.tmp, f.env, async (hook) => {
       await fs.writeFile(path.join(f.root, 'shell/share.sh'), 'exit 99');
-      await hook('delete_pm2; printf stopped > "$QL_DIR/stop-returned"');
-      await hook('reload_pm2');
-      assert.equal(
-        await fs.readFile(path.join(f.root, 'stop-returned'), 'utf8'),
-        'stopped',
-      );
+      await hook('stop');
+      await hook('start');
       assert.match(
         await fs.readFile(path.join(f.root, 'pm2-calls'), 'utf8'),
         /startOrGracefulReload/,
@@ -123,7 +120,7 @@ ${process.platform === 'darwin' ? 'pkill() { command pkill -a "$@"; }' : ''}
     );
     await withUpgradeLock(f.tmp, () =>
       withLifecycleHooks(f.root, f.tmp, f.env, async (hook) => {
-        await hook('reload_pm2');
+        await hook('start');
         for (let attempt = 0; attempt < 150; attempt++) {
           try {
             pid = Number(
@@ -136,11 +133,7 @@ ${process.platform === 'darwin' ? 'pkill() { command pkill -a "$@"; }' : ''}
         }
         assert.ok(pid, 'fallback backend started');
         process.kill(pid, 0);
-        await hook('delete_pm2; printf stopped > "$QL_DIR/stop-returned"');
-        assert.equal(
-          await fs.readFile(path.join(f.root, 'stop-returned'), 'utf8'),
-          'stopped',
-        );
+        await hook('stop');
         await assertStopped(pid);
       }),
     );
@@ -183,17 +176,20 @@ setInterval(() => fs.appendFileSync(path.join(process.env.QL_DIR, 'heartbeat'), 
       );
       await fs.writeFile(
         path.join(f.root, 'shell/share.sh'),
-        'import_config() { :; }',
+        `import_config() { :; }
+npm_install_2() {
+  ${ignoreShell ? "trap '' TERM" : ':'}
+  "$TEST_NODE" "$1"${redirect ? ' >/dev/null 2>&1' : ''}
+  exit_status=$?
+}
+`,
       );
       const operation = withUpgradeLock(f.tmp, () =>
-        withLifecycleHooks(f.root, f.tmp, f.env, (hook) =>
-          hook(
-            `${ignoreShell ? "trap '' TERM; " : ''}"$1" "$2"${
-              redirect ? ' >/dev/null 2>&1' : ''
-            }; printf done`,
-            [process.execPath, worker],
-            controller.signal,
-          ),
+        withLifecycleHooks(
+          f.root,
+          f.tmp,
+          { ...f.env, TEST_NODE: process.execPath },
+          (hook) => hook('install', [worker], controller.signal),
         ),
       );
       // Attach rejection handling before aborting the in-flight operation.
@@ -228,14 +224,10 @@ test('an already cancelled command does not spawn and a spawn failure releases t
   const f = await fixture(t);
   const controller = new AbortController();
   controller.abort(new Error('cancelled before spawn'));
+  const script = path.join(f.root, 'never-run.sh');
+  await fs.writeFile(script, 'touch "$QL_DIR/spawned"');
   await assert.rejects(
-    runProcess(
-      f.env,
-      'bash',
-      ['-c', 'touch "$QL_DIR/spawned"'],
-      false,
-      controller.signal,
-    ),
+    runProcess(f.env, 'bash', ['--', script], false, controller.signal),
     /cancelled before spawn/,
   );
   await assert.rejects(fs.access(path.join(f.root, 'spawned')), {
@@ -246,6 +238,51 @@ test('an already cancelled command does not spawn and a spawn failure releases t
       runProcess(f.env, path.join(f.root, 'missing-program'), []),
     ),
     { code: 'ENOENT' },
+  );
+  assert.deepEqual(await fs.readdir(f.tmp), []);
+});
+
+test('fixed lifecycle dispatch treats spaces, quotes and command substitutions in paths as data', async (t) => {
+  const special =
+    'panel spaces \u0027"; $(touch "$TEST_MARKER"); `touch "$TEST_MARKER"`';
+  const f = await fixture(t, special);
+  const marker = path.join(f.root, 'injected');
+  const source = path.join(f.root, 'source ' + special);
+  await fs.writeFile(
+    path.join(f.root, 'shell/share.sh'),
+    `
+import_config() { :; }
+delete_pm2() { printf stopped > "$QL_DIR/stopped"; }
+reload_pm2() { printf started > "$QL_DIR/started"; }
+npm_install_2() { printf '%s' "$1" > "$QL_DIR/installed"; exit_status=0; }
+`,
+  );
+  await withUpgradeLock(f.tmp, () =>
+    withLifecycleHooks(
+      f.root,
+      f.tmp,
+      { ...f.env, TEST_MARKER: marker },
+      async (hook) => {
+        await hook('stop');
+        await hook('start');
+        await hook('install', [source]);
+        assert.equal(
+          await fs.readFile(path.join(f.root, 'stopped'), 'utf8'),
+          'stopped',
+        );
+        assert.equal(
+          await fs.readFile(path.join(f.root, 'started'), 'utf8'),
+          'started',
+        );
+        assert.equal(
+          await fs.readFile(path.join(f.root, 'installed'), 'utf8'),
+          source,
+        );
+        await assert.rejects(fs.access(marker), { code: 'ENOENT' });
+        await assert.rejects(hook('touch "$TEST_MARKER"'), /exit 2/);
+        await assert.rejects(fs.access(marker), { code: 'ENOENT' });
+      },
+    ),
   );
   assert.deepEqual(await fs.readdir(f.tmp), []);
 });
