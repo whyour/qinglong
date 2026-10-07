@@ -145,3 +145,35 @@ test('version static snapshots retain a matching branch and Git tag on all three
     128,
   );
 });
+
+test('static backfill uses existing snapshots and skips all source, build and image publication jobs', () => {
+  const workflow = require('js-yaml').load(
+    fs.readFileSync('.github/workflows/build-docker-image.yml', 'utf8'),
+  );
+  assert.equal(
+    workflow.on.workflow_dispatch.inputs.static_sync_only.default,
+    false,
+  );
+  const job = workflow.jobs['sync-existing-static'];
+  assert.match(job.if, /workflow_dispatch.*inputs.static_sync_only/);
+  assert.deepEqual(job.strategy.matrix.mirror, ['gitlab', 'gitee']);
+  const sync = job.steps.find((step) => step.run);
+  assert.equal(sync.env.STATIC_REF, '${{ inputs.static_ref }}');
+  assert.equal(sync.env.STATIC_REF_TYPE, '${{ inputs.static_ref_type }}');
+  assert.match(sync.run, /bash scripts\/sync-static.sh/);
+  assert.doesNotMatch(sync.run, /publish-static|docker|pub.sh/);
+  for (const name of ['validate', 'code_gitlab', 'code_gitee', 'build-static'])
+    assert.match(workflow.jobs[name].if, /!inputs.static_sync_only/);
+  // Downstream jobs require the skipped build; none bypass dependency failures.
+  for (const name of [
+    'static_gitlab',
+    'static_gitee',
+    'build-alpine',
+    'build-debian',
+    'build-alpine310',
+    'build-debian310',
+  ]) {
+    assert.equal(workflow.jobs[name].needs, 'build-static');
+    assert.doesNotMatch(workflow.jobs[name].if || '', /always\(/);
+  }
+});

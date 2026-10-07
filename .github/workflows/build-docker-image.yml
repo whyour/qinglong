@@ -13,15 +13,31 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      static_sync_only:
+        description: Only synchronize an existing GitHub static snapshot
+        type: boolean
+        default: false
+      static_ref:
+        description: Static branch or version name, for example v2.22.0
+        type: string
+        default: ''
+      static_ref_type:
+        description: Synchronize a branch, or a version branch and Git tag
+        type: choice
+        options: [branch, tag]
+        default: branch
 
 permissions:
   contents: read
 
 jobs:
   validate:
+    if: ${{ !inputs.static_sync_only }}
     uses: ./.github/workflows/validate.yml
 
   code_gitlab:
+    if: ${{ !inputs.static_sync_only }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -39,6 +55,7 @@ jobs:
           git push --force --tags gitlab 2>&1 || echo "::warning::GitLab tags push failed"
 
   code_gitee:
+    if: ${{ !inputs.static_sync_only }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -69,6 +86,7 @@ jobs:
           git push --force --tags gitee 2>&1 || echo "::warning::Gitee tags push failed"
 
   build-static:
+    if: ${{ !inputs.static_sync_only }}
     needs: validate
     runs-on: ubuntu-latest
     steps:
@@ -146,6 +164,32 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -T 10 gitee.com >> ~/.ssh/known_hosts 2>/dev/null
           bash scripts/sync-static.sh git@gitee.com:whyour/qinglong-static.git "$STATIC_BRANCH" "$STATIC_REF_TYPE"
+
+  sync-existing-static:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.static_sync_only }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mirror: [gitlab, gitee]
+    concurrency:
+      group: static-${{ matrix.mirror }}-${{ inputs.static_ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - name: Synchronize existing static snapshot
+        env:
+          STATIC_REF: ${{ inputs.static_ref }}
+          STATIC_REF_TYPE: ${{ inputs.static_ref_type }}
+          MIRROR_HOST: ${{ matrix.mirror }}.com
+          MIRROR_SSH_KEY: ${{ secrets.GITLAB_SSH_PK }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$MIRROR_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -T 10 "$MIRROR_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          bash scripts/sync-static.sh "git@$MIRROR_HOST:whyour/qinglong-static.git" "$STATIC_REF" "$STATIC_REF_TYPE"
 
   build-alpine:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
