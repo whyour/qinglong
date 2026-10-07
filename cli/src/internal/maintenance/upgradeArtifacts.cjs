@@ -405,24 +405,103 @@ async function waitForHealth(env, timeout = 60000, signal) {
 }
 
 function runProcess(env, program, args, capture = false, signal) {
+  if (signal?.aborted) return Promise.reject(signal.reason);
   return new Promise((resolve, reject) => {
     const child = spawn(program, args, {
       env,
-      signal,
-      stdio: capture ? ['ignore', 'pipe', 'inherit'] : 'inherit',
+      detached: process.platform !== 'win32',
+      // Pipes keep close pending until children have released their output.
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
-    if (capture)
-      child.stdout.on('data', (chunk) => {
-        stdout += chunk;
-      });
-    child.once('error', reject);
-    child.once('close', (code) =>
-      code === 0
-        ? resolve({ stdout })
-        : reject(new Error(`${program} failed (exit ${code})`)),
-    );
+    let aborted = false;
+    let failure;
+    let escalation;
+    const kill = (name) => {
+      if (!child.pid) return;
+      try {
+        process.kill(
+          process.platform === 'win32' ? child.pid : -child.pid,
+          name,
+        );
+      } catch (error) {
+        if (error.code === 'EPERM') {
+          child.kill(name);
+          return;
+        }
+        if (error.code !== 'ESRCH') throw error;
+      }
+    };
+    const abort = () => {
+      if (aborted) return;
+      aborted = true;
+      kill('SIGTERM');
+      escalation = setTimeout(() => kill('SIGKILL'), 1000);
+      escalation.unref();
+    };
+    child.stdout.on('data', (chunk) => {
+      if (capture) stdout += chunk;
+      else process.stdout.write(chunk);
+    });
+    child.stderr.on('data', (chunk) => process.stderr.write(chunk));
+    child.once('error', (error) => {
+      failure = error;
+    });
+    child.once('exit', () => {
+      // The shell can exit before a descendant that ignores SIGTERM.
+      if (aborted) kill('SIGKILL');
+    });
+    child.once('close', (code) => {
+      if (aborted) kill('SIGKILL');
+      clearTimeout(escalation);
+      signal?.removeEventListener('abort', abort);
+      if (aborted) reject(signal.reason);
+      else if (failure) reject(failure);
+      else if (code === 0) resolve({ stdout });
+      else reject(new Error(`${program} failed (exit ${code})`));
+    });
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
   });
+}
+
+async function withLifecycleHooks(root, tmp, env, operation) {
+  const helpers = await fs.readFile(path.join(root, 'shell/share.sh'), 'utf8');
+  const environment = await fs.readFile(
+    path.join(root, 'shell/env.sh'),
+    'utf8',
+  );
+  const directory = await fs.mkdtemp(path.join(tmp, 'upgrade-hooks-'));
+  try {
+    // Keep the installed functions available through replacement and rollback.
+    // Their pkill patterns must never become part of the bash command line.
+    const snapshot = path.join(directory, 'lifecycle.sh');
+    await fs.writeFile(
+      snapshot,
+      `${helpers}\n${environment}\nimport_config\n`,
+      {
+        flag: 'wx',
+        mode: 0o600,
+      },
+    );
+    const hook = (body, args = [], signal) =>
+      runProcess(
+        env,
+        'bash',
+        ['-c', `source "$1"; shift; ${body}`, 'upgrade', snapshot, ...args],
+        false,
+        signal,
+      );
+    return await operation(hook);
+  } finally {
+    await fs
+      .rm(directory, { recursive: true, force: true })
+      .catch(() =>
+        console.error(
+          `Retained lifecycle snapshot / 保留生命周期快照: ${directory}`,
+        ),
+      );
+  }
 }
 
 async function main() {
@@ -438,65 +517,51 @@ async function main() {
     );
   const run = (program, args, capture) =>
     runProcess(env, program, args, capture, controller.signal);
-  // Snapshot installed lifecycle functions: replacing shell/ must not change
-  // the stop/start implementation halfway through a transaction or rollback.
-  const helpers = await fs.readFile(path.join(root, 'shell/share.sh'), 'utf8');
-  const environment = await fs.readFile(
-    path.join(root, 'shell/env.sh'),
-    'utf8',
-  );
-  const hook = (body, args = [], signal) =>
-    runProcess(
-      env,
-      'bash',
-      [
-        '-c',
-        `${helpers}\n${environment}\nimport_config\n${body}`,
-        'upgrade',
-        ...args,
-      ],
-      false,
-      signal,
-    );
-  const lifecycle = {
-    signal: controller.signal,
-    stop: () => hook('delete_pm2'),
-    start: async (recover) => {
-      await hook('reload_pm2');
-      await waitForHealth(env, 60000, recover ? undefined : controller.signal);
-    },
-  };
-  await withUpgradeLock(tmp, async () => {
-    if (process.argv[2] === 'update') {
-      await stageUpgrade({
+  await withUpgradeLock(tmp, () =>
+    withLifecycleHooks(root, tmp, env, async (hook) => {
+      const lifecycle = {
+        signal: controller.signal,
+        stop: () => hook('delete_pm2'),
+        start: async (recover) => {
+          await hook('reload_pm2', [], recover ? undefined : controller.signal);
+          await waitForHealth(
+            env,
+            60000,
+            recover ? undefined : controller.signal,
+          );
+        },
+      };
+      if (process.argv[2] === 'update') {
+        await stageUpgrade({
+          root,
+          tmp,
+          env,
+          mirror: process.argv[3],
+          run,
+          signal: controller.signal,
+          install: (source) =>
+            hook(
+              'npm_install_2 "$1"; exit "$exit_status"',
+              [source],
+              controller.signal,
+            ),
+        });
+        console.log('更新包下载及校验成功...');
+        if (process.argv[4] !== 'true') return;
+      } else if (process.argv[2] !== 'reload')
+        throw new Error('Unknown upgrade command.');
+      await reloadSystem({
         root,
         tmp,
         env,
-        mirror: process.argv[3],
-        run,
-        signal: controller.signal,
-        install: (source) =>
-          hook(
-            'npm_install_2 "$1"; exit "$exit_status"',
-            [source],
-            controller.signal,
-          ),
+        data: env.dir_data || path.join(root, 'data'),
+        staticRoot: env.dir_static || path.join(root, 'static'),
+        config: env.dir_config || path.join(root, 'data/config'),
+        lifecycle,
       });
-      console.log('更新包下载及校验成功...');
-      if (process.argv[4] !== 'true') return;
-    } else if (process.argv[2] !== 'reload')
-      throw new Error('Unknown upgrade command.');
-    await reloadSystem({
-      root,
-      tmp,
-      env,
-      data: env.dir_data || path.join(root, 'data'),
-      staticRoot: env.dir_static || path.join(root, 'static'),
-      config: env.dir_config || path.join(root, 'data/config'),
-      lifecycle,
-    });
-    console.log('更新及启动检查成功...');
-  });
+      console.log('更新及启动检查成功...');
+    }),
+  );
 }
 
 module.exports = {
@@ -508,6 +573,8 @@ module.exports = {
   replaceAndReload,
   reloadSystem,
   waitForHealth,
+  runProcess,
+  withLifecycleHooks,
   main,
 };
 if (require.main === module)
