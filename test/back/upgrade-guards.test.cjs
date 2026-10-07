@@ -196,19 +196,33 @@ test('health checks normalize supported URL prefixes exactly like the backend', 
   const requests = [];
   const port = await healthServer(t, (req, res) => {
     requests.push(req.url);
-    if (['/api/health', '/panel/api/health'].includes(req.url))
+    if (
+      ['/api/health', '/panel/api/health', '/panel//api/health'].includes(
+        req.url,
+      )
+    )
       res.end('{"code":200,"data":{"status":"ok"}}');
     else {
       res.statusCode = 404;
       res.end('{}');
     }
   });
-  for (const prefix of ['', '/', 'panel', '/panel', 'panel/', '/panel/'])
+  for (const prefix of [
+    '',
+    '/',
+    'panel',
+    '/panel',
+    'panel/',
+    '/panel/',
+    'panel//',
+    '/panel//',
+  ])
     await waitForHealth({ QlPort: port, QlBaseUrl: prefix }, 100);
   assert.deepEqual(requests, [
     '/api/health',
     '/api/health',
     ...Array(4).fill('/panel/api/health'),
+    ...Array(2).fill('/panel//api/health'),
   ]);
 });
 

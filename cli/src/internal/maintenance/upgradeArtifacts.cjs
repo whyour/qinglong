@@ -420,7 +420,7 @@ async function waitForHealth(env, timeout = 60000, signal) {
   const port = Number(env.QlPort || 5700);
   let base = env.QlBaseUrl || '';
   if (base && !base.startsWith('/')) base = `/${base}`;
-  base = base.replace(/\/+$/, '');
+  if (base.endsWith('/')) base = base.slice(0, -1);
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     signal?.throwIfAborted();
