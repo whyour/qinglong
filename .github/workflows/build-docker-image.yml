@@ -2,11 +2,13 @@ name: Build And Push Docker Image
 
 on:
   push:
-    paths-ignore:
-      - "*.md"
-      # CLI is verified and published separately; images do not build cli/dist.
-      - "cli/**"
-      - ".github/workflows/cli-package.yml"
+    paths:
+      - "**"
+      - "!*.md"
+      # CLI is verified separately; its shared Bash upgrade engine ships in images.
+      - "!cli/**"
+      - "cli/src/internal/maintenance/upgradeArtifacts.cjs"
+      - "!.github/workflows/cli-package.yml"
     branches:
       - "master"
       - "develop"
