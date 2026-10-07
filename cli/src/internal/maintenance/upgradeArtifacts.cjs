@@ -5,6 +5,7 @@ const path = require('node:path');
 const { createHash, randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
 const http = require('node:http');
+const { setTimeout: delay } = require('node:timers/promises');
 
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const releaseBranch = (env) =>
@@ -69,33 +70,83 @@ async function verifyUpgrade(source, staticRoot) {
 async function withUpgradeLock(tmp, operation) {
   await fs.mkdir(tmp, { recursive: true });
   const lock = path.join(tmp, 'upgrade.lock');
+  const token = randomUUID();
+  const owner = `owner-${process.pid}-${token}`;
+  const candidate = path.join(tmp, `upgrade-lock-${token}`);
+  let acquired = false;
+  await fs.mkdir(candidate, { mode: 0o700 });
   try {
-    await fs.mkdir(lock);
-  } catch (error) {
-    if (error.code !== 'EEXIST') throw error;
-    const pid = Number(
-      await fs.readFile(path.join(lock, 'pid'), 'utf8').catch(() => ''),
-    );
-    let stale = false;
-    if (pid > 0) {
+    // Publish a nonempty directory atomically: a live lock can never be
+    // replaced, and a crash before publication cannot leave an ownerless lock.
+    await fs.writeFile(path.join(candidate, owner), '', {
+      flag: 'wx',
+      mode: 0o600,
+    });
+    for (;;) {
       try {
-        process.kill(pid, 0);
+        await fs.rename(candidate, lock);
+        acquired = true;
+        break;
       } catch (error) {
-        if (error.code === 'ESRCH') stale = true;
+        if (!['ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error;
+      }
+      let entries;
+      try {
+        entries = await fs.readdir(lock);
+      } catch (error) {
+        if (error.code === 'ENOENT') continue;
+        throw error;
+      }
+      if (!entries.length) continue;
+      const heldOwner = entries[0];
+      const match = /^owner-([1-9]\d*)-[a-f0-9-]{36}$/.exec(heldOwner);
+      let pid = match ? Number(match[1]) : 0;
+      if (entries.length === 1 && heldOwner === 'pid') {
+        try {
+          pid = Number(await fs.readFile(path.join(lock, heldOwner), 'utf8'));
+        } catch (error) {
+          if (error.code === 'ENOENT') continue;
+          throw error;
+        }
+      }
+      let stale = false;
+      if (
+        entries.length === 1 &&
+        Number.isSafeInteger(pid) &&
+        pid > 0 &&
+        pid <= 0x7fffffff
+      ) {
+        try {
+          process.kill(pid, 0);
+        } catch (error) {
+          if (error.code === 'ESRCH') stale = true;
+        }
+      }
+      if (!stale)
+        throw new Error(
+          'Another upgrade is running / 已有更新或重载正在执行。',
+        );
+      // Removing the observed unique marker is a compare-and-delete. A
+      // contender cannot unlink the marker belonging to a replacement lock.
+      // Legacy pid files are supported; new owners never reuse that filename.
+      try {
+        await fs.unlink(path.join(lock, heldOwner));
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
       }
     }
-    if (!stale)
-      throw new Error('Another upgrade is running / 已有更新或重载正在执行。');
-    await fs.rm(lock, { recursive: true });
-    await fs.mkdir(lock);
-  }
-  try {
-    await fs.writeFile(path.join(lock, 'pid'), String(process.pid), {
-      flag: 'wx',
-    });
     return await operation();
   } finally {
-    await fs.rm(lock, { recursive: true, force: true });
+    if (acquired) {
+      await fs.unlink(path.join(lock, owner)).catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+      await fs.rmdir(lock).catch((error) => {
+        if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code))
+          throw error;
+      });
+    }
+    await fs.rm(candidate, { recursive: true, force: true });
   }
 }
 
@@ -367,13 +418,20 @@ async function reloadSystem({
 
 async function waitForHealth(env, timeout = 60000, signal) {
   const port = Number(env.QlPort || 5700);
-  const base = (env.QlBaseUrl || '/').replace(/\/+$/, '');
+  let base = env.QlBaseUrl || '';
+  if (base && !base.startsWith('/')) base = `/${base}`;
+  base = base.replace(/\/+$/, '');
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     signal?.throwIfAborted();
     const healthy = await new Promise((resolve) => {
+      let timer;
+      const finish = (healthy) => {
+        clearTimeout(timer);
+        resolve(healthy);
+      };
       const req = http.get(
-        { hostname: '127.0.0.1', port, path: `${base}/api/health` },
+        { hostname: '127.0.0.1', port, path: `${base}/api/health`, signal },
         (res) => {
           let body = '';
           res.on('data', (chunk) => {
@@ -383,23 +441,36 @@ async function waitForHealth(env, timeout = 60000, signal) {
           res.on('end', () => {
             try {
               const result = JSON.parse(body);
-              resolve(
+              finish(
                 res.statusCode === 200 &&
                   result.code === 200 &&
                   result.data?.status === 'ok',
               );
             } catch {
-              resolve(false);
+              finish(false);
             }
           });
-          res.on('error', () => resolve(false));
+          res.on('error', () => finish(false));
         },
       );
-      req.setTimeout(1000, () => req.destroy());
-      req.on('error', () => resolve(false));
+      // Socket inactivity timeouts do not bound a response that keeps streaming.
+      timer = setTimeout(
+        () => req.destroy(new Error('Health probe timed out')),
+        Math.min(1000, Math.max(1, deadline - Date.now())),
+      );
+      req.on('error', () => finish(false));
     });
+    signal?.throwIfAborted();
     if (healthy) return;
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    const remaining = deadline - Date.now();
+    if (remaining > 0) {
+      try {
+        await delay(Math.min(500, remaining), undefined, { signal });
+      } catch (error) {
+        signal?.throwIfAborted();
+        throw error;
+      }
+    }
   }
   throw new Error('Backend failed health check / 后端启动检查失败。');
 }
