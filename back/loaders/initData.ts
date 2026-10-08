@@ -144,7 +144,11 @@ export default async () => {
 
   // 清空所有运行中的实例记录（服务重启后进程已不存在）
   await RunningInstanceModel.update(
-    { status: InstanceStatus.stopped },
+    {
+      status: InstanceStatus.stopped,
+      finished_at: Math.floor(Date.now() / 1000),
+      // The previous process's exit code cannot be recovered after a restart.
+    },
     { where: { status: InstanceStatus.running } },
   );
 

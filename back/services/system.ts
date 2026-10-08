@@ -239,7 +239,6 @@ export default class SystemService {
       return;
     }
     const command = await updateLinuxMirrorFile(info.linuxMirror || '');
-    let hasError = false;
     this.scheduleService.runTask(
       command,
       {
@@ -247,14 +246,15 @@ export default class SystemService {
           res?.setHeader('QL-Task-Pid', `${cp.pid}`);
           res?.end();
         },
-        onEnd: async () => {
+        onEnd: async (cp) => {
           this.sockService.sendMessage({
             type: 'updateLinuxMirror',
             message: 'update linux mirror end',
             status: 'completed',
           });
           onEnd?.();
-          if (!hasError) {
+          // Tools such as sudo and apt may write warnings to stderr on success.
+          if (cp?.exitCode === 0 && cp.signalCode === null) {
             await this.updateAuthDb({
               ...oDoc,
               info: { ...oDoc.info, ...info },
@@ -262,7 +262,6 @@ export default class SystemService {
           }
         },
         onError: async (message: string) => {
-          hasError = true;
           this.sockService.sendMessage({ type: 'updateLinuxMirror', message });
         },
         onLog: async (message: string) => {

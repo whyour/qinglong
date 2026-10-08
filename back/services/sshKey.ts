@@ -15,7 +15,15 @@ import {
 
 @Service()
 export default class SshKeyService {
-  private homedir = os.homedir();
+  // OpenSSH uses the effective user's passwd entry, not the HOME override.
+  private get homedir(): string {
+    try {
+      return os.userInfo().homedir;
+    } catch {
+      // Custom container UIDs may have no passwd entry. Keep startup working.
+      return os.homedir();
+    }
+  }
   private sshPath = config.sshdPath;
   private sshConfigFilePath = path.resolve(this.homedir, '.ssh', 'config');
   private sshConfigHeader = `Include ${path.join(this.sshPath, '*.config')}`;
@@ -25,6 +33,10 @@ export default class SshKeyService {
   }
 
   private async initSshConfigFile() {
+    await fs.mkdir(path.dirname(this.sshConfigFilePath), {
+      recursive: true,
+      mode: 0o700,
+    });
     let config = '';
     const _exist = await fileExist(this.sshConfigFilePath);
     if (_exist) {

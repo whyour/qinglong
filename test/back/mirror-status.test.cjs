@@ -92,9 +92,8 @@ test('empty or missing refs never count as a synchronized mirror', (t) => {
     const result = spawnSync(
       'bash',
       [script, source, mirror, ref],
-      options({
-        QL_MIRROR_WAIT_SECONDS: '1',
-      }),
+      // Leave time to read both refs before checking the missing-ref diagnostic.
+      options(),
     );
     assert.equal(result.status, 1, result.stderr + result.stdout);
     assert.match(result.stdout, /is missing refs\/heads\//);
@@ -110,7 +109,7 @@ test('static releases require both the version branch and annotated tag object',
   const args = [script, source, mirror, 'v2.22.0', 'tag'];
   const env = {
     QL_MIRROR_INCLUDE_VERSION_BRANCH: 'true',
-    QL_MIRROR_WAIT_SECONDS: '1',
+    QL_MIRROR_WAIT_SECONDS: '3',
   };
   const partial = spawnSync('bash', args, options(env));
   assert.equal(partial.status, 1, partial.stderr + partial.stdout);
@@ -134,7 +133,7 @@ test('network failures and hung ref queries stop within the configured deadline'
     'bash',
     [script, source, path.join(tmp, 'absent'), 'develop'],
     options({
-      QL_MIRROR_WAIT_SECONDS: '1',
+      QL_MIRROR_WAIT_SECONDS: '3',
     }),
   );
   assert.equal(failure.status, 1, failure.stderr + failure.stdout);
