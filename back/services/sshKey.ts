@@ -16,14 +16,14 @@ import {
 @Service()
 export default class SshKeyService {
   // OpenSSH uses the effective user's passwd entry, not the HOME override.
-  private homedir = (() => {
+  private get homedir(): string {
     try {
       return os.userInfo().homedir;
     } catch {
       // Custom container UIDs may have no passwd entry. Keep startup working.
       return os.homedir();
     }
-  })();
+  }
   private sshPath = config.sshdPath;
   private sshConfigFilePath = path.resolve(this.homedir, '.ssh', 'config');
   private sshConfigHeader = `Include ${path.join(this.sshPath, '*.config')}`;
