@@ -261,7 +261,8 @@ jobs:
             --cache "$RUNNER_TEMP/legacy-pnpm-cache" --registry=https://registry.npmjs.org \
             2>&1 | tee "$RUNNER_TEMP/legacy-pnpm-install.log"
           legacy_cli="$RUNNER_TEMP/legacy-pnpm/lib/node_modules/pnpm/bin/pnpm.cjs"
-          test "$(node "$legacy_cli" --config.manage-package-manager-versions=false --version)" = '8.3.1'
+          node "$legacy_cli" --version | tee "$RUNNER_TEMP/legacy-pnpm-version.log"
+          test "$(cat "$RUNNER_TEMP/legacy-pnpm-version.log")" = '8.3.1'
           node -e 'const fs=require("node:fs"),os=require("node:os"); fs.writeFileSync(process.argv[1],JSON.stringify(fs.readdirSync(os.tmpdir()).filter(n=>n.startsWith("qinglong-source-tools-")).sort()))' "$RUNNER_TEMP/source-tool-prefixes-before.json"
           node scripts/install-panel-dependencies.cjs \
             --root "$RUNNER_TEMP/source-tool-fallback" \
@@ -294,6 +295,7 @@ jobs:
           name: qinglong-source-tool-fallback-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ${{ runner.temp }}/legacy-pnpm-install.log
+            ${{ runner.temp }}/legacy-pnpm-version.log
             ${{ runner.temp }}/source-tool-fallback.log
             ${{ runner.temp }}/source-tool-fallback-protocols.log
             ${{ runner.temp }}/source-tool-native-proof.json
