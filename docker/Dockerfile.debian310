@@ -11,13 +11,14 @@ RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates
 # The floating 3.10-slim-bookworm tag no longer includes s390x.
 FROM python:3.10.19-slim-bookworm@sha256:23f63358922e79a794f71be8f3723c84e5ccca9638af3f74456dc73d6184499e AS builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
+COPY static/runtime-tools.tgz static/runtime-tools-proof.json /tmp/runtime-tools/
+COPY scripts/install-runtime-tools.cjs /tmp/install-runtime-tools.cjs
 COPY --from=nodebuilder /opt/node-target/bin/node /usr/local/bin/
-COPY --from=nodebuilder /opt/node-target/lib/node_modules/. /usr/local/lib/node_modules/
 RUN set -x && \
   ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
   apt-get update && \
   apt-get install --no-install-recommends -y libatomic1 && \
-  npm i -g pnpm@8.3.1 && \
+  node /tmp/install-runtime-tools.cjs --archive /tmp/runtime-tools/runtime-tools.tgz --proof /tmp/runtime-tools/runtime-tools-proof.json --prefix /usr/local && \
   cd /tmp/build && \
   pnpm install --prod --frozen-lockfile
 
@@ -50,7 +51,8 @@ ENV QL_USER=qinglong
 ENV QL_HOME=/home/$QL_USER
 
 COPY --from=nodebuilder /opt/node-target/bin/node /usr/local/bin/
-COPY --from=nodebuilder /opt/node-target/lib/node_modules/. /usr/local/lib/node_modules/
+COPY static/runtime-tools.tgz static/runtime-tools-proof.json /tmp/runtime-tools/
+COPY scripts/install-runtime-tools.cjs /tmp/install-runtime-tools.cjs
 
 RUN set -x && \
   ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
@@ -75,7 +77,8 @@ RUN set -x && \
   git config --global user.email "qinglong@users.noreply.github.com" && \
   git config --global user.name "qinglong" && \
   git config --global http.postBuffer 524288000 && \
-  npm install -g pnpm@8.3.1 pm2 ts-node typescript@5 && \
+  node /tmp/install-runtime-tools.cjs --archive /tmp/runtime-tools/runtime-tools.tgz --proof /tmp/runtime-tools/runtime-tools-proof.json --prefix /usr/local && \
+  rm -rf /tmp/runtime-tools /tmp/install-runtime-tools.cjs && \
   npm cache clean --force && \
   rm -rf /root/.cache && \
   rm -rf /root/.npm && \

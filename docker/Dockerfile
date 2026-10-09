@@ -7,9 +7,11 @@ ENV NPM_CONFIG_PREFIX=/opt/node-global
 ENV PATH=/opt/node-global/bin:${PATH}
 
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
+COPY static/runtime-tools.tgz static/runtime-tools-proof.json /tmp/runtime-tools/
+COPY scripts/install-runtime-tools.cjs /tmp/install-runtime-tools.cjs
 RUN set -x \
   && apk add --no-cache git \
-  && npm i -g pnpm@8.3.1 pm2 ts-node typescript@5 \
+  && node /tmp/install-runtime-tools.cjs --archive /tmp/runtime-tools/runtime-tools.tgz --proof /tmp/runtime-tools/runtime-tools-proof.json --prefix /opt/node-global \
   && cd /tmp/build \
   && case "${TARGETARCH}" in \
     amd64) NODE_ARCH=x64 ;; \
@@ -41,7 +43,7 @@ VOLUME /ql/data
 
 EXPOSE 5700
 
-COPY --from=builder /opt/node-global/lib/node_modules/. /usr/local/lib/node_modules/
+COPY --from=builder /opt/node-global/lib/. /usr/local/lib/
 COPY --from=builder /opt/node-global/bin/. /usr/local/bin/
 
 RUN set -x \
@@ -61,7 +63,6 @@ RUN set -x \
   procps \
   netcat-openbsd \
   unzip \
-  npm \
   && rm -rf /var/cache/apk/* \
   && apk update \
   && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \

@@ -1,0 +1,8 @@
+{
+  "name": "npm",
+  "version": "12.2.0",
+  "url": "https://registry.npmjs.org/npm/-/npm-12.2.0.tgz",
+  "sha512Base64": "ZsJjKpTnlmSXOLLXiU1xDCzC4Wlok4IwZmh/aw2KUuXytU7q6qMv/cUT7MoeSf95Slwuw/lRXYefGzGCspHPNQ==",
+  "sha256": "6666b48816b39b86c3febac7b51a4ee4de6c5ca589c382ad8004b6b113f86677",
+  "note": "Official source archive, runtime-only manifest and actual npm lock replace the bundled dependency tree; JavaScript source remains unchanged."
+}

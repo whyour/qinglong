@@ -9,13 +9,14 @@ RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates
 
 FROM python:3.11.17-slim-trixie@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce AS builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
+COPY static/runtime-tools.tgz static/runtime-tools-proof.json /tmp/runtime-tools/
+COPY scripts/install-runtime-tools.cjs /tmp/install-runtime-tools.cjs
 COPY --from=nodebuilder /opt/node-target/bin/node /usr/local/bin/
-COPY --from=nodebuilder /opt/node-target/lib/node_modules/. /usr/local/lib/node_modules/
 RUN set -x && \
   ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
   apt-get update && \
   apt-get install --no-install-recommends -y libatomic1 && \
-  npm i -g pnpm@8.3.1 && \
+  node /tmp/install-runtime-tools.cjs --archive /tmp/runtime-tools/runtime-tools.tgz --proof /tmp/runtime-tools/runtime-tools-proof.json --prefix /usr/local && \
   cd /tmp/build && \
   pnpm install --prod --frozen-lockfile
 
@@ -48,7 +49,8 @@ ENV QL_USER=qinglong
 ENV QL_HOME=/home/$QL_USER
 
 COPY --from=nodebuilder /opt/node-target/bin/node /usr/local/bin/
-COPY --from=nodebuilder /opt/node-target/lib/node_modules/. /usr/local/lib/node_modules/
+COPY static/runtime-tools.tgz static/runtime-tools-proof.json /tmp/runtime-tools/
+COPY scripts/install-runtime-tools.cjs /tmp/install-runtime-tools.cjs
 
 RUN set -x && \
   ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
@@ -74,7 +76,8 @@ RUN set -x && \
   git config --global user.email "qinglong@users.noreply.github.com" && \
   git config --global user.name "qinglong" && \
   git config --global http.postBuffer 524288000 && \
-  npm install -g pnpm@8.3.1 pm2 ts-node typescript@5 && \
+  node /tmp/install-runtime-tools.cjs --archive /tmp/runtime-tools/runtime-tools.tgz --proof /tmp/runtime-tools/runtime-tools-proof.json --prefix /usr/local && \
+  rm -rf /tmp/runtime-tools /tmp/install-runtime-tools.cjs && \
   npm cache clean --force && \
   rm -rf /root/.cache && \
   rm -rf /root/.npm && \

@@ -17,7 +17,11 @@ jobs:
   regression:
     uses: ./.github/workflows/validate.yml
 
+  runtime-tools:
+    uses: ./.github/workflows/runtime-tools.yml
+
   static:
+    needs: runtime-tools
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -26,14 +30,19 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: pnpm/action-setup@v6
         with:
-          version: '8.3.1'
+          version: '10.34.6'
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --prod --audit-level high
-      - run: pnpm build:front && pnpm build:back && pnpm build:info
+      - run: pnpm build:front && pnpm build:back
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-runtime-tools-${{ github.event.pull_request.head.sha || github.sha }}
+          path: static/
+      - run: pnpm build:info
       - uses: actions/upload-artifact@v6
         with:
           name: release-readiness-static
@@ -50,7 +59,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: pnpm/action-setup@v6
         with:
-          version: '8.3.1'
+          version: '10.34.6'
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -67,6 +76,12 @@ jobs:
           pnpm rebuild @whyour/sqlite3
       - name: Verify source-built SQLite and production protocols
         run: node scripts/verify-production-dependencies.cjs
+
+  npm-package:
+    needs: static
+    uses: ./.github/workflows/npm-package.yml
+    with:
+      static-artifact: release-readiness-static
 
   images:
     needs: [regression, static, sqlite-install]
@@ -149,6 +164,9 @@ jobs:
             --eval 'console.log(JSON.stringify({node: process.version, arch: process.arch, platform: process.platform}))'
           docker run --rm --network none --entrypoint python3 \
             qinglong-readiness:${{ matrix.image }} --version
+          docker run --rm --network none --entrypoint node \
+            qinglong-readiness:${{ matrix.image }} \
+            scripts/verify-system-runtime.cjs
           docker run --rm --network none --entrypoint node \
             qinglong-readiness:${{ matrix.image }} \
             scripts/verify-production-dependencies.cjs

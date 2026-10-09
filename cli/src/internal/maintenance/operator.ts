@@ -71,14 +71,18 @@ export async function executableAvailable(
 export async function installPanelDependencies(
   context: LocalContext,
   cwd = context.root,
+  staticRoot?: string,
+  sourceCommit?: string,
 ): Promise<void> {
-  const termux = context.env.is_termux === '1';
-  const pnpm = !termux && (await executableAvailable('pnpm', context.env));
   await checkedProcess(
-    pnpm ? 'pnpm' : 'npm',
-    pnpm
-      ? ['install', '--loglevel', 'error', '--production']
-      : ['install', '--production', ...(termux ? ['--no-bin-links'] : [])],
+    process.execPath,
+    [
+      path.join(context.root, 'scripts/install-panel-dependencies.cjs'),
+      '--root',
+      cwd,
+      ...(staticRoot ? ['--static-dir', staticRoot] : []),
+      ...(sourceCommit ? ['--source-commit', sourceCommit] : []),
+    ],
     { cwd, env: context.env },
   );
 }

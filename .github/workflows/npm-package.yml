@@ -1,0 +1,310 @@
+name: Verify main npm archive
+
+on:
+  workflow_call:
+    inputs:
+      static-artifact:
+        description: Complete static artifact including the same-source runtime tools
+        required: true
+        type: string
+    outputs:
+      artifact-name:
+        description: Main npm archive and producer summary, after every consumer passes
+        value: ${{ jobs.verified.outputs.artifact-name }}
+      tarball-sha256:
+        description: SHA256 of the exact archive consumed by all six cases
+        value: ${{ jobs.verified.outputs.tarball-sha256 }}
+      package-version:
+        description: Source package version verified against the archive
+        value: ${{ jobs.verified.outputs.package-version }}
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      artifact-name: ${{ steps.archive.outputs.artifact-name }}
+      tarball-sha256: ${{ steps.archive.outputs.tarball-sha256 }}
+      package-version: ${{ steps.archive.outputs.package-version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: ${{ inputs.static-artifact }}
+          path: static/
+      - name: Verify tool artifact source before executing the producer tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs'), crypto = require('node:crypto'), assert = require('node:assert/strict');
+          const hash = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+          const build = JSON.parse(fs.readFileSync('static/build-info.json'));
+          const tools = JSON.parse(fs.readFileSync('static/runtime-tools-proof.json'));
+          assert.equal(build.sourceCommit, process.env.SOURCE_SHA); assert.equal(build.dirty, false);
+          assert.equal(build.lockfileSha256, hash('pnpm-lock.yaml'));
+          assert.equal(tools.sourceCommit, process.env.SOURCE_SHA);
+          assert.equal(tools.builder.platform, 'linux'); assert.equal(tools.builder.releaseBuild, true);
+          assert.equal(tools.sourceAttestation.verified, true); assert.equal(tools.sourceAttestation.head, process.env.SOURCE_SHA);
+          for (const name of ['runtime-tools.tgz', 'runtime-tools-proof.json']) assert.equal(hash(`static/${name}`), build.files[name]);
+          assert.equal(hash('static/runtime-tools.tgz'), tools.archive.sha256);
+          for (const input of tools.inputs) {
+            assert(input.path && !input.path.startsWith('/') && !input.path.split(/[\\/]/).includes('..'));
+            assert.equal(hash(input.path), input.sha256, `Runtime source input changed: ${input.path}`);
+          }
+          NODE
+      - name: Install fixed producer tools into an isolated prefix
+        run: |
+          node scripts/install-runtime-tools.cjs \
+            --archive "$GITHUB_WORKSPACE/static/runtime-tools.tgz" \
+            --proof "$GITHUB_WORKSPACE/static/runtime-tools-proof.json" \
+            --prefix "$RUNNER_TEMP/npm-producer-tools"
+      - name: Export the single frozen production graph
+        run: |
+          node scripts/build-npm-package.cjs \
+            --repo "$GITHUB_WORKSPACE" \
+            --source-ref "$SOURCE_SHA" \
+            --artifact-dir "$GITHUB_WORKSPACE/static" \
+            --pnpm-cli "$RUNNER_TEMP/npm-producer-tools/lib/node_modules/qinglong-runtime-tools/node_modules/pnpm/bin/pnpm.cjs" \
+            --npm-cli "$RUNNER_TEMP/npm-producer-tools/lib/node_modules/npm/bin/npm-cli.js" \
+            --output "$RUNNER_TEMP/qinglong-npm-export"
+      - name: Verify and retain the exact consumer archive
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), assert = require('node:assert/strict');
+          const root = path.join(process.env.RUNNER_TEMP, 'qinglong-npm-export');
+          const summary = JSON.parse(fs.readFileSync(path.join(root, 'package-build-summary.json')));
+          const pkg = JSON.parse(fs.readFileSync('package.json'));
+          const hash = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+          assert.equal(summary.sourceCommit, process.env.SOURCE_SHA); assert.equal(summary.previewMetadata, false);
+          assert.deepEqual(summary.sourceMetadataChanges, []); assert(summary.helperProvenance.every((item) => item.matchesGitSource));
+          assert.equal(summary.package, pkg.name); assert.equal(summary.packageVersion, pkg.version);
+          assert.equal(summary.productionManifestSHA256, hash('package.json')); assert.equal(summary.productionLockSHA256, hash('pnpm-lock.yaml'));
+          assert.equal(summary.runtimeToolsIncluded, true); assert.equal(summary.runtimeTools.sourceCommit, process.env.SOURCE_SHA);
+          assert.equal(summary.runtimeTools.builder.releaseBuild, true);
+          assert.equal(path.basename(summary.tarball.filename), summary.tarball.filename);
+          const tarball = path.join(root, 'artifacts', summary.tarball.filename);
+          assert.equal(hash(tarball), summary.tarball.sha256); assert.equal(fs.statSync(tarball).size, summary.tarball.bytes);
+          const delivery = path.join(process.env.RUNNER_TEMP, 'main-npm-delivery'); fs.mkdirSync(delivery);
+          fs.copyFileSync(tarball, path.join(delivery, summary.tarball.filename));
+          fs.copyFileSync(path.join(root, 'package-build-summary.json'), path.join(delivery, 'package-build-summary.json'));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `artifact-name=qinglong-main-npm-${process.env.SOURCE_SHA}\ntarball-sha256=${summary.tarball.sha256}\npackage-version=${pkg.version}\n`);
+          NODE
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.archive.outputs.artifact-name }}
+          path: ${{ runner.temp }}/main-npm-delivery/
+          compression-level: 0
+          if-no-files-found: error
+      - name: Preserve producer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qinglong-main-npm-producer-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/qinglong-npm-export/logs/
+          if-no-files-found: ignore
+
+  consumer:
+    needs: archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        client:
+          - {npm: '10', mode: local}
+          - {npm: '12', mode: local}
+          - {npm: '12', mode: global}
+        sqlite: [prebuilt, source]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.archive.outputs.artifact-name }}
+          path: ${{ runner.temp }}/main-npm-input/
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-runtime-tools-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/runtime-tools-input/
+      - name: Verify archive and client tools against the producer source
+        env:
+          VERIFIED_TARBALL_SHA256: ${{ needs.archive.outputs.tarball-sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), assert = require('node:assert/strict');
+          const directory = path.join(process.env.RUNNER_TEMP, 'main-npm-input');
+          const summary = JSON.parse(fs.readFileSync(path.join(directory, 'package-build-summary.json')));
+          const pkg = JSON.parse(fs.readFileSync('package.json'));
+          const hash = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+          assert.equal(summary.sourceCommit, process.env.SOURCE_SHA); assert.equal(summary.previewMetadata, false);
+          assert.equal(summary.package, pkg.name); assert.equal(summary.packageVersion, pkg.version);
+          assert.equal(summary.productionManifestSHA256, hash('package.json')); assert.equal(summary.productionLockSHA256, hash('pnpm-lock.yaml'));
+          assert.equal(summary.runtimeToolsIncluded, true); assert.equal(summary.runtimeTools.sourceCommit, process.env.SOURCE_SHA);
+          assert.equal(summary.tarball.sha256, process.env.VERIFIED_TARBALL_SHA256);
+          assert.equal(path.basename(summary.tarball.filename), summary.tarball.filename);
+          assert.deepEqual(fs.readdirSync(directory).filter((name) => name.endsWith('.tgz')), [summary.tarball.filename]);
+          assert.equal(hash(path.join(directory, summary.tarball.filename)), process.env.VERIFIED_TARBALL_SHA256);
+          const tools = path.join(process.env.RUNNER_TEMP, 'runtime-tools-input');
+          assert.equal(hash(path.join(tools, 'runtime-tools.tgz')), summary.runtimeTools.archiveSHA256);
+          assert.equal(hash(path.join(tools, 'runtime-tools-proof.json')), summary.runtimeTools.proofSHA256);
+          NODE
+      - name: Install native compiler prerequisites
+        if: matrix.sqlite == 'source'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential python3
+      - name: Select the isolated npm client
+        env:
+          CLIENT_NPM: ${{ matrix.client.npm }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm10_cli="$(node -p "require('node:path').join(require('node:path').dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js')")"
+          if [[ "$(node "$npm10_cli" --version)" != 10.* ]]; then
+            echo '::error::The pinned Node22 client must supply npm10.'
+            exit 1
+          fi
+          node scripts/install-runtime-tools.cjs \
+            --archive "$RUNNER_TEMP/runtime-tools-input/runtime-tools.tgz" \
+            --proof "$RUNNER_TEMP/runtime-tools-input/runtime-tools-proof.json" \
+            --prefix "$RUNNER_TEMP/npm-consumer-tools"
+          if [[ "$CLIENT_NPM" == 10 ]]; then
+            npm_cli="$npm10_cli"
+          else
+            npm_cli="$RUNNER_TEMP/npm-consumer-tools/lib/node_modules/npm/bin/npm-cli.js"
+          fi
+          echo "QINGLONG_CONSUMER_NPM_CLI=$npm_cli" >> "$GITHUB_ENV"
+      - name: Consume the same archive and verify the selected SQLite installation
+        env:
+          CONSUMER_MODE: ${{ matrix.client.mode }}
+          SQLITE_INSTALL: ${{ matrix.sqlite }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          extra_args=()
+          if [[ "$CONSUMER_MODE" == global ]]; then extra_args+=(--global); fi
+          if [[ "$SQLITE_INSTALL" == source ]]; then extra_args+=(--source-build); else extra_args+=(--require-prebuilt); fi
+          tarball="$(node -e 'const fs=require("node:fs"),p=require("node:path"); const d=process.argv[1]; const s=JSON.parse(fs.readFileSync(p.join(d,"package-build-summary.json"))); process.stdout.write(p.join(d,s.tarball.filename))' "$RUNNER_TEMP/main-npm-input")"
+          node scripts/verify-npm-package.cjs \
+            --tarball "$tarball" \
+            --build-summary "$RUNNER_TEMP/main-npm-input/package-build-summary.json" \
+            --npm-cli "$QINGLONG_CONSUMER_NPM_CLI" \
+            --output "$RUNNER_TEMP/qinglong-npm-consumer" \
+            "${extra_args[@]}"
+      - name: Preserve actual consumer evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qinglong-main-npm-consumer-${{ matrix.client.npm }}-${{ matrix.client.mode }}-${{ matrix.sqlite }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/qinglong-npm-consumer/*.log
+            ${{ runner.temp }}/qinglong-npm-consumer/npm-consumer-validation.json
+          if-no-files-found: ignore
+
+  source-fallback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.23.3'
+          package-manager-cache: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: ${{ inputs.static-artifact }}
+          path: static/
+      - name: Install native compiler prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential python3
+      - name: Prepare source using an older manager and the same verified static tools
+        env:
+          npm_config_build_from_source: 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/source-tool-fallback"
+          git archive "$SOURCE_SHA" | tar -x -C "$RUNNER_TEMP/source-tool-fallback"
+          npm10_cli="$(node -p "require('node:path').join(require('node:path').dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js')")"
+          printf 'registry=https://registry.npmjs.org/\n' > "$RUNNER_TEMP/legacy-pnpm-public.npmrc"
+          export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/legacy-pnpm-public.npmrc"
+          export npm_config_userconfig="$NPM_CONFIG_USERCONFIG"
+          export NPM_CONFIG_GLOBALCONFIG=/dev/null npm_config_globalconfig=/dev/null
+          export NPM_CONFIG_CACHE="$RUNNER_TEMP/legacy-pnpm-cache"
+          export PNPM_HOME="$RUNNER_TEMP/legacy-pnpm-home"
+          export XDG_CACHE_HOME="$RUNNER_TEMP/legacy-pnpm-xdg-cache" XDG_STATE_HOME="$RUNNER_TEMP/legacy-pnpm-xdg-state"
+          node "$npm10_cli" install --global pnpm@8.3.1 \
+            --prefix "$RUNNER_TEMP/legacy-pnpm" --ignore-scripts --no-audit --no-fund \
+            --userconfig "$RUNNER_TEMP/legacy-pnpm-public.npmrc" --globalconfig /dev/null \
+            --cache "$RUNNER_TEMP/legacy-pnpm-cache" --registry=https://registry.npmjs.org \
+            2>&1 | tee "$RUNNER_TEMP/legacy-pnpm-install.log"
+          legacy_cli="$RUNNER_TEMP/legacy-pnpm/lib/node_modules/pnpm/bin/pnpm.cjs"
+          test "$(node "$legacy_cli" --config.manage-package-manager-versions=false --version)" = '8.3.1'
+          node -e 'const fs=require("node:fs"),os=require("node:os"); fs.writeFileSync(process.argv[1],JSON.stringify(fs.readdirSync(os.tmpdir()).filter(n=>n.startsWith("qinglong-source-tools-")).sort()))' "$RUNNER_TEMP/source-tool-prefixes-before.json"
+          node scripts/install-panel-dependencies.cjs \
+            --root "$RUNNER_TEMP/source-tool-fallback" \
+            --pnpm-cli "$legacy_cli" \
+            --static-dir "$GITHUB_WORKSPACE/static" \
+            --source-commit "$SOURCE_SHA" \
+            2>&1 | tee "$RUNNER_TEMP/source-tool-fallback.log"
+          grep -q 'SOLINK_MODULE' "$RUNNER_TEMP/source-tool-fallback.log"
+          grep -q 'node-gyp@12.4.0' "$RUNNER_TEMP/source-tool-fallback.log"
+          grep -q '"prefixScope":"fresh temporary only"' "$RUNNER_TEMP/source-tool-fallback.log"
+          node <<'NODE'
+          const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), crypto = require('node:crypto'), assert = require('node:assert/strict');
+          const { createRequire } = require('node:module');
+          const root = path.join(process.env.RUNNER_TEMP, 'source-tool-fallback');
+          const hash = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+          assert.equal(hash(path.join(root, 'pnpm-lock.yaml')), hash('pnpm-lock.yaml'));
+          const before = JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP, 'source-tool-prefixes-before.json')));
+          assert.deepEqual(fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('qinglong-source-tools-')).sort(), before);
+          const requireSource = createRequire(path.join(root, 'package.json')); requireSource('sqlite3');
+          const binding = Object.keys(require.cache).find((file) => file.endsWith('.node'));
+          assert(binding); assert.equal(fs.readFileSync(binding).subarray(0, 4).toString('hex'), '7f454c46');
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'source-tool-native-proof.json'), JSON.stringify({ sourceCommit: process.env.SOURCE_SHA, productionLockSHA256: hash('pnpm-lock.yaml'), legacyManagerVersion: '8.3.1', legacyManagerCliSHA256: hash(path.join(process.env.RUNNER_TEMP, 'legacy-pnpm/lib/node_modules/pnpm/bin/pnpm.cjs')), binding: path.relative(root, binding), bindingSHA256: hash(binding), temporaryPrefixRemoved: true }, null, 2));
+          NODE
+          node "$RUNNER_TEMP/source-tool-fallback/scripts/verify-production-dependencies.cjs" \
+            2>&1 | tee "$RUNNER_TEMP/source-tool-fallback-protocols.log"
+      - name: Preserve source migration evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qinglong-source-tool-fallback-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/legacy-pnpm-install.log
+            ${{ runner.temp }}/source-tool-fallback.log
+            ${{ runner.temp }}/source-tool-fallback-protocols.log
+            ${{ runner.temp }}/source-tool-native-proof.json
+          if-no-files-found: ignore
+
+  verified:
+    needs: [archive, consumer, source-fallback]
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ needs.archive.outputs.artifact-name }}
+      tarball-sha256: ${{ needs.archive.outputs.tarball-sha256 }}
+      package-version: ${{ needs.archive.outputs.package-version }}
+    steps:
+      - run: echo 'The exact main npm archive passed six Linux consumers and the older-manager source migration.'
