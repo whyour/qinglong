@@ -1,6 +1,6 @@
 # Run Node package installation natively on the builder. Node/npm can spin at
 # 100% CPU when Alpine s390x is emulated through QEMU.
-FROM --platform=$BUILDPLATFORM node:18-alpine3.18 AS builder
+FROM --platform=$BUILDPLATFORM node:22.23.3-alpine3.24 AS builder
 
 ARG TARGETARCH
 ENV NPM_CONFIG_PREFIX=/opt/node-global

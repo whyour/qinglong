@@ -5,7 +5,7 @@
 
 npm 与面板内部入口都叫 `ql`，但使用独立的 Commander 命令树：npm 入口只调用远程 API，内部入口只运行本机工具。使用前确认可执行文件的绝对路径和 `--help`；安装 npm 包不会迁移内置 Shell 命令。
 
-`@whyour/qinglong-cli` 是独立 npm 包，覆盖当前 develop 的有效 OpenAPI，只注册一个 `ql` 命令。它不包含脚本执行器或本机运维实现；`task exec`、`repo/raw`、`reload/update/reset*` 等属于面板内部工具，不随 npm 包分发。开发发布也不属于 CLI 范围。
+`@whyour/qinglong-cli` 是独立 npm 包，覆盖当前 develop 的有效 OpenAPI，只注册一个 `ql` 命令。它不包含脚本执行器或本机运维实现；`task exec`、`repo/raw`、`reload/update/reset*` 等属于面板内部工具，不随 npm 包分发。远程 CLI 命令不提供开发发布操作。
 
 ## 安装与使用
 
@@ -43,7 +43,7 @@ ql auth logout --json
 
 ## 全量 OpenAPI 管理
 
-现在还支持任务/订阅创建、修改、删除，应用管理与密钥重置，以及环境变量、配置、脚本、日志、依赖、系统、仪表盘和用户管理。`ql api routes --json` 列出全部 143 条有效路由；3 条已下线文件读取接口不包含在内。新增命令在 [完整双语参考](skills/qinglong-cli/references/openapi.md) 中逐项列出，路由覆盖由 CI 与后端代码核对。
+现在还支持任务/订阅创建、修改、删除，应用管理与密钥重置，以及环境变量、配置、脚本、日志、依赖、系统、仪表盘和用户管理。`ql api routes --json` 列出全部 146 条有效路由；3 条已下线文件读取接口不包含在内。新增命令在 [完整双语参考](skills/qinglong-cli/references/openapi.md) 中逐项列出，路由覆盖由 CI 与后端代码核对。
 
 ```sh
 ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
@@ -53,7 +53,19 @@ ql env create --data @envs.json --json
 ql api request PUT /open/crons/run --data '[12,13]' --json
 ```
 
+CLI 0.1.2 增加脚本历史列表、详情和确认恢复命令，需要青龙 2.23.0 的历史 API。恢复使用详情返回的当前哈希，409 后应重新读取并确认。
+
+```sh
+ql script history-list --query '{"filename":"demo.js","path":""}' --json
+ql script history-detail --query '{"filename":"demo.js","path":"","id":"VERSION_UUID"}' --json
+ql script history-restore --data '{"filename":"demo.js","path":"","id":"VERSION_UUID","expectedHash":"CURRENT_SHA256"}' --json
+```
+
+将 `VERSION_UUID` 和 `CURRENT_SHA256` 替换为列表和详情实际返回值。
+
 请求体使用 --data JSON/@file/-，查询使用 --query，上传 --file，下载 --output。新命令支持 --timeout 秒数；旧命令行为保留，完整参数可用 api request。下载不覆盖现有文件，应用密钥默认隐藏，明确加 --show-secrets 才输出。新增资源通常保留原始返回字段，注意环境、配置和会话信息可能敏感。
+
+`--timeout` 只限制等待 HTTP 响应，不停止服务器上的任务；失败的写入可能已经生效，应先查询状态。
 
 远程 `ql system ...` 调用面板 API；本机 reload/reset 等仍不在 npm 包中。不要将远程 API 覆盖理解为本机运维重新混入包。
 
@@ -130,9 +142,9 @@ node cli/scripts/verify-package.cjs
 
 测试覆盖请求格式、认证刷新、输出、错误、禁止自动重试、权限和独立安装。打包验证会离线安装 tgz，并确认唯一入口是 `ql`，本机命令不可调用。
 
-CLI package 工作流在相关 PR、develop/master 推送和手动触发时执行 Node 22.12/24 类型检查、构建及测试。Node 24 上传通过离线安装验证的 `qinglong-cli-<commit>` artifact。两个矩阵任务成功后，master 推送会将这份已验证的 tgz 发布到 npm 的 latest 标签，通过 GitHub Actions OIDC 可信发布，无需 `NPM_TOKEN` Secret。手动运行需选择 master 并勾选 publish；PR、develop 和 fork 不发布。npm 的 Trusted Publisher 需绑定仓库 `whyour/qinglong` 和工作流 `cli-package.yml`，允许 `npm publish`；面板包 `@whyour/qinglong` 单独绑定 `build-docker-image.yml`。发布 job 使用 Node 24，并仅在该 job 授予 `id-token: write`。新包需先完成首次发布，再配置对应包的可信发布关系。
+CLI package 工作流在相关 PR、develop/master 推送和手动触发时执行 Node 22.12/24 类型检查、构建及测试。Node 24 上传通过离线安装验证的 `qinglong-cli-<commit>` artifact。两个矩阵任务成功后，master 推送会将这份已验证的 tgz 发布到 npm 的 latest 标签，通过 GitHub Actions OIDC 可信发布，无需 `NPM_TOKEN` Secret。手动发布在 master 勾选 publish，或在 develop 勾选 publish 并填写 `X.Y.Z-alpha.N`、`X.Y.Z-beta.N` 或 `X.Y.Z-rc.N` 版本。develop 预发布在两个 Node 矩阵中先设置相同版本并验证，发布对应 alpha/beta/rc 标签，不更新 latest。普通 PR、develop 推送、仅验证的手动运行和 fork 不发布。发布与验证使用独立并发组，正在运行的发布不会被新验证取消。npm 的 Trusted Publisher 需绑定仓库 `whyour/qinglong` 和工作流 `cli-package.yml`，允许 `npm publish`；面板包 `@whyour/qinglong` 单独绑定 `build-docker-image.yml`。发布 job 使用 Node 24，并仅在该 job 授予 `id-token: write`。新包需先完成首次发布，再配置对应包的可信发布关系。
 
-CLI 版本独立维护在 cli/package.json 和 cli/package-lock.json。发布改动前执行 `npm version patch --prefix cli --no-git-tag-version`（也可用 minor/major），提交这两个文件。已发布的版本会提示并跳过；registry 查询失败则停止发布。该流程仅发布 X.Y.Z 稳定版本，不重新构建产物或执行包生命周期脚本。
+CLI 版本独立维护在 cli/package.json 和 cli/package-lock.json。发布改动前执行 `npm version patch --prefix cli --no-git-tag-version`（也可用 minor/major），提交这两个文件。已存在的稳定版本提示并跳过；预发布版本已存在则失败，需选择新版本。registry 查询失败停止发布。手动 develop 预发布只临时修改本轮验证工作区的版本，不代替稳定版本元数据维护。发布不重新构建已验证归档，也不执行包生命周期脚本。
 
 ## 面板内部工具
 

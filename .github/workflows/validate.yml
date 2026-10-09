@@ -11,6 +11,10 @@ permissions:
 jobs:
   regression:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -18,7 +22,7 @@ jobs:
           version: '8.3.1'
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: cp .env.example .env
@@ -27,5 +31,5 @@ jobs:
       - run: pnpm benchmark:execution -- --runs=10 --output=execution-baseline.json
       - uses: actions/upload-artifact@v6
         with:
-          name: execution-baseline
+          name: execution-baseline-node-${{ matrix.node }}
           path: execution-baseline.json

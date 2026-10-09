@@ -68,7 +68,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -212,7 +212,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -298,7 +298,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -384,7 +384,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -456,7 +456,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -526,7 +526,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
 
       - name: build front and back

@@ -29,7 +29,7 @@ jobs:
           version: '8.3.1'
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --prod --audit-level high
@@ -53,7 +53,7 @@ jobs:
           version: '8.3.1'
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: pnpm
       - run: pnpm install --prod --frozen-lockfile
       - name: Verify precompiled SQLite and production protocols
@@ -146,4 +146,29 @@ jobs:
         run: |
           docker run --rm --network none --entrypoint node \
             qinglong-readiness:${{ matrix.image }} \
+            --eval 'console.log(JSON.stringify({node: process.version, arch: process.arch, platform: process.platform}))'
+          docker run --rm --network none --entrypoint python3 \
+            qinglong-readiness:${{ matrix.image }} --version
+          docker run --rm --network none --entrypoint node \
+            qinglong-readiness:${{ matrix.image }} \
             scripts/verify-production-dependencies.cjs
+      - name: Archive verified native Debian image for isolated dev validation
+        if: matrix.image == 'debian'
+        shell: bash
+        run: |
+          docker image inspect qinglong-readiness:debian \
+            --format '{"id":{{json .Id}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}},"architecture":{{json .Architecture}},"os":{{json .Os}}}' \
+            > release-readiness-debian-image.json
+          docker save qinglong-readiness:debian | gzip > release-readiness-debian-image.tar.gz
+          sha256sum release-readiness-debian-image.tar.gz > release-readiness-debian-image.sha256
+      - uses: actions/upload-artifact@v6
+        if: matrix.image == 'debian'
+        with:
+          name: release-readiness-debian-image
+          path: |
+            release-readiness-debian-image.tar.gz
+            release-readiness-debian-image.sha256
+            release-readiness-debian-image.json
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: error

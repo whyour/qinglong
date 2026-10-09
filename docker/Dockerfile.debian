@@ -1,11 +1,16 @@
-# Node 20 Bookworm is the latest official Node image variant that covers the
-# full Debian build matrix, including arm/v7, ppc64le, and s390x.
-FROM node:20-bookworm-slim AS nodebuilder
+# Download authenticated target binaries natively; Node 22 Bookworm images do
+# not include s390x, while official Node tarballs retain all five targets.
+FROM --platform=$BUILDPLATFORM node:22.23.3-bookworm-slim AS nodebuilder
+ARG TARGETARCH
+ARG TARGETVARIANT
+COPY docker/install-node.sh docker/node-release-key.asc docker/node-v22.23.3-SHASUMS256.txt.asc /tmp/
+RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates curl gnupg xz-utils \
+  && sh /tmp/install-node.sh
 
-FROM python:3.11.14-slim-bookworm AS builder
+FROM python:3.11.17-slim-trixie@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce AS builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
-COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
-COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
+COPY --from=nodebuilder /opt/node-target/bin/node /usr/local/bin/
+COPY --from=nodebuilder /opt/node-target/lib/node_modules/. /usr/local/lib/node_modules/
 RUN set -x && \
   ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
   apt-get update && \
@@ -14,7 +19,7 @@ RUN set -x && \
   cd /tmp/build && \
   pnpm install --prod --frozen-lockfile
 
-FROM python:3.11.14-slim-bookworm
+FROM python:3.11.17-slim-trixie@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -42,8 +47,8 @@ RUN groupadd -g ${QL_GID} qinglong && \
 ENV QL_USER=qinglong
 ENV QL_HOME=/home/$QL_USER
 
-COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
-COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
+COPY --from=nodebuilder /opt/node-target/bin/node /usr/local/bin/
+COPY --from=nodebuilder /opt/node-target/lib/node_modules/. /usr/local/lib/node_modules/
 
 RUN set -x && \
   ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \

@@ -1,6 +1,6 @@
 # Run Node package installation natively on the builder. Node/npm can spin at
 # 100% CPU when Alpine s390x is emulated through QEMU.
-FROM --platform=$BUILDPLATFORM node:18-alpine3.18 AS builder
+FROM --platform=$BUILDPLATFORM node:22.23.3-alpine3.24 AS builder
 
 ARG TARGETARCH
 ENV NPM_CONFIG_PREFIX=/opt/node-global
@@ -22,7 +22,7 @@ RUN set -x \
     npm_config_target_libc=musl \
     pnpm install --prod --frozen-lockfile
 
-FROM python:3.11-alpine
+FROM python:3.11.17-alpine3.24@sha256:d9368b3a5ac59afea7b5d4f2e2aea0941dbf9fdee9c369c5bec00b98244bc929
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
