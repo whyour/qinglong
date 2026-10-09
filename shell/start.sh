@@ -33,6 +33,7 @@ if [[ $QL_DATA_DIR != */data ]]; then
 fi
 
 command="$1"
+ql_tools_prefix=$(npm prefix --global)
 
 if [[ $command != "reload" ]]; then
   # 安装依赖
@@ -74,7 +75,10 @@ if [[ $command != "reload" ]]; then
       ;;
   esac
 
-  npm install -g pnpm@8.3.1 pm2 ts-node typescript@5
+  node "$QL_DIR/scripts/install-runtime-tools.cjs" \
+    --archive "$QL_DIR/static/runtime-tools.tgz" \
+    --proof "$QL_DIR/static/runtime-tools-proof.json" \
+    --prefix "$ql_tools_prefix"
 fi
 
 export PYTHON_SHORT_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
@@ -82,8 +86,8 @@ export PNPM_HOME=${QL_DIR}/data/dep_cache/node
 export PYTHON_HOME=${QL_DIR}/data/dep_cache/python3
 export PYTHONUSERBASE=${QL_DIR}/data/dep_cache/python3
 
-export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}:${PYTHON_HOME}/bin
-export NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules:${PNPM_HOME}/global/5/node_modules
+export PATH=${ql_tools_prefix:+${ql_tools_prefix}/bin:}/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}:${PYTHON_HOME}/bin
+export NODE_PATH=${ql_tools_prefix:+${ql_tools_prefix}/lib/node_modules:}/usr/local/bin:/usr/local/lib/node_modules:${PNPM_HOME}/global/5/node_modules
 export PIP_CACHE_DIR=${PYTHON_HOME}/pip
 export PYTHONPATH=${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages
 

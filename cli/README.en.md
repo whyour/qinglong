@@ -5,7 +5,7 @@
 
 The npm and panel-internal entries both use the name `ql`, but have separate Commander command trees. The npm entry only calls remote APIs; the internal entry only runs local tools. Verify the absolute executable path and `--help` before use. Installing the npm package does not migrate the built-in Shell commands.
 
-`@whyour/qinglong-cli` is a standalone npm client for the panel's open API. It registers only `ql`, for the currently supported OpenAPI resources. Local execution, repo/raw workers, reload/update/account recovery belong to the panel's internal tools and are excluded from npm. Development publishing is outside both command sets.
+`@whyour/qinglong-cli` is a standalone npm client for the panel's open API. It registers only `ql`, for the currently supported OpenAPI resources. Local execution, repo/raw workers, reload/update/account recovery belong to the panel's internal tools and are excluded from npm. Remote CLI commands do not manage development publishing.
 
 ## Installation and commands
 
@@ -43,7 +43,7 @@ Use command `--help` and `QL_LANG=en` for English. Command names and JSON fields
 
 ## Complete OpenAPI management
 
-The CLI also supports task/subscription CRUD, application and secret management, environment variables, configuration, scripts, logs, dependencies, system, dashboard and user APIs. `ql api routes --json` lists all 143 active routes; three retired file-reading endpoints are excluded. CI compares the catalogue against backend routes. See the [complete bilingual reference](skills/qinglong-cli/references/openapi.md) for every command and payload.
+The CLI also supports task/subscription CRUD, application and secret management, environment variables, configuration, scripts, logs, dependencies, system, dashboard and user APIs. `ql api routes --json` lists all 146 active routes; three retired file-reading endpoints are excluded. CI compares the catalogue against backend routes. See the [complete bilingual reference](skills/qinglong-cli/references/openapi.md) for every command and payload.
 
 ```sh
 ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
@@ -53,7 +53,19 @@ ql env create --data @envs.json --json
 ql api request PUT /open/crons/run --data '[12,13]' --json
 ```
 
+CLI 0.1.2 adds script history listing, detail and confirmed restore commands, requiring the history APIs in QingLong 2.23.0. Restore uses the current hash from the detail response; on 409, read and review the current state again.
+
+```sh
+ql script history-list --query '{"filename":"demo.js","path":""}' --json
+ql script history-detail --query '{"filename":"demo.js","path":"","id":"VERSION_UUID"}' --json
+ql script history-restore --data '{"filename":"demo.js","path":"","id":"VERSION_UUID","expectedHash":"CURRENT_SHA256"}' --json
+```
+
+Replace `VERSION_UUID` and `CURRENT_SHA256` with values returned by the list and detail commands.
+
 Use --data JSON/@file/- for bodies, --query for query objects, --file for uploads and --output for downloads. New commands support --timeout seconds. Existing command contracts remain; raw API requests expose all fields and batch operations. Downloads do not overwrite files. App secrets require --show-secrets; other raw resources may contain sensitive data.
+
+`--timeout` only limits waiting for the HTTP response; it does not stop server-side tasks. A failed write may already have taken effect, so inspect the resource before retrying.
 
 Remote ql system commands call the target panel API. Local reload/reset tools remain excluded from npm.
 
@@ -130,9 +142,9 @@ node cli/scripts/verify-package.cjs
 
 Tests cover requests, token refresh, output, errors, no automatic retries, permissions and isolated installation. Package verification installs the archive offline, verifies the sole ql executable and rejects local commands.
 
-The CLI package workflow checks, builds and tests Node 22.12/24 on relevant PRs, develop/master pushes and manual runs. Node 24 uploads the archive verified by offline installation as `qinglong-cli-<commit>`. After both matrix jobs succeed, master pushes publish that exact archive to npm as latest, using GitHub Actions OIDC trusted publishing without an NPM_TOKEN secret. Manual runs publish only when run on master with publish enabled; PRs, develop and forks never publish. Configure the npm Trusted Publisher for repository `whyour/qinglong`, workflow `cli-package.yml`, with `npm publish` allowed. The panel package `@whyour/qinglong` separately trusts `build-docker-image.yml`. Publishing uses Node 24 with `id-token: write` granted only to the publish job. New packages need an initial publication before configuring their trusted publisher.
+The CLI package workflow checks, builds and tests Node 22.12/24 on relevant PRs, develop/master pushes and manual runs. Node 24 uploads the archive verified by offline installation as `qinglong-cli-<commit>`. After both matrix jobs succeed, master pushes publish that exact archive to npm as latest, using GitHub Actions OIDC trusted publishing without an NPM_TOKEN secret. A manual release requires publish on master, or publish plus an explicit `X.Y.Z-alpha.N`, `X.Y.Z-beta.N` or `X.Y.Z-rc.N` version on develop. Develop prereleases set the same requested version before both Node verification jobs and publish to alpha/beta/rc without changing latest. Ordinary PRs, develop pushes, validation-only manual runs and forks do not publish. Releases and validation use separate concurrency groups; new validation does not cancel an active release. Configure the npm Trusted Publisher for repository `whyour/qinglong`, workflow `cli-package.yml`, with `npm publish` allowed. The panel package `@whyour/qinglong` separately trusts `build-docker-image.yml`. Publishing uses Node 24 with `id-token: write` granted only to the publish job. New packages need an initial publication before configuring their trusted publisher.
 
-The CLI has an independent stable version in cli/package.json and cli/package-lock.json. Before releasing changes, run `npm version patch --prefix cli --no-git-tag-version` (or minor/major) and commit both files. Existing versions are skipped with a notice; registry failures stop publication. Only stable X.Y.Z versions are published by this workflow. Publication does not rebuild the verified archive or run package lifecycle scripts.
+The CLI has an independent stable version in cli/package.json and cli/package-lock.json. Before releasing changes, run `npm version patch --prefix cli --no-git-tag-version` (or minor/major) and commit both files. Existing stable versions are skipped with a notice; an existing prerelease is an error and requires a new version. Registry failures stop publication. Manual develop prereleases only update the version in that verification workspace and do not replace stable source metadata maintenance. Publication does not rebuild the verified archive or run package lifecycle scripts.
 
 ## Panel-internal tools
 

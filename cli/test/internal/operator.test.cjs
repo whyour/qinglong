@@ -59,6 +59,24 @@ async function stub(context, program, body) {
   context.env.PATH = `${bin}:/usr/bin:/bin`;
 }
 
+async function stubRuntimeTools(context, record) {
+  const prefix = path.join(context.root, 'global-prefix');
+  await stub(
+    context,
+    'npm',
+    `${record}
+if(process.argv[2]==='prefix') process.stdout.write(${JSON.stringify(
+      prefix,
+    )}+'\\n');`,
+  );
+  await fs.mkdir(path.join(context.root, 'scripts'), { recursive: true });
+  await fs.writeFile(
+    path.join(context.root, 'scripts/install-runtime-tools.cjs'),
+    record,
+  );
+  return prefix;
+}
+
 test('configuration repair preserves custom content and intentionally empty hooks', async (t) => {
   const ctx = await fixture(t);
   await fs.mkdir(ctx.paths.dir_config, { recursive: true });
@@ -75,29 +93,51 @@ test('configuration repair preserves custom content and intentionally empty hook
   assert.deepEqual(await repairConfiguration(ctx), [ctx.paths.file_notify_py]);
 });
 
-test('dependency installation selects pnpm or Termux npm argv without shell interpolation', async (t) => {
+async function stubPanelDependencies(context, body) {
+  await fs.mkdir(path.join(context.root, 'scripts'), { recursive: true });
+  await fs.writeFile(
+    path.join(context.root, 'scripts/install-panel-dependencies.cjs'),
+    body,
+  );
+}
+
+test('dependency installation uses the installed helper and preserves root, static and commit arguments', async (t) => {
   const ctx = await fixture(t);
-  const output = path.join(ctx.root, 'calls.jsonl');
-  ctx.env.CALLS = output;
+  ctx.env.CALLS = path.join(ctx.root, 'dependencies.jsonl');
   const record =
-    'require("node:fs").appendFileSync(process.env.CALLS, JSON.stringify({args:process.argv.slice(2),cwd:process.cwd()})+"\\n");';
-  await stub(ctx, 'pnpm', record);
-  await stub(ctx, 'npm', record);
+    'require("node:fs").appendFileSync(process.env.CALLS,JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),termux:process.env.is_termux||""})+"\\n");';
+  await stubPanelDependencies(ctx, record);
   await installPanelDependencies(ctx);
   ctx.env.is_termux = '1';
   await installPanelDependencies(ctx);
-  const calls = (await fs.readFile(output, 'utf8'))
+  const source = path.join(ctx.root, 'source ;$(touch SHOULD_NOT_RUN)');
+  const staticRoot = path.join(ctx.root, 'static ;$(touch SHOULD_NOT_RUN)');
+  await fs.mkdir(source);
+  await installPanelDependencies(ctx, source, staticRoot, sourceCommit);
+  const calls = (await fs.readFile(ctx.env.CALLS, 'utf8'))
     .trim()
     .split('\n')
     .map(JSON.parse);
-  assert.deepEqual(
-    calls.map((c) => c.args),
-    [
-      ['install', '--loglevel', 'error', '--production'],
-      ['install', '--production', '--no-bin-links'],
-    ],
-  );
-  assert.ok(calls.every((c) => c.cwd === ctx.root));
+  assert.deepEqual(calls, [
+    { args: ['--root', ctx.root], cwd: ctx.root, termux: '0' },
+    { args: ['--root', ctx.root], cwd: ctx.root, termux: '1' },
+    {
+      args: [
+        '--root',
+        source,
+        '--static-dir',
+        staticRoot,
+        '--source-commit',
+        sourceCommit,
+      ],
+      cwd: source,
+      termux: '1',
+    },
+  ]);
+  for (const directory of [ctx.root, source])
+    await assert.rejects(fs.stat(path.join(directory, 'SHOULD_NOT_RUN')), {
+      code: 'ENOENT',
+    });
 });
 
 test('PM2 reload uses installation cwd and exact process-manager arguments', async (t) => {
@@ -278,6 +318,49 @@ test('upgrade staging extracts both archives before publishing readiness and rej
     ),
     { ...staged, sourceCommit, dependenciesChanged: false },
   );
+  await fs.writeFile(
+    path.join(ctx.root, 'package.json'),
+    '{"name":"older-installed"}',
+  );
+  ctx.env.CALLS = path.join(ctx.root, 'upgrade-dependencies.jsonl');
+  await stubPanelDependencies(ctx, 'process.exit(23);');
+  await assert.rejects(stageUpgrade(ctx, 'github'), /exit 23/);
+  const ready = path.join(ctx.paths.dir_tmp, 'upgrade-ready-master.json');
+  assert.deepEqual(JSON.parse(await fs.readFile(ready, 'utf8')), {
+    directory: path.basename(path.dirname(staged.source)),
+  });
+  assert.equal(
+    await fs.readFile(path.join(ctx.root, 'package.json'), 'utf8'),
+    '{"name":"older-installed"}',
+  );
+  await stubPanelDependencies(
+    ctx,
+    'const fs=require("node:fs"),p=require("node:path"),args=process.argv.slice(2);fs.appendFileSync(process.env.CALLS,JSON.stringify({args,cwd:process.cwd()})+"\\n");fs.mkdirSync(p.join(args[args.indexOf("--root")+1],"node_modules"),{recursive:true});',
+  );
+  const changedStage = await stageUpgrade(ctx, 'github');
+  assert.deepEqual(
+    JSON.parse((await fs.readFile(ctx.env.CALLS, 'utf8')).trim()),
+    {
+      args: [
+        '--root',
+        changedStage.source,
+        '--static-dir',
+        changedStage.static,
+        '--source-commit',
+        sourceCommit,
+      ],
+      cwd: changedStage.source,
+    },
+  );
+  assert.equal(
+    JSON.parse(
+      await fs.readFile(
+        path.join(path.dirname(changedStage.source), 'ready.json'),
+        'utf8',
+      ),
+    ).dependenciesChanged,
+    true,
+  );
   await fs.symlink(
     '../../outside',
     path.join(payloads, `qinglong-${sourceCommit}/escape`),
@@ -291,7 +374,7 @@ test('upgrade staging extracts both archives before publishing readiness and rej
   assert.deepEqual(
     (await fs.readdir(ctx.paths.dir_tmp)).sort(),
     [
-      path.basename(path.dirname(staged.source)),
+      path.basename(path.dirname(changedStage.source)),
       'upgrade-ready-master.json',
     ].sort(),
   );
@@ -336,8 +419,9 @@ test('check repairs dependencies and notifications, probes loopback and reloads 
   ctx.env.HTTP_PROXY = 'http://127.0.0.1:1';
   const record =
     'require("node:fs").appendFileSync(process.env.CALLS,JSON.stringify({program:require("node:path").basename(process.argv[1]),args:process.argv.slice(2)})+"\\n");';
-  for (const executable of ['npm', 'pnpm', 'pm2'])
-    await stub(ctx, executable, record);
+  for (const executable of ['pnpm', 'pm2']) await stub(ctx, executable, record);
+  const toolsPrefix = await stubRuntimeTools(ctx, record);
+  await stubPanelDependencies(ctx, record);
   await repairConfiguration(ctx);
   await fs.writeFile(ctx.paths.file_notify_py, 'custom old notify');
   await fs.mkdir(path.join(ctx.env.PM2_HOME, 'logs'), { recursive: true });
@@ -364,11 +448,22 @@ test('check repairs dependencies and notifications, probes loopback and reloads 
   assert.deepEqual(calls, [
     {
       program: 'npm',
-      args: ['i', '-g', 'pnpm@8.3.1', 'pm2', 'ts-node', 'typescript@5'],
+      args: ['prefix', '--global'],
     },
     {
-      program: 'pnpm',
-      args: ['install', '--loglevel', 'error', '--production'],
+      program: 'install-runtime-tools.cjs',
+      args: [
+        '--archive',
+        path.join(ctx.root, 'static/runtime-tools.tgz'),
+        '--proof',
+        path.join(ctx.root, 'static/runtime-tools-proof.json'),
+        '--prefix',
+        toolsPrefix,
+      ],
+    },
+    {
+      program: 'install-panel-dependencies.cjs',
+      args: ['--root', ctx.root],
     },
     { program: 'pm2', args: ['flush'] },
     {
@@ -437,6 +532,28 @@ test('repair stops after installer failure before replacing user files or reload
   });
 });
 
+test('dependency helper failure preserves notifications and prevents a service reload', async (t) => {
+  const { checkAndRepair } = require('../../dist/internal/maintenance/check');
+  const ctx = await fixture(t);
+  await repairConfiguration(ctx);
+  await fs.writeFile(ctx.paths.file_notify_js, 'keep installed notification');
+  await stubRuntimeTools(ctx, '');
+  await stubPanelDependencies(ctx, 'process.exit(19);');
+  await stub(
+    ctx,
+    'pm2',
+    'require("node:fs").writeFileSync(process.env.QL_DIR+"/unexpected-reload", "bad");',
+  );
+  await assert.rejects(checkAndRepair(ctx), /exit 19/);
+  assert.equal(
+    await fs.readFile(ctx.paths.file_notify_js, 'utf8'),
+    'keep installed notification',
+  );
+  await assert.rejects(fs.stat(path.join(ctx.root, 'unexpected-reload')), {
+    code: 'ENOENT',
+  });
+});
+
 test('legacy check workflow and TypeScript repair agree on dependency and notification operations', async (t) => {
   const { execFileSync } = require('node:child_process');
   const ctx = await fixture(t);
@@ -444,7 +561,8 @@ test('legacy check workflow and TypeScript repair agree on dependency and notifi
   const trace = path.join(ctx.root, 'legacy-trace');
   const shell = `
     t() { :; }
-    npm() { printf 'npm %s\\n' "$*" >> "$TRACE"; }
+    npm() { printf 'npm %s\\n' "$*" >> "$TRACE"; printf '%s\\n' "$dir_root/global-prefix"; }
+    node() { printf 'tools %s\\n' "$*" >> "$TRACE"; }
     fix_config() { printf 'repair-config\\n' >> "$TRACE"; }
     npm_install_2() { printf 'dependencies %s\\n' "$1" >> "$TRACE"; }
     cp() { printf 'copy %s\\n' "$*" >> "$TRACE"; command cp "$@"; }
@@ -468,7 +586,8 @@ test('legacy check workflow and TypeScript repair agree on dependency and notifi
   });
   const operations = (await fs.readFile(trace, 'utf8')).trim().split('\n');
   assert.deepEqual(operations, [
-    'npm i -g pnpm@8.3.1 pm2 ts-node typescript@5',
+    'npm prefix --global',
+    `tools ${ctx.root}/scripts/install-runtime-tools.cjs --archive ${ctx.root}/static/runtime-tools.tgz --proof ${ctx.root}/static/runtime-tools-proof.json --prefix ${ctx.root}/global-prefix`,
     'repair-config',
     `dependencies ${ctx.root}`,
     `copy -fv ${ctx.paths.file_notify_py_sample} ${ctx.paths.file_notify_py}`,
@@ -483,6 +602,91 @@ test('legacy check workflow and TypeScript repair agree on dependency and notifi
     await fs.readFile(ctx.paths.file_notify_py, 'utf8'),
     'sample:notify.py',
   );
+});
+
+test('legacy check aborts dependency failure before copying notifications or reloading', async (t) => {
+  const { execFileSync } = require('node:child_process');
+  const ctx = await fixture(t);
+  await repairConfiguration(ctx);
+  await fs.writeFile(ctx.paths.file_notify_js, 'keep legacy notification');
+  const shell = `
+    t() { :; }
+    npm() { printf '%s\\n' "$dir_root/global-prefix"; }
+    node() { :; }
+    fix_config() { :; }
+    npm_install_2() { return 19; }
+    reload_pm2() { printf unexpected > "$dir_root/unexpected-reload"; }
+    curl() { printf '<div id="root"></div>{"code":200,"status":"ok"}'; }
+    . "$CHECK_SOURCE"
+  `;
+  assert.throws(
+    () =>
+      execFileSync('/bin/bash', ['--noprofile', '--norc', '-c', shell], {
+        env: {
+          ...ctx.env,
+          CHECK_SOURCE: path.resolve(__dirname, '../../../shell/check.sh'),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }),
+    (error) => error.status === 19,
+  );
+  assert.equal(
+    await fs.readFile(ctx.paths.file_notify_js, 'utf8'),
+    'keep legacy notification',
+  );
+  await assert.rejects(fs.stat(path.join(ctx.root, 'unexpected-reload')), {
+    code: 'ENOENT',
+  });
+});
+
+test('installed upgrade hooks propagate returned failures and preserve legacy installer status', async (t) => {
+  const {
+    withLifecycleHooks,
+  } = require('../../dist/internal/maintenance/upgradeArtifacts.cjs');
+  for (const [returned, legacy, expected] of [
+    [19, 0, 19],
+    [0, 23, 23],
+    [0, 0, 0],
+  ]) {
+    const ctx = await fixture(t);
+    const tmp = path.join(ctx.root, 'tmp');
+    await fs.mkdir(tmp);
+    await fs.mkdir(path.join(ctx.root, 'shell'));
+    const trace = path.join(ctx.root, 'install-args');
+    await fs.writeFile(path.join(ctx.root, 'shell/env.sh'), '');
+    await fs.writeFile(
+      path.join(ctx.root, 'shell/share.sh'),
+      `import_config() { :; }
+npm_install_2() {
+  printf '%s\\n' "$@" > "$QL_INSTALL_TRACE"
+  exit_status=${legacy}
+  return ${returned}
+}
+`,
+    );
+    const args = [
+      path.join(ctx.root, 'staged source;$(touch SHOULD_NOT_RUN)'),
+      path.join(ctx.root, 'staged static;$(touch SHOULD_NOT_RUN)'),
+      sourceCommit,
+    ];
+    const operation = withLifecycleHooks(
+      ctx.root,
+      tmp,
+      { ...ctx.env, QL_INSTALL_TRACE: trace },
+      (hook) => hook('install', args),
+    );
+    if (expected)
+      await assert.rejects(operation, new RegExp(`exit ${expected}`));
+    else await operation;
+    assert.deepEqual(
+      (await fs.readFile(trace, 'utf8')).trim().split('\n'),
+      args,
+    );
+    await assert.rejects(fs.stat(path.join(ctx.root, 'SHOULD_NOT_RUN')), {
+      code: 'ENOENT',
+    });
+    assert.deepEqual(await fs.readdir(tmp), []);
+  }
 });
 
 test('interrupted reload restores old files and recovery subprocesses ignore the cancelled operation', async (t) => {

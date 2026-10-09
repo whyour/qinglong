@@ -232,24 +232,29 @@ fix_config() {
 }
 
 npm_install_sub() {
-  if [ $is_termux -eq 1 ]; then
-    npm install --production --no-bin-links
-  elif ! type pnpm &>/dev/null; then
-    npm install --production
+  if node "$dir_root/scripts/install-panel-dependencies.cjs" --root "$PWD" "$@"; then
+    exit_status=0
   else
-    pnpm install --loglevel error --production
+    exit_status=$?
   fi
-  exit_status=$?
+  return "$exit_status"
 }
 
 npm_install_2() {
   local dir_current=$(pwd)
   local dir_work=$1
+  local static_root="${2:-}"
+  local source_commit="${3:-}"
+  local installer_args=()
+  [[ -n "$static_root" ]] && installer_args+=(--static-dir "$static_root")
+  [[ -n "$source_commit" ]] && installer_args+=(--source-commit "$source_commit")
 
-  cd $dir_work
+  cd "$dir_work" || return $?
   t '安装 %s 依赖包...\n' "$dir_work"
-  npm_install_sub
-  cd $dir_current
+  local install_status=0
+  npm_install_sub "${installer_args[@]}" || install_status=$?
+  cd "$dir_current" || return $?
+  return "$install_status"
 }
 
 diff_and_copy() {

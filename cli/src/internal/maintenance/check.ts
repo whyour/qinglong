@@ -4,7 +4,7 @@ import path from 'node:path';
 import http from 'node:http';
 import type { LocalContext } from '../runtime/context';
 import { atomicWrite } from '../runtime/files';
-import { checkedProcess } from '../runtime/process';
+import { installRuntimeTools } from './tools';
 import {
   repairConfiguration,
   installPanelDependencies,
@@ -152,11 +152,7 @@ export async function diagnosticLog(file: string): Promise<{
 }
 
 export async function checkAndRepair(context: LocalContext): Promise<unknown> {
-  await checkedProcess(
-    'npm',
-    ['i', '-g', 'pnpm@8.3.1', 'pm2', 'ts-node', 'typescript@5'],
-    { cwd: context.root, env: context.env },
-  );
+  await installRuntimeTools(context);
   const restored = await repairConfiguration(context);
   await installPanelDependencies(context);
   const copied: string[] = [];

@@ -62,10 +62,14 @@ docker run -d \
 
 ### npm
 
-The npm version supports `debian/ubuntu/alpine` systems and requires `node/npm/python3/pip3/pnpm` to be installed.
+The npm deployment supports `debian/ubuntu/alpine` with Node.js 22.x >=22.22.2 or 24.x >=24.15.0, npm, Python 3 and pip. The 2.23.0 archive includes frozen production dependencies and verified runtime tools; a separate pnpm installation is unnecessary. After this version is published, use the command below. With npm 12, approve this exact package lifecycle in your project's `package.json` first:
+
+```json
+{"allowScripts":{"@whyour/qinglong@2.23.0":true}}
+```
 
 ```bash
-npm i @whyour/qinglong
+npm i @whyour/qinglong@2.23.0
 ```
 
 ## Deployment
@@ -105,13 +109,15 @@ The package includes a [remote management skill](cli/skills/qinglong-cli/SKILL.m
 
 ## Development
 
+Use Node.js 22.x starting at 22.22.2, or Node.js 24.x starting at 24.15.0.
+
 ```bash
 git clone https://github.com/whyour/qinglong.git
 cd qinglong
 cp .env.example .env
 # Recommended use pnpm https://pnpm.io/zh/installation
-npm install -g pnpm@8.3.1
-pnpm install
+npm install -g pnpm@10.34.6
+pnpm install --frozen-lockfile
 pnpm start
 ```
 

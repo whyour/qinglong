@@ -1,0 +1,41 @@
+{
+  "tag": "v10.34.6",
+  "ref": {
+    "ref": "refs/tags/v10.34.6",
+    "node_id": "MDM6UmVmNTA1NjU0MzA6cmVmcy90YWdzL3YxMC4zNC42",
+    "url": "https://api.github.com/repos/pnpm/pnpm/git/refs/tags/v10.34.6",
+    "object": {
+      "sha": "656c6b25d02a924ead9088ce6c69bba23b0d6d51",
+      "type": "tag",
+      "url": "https://api.github.com/repos/pnpm/pnpm/git/tags/656c6b25d02a924ead9088ce6c69bba23b0d6d51"
+    }
+  },
+  "tagObject": {
+    "node_id": "TA_kwDOAwORNtoAKDY1NmM2YjI1ZDAyYTkyNGVhZDkwODhjZTZjNjliYmEyM2IwZDZkNTE",
+    "sha": "656c6b25d02a924ead9088ce6c69bba23b0d6d51",
+    "url": "https://api.github.com/repos/pnpm/pnpm/git/tags/656c6b25d02a924ead9088ce6c69bba23b0d6d51",
+    "tagger": {
+      "name": "Zoltan Kochan",
+      "email": "z@kochan.io",
+      "date": "2026-09-28T18:14:05Z"
+    },
+    "object": {
+      "sha": "9287c31cea69206c4eeca7f21cd21df81d0b93e7",
+      "type": "commit",
+      "url": "https://api.github.com/repos/pnpm/pnpm/git/commits/9287c31cea69206c4eeca7f21cd21df81d0b93e7"
+    },
+    "tag": "v10.34.6",
+    "message": "=v10.34.6\n-----BEGIN PGP SIGNATURE-----\n\niQIzBAABCgAdFiEEe3TRKZVotYa6mWK1ZJ5NSvdOfewFAmq6rm0ACgkQZJ5NSvdO\nfew2+g/8D3KQPdz48P6WzDBjdk+p39nfUo9Yus9/NrNuUwAnZM7AfloI+U964zdO\nT81cTmlO4lh2psfE+QPrO+l/dKXtaxG8JrIASqFoNZ5JV+j091hneRQAj/ZrKq0E\nI/MdVtISCLCEHslt6wZeKZZQqTkJMkwbdaTxbjVPCvRPxrCbBKWtRs3z/7Uw5FND\nXvj+/eo8EBidJOHxxSk0Ib5lz3+vXHGx/tcilVmAdQVK29MMsEVwbck4Ve4rcbq+\n4hxjfxJrH1xJ8zI8zlAvpYQ51bab1DJZJ2hXzuhlGyZbgwRiPTLMTQKB+DnbDzaD\nVaRWQES+bmmKQlGplw7JuA7oryBBJo5nNldxwG/8YSbBTtxcyQzGJi5r2Of1XUth\no041P4f53IK2xhXdyRvgofTVRUMr/i6zC+AEW+/1h/RWc2iDXImjXlzN0BKz7bk3\nbqufant5hDMeOsJETAtZ3i7uOyfmqUOkR4gmumKO+XRgTI3OlMMaDIdrfAx5jHi4\nh8dXgzaplJ7KVzWkkmucF4Hv4ffkq/orJp4FE9KOCtIdzF4pnDmoB3jf70oE8V1H\nHcqK53ztD9fT0l3TKArT6A48s/cZBS/CAr9BHkIg7QrCITEZLCC2zUrz2f6KECgc\noVVsd2+Ww4h7DPCQqM5nsKXLF/wyYHGWzJJ+FQW7d+PX0zlw21w=\n=GC4w\n-----END PGP SIGNATURE-----\n",
+    "verification": {
+      "verified": true,
+      "reason": "valid",
+      "signature": "-----BEGIN PGP SIGNATURE-----\n\niQIzBAABCgAdFiEEe3TRKZVotYa6mWK1ZJ5NSvdOfewFAmq6rm0ACgkQZJ5NSvdO\nfew2+g/8D3KQPdz48P6WzDBjdk+p39nfUo9Yus9/NrNuUwAnZM7AfloI+U964zdO\nT81cTmlO4lh2psfE+QPrO+l/dKXtaxG8JrIASqFoNZ5JV+j091hneRQAj/ZrKq0E\nI/MdVtISCLCEHslt6wZeKZZQqTkJMkwbdaTxbjVPCvRPxrCbBKWtRs3z/7Uw5FND\nXvj+/eo8EBidJOHxxSk0Ib5lz3+vXHGx/tcilVmAdQVK29MMsEVwbck4Ve4rcbq+\n4hxjfxJrH1xJ8zI8zlAvpYQ51bab1DJZJ2hXzuhlGyZbgwRiPTLMTQKB+DnbDzaD\nVaRWQES+bmmKQlGplw7JuA7oryBBJo5nNldxwG/8YSbBTtxcyQzGJi5r2Of1XUth\no041P4f53IK2xhXdyRvgofTVRUMr/i6zC+AEW+/1h/RWc2iDXImjXlzN0BKz7bk3\nbqufant5hDMeOsJETAtZ3i7uOyfmqUOkR4gmumKO+XRgTI3OlMMaDIdrfAx5jHi4\nh8dXgzaplJ7KVzWkkmucF4Hv4ffkq/orJp4FE9KOCtIdzF4pnDmoB3jf70oE8V1H\nHcqK53ztD9fT0l3TKArT6A48s/cZBS/CAr9BHkIg7QrCITEZLCC2zUrz2f6KECgc\noVVsd2+Ww4h7DPCQqM5nsKXLF/wyYHGWzJJ+FQW7d+PX0zlw21w=\n=GC4w\n-----END PGP SIGNATURE-----\n",
+      "payload": "object 9287c31cea69206c4eeca7f21cd21df81d0b93e7\ntype commit\ntag v10.34.6\ntagger Zoltan Kochan <z@kochan.io> 1790619245 +0200\n\n=v10.34.6\n",
+      "verified_at": "2026-09-28T18:14:14Z"
+    }
+  },
+  "commit": "9287c31cea69206c4eeca7f21cd21df81d0b93e7",
+  "url": "https://codeload.github.com/pnpm/pnpm/tar.gz/9287c31cea69206c4eeca7f21cd21df81d0b93e7",
+  "sha256": "260a2810d2710baac9d82852dada85d7a136a0043a4708090e406f79834e5d17",
+  "sourcePath": "/private/tmp/qinglong-tools-fix-preview/pnpm10-official-source/pnpm-9287c31cea69206c4eeca7f21cd21df81d0b93e7"
+}

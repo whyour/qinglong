@@ -46,6 +46,7 @@ async function fixture(t) {
     const fs=require('node:fs'),p=require('node:path');
     const program=p.basename(process.argv[1]),args=process.argv.slice(2);
     fs.appendFileSync(process.env.CALLS,JSON.stringify({program,args,python:process.env.PYTHON_HOME,node:process.env.PNPM_HOME})+'\\n');
+    if(program==='npm' && args[0]==='prefix') process.stdout.write(p.join(p.dirname(process.env.CALLS),'global-prefix')+'\\n');
     if(program==='python3') process.stdout.write('3.12\\n');
     if(program==='nginx' && args.includes('-s')) process.exit(1);
   `;
@@ -64,6 +65,11 @@ async function fixture(t) {
       `#!${process.execPath}\n${program}`,
       { mode: 0o755 },
     );
+  await fs.mkdir(path.join(root, 'scripts'));
+  await fs.writeFile(
+    path.join(root, 'scripts/install-runtime-tools.cjs'),
+    program,
+  );
   const hooks = [];
   const registrations = [];
   const system = {
@@ -82,7 +88,7 @@ async function fixture(t) {
 }
 
 test('bootstrap installs prerequisites, uses the configured data directory and starts services in order', async (t) => {
-  const { ctx, system, hooks, registrations } = await fixture(t);
+  const { ctx, system, hooks, base, registrations } = await fixture(t);
   await fs.writeFile(path.join(ctx.root, '.env'), 'KEEP=true');
   const result = await bootstrapPanel(ctx, false, system);
   assert.equal(result.mode, 'install');
@@ -107,6 +113,7 @@ test('bootstrap installs prerequisites, uses the configured data directory and s
       process.getuid() === 0 ? 'apt-get' : 'sudo',
       process.getuid() === 0 ? 'apt-get' : 'sudo',
       'npm',
+      'install-runtime-tools.cjs',
       'python3',
       'pip3',
       'pm2',
@@ -118,14 +125,23 @@ test('bootstrap installs prerequisites, uses the configured data directory and s
       'pm2',
     ],
   );
-  assert.deepEqual(calls[4].args, [
+  assert.deepEqual(calls[2].args, ['prefix', '--global']);
+  assert.deepEqual(calls[3].args, [
+    '--archive',
+    path.join(ctx.root, 'static/runtime-tools.tgz'),
+    '--proof',
+    path.join(ctx.root, 'static/runtime-tools-proof.json'),
+    '--prefix',
+    path.join(base, 'global-prefix'),
+  ]);
+  assert.deepEqual(calls[5].args, [
     'install',
     '--prefix',
     path.join(ctx.data, 'dep_cache/python3'),
     'requests',
   ]);
-  assert.deepEqual(calls[6].args, ['-c', system.nginxConfig, '-s', 'reload']);
-  assert.deepEqual(calls[7].args, ['-c', system.nginxConfig]);
+  assert.deepEqual(calls[7].args, ['-c', system.nginxConfig, '-s', 'reload']);
+  assert.deepEqual(calls[8].args, ['-c', system.nginxConfig]);
   assert.deepEqual(
     calls.slice(-4).map((c) => c.args),
     [
@@ -137,7 +153,7 @@ test('bootstrap installs prerequisites, uses the configured data directory and s
   );
   assert.ok(
     calls
-      .slice(4)
+      .slice(5)
       .every(
         (c) =>
           c.python === path.join(ctx.data, 'dep_cache/python3') &&
@@ -240,7 +256,9 @@ for (const language of ['zh', 'en', 'unsupported']) {
         return true;
       },
     );
-    const { runtimeEnvironment } = require('../../dist/internal/maintenance/bootstrap');
+    const {
+      runtimeEnvironment,
+    } = require('../../dist/internal/maintenance/bootstrap');
     assert.throws(
       () => runtimeEnvironment(ctx, 'bad'),
       (error) => {
@@ -255,3 +273,55 @@ for (const language of ['zh', 'en', 'unsupported']) {
     assert.deepEqual(await fs.readdir(root), []);
   });
 }
+
+test('failed reviewed runtime installation stops before service registration and startup', async (t) => {
+  const { ctx, system, hooks, registrations } = await fixture(t);
+  await fs.writeFile(path.join(ctx.root, '.env'), 'KEEP=true');
+  await fs.writeFile(
+    path.join(ctx.root, 'scripts/install-runtime-tools.cjs'),
+    'process.exit(19);',
+  );
+  await assert.rejects(bootstrapPanel(ctx, false, system), /exit 19|退出码 19/);
+  assert.deepEqual(registrations, []);
+  assert.deepEqual(hooks, []);
+  assert.equal(
+    await fs.readFile(path.join(ctx.root, '.env'), 'utf8'),
+    'KEEP=true',
+  );
+  const calls = (await fs.readFile(ctx.env.CALLS, 'utf8'))
+    .trim()
+    .split('\n')
+    .map(JSON.parse);
+  assert.ok(
+    calls.every(
+      (call) => !['python3', 'pip3', 'nginx', 'pm2'].includes(call.program),
+    ),
+  );
+});
+
+test('runtime environment preserves the controlled tools prefix and persistent global dependencies', async (t) => {
+  const { ctx, base } = await fixture(t);
+  const {
+    runtimeEnvironment,
+  } = require('../../dist/internal/maintenance/bootstrap');
+  const toolsModules = path.join(base, 'global-prefix/lib/node_modules');
+  const customModules = path.join(base, 'operator-modules');
+  const env = runtimeEnvironment(
+    {
+      ...ctx,
+      env: {
+        ...ctx.env,
+        NODE_PATH: [toolsModules, customModules].join(path.delimiter),
+      },
+    },
+    '3.12',
+  );
+  const modules = env.NODE_PATH.split(path.delimiter);
+  assert.deepEqual(modules.slice(0, 2), [toolsModules, customModules]);
+  assert.ok(modules.includes('/usr/local/lib/node_modules'));
+  assert.ok(
+    modules.includes(
+      path.join(ctx.data, 'dep_cache/node/global/5/node_modules'),
+    ),
+  );
+});

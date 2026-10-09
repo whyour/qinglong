@@ -8,6 +8,7 @@ import { repairConfiguration, startPanel } from './operator';
 import { operatingSystem } from './bot';
 import { fail } from '../../shared/errors';
 import { registerHostServices } from '../runtime/hostServices';
+import { installRuntimeTools } from './tools';
 
 export function bootstrapPackages(
   os: string,
@@ -92,10 +93,13 @@ export function runtimeEnvironment(
       .filter(Boolean)
       .join(path.delimiter),
     NODE_PATH: [
+      context.env.NODE_PATH,
       '/usr/local/bin',
       '/usr/local/lib/node_modules',
       path.join(node, 'global/5/node_modules'),
-    ].join(path.delimiter),
+    ]
+      .filter(Boolean)
+      .join(path.delimiter),
     PYTHONPATH: [
       python,
       path.join(python, `lib/python${pythonVersion}`),
@@ -176,11 +180,7 @@ export async function bootstrapPanel(
         root ? args : [packages.program, ...args],
         { cwd: context.root, env: context.env },
       );
-    await checkedProcess(
-      'npm',
-      ['install', '-g', 'pnpm@8.3.1', 'pm2', 'ts-node', 'typescript@5'],
-      { cwd: context.root, env: context.env },
-    );
+    await installRuntimeTools(context);
   }
   const python = await checkedProcess(
     'python3',

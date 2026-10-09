@@ -1,0 +1,12 @@
+{
+  "name": "qinglong-pnpm10-runtime-node-gyp",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "node-gyp": "12.4.0"
+  },
+  "overrides": {
+    "http-cache-semantics": "4.3.0",
+    "brace-expansion@2": "2.1.7"
+  }
+}
