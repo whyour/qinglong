@@ -74,20 +74,22 @@
     "overrides": {
       "sqlite3": "npm:@whyour/sqlite3@1.1.2",
       "@codemirror/state": "6.5.4",
-      "@codemirror/view": "6.39.16"
+      "@codemirror/view": "6.39.16",
+      "proxy-addr": "2.0.8",
+      "websocket-driver": "0.7.5"
     }
   },
   "dependencies": {
     "@ant-design/plots": "^2.6.8",
     "@bufbuild/protobuf": "^2.10.0",
-    "@grpc/grpc-js": "^1.14.0",
+    "@grpc/grpc-js": "1.14.5",
     "@grpc/proto-loader": "^0.8.0",
     "@keyv/sqlite": "^4.0.1",
     "@otplib/preset-default": "^12.0.1",
     "body-parser": "^1.20.3",
     "celebrate": "^15.0.3",
     "chokidar": "^4.0.1",
-    "compression": "^1.7.4",
+    "compression": "1.8.2",
     "cors": "^2.8.5",
     "cron-parser": "^5.4.0",
     "cross-spawn": "^7.0.6",
@@ -106,7 +108,7 @@
     "jsonwebtoken": "^9.0.2",
     "keyv": "^5.2.3",
     "lodash": "^4.17.21",
-    "multer": "2.1.1",
+    "multer": "2.3.0",
     "node-cron": "4.6.0",
     "nodemailer": "^8.0.1",
     "p-queue-cjs": "7.3.4",
@@ -114,7 +116,7 @@
     "ps-tree": "^1.2.0",
     "reflect-metadata": "^0.2.2",
     "request-ip": "3.3.0",
-    "sequelize": "^6.37.5",
+    "sequelize": "6.37.8",
     "sockjs": "^0.3.24",
     "sqlite3": "npm:@whyour/sqlite3@1.1.2",
     "toad-scheduler": "^3.0.1",
