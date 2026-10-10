@@ -91,13 +91,13 @@ test('expired, corrupt, missing or header-unsafe token cache refreshes under err
     assert.equal(r.stdout, 'generated:1');
   }
 });
-test('success with a message still parses once and stays silent', (t) => {
+test('success with a message checks authentication and stays silent', (t) => {
   const f = fixture(t);
   fs.writeFileSync(f.response, JSON.stringify({ code: 200, message: 'ok' }));
   const r = f.run('update_cron 1 0 123 log 1');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, '');
-  assert.equal(f.count(), 1);
+  assert.equal(f.count(), 2);
 });
 test('status and statistics errors preserve multiline Unicode messages', (t) => {
   const f = fixture(t);
@@ -113,7 +113,7 @@ test('status and statistics errors preserve multiline Unicode messages', (t) => 
     assert.equal(r.status, 0, r.stderr);
     assert.equal(r.stdout, '写入失败\n请重试 "原任务"\n');
   }
-  assert.equal(f.count(), 2);
+  assert.equal(f.count(), 4);
 });
 test('non-JSON errors fall back to raw text and absent messages retain legacy null', (t) => {
   const f = fixture(t);
@@ -180,5 +180,5 @@ test('success-shaped invalid documents retain the raw-response error fallback', 
     assert.equal(r.status, 0, r.stderr);
     assert.equal(r.stdout, body + '\n');
   }
-  assert.equal(f.count(), cases.length);
+  assert.equal(f.count(), cases.length * 2);
 });
