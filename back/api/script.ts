@@ -35,6 +35,23 @@ function isPathAllowed(targetPath: string): boolean {
   );
 }
 
+async function writeScriptFile(
+  targetPath: string,
+  content: string,
+): Promise<boolean> {
+  const target = resolve(targetPath);
+  for (const writableRoot of config.writePathList) {
+    const root = resolve(writableRoot);
+    const prefix = root.endsWith(sep) ? root : root + sep;
+    // Check the actual write target, including filename, at the write boundary.
+    if (!target.startsWith(prefix)) continue;
+    if (!isPathAllowed(target)) return false;
+    await writeFileWithLock(target, content);
+    return true;
+  }
+  return false;
+}
+
 async function existingWritableRealPath(targetPath: string): Promise<string> {
   if (!isPathAllowed(targetPath)) {
     throw new ScriptHistoryError(403, '暂无权限');
@@ -373,7 +390,9 @@ export default (app: Router) => {
             await rmPath(originFilePath);
           }
         }
-        await writeFileWithLock(filePath, content);
+        if (!(await writeScriptFile(filePath, content))) {
+          return res.send({ code: 403, message: t('暂无权限') });
+        }
         return res.send({ code: 200 });
       } catch (e) {
         return historyError(e, res, next);
@@ -513,7 +532,9 @@ export default (app: Router) => {
         if (!isPathAllowed(filePath)) {
           return res.send({ code: 403, message: t('暂无权限') });
         }
-        await writeFileWithLock(filePath, content || '');
+        if (!(await writeScriptFile(filePath, content || ''))) {
+          return res.send({ code: 403, message: t('暂无权限') });
+        }
 
         const scriptService = Container.get(ScriptService);
         const result = await scriptService.runScript(filePath);
