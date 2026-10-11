@@ -94,8 +94,8 @@ push_config = {
 
     'QYWX_KEY': '',                     # 企业微信机器人
 
-    'TG_BOT_TOKEN': '',                 # tg 机器人的 TG_BOT_TOKEN，例：1407203283:AAG9rt-6RDaaX0HBLZQq0laNOh898iFYaRQ
-    'TG_USER_ID': '',                   # tg 机器人的 TG_USER_ID，例：1434078534
+    'TG_BOT_TOKEN': '',                 # tg 机器人的 TG_BOT_TOKEN，例：1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+    'TG_USER_ID': '',                   # tg 机器人的 TG_USER_ID，例：1234567890
     'TG_API_HOST': '',                  # tg 代理 api
     'TG_PROXY_AUTH': '',                # tg 代理认证参数
     'TG_PROXY_HOST': '',                # tg 机器人的 TG_PROXY_HOST
@@ -107,7 +107,8 @@ push_config = {
 
     'SMTP_SERVER': '',                  # SMTP 发送邮件服务器，形如 smtp.exmail.qq.com:465
     'SMTP_SSL': 'false',                # SMTP 发送邮件服务器是否使用 SSL，填写 true 或 false
-    'SMTP_EMAIL': '',                   # SMTP 收发件邮箱，通知将会由自己发给自己
+    'SMTP_EMAIL': '',                   # SMTP 发件邮箱
+    'SMTP_EMAIL_TO': '',                # SMTP 收件邮箱，多个分号分隔，默认发给发件邮箱
     'SMTP_PASSWORD': '',                # SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
     'SMTP_NAME': '',                    # SMTP 收发件人姓名，可随意填写
 
@@ -132,9 +133,25 @@ push_config = {
     'NTFY_PASSWORD': '',                # 推送用户密码,可选
     'NTFY_ACTIONS': '',                 # 推送用户动作,可选
 
+    ### 方式一：标准发送（更强大）
+    #### 官方文档: https://wxpusher.zjiecode.com/docs/
+    #### 管理后台: https://wxpusher.zjiecode.com/admin/
     'WXPUSHER_APP_TOKEN': '',           # wxpusher 的 appToken 官方文档: https://wxpusher.zjiecode.com/docs/ 管理后台: https://wxpusher.zjiecode.com/admin/
     'WXPUSHER_TOPIC_IDS': '',           # wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
     'WXPUSHER_UIDS': '',                # wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+    ### 方式二：极简发送（最简单，简单好用，一键配置，更推荐） 
+    #### wxPusher 的 SPT（极简推送），扫码获取 https://wxpusher.zjiecode.com/docs/#/?id=spt
+    #### 多个用英文逗号,分隔，最多10个；与上面的 appToken 方式二选一即可
+    'WXPUSHER_SPT_LIST': '',            # wxpusher 的 SPT（极简推送），多个用英文逗号,分隔，最多10个 官方文档: https://wxpusher.zjiecode.com/docs/#/?id=spt
+
+    'OPENILINK_APP_TOKEN': '',          # OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取 官方文档: https://openilink.com/docs/hub/apps
+    'OPENILINK_HUB_URL': '',            # OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
+    'OPENILINK_CONTEXT_TOKEN': '',      # OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
+
+  # WPUSH 官方文档: https://wpush.cn/docs
+  'WPUSH_APIKEY': '',  # WPUSH 的 API Key，在 https://wpush.cn/settings 获取
+  'WPUSH_CHANNEL': 'wechat',  # 推送渠道，支持 wechat/app/sms/mail/webhook/dingtalk/feishu/wechat_work/clawbot/qqbot
+  'WPUSH_TOPIC_CODE': '',  # 可选，Topic 广播编码
 }
 # fmt: on
 
@@ -690,6 +707,10 @@ def smtp(title: str, content: str) -> None:
         return
     print("SMTP 邮件 服务启动")
 
+    email_to = push_config.get("SMTP_EMAIL_TO") or push_config.get("SMTP_EMAIL")
+    email_to_list = [
+        item.strip() for item in re.split(r"[;；]", email_to) if item.strip()
+    ]
     message = MIMEText(content, "plain", "utf-8")
     message["From"] = formataddr(
         (
@@ -697,12 +718,7 @@ def smtp(title: str, content: str) -> None:
             push_config.get("SMTP_EMAIL"),
         )
     )
-    message["To"] = formataddr(
-        (
-            Header(push_config.get("SMTP_NAME"), "utf-8").encode(),
-            push_config.get("SMTP_EMAIL"),
-        )
-    )
+    message["To"] = ",".join(email_to_list)
     message["Subject"] = Header(title, "utf-8")
 
     try:
@@ -716,7 +732,7 @@ def smtp(title: str, content: str) -> None:
         )
         smtp_server.sendmail(
             push_config.get("SMTP_EMAIL"),
-            push_config.get("SMTP_EMAIL"),
+            email_to_list,
             message.as_bytes(),
         )
         smtp_server.close()
@@ -898,6 +914,120 @@ def wxpusher_bot(title: str, content: str) -> None:
         print(f"wxpusher 推送失败！错误信息：{response.get('msg')}")
 
 
+def wxpusher_spt(title: str, content: str) -> None:
+    """
+    通过 wxpusher 极简推送（SPT）推送消息。
+    支持的环境变量:
+    - WXPUSHER_SPT_LIST: SPT, 多个用英文逗号,分隔, 最多10个
+    """
+    if not push_config.get("WXPUSHER_SPT_LIST"):
+        return
+
+    # 处理 SPT，将逗号分隔的字符串转为数组
+    spts = [
+        spt.strip()
+        for spt in push_config.get("WXPUSHER_SPT_LIST").split(",")
+        if spt.strip()
+    ]
+
+    if not spts:
+        print("wxpusher 服务的 WXPUSHER_SPT_LIST 不能为空!!")
+        return
+    if len(spts) > 10:
+        print("wxpusher 服务的 WXPUSHER_SPT_LIST 最多支持 10 个!!")
+        return
+
+    print("wxpusher SPT 服务启动")
+
+    url = "https://wxpusher.zjiecode.com/api/send/message/simple-push"
+
+    data = {
+        "content": f"<h1>{title}</h1><br/><div style='white-space: pre-wrap;'>{content}</div>",
+        "summary": title,
+        "contentType": 2,
+    }
+    # 单个 SPT 用 spt，多个用 sptList
+    if len(spts) == 1:
+        data["spt"] = spts[0]
+    else:
+        data["sptList"] = spts
+
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url=url, json=data, headers=headers).json()
+
+    if response.get("code") == 1000:
+        print("wxpusher SPT 推送成功！")
+    else:
+        print(f"wxpusher SPT 推送失败！错误信息：{response.get('msg')}")
+
+
+
+def wpush(title: str, content: str) -> None:
+    """
+    通过 WPUSH 推送消息。
+    官方文档: https://wpush.cn/docs
+    """
+    if not push_config.get("WPUSH_APIKEY"):
+        return
+
+    print("WPUSH 服务启动")
+
+    url = "https://api.wpush.cn/api/v1/send"
+    data = {
+        "apikey": push_config.get("WPUSH_APIKEY"),
+        "title": title,
+        "content": content,
+        "channel": push_config.get("WPUSH_CHANNEL") or "wechat",
+    }
+    if push_config.get("WPUSH_TOPIC_CODE"):
+        data["topic_code"] = push_config.get("WPUSH_TOPIC_CODE")
+
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url=url, json=data, headers=headers, timeout=15).json()
+
+    if response.get("code") == 0:
+        print("WPUSH 推送成功！")
+    else:
+        print(f'WPUSH 推送失败！错误信息：{response.get("message") or response}')
+
+
+def openilink(title: str, content: str) -> None:
+    """
+    通过 OpeniLink 推送消息。
+    支持的环境变量:
+    - OPENILINK_APP_TOKEN: 在 OpeniLink Hub 后台安装 App 后获取的 app_token
+    - OPENILINK_HUB_URL: OpeniLink Hub 地址，默认为 https://hub.openilink.com
+    - OPENILINK_CONTEXT_TOKEN: 消息会话上下文 token，可从消息事件中获取
+    """
+    if not push_config.get("OPENILINK_APP_TOKEN"):
+        return
+
+    print("OpeniLink 服务启动")
+
+    base_url = (
+        push_config.get("OPENILINK_HUB_URL", "").rstrip("/")
+        or "https://hub.openilink.com"
+    )
+    url = f"{base_url}/bot/v1/message/send"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f'Bearer {push_config.get("OPENILINK_APP_TOKEN")}',
+    }
+    data = {
+        "type": "text",
+        "content": f"{title}\n\n{content}",
+    }
+    if push_config.get("OPENILINK_CONTEXT_TOKEN"):
+        data["context_token"] = push_config.get("OPENILINK_CONTEXT_TOKEN")
+
+    response = requests.post(url=url, json=data, headers=headers).json()
+
+    if response.get("ok"):
+        print("OpeniLink 推送成功！")
+    else:
+        print(f'OpeniLink 推送失败！错误信息：{response.get("error")}')
+
+
 def parse_headers(headers):
     if not headers:
         return {}
@@ -1063,6 +1193,12 @@ def add_notify_function():
         push_config.get("WXPUSHER_TOPIC_IDS") or push_config.get("WXPUSHER_UIDS")
     ):
         notify_function.append(wxpusher_bot)
+    if push_config.get("WXPUSHER_SPT_LIST"):
+        notify_function.append(wxpusher_spt)
+    if push_config.get("OPENILINK_APP_TOKEN"):
+        notify_function.append(openilink)
+    if push_config.get("WPUSH_APIKEY"):
+        notify_function.append(wpush)
     if not notify_function:
         print(f"无推送渠道，请检查通知变量是否正确")
     return notify_function
@@ -1088,7 +1224,7 @@ def send(title: str, content: str, ignore_default_config: bool = False, **kwargs
             return
 
     hitokoto = push_config.get("HITOKOTO")
-    content += "\n\n" + one() if hitokoto != "false" else ""
+    content += "\n\n" + one() if hitokoto not in [False, "false"] else ""
 
     notify_function = add_notify_function()
     ts = [

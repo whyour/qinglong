@@ -13,11 +13,13 @@ import { AuthDataType, SystemModel } from '../data/system';
 import SystemService from '../services/system';
 import UserService from '../services/user';
 import { writeFile, readFile } from 'fs/promises';
-import { createRandomString, fileExist, isDemoEnv, safeJSONParse } from '../config/util';
+import { fileExist, isDemoEnv, safeJSONParse } from '../config/util';
 import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
 import Logger from './logger';
-import { AppModel } from '../data/open';
+import cronClient from '../schedule/client';
+import { InstanceStatus, RunningInstanceModel } from '../data/runningInstance';
+import { setLang, systemLang } from '../shared/i18n';
 
 export default async () => {
   const cronService = Container.get(CronService);
@@ -28,19 +30,7 @@ export default async () => {
   const openService = Container.get(OpenService);
 
   // 初始化增加系统配置
-  let systemApp = (
-    await AppModel.findOne({
-      where: { name: 'system' },
-    })
-  )?.get({ plain: true });
-  if (!systemApp) {
-    systemApp = await AppModel.create({
-      name: 'system',
-      scopes: ['crons', 'system'],
-      client_id: createRandomString(12, 12),
-      client_secret: createRandomString(24, 24),
-    });
-  }
+  await openService.initializeSystemApp();
   const [systemConfig] = await SystemModel.findOrCreate({
     where: { type: AuthDataType.systemConfig },
   });
@@ -134,6 +124,16 @@ export default async () => {
   // 初始化更新所有任务状态为空闲
   await CrontabModel.update({ status: CrontabStatus.idle }, { where: {} });
 
+  // 清空所有运行中的实例记录（服务重启后进程已不存在）
+  await RunningInstanceModel.update(
+    {
+      status: InstanceStatus.stopped,
+      finished_at: Math.floor(Date.now() / 1000),
+      // The previous process's exit code cannot be recovered after a restart.
+    },
+    { where: { status: InstanceStatus.running } },
+  );
+
   // 初始化时执行一次所有的 ql repo 任务
   CrontabModel.findAll({
     where: {
@@ -210,14 +210,28 @@ export default async () => {
     }
   });
 
+  // 初始化语言（必须在 autosave_crontab 之前）
+  const lang = systemConfig.info?.lang || systemLang();
+  setLang(lang);
+
+  // 确保 lang_env.sh 存在
+  try {
+    const langEnvExist = await fileExist(config.langEnvFile);
+    if (!langEnvExist) {
+      await writeFile(config.langEnvFile, `export QL_LANG='${lang}'\n`);
+    }
+  } catch { }
+
   // 初始化保存一次ck和定时任务数据
-  await cronService.autosave_crontab();
+  cronClient.readiness.configure(async () => {
+    await cronService.autosave_crontab(true);
+    await systemService.restoreCronConcurrency();
+  });
+  await cronClient.readiness.recover();
+
   await envService.set_envs();
 
   const authInfo = await userService.getAuthInfo();
-  const apps = await openService.findApps();
   await shareStore.updateAuthInfo(authInfo);
-  if (apps?.length) {
-    await shareStore.updateApps(apps);
-  }
+  await openService.refreshApps();
 };

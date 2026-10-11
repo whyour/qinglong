@@ -20,7 +20,7 @@ export class Subscription {
   pull_option?:
     | { private_key: string }
     | { username: string; password: string };
-  pid?: number;
+  pid?: number | null;
   is_disabled?: 1 | 0;
   log_path?: string;
   alias: string;

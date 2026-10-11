@@ -1,6 +1,6 @@
 import { Service } from 'typedi';
 import Logger from '../loaders/logger';
-import { GrpcServerService } from './grpc';
+import cronClient from '../schedule/client';
 import { HttpServerService } from './http';
 
 interface HealthStatus {
@@ -23,7 +23,6 @@ export class HealthService {
   private startTime = Date.now();
 
   constructor(
-    private grpcServerService: GrpcServerService,
     private httpServerService: HttpServerService,
   ) {}
 
@@ -56,8 +55,7 @@ export class HealthService {
     }
 
     try {
-      const grpcServer = this.grpcServerService.getServer();
-      if (!grpcServer) {
+      if (!(await cronClient.readiness.check())) {
         status.services.grpc = false;
         status.status = 'error';
       }

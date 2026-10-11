@@ -9,8 +9,9 @@ import axios, {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from 'axios';
+import { getErrorDetails, ValidationErrorResponse } from './httpError';
 
-export interface IResponseData {
+export interface IResponseData extends ValidationErrorResponse {
   code?: number;
   data?: any;
   message?: string;
@@ -43,13 +44,14 @@ const errorHandler = function (
     const msg = error.response.data
       ? error.response.data.message || error.message
       : error.response.statusText;
+    const errorDetails = getErrorDetails(error.response.data);
     const responseStatus = error.response.status;
     if ([502, 504].includes(responseStatus)) {
       history.push('/error');
     } else if (responseStatus === 401) {
+      localStorage.removeItem(config.authKey);
       if (history.location.pathname !== '/login') {
         message.error(intl.get('登录已过期，请重新登录'));
-        localStorage.removeItem(config.authKey);
         history.push('/login');
       }
     } else {
@@ -60,12 +62,10 @@ const errorHandler = function (
       msg &&
         notification.error({
           message: msg,
-          description: error.response?.data?.errors ? (
+          description: errorDetails.length ? (
             <>
-              {error.response?.data?.errors?.map((item: any) => (
-                <div>
-                  {item.message} ({item.value})
-                </div>
+              {errorDetails.map((detail, index) => (
+                <div key={`${index}-${detail}`}>{detail}</div>
               ))}
             </>
           ) : undefined,
@@ -84,6 +84,7 @@ let _request = axios.create({
 });
 
 const apiWhiteList = [
+  `${config.baseUrl}api/health`,
   `${config.baseUrl}api/user/login`,
   `${config.baseUrl}open/auth/token`,
   `${config.baseUrl}api/user/two-factor/login`,
@@ -106,8 +107,8 @@ _request.interceptors.response.use(async (response) => {
   if ([502, 504].includes(responseStatus)) {
     history.push('/error');
   } else if (responseStatus === 401) {
+    localStorage.removeItem(config.authKey);
     if (history.location.pathname !== '/login') {
-      localStorage.removeItem(config.authKey);
       history.push('/login');
     }
   } else {

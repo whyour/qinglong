@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
+import { saveWithHistory } from './saveWithHistory';
 
 const SaveModal = ({
   file,
@@ -16,18 +17,21 @@ const SaveModal = ({
 
   const handleOk = async (values: any) => {
     setLoading(true);
-    const payload = { ...values, originFilename: file.title, content: file.content };
-    request
-      .post(`${config.apiPrefix}scripts`, payload)
-      .then(({ code, data }) => {
-        if (code === 200) {
-          message.success(intl.get('保存文件成功'));
-          handleCancel(data);
-        }
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    const payload = {
+      ...values,
+      originFilename: file.title,
+      content: file.content,
+    };
+    try {
+      const result = await saveWithHistory(
+        'post',
+        `${config.apiPrefix}scripts`,
+        payload,
+      );
+      if (result?.code === 200) handleCancel(result.data);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

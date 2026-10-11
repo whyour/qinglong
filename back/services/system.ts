@@ -1,8 +1,11 @@
+import { Op } from 'sequelize';
 import { spawn } from 'cross-spawn';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { shellQuote } from '../shared/shellQuote';
 import { Response } from 'express';
 import fs from 'fs';
 import { Agent, request } from 'undici';
-import sum from 'lodash/sum';
 import path from 'path';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
@@ -34,11 +37,15 @@ import {
   NotifyLogInfo,
 } from '../data/system';
 import taskLimit from '../shared/pLimit';
+import cronClient from '../schedule/client';
+import { withSchedulerMutation } from '../shared/schedulerMutationLock';
 import NotificationService from './notify';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import SockService from './sock';
 import os from 'os';
 import dayjs from 'dayjs';
+import { t, setLang } from '../shared/i18n';
+import { updateLinuxMirrorFile } from '../config/util';
 
 @Service()
 export default class SystemService {
@@ -49,7 +56,7 @@ export default class SystemService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
@@ -78,8 +85,8 @@ export default class SystemService {
     const code = Math.random().toString().slice(-6);
     const isSuccess = await this.notificationService.testNotify(
       notificationInfo,
-      '青龙',
-      `【蛟龙】测试通知 https://t.me/jiao_long`,
+      t('青龙'),
+      t('【蛟龙】测试通知 https://t.me/jiao_long'),
     );
     if (isSuccess) {
       const result = await this.updateAuthDb({
@@ -88,7 +95,7 @@ export default class SystemService {
       });
       return { code: 200, data: { ...result, code } };
     } else {
-      return { code: 400, message: '通知发送失败，请检查参数' };
+      return { code: 400, message: t('通知发送失败，请检查参数') };
     }
   }
 
@@ -100,7 +107,7 @@ export default class SystemService {
     });
     const cron = {
       id: result.id as number,
-      name: '删除日志',
+      name: t('删除日志'),
       command: `ql rmlog ${info.logRemoveFrequency}`,
       runOrigin: 'system' as const,
     };
@@ -120,15 +127,29 @@ export default class SystemService {
   }
 
   public async updateCronConcurrency(info: SystemModelInfo) {
-    const oDoc = await this.getSystemConfig();
-    await this.updateAuthDb({
-      ...oDoc,
-      info: { ...oDoc.info, ...info },
-    });
-    if (info.cronConcurrency) {
-      await taskLimit.setCustomLimit(info.cronConcurrency);
+    const limit = info.cronConcurrency ?? 0;
+    if (!Number.isInteger(limit) || limit < 0 || limit > 2147483647) {
+      throw Object.assign(new Error(t('参数错误')), { status: 400 });
     }
-    return { code: 200, data: info };
+    return withSchedulerMutation(async () => {
+      const oDoc = await this.getSystemConfig();
+      await this.updateAuthDb({
+        ...oDoc,
+        info: { ...oDoc.info, ...info, cronConcurrency: limit },
+      });
+      await taskLimit.setCustomLimit(limit || Math.max(os.cpus().length, 4));
+      await cronClient.setConcurrency(limit);
+      return { code: 200, data: info };
+    });
+  }
+
+  public async restoreCronConcurrency() {
+    await withSchedulerMutation(async () => {
+      const doc = await this.getSystemConfig();
+      const limit = doc.info?.cronConcurrency ?? 0;
+      await taskLimit.setCustomLimit(limit || Math.max(os.cpus().length, 4));
+      await cronClient.setConcurrency(limit);
+    });
   }
 
   public async updateDependenceProxy(info: SystemModelInfo) {
@@ -140,7 +161,9 @@ export default class SystemService {
     if (info.dependenceProxy) {
       await fs.promises.writeFile(
         config.dependenceProxyFile,
-        `export http_proxy="${info.dependenceProxy}"\nexport https_proxy="${info.dependenceProxy}"`,
+        `export http_proxy=${shellQuote(
+          info.dependenceProxy,
+        )}\nexport https_proxy=${shellQuote(info.dependenceProxy)}`,
       );
     } else {
       await fs.promises.rm(config.dependenceProxyFile);
@@ -156,7 +179,7 @@ export default class SystemService {
     });
     let cmd = 'pnpm config delete registry';
     if (info.nodeMirror) {
-      cmd = `pnpm config set registry ${info.nodeMirror}`;
+      cmd = `pnpm config set registry ${shellQuote(info.nodeMirror)}`;
     }
     let command = `cd && ${cmd}`;
     const docs = await DependenceModel.findAll({
@@ -179,6 +202,7 @@ export default class SystemService {
           this.sockService.sendMessage({
             type: 'updateNodeMirror',
             message: 'update node mirror end',
+            status: 'completed',
           });
         },
         onError: async (message: string) => {
@@ -204,7 +228,7 @@ export default class SystemService {
     });
     let cmd = 'pip config unset global.index-url';
     if (info.pythonMirror) {
-      cmd = `pip3 config set global.index-url ${info.pythonMirror}`;
+      cmd = `pip3 config set global.index-url ${shellQuote(info.pythonMirror)}`;
     }
     await promiseExec(cmd);
     return { code: 200, data: info };
@@ -216,33 +240,10 @@ export default class SystemService {
     onEnd?: () => void,
   ) {
     const oDoc = await this.getSystemConfig();
-    await this.updateAuthDb({
-      ...oDoc,
-      info: { ...oDoc.info, ...info },
-    });
-    let defaultDomain = 'https://dl-cdn.alpinelinux.org';
-    let targetDomain = 'https://dl-cdn.alpinelinux.org';
     if (os.platform() !== 'linux') {
       return;
     }
-    const content = await fs.promises.readFile('/etc/apk/repositories', {
-      encoding: 'utf-8',
-    });
-    const domainMatch = content.match(/(http.*)\/alpine\/.*/);
-    if (domainMatch) {
-      defaultDomain = domainMatch[1];
-    }
-    if (info.linuxMirror) {
-      targetDomain = info.linuxMirror;
-    }
-    const command = `sed -i 's/${defaultDomain.replace(
-      /\//g,
-      '\\/',
-    )}/${targetDomain.replace(
-      /\//g,
-      '\\/',
-    )}/g' /etc/apk/repositories && apk update -f`;
-
+    const command = await updateLinuxMirrorFile(info.linuxMirror || '');
     this.scheduleService.runTask(
       command,
       {
@@ -250,12 +251,20 @@ export default class SystemService {
           res?.setHeader('QL-Task-Pid', `${cp.pid}`);
           res?.end();
         },
-        onEnd: async () => {
+        onEnd: async (cp) => {
           this.sockService.sendMessage({
             type: 'updateLinuxMirror',
             message: 'update linux mirror end',
+            status: 'completed',
           });
           onEnd?.();
+          // Tools such as sudo and apt may write warnings to stderr on success.
+          if (cp?.exitCode === 0 && cp.signalCode === null) {
+            await this.updateAuthDb({
+              ...oDoc,
+              info: { ...oDoc.info, ...info },
+            });
+          }
         },
         onError: async (message: string) => {
           this.sockService.sendMessage({ type: 'updateLinuxMirror', message });
@@ -289,7 +298,7 @@ export default class SystemService {
         );
         const text = await body.text();
         lastVersionContent = parseContentVersion(text);
-      } catch (error) { }
+      } catch (error) {}
 
       if (!lastVersionContent) {
         lastVersionContent = currentVersionContent;
@@ -355,6 +364,15 @@ export default class SystemService {
       this.sockService.sendMessage({
         type: 'updateSystemVersion',
         message: JSON.stringify(err),
+        status: 'failed',
+      });
+    });
+
+    cp.on('exit', (code) => {
+      this.sockService.sendMessage({
+        type: 'updateSystemVersion',
+        message: '',
+        status: code === 0 ? 'success' : 'failed',
       });
     });
 
@@ -362,7 +380,10 @@ export default class SystemService {
   }
 
   public async reloadSystem(target?: 'system' | 'data') {
-    const cmd = `real_time=true ql reload ${target || ''}`;
+    if (target && !['system', 'data'].includes(target)) {
+      return { code: 400, message: t('参数错误') };
+    }
+    const cmd = `real_time=true ql reload ${shellQuote(target || '')}`;
     const cp = spawn(cmd, {
       shell: '/bin/bash',
       detached: true,
@@ -397,7 +418,9 @@ export default class SystemService {
       notifyType = typeString || (notificationInfo.type as string);
     } else {
       try {
-        const notifConfig = await this.getDb({ type: AuthDataType.notification });
+        const notifConfig = await this.getDb({
+          type: AuthDataType.notification,
+        });
         notifyType = notifConfig.info?.type as string | undefined;
       } catch (e) {}
     }
@@ -408,21 +431,40 @@ export default class SystemService {
       notificationInfo,
     );
 
-    await SystemModel.create({
-      type: AuthDataType.notifyLog,
-      info: {
-        timestamp: Date.now(),
-        title,
-        content,
-        status: isSuccess ? NotifyStatus.success : NotifyStatus.fail,
-        notifyType,
-      },
-    });
+    try {
+      await SystemModel.create({
+        type: AuthDataType.notifyLog,
+        info: {
+          timestamp: Date.now(),
+          title: title.slice(0, 512),
+          content: content.slice(0, 8192),
+          status: isSuccess ? NotifyStatus.success : NotifyStatus.fail,
+          notifyType,
+        },
+      });
+      const oldest = await SystemModel.findAll({
+        where: { type: AuthDataType.notifyLog },
+        attributes: ['id'],
+        order: [['id', 'DESC']],
+        offset: 200,
+        limit: 1,
+      });
+      if (oldest[0]?.id) {
+        await SystemModel.destroy({
+          where: {
+            type: AuthDataType.notifyLog,
+            id: { [Op.lte]: oldest[0].id },
+          },
+        });
+      }
+    } catch (error) {
+      this.logger.error('Failed to persist notification audit log: %o', error);
+    }
 
     if (isSuccess) {
-      return { code: 200, message: '通知发送成功' };
+      return { code: 200, message: t('通知发送成功') };
     } else {
-      return { code: 400, message: '通知发送失败，请检查系统设置/通知配置' };
+      return { code: 400, message: t('通知发送失败，请检查系统设置/通知配置') };
     }
   }
 
@@ -430,29 +472,33 @@ export default class SystemService {
     const docs = await SystemModel.findAll({
       where: { type: AuthDataType.notifyLog },
       order: [['id', 'DESC']],
+      limit: 200,
     });
-    if (docs.length > 200) {
-      const ids = docs.slice(200).map((x) => x.id!);
-      await SystemModel.destroy({ where: { id: ids } });
-    }
-    return docs.slice(0, 200).map((x) => ({ ...x.info, id: x.id }));
+    return docs.map((x) => ({ ...x.info, id: x.id }));
   }
 
-  public async run({ command, logPath }: { command: string; logPath?: string }, callback: TaskCallbacks) {
+  public async run(
+    { command, logPath }: { command: string; logPath?: string },
+    callback: TaskCallbacks,
+  ) {
     if (!command.startsWith(TASK_COMMAND)) {
       command = `${TASK_COMMAND} ${command}`;
     }
-    const logPathPrefix = logPath ? `real_log_path=${logPath}` : ''
-    this.scheduleService.runTask(`${logPathPrefix} real_time=true ${command}`, callback, {
-      command,
-      id: command.replace(/ /g, '-'),
-      runOrigin: 'system',
-    });
+    const logPathPrefix = logPath ? `real_log_path=${logPath}` : '';
+    this.scheduleService.runTask(
+      `${logPathPrefix} real_time=true ${command}`,
+      callback,
+      {
+        command,
+        id: command.replace(/ /g, '-'),
+        runOrigin: 'system',
+      },
+    );
   }
 
   public async stop({ command, pid }: { command: string; pid: number }) {
     if (!pid && !command) {
-      return { code: 400, message: '参数错误' };
+      return { code: 400, message: t('参数错误') };
     }
 
     if (pid) {
@@ -468,7 +514,7 @@ export default class SystemService {
       await killTask(_pid);
       return { code: 200 };
     } else {
-      return { code: 400, message: '任务未找到' };
+      return { code: 400, message: t('任务未找到') };
     }
   }
 
@@ -478,10 +524,35 @@ export default class SystemService {
       if (type && type.length) {
         dataDirs = dataDirs.concat(type.filter((x) => x !== 'base'));
       }
-      const dataPaths = dataDirs.map((dir) => `data/${dir}`);
-      await promiseExec(
-        `cd ${config.dataPath} && cd ../ && tar -zcvf ${config.dataTgzFile
-        } ${dataPaths.join(' ')}`,
+      const allowed = new Set([
+        'db',
+        'upload',
+        'config',
+        'scripts',
+        'log',
+        'deps',
+        'syslog',
+        'dep_cache',
+        'raw',
+        'repo',
+        'ssh.d',
+        'script-history',
+      ]);
+      if (dataDirs.some((dir) => !allowed.has(dir))) {
+        return res.status(400).send({ code: 400, message: t('参数错误') });
+      }
+      if (dataDirs.includes('scripts')) dataDirs.push('script-history');
+      // History is created lazily; old/fresh installations must still export.
+      if (!fs.existsSync(path.join(config.dataPath, 'script-history'))) {
+        dataDirs = dataDirs.filter((dir) => dir !== 'script-history');
+      }
+      const dataPaths = [...new Set(dataDirs)].map((dir) => `data/${dir}`);
+      await promisify(execFile)(
+        'tar',
+        ['-zcf', config.dataTgzFile, '--', ...dataPaths],
+        {
+          cwd: path.dirname(config.dataPath),
+        },
       );
       res.download(config.dataTgzFile);
     } catch (error: any) {
@@ -506,6 +577,7 @@ export default class SystemService {
     query: {
       startTime?: string;
       endTime?: string;
+      limit?: number;
     },
   ) {
     const startTime = dayjs(query.startTime || undefined)
@@ -520,8 +592,30 @@ export default class SystemService {
       .filter((x) => x.title.endsWith('.log'))
       .filter((x) => x.createTime >= startTime && x.createTime <= endTime);
 
+    const limit = Math.min(
+      Math.max(Number(query.limit) || 1024 * 1024, 1),
+      1024 * 1024,
+    );
+    const total = logs.reduce((size, log) => size + (log.size || 0), 0);
+    let remaining = limit;
+    const selected: Array<
+      (typeof logs)[number] & { start: number; length: number }
+    > = [];
+    for (let index = logs.length - 1; index >= 0 && remaining > 0; index--) {
+      const log = logs[index];
+      const size = log.size || 0;
+      const length = Math.min(size, remaining);
+      if (length > 0) {
+        selected.unshift({ ...log, start: size - length, length });
+        remaining -= length;
+      }
+    }
+
+    const contentLength = selected.reduce((size, log) => size + log.length, 0);
     res.set({
-      'Content-Length': sum(logs.map((x) => x.size)),
+      'Content-Length': contentLength,
+      'X-QL-Log-Total': total,
+      'X-QL-Log-Truncated': total > contentLength ? 'true' : 'false',
     });
     (function sendFiles(res, fileNames) {
       if (fileNames.length === 0) {
@@ -533,13 +627,17 @@ export default class SystemService {
       if (currentLog) {
         const currentFileStream = fs.createReadStream(
           path.join(config.systemLogPath, currentLog.title),
+          {
+            start: currentLog.start,
+            end: currentLog.start + currentLog.length - 1,
+          },
         );
         currentFileStream.on('end', () => {
           sendFiles(res, fileNames);
         });
         currentFileStream.pipe(res, { end: false });
       }
-    })(res, logs);
+    })(res, selected);
   }
 
   public async deleteSystemLog() {
@@ -563,8 +661,38 @@ export default class SystemService {
     if (success) {
       return { code: 200, data: info };
     } else {
-      return { code: 400, message: '设置时区失败' };
+      return { code: 400, message: t('设置时区失败') };
     }
+  }
+
+  public async updateLanguage(info: SystemModelInfo) {
+    const oDoc = await this.getSystemConfig();
+    const lang = info.lang || 'zh';
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, lang },
+    });
+    // Write to standalone lang_env.sh, sourced by shell scripts
+    try {
+      await fs.promises.writeFile(
+        config.langEnvFile,
+        `export QL_LANG=${shellQuote(lang)}\n`,
+      );
+    } catch (error) {
+      this.logger.error(`Failed to write lang_env.sh: ${error}`);
+    }
+    setLang(lang);
+    return { code: 200, data: { lang } };
+  }
+
+  public async updatePanelTitle(info: SystemModelInfo) {
+    const oDoc = await this.getSystemConfig();
+    const panelTitle = info.panelTitle?.trim() || '';
+    await this.updateAuthDb({
+      ...oDoc,
+      info: { ...oDoc.info, panelTitle },
+    });
+    return { code: 200, data: { panelTitle } };
   }
 
   public async updateGlobalSshKey(info: SystemModelInfo) {
@@ -573,29 +701,37 @@ export default class SystemService {
       ...oDoc,
       info: { ...oDoc.info, ...info },
     });
-    
+
     // Apply the global SSH key
     const SshKeyService = require('./sshKey').default;
     const Container = require('typedi').Container;
     const sshKeyService = Container.get(SshKeyService);
-    
+
     if (info.globalSshKey) {
       await sshKeyService.addGlobalSSHKey(info.globalSshKey, 'global');
     } else {
       await sshKeyService.removeGlobalSSHKey('global');
     }
-    
+
     return { code: 200, data: result };
   }
 
   public async cleanDependence(type: 'node' | 'python3') {
     if (!type || !['node', 'python3'].includes(type)) {
-      return { code: 400, message: '参数错误' };
+      return { code: 400, message: t('参数错误') };
     }
-    try {
-      const finalPath = path.join(config.dependenceCachePath, type);
-      await fs.promises.rm(finalPath, { recursive: true });
-    } catch (error) { }
+    const finalPath = path.join(config.dependenceCachePath, type);
+    await fs.promises.rm(finalPath, { recursive: true, force: true });
+    await DependenceModel.update(
+      { status: DependenceStatus.installFailed },
+      {
+        where: {
+          type:
+            type === 'node' ? DependenceTypes.nodejs : DependenceTypes.python3,
+          status: DependenceStatus.installed,
+        },
+      },
+    );
     return { code: 200 };
   }
 }

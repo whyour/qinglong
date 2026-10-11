@@ -365,9 +365,9 @@ const Crontab = () => {
     }
   };
 
-  const getCrons = () => {
-    setLoading(true);
-    const { page, size, sorter, filters } = pageConf;
+  const getCrons = async (silent?: boolean) => {
+    if (!silent) setLoading(true);
+    const { page = 1, size = 20, sorter, filters = {} } = pageConf;
     let url = `${config.apiPrefix
       }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
         filters,
@@ -385,7 +385,7 @@ const Crontab = () => {
         filterRelation: viewConf.filterRelation || 'and',
       })}`;
     }
-    request
+    return request
       .get(url)
       .then(async ({ code, data: _data }) => {
         if (code === 200) {
@@ -419,8 +419,23 @@ const Crontab = () => {
           setTotal(total);
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => !silent && setLoading(false));
   };
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+    const poll = async () => {
+      await getCrons(true);
+      if (cancelled) return;
+      timer = setTimeout(poll, 10000);
+    };
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [pageConf, viewConf, searchText]);
 
   const addCron = () => {
     setEditedCron(null as any);
@@ -809,7 +824,7 @@ const Crontab = () => {
           setAllSubscriptions(data || []);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   useEffect(() => {
@@ -1077,8 +1092,11 @@ const Crontab = () => {
       )}
       {isDetailModalVisible && (
         <CronDetailModal
-          handleCancel={() => {
+          handleCancel={(needUpdate?: boolean) => {
             setIsDetailModalVisible(false);
+            if (needUpdate) {
+              getCrons();
+            }
           }}
           cron={detailCron}
           theme={theme}

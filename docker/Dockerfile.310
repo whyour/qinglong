@@ -1,11 +1,26 @@
-FROM python:3.10-alpine3.18 AS builder
+# Run Node package installation natively on the builder. Node/npm can spin at
+# 100% CPU when Alpine s390x is emulated through QEMU.
+FROM --platform=$BUILDPLATFORM node:18-alpine3.18 AS builder
+
+ARG TARGETARCH
+ENV NPM_CONFIG_PREFIX=/opt/node-global
+ENV PATH=/opt/node-global/bin:${PATH}
+
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
 RUN set -x \
-  && apk update \
-  && apk add nodejs npm git \
-  && npm i -g pnpm@8.3.1 pm2 ts-node \
+  && apk add --no-cache git \
+  && npm i -g pnpm@8.3.1 pm2 ts-node typescript@5 \
   && cd /tmp/build \
-  && pnpm install --prod
+  && case "${TARGETARCH}" in \
+    amd64) NODE_ARCH=x64 ;; \
+    386) NODE_ARCH=ia32 ;; \
+    ppc64le) NODE_ARCH=ppc64 ;; \
+    *) NODE_ARCH="${TARGETARCH}" ;; \
+  esac \
+  && npm_config_target_platform=linux \
+    npm_config_target_arch="${NODE_ARCH}" \
+    npm_config_target_libc=musl \
+    pnpm install --prod --frozen-lockfile
 
 FROM python:3.10-alpine
 
@@ -17,16 +32,17 @@ ARG PYTHON_SHORT_VERSION=3.10
 
 ENV QL_DIR=/ql \
   QL_BRANCH=${QL_BRANCH} \
+  QL_CONTAINER=true \
   LANG=C.UTF-8 \
   SHELL=/bin/bash \
   PS1="\u@\h:\w \$ "
 
 VOLUME /ql/data
-  
+
 EXPOSE 5700
 
-COPY --from=builder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
-COPY --from=builder /usr/local/bin/. /usr/local/bin/
+COPY --from=builder /opt/node-global/lib/node_modules/. /usr/local/lib/node_modules/
+COPY --from=builder /opt/node-global/bin/. /usr/local/bin/
 
 RUN set -x \
   && apk update -f \
@@ -57,15 +73,19 @@ RUN set -x \
   && ulimit -c 0
 
 ARG SOURCE_COMMIT
+LABEL org.opencontainers.image.revision=${SOURCE_COMMIT}
 RUN git clone --depth=1 -b ${QL_BRANCH} ${QL_URL} ${QL_DIR} \
   && cd ${QL_DIR} \
+  && if [ -n "${SOURCE_COMMIT}" ]; then git fetch --depth=1 origin "${SOURCE_COMMIT}" && git reset --hard FETCH_HEAD; fi \
   && cp -f .env.example .env \
   && chmod 777 ${QL_DIR}/shell/*.sh \
-  && chmod 777 ${QL_DIR}/docker/*.sh \
-  && git clone --depth=1 -b ${QL_BRANCH} https://github.com/${QL_MAINTAINER}/qinglong-static.git /static \
-  && mkdir -p ${QL_DIR}/static \
-  && cp -rf /static/* ${QL_DIR}/static \
-  && rm -rf /static
+  && chmod 777 ${QL_DIR}/docker/*.sh
+
+# Downloaded by CI from the build-static job in this workflow run.
+COPY static/ /ql/static/
+COPY docker/verify-build.cjs docker/build-manifest.cjs /tmp/
+COPY --from=builder /tmp/build/pnpm-lock.yaml /tmp/dependency-lock.yaml
+RUN cd ${QL_DIR} && node /tmp/verify-build.cjs /tmp/dependency-lock.yaml
 
 ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \
@@ -73,7 +93,7 @@ ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   HOME=/root
 
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}:${PYTHON_HOME}/bin:${HOME}/bin \
-  NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules:${PNPM_HOME}/global/5/node_modules \
+  NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules \
   PIP_CACHE_DIR=${PYTHON_HOME}/pip \
   PYTHONPATH=${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages
 
@@ -81,9 +101,13 @@ RUN pip3 install --prefix ${PYTHON_HOME} requests
 
 COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
 
+RUN ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/task \
+  && ln -sf ${QL_DIR}/shell/update.sh /usr/local/bin/ql \
+  && chmod +x /usr/local/bin/task /usr/local/bin/ql
+
 WORKDIR ${QL_DIR}
 
 HEALTHCHECK --interval=5s --timeout=2s --retries=20 \
-  CMD curl -sf --noproxy '*' http://127.0.0.1:${QlPort:-5700}/api/health || exit 1
+  CMD curl -sf --noproxy '*' http://localhost:${QlPort:-5700}/api/health || exit 1
 
 ENTRYPOINT ["./docker/docker-entrypoint.sh"]

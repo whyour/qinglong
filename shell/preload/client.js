@@ -1,11 +1,29 @@
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
+const { readFileSync } = require('fs');
 const { join } = require('path');
 
 class GrpcClient {
+  static #certDir = join(
+    process.env.QL_DATA_DIR || join(process.env.QL_DIR, 'data'),
+    'config/grpc',
+  );
+
+  static #loadTlsCredentials() {
+    try {
+      return grpc.credentials.createSsl(
+        readFileSync(join(GrpcClient.#certDir, 'ca.crt')),
+        readFileSync(join(GrpcClient.#certDir, 'client.key')),
+        readFileSync(join(GrpcClient.#certDir, 'client.crt')),
+      );
+    } catch {
+      return grpc.credentials.createInsecure();
+    }
+  }
+
   static #config = {
     protoPath: join(process.env.QL_DIR, 'back/protos/api.proto'),
-    serverAddress: `0.0.0.0:${process.env.GRPC_PORT || '5500'}`,
+    serverAddress: `localhost:${process.env.GRPC_PORT || '5500'}`,
     protoOptions: {
       keepCase: true,
       longs: String,
@@ -58,7 +76,7 @@ class GrpcClient {
 
       this.#client = new apiProto.Api(
         serverAddress,
-        grpc.credentials.createInsecure(),
+        GrpcClient.#loadTlsCredentials(),
         grpcOptions,
       );
     } catch (error) {
