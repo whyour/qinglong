@@ -1,0 +1,28 @@
+.scenario-page {
+  background: white;
+  border-radius: 2px;
+}
+
+.scenario-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+[data-theme='dark'] .scenario-page {
+  background: #1f1f1f;
+}
+
+@media (max-width: 768px) {
+  .scenario-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .scenario-toolbar .ant-space,
+  .scenario-toolbar .ant-input-search {
+    width: 100%;
+  }
+}

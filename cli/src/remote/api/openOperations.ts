@@ -12,6 +12,29 @@ export interface OpenOperation {
   anonymous?: boolean;
 }
 export const openOperations: readonly OpenOperation[] = [
+  { name: 'scenario list', method: 'GET', path: 'scenarios' },
+  {
+    name: 'scenario get',
+    method: 'GET',
+    path: 'scenarios/:id',
+    params: ['id'],
+  },
+  { name: 'scenario create', method: 'POST', path: 'scenarios', body: 'json' },
+  { name: 'scenario update', method: 'PUT', path: 'scenarios', body: 'json' },
+  { name: 'scenario delete', method: 'DELETE', path: 'scenarios', body: 'ids' },
+  {
+    name: 'scenario enable',
+    method: 'PUT',
+    path: 'scenarios/enable',
+    body: 'ids',
+  },
+  {
+    name: 'scenario disable',
+    method: 'PUT',
+    path: 'scenarios/disable',
+    body: 'ids',
+  },
+
   { name: 'task view-list', method: 'GET', path: 'crons/views' },
   {
     name: 'task view-create',
@@ -478,7 +501,12 @@ export const openOperations: readonly OpenOperation[] = [
     path: 'system/config/dependence-clean',
     body: 'json',
   },
-  { name: 'dashboard record', method: 'POST', path: 'dashboard/record', body: 'json' },
+  {
+    name: 'dashboard record',
+    method: 'POST',
+    path: 'dashboard/record',
+    body: 'json',
+  },
   { name: 'dashboard overview', method: 'GET', path: 'dashboard/overview' },
   { name: 'dashboard trend', method: 'GET', path: 'dashboard/trend' },
   { name: 'dashboard top-time', method: 'GET', path: 'dashboard/top-time' },

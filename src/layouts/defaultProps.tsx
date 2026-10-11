@@ -1,5 +1,9 @@
 import intl from 'react-intl-universal';
-import { SettingOutlined, DashboardOutlined } from '@ant-design/icons';
+import {
+  SettingOutlined,
+  DashboardOutlined,
+  ApartmentOutlined,
+} from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
 import { BasicLayoutProps } from '@ant-design/pro-layout';
 
@@ -77,6 +81,12 @@ export default {
         name: intl.get('对比工具'),
         icon: <IconFont type="ql-icon-diff" />,
         component: '@/pages/diff/index',
+      },
+      {
+        path: '/scenario',
+        name: intl.get('场景管理'),
+        icon: <ApartmentOutlined />,
+        component: '@/pages/scenario/index',
       },
       {
         path: '/setting',

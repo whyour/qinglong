@@ -1,0 +1,10 @@
+export
+.form-item-type-tag {
+  color: inherit;
+  padding: 0 2px;
+  height: 18px;
+  width: 18px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  flex-grow: 0;
+}

@@ -12,6 +12,7 @@ import subscription from './subscription';
 import update from './update';
 import dashboard from './dashboard';
 import health from './health';
+import scenario from './scenario';
 import clientIp from './clientIp';
 import retention from './retention';
 
@@ -30,6 +31,7 @@ export default () => {
   update(app);
   dashboard(app);
   health(app);
+  scenario(app);
   clientIp(app);
   retention(app);
 
