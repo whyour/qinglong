@@ -3,6 +3,7 @@ import { Container } from 'typedi';
 import OpenService from '../services/open';
 import { Logger } from 'winston';
 import { celebrate, Joi } from 'celebrate';
+import { rateLimit } from 'express-rate-limit';
 const route = Router();
 
 export default (app: Router) => {
@@ -100,6 +101,7 @@ export default (app: Router) => {
 
   route.get(
     '/auth/token',
+    rateLimit({ windowMs: 15 * 60 * 1000, limit: 100 }),
     celebrate({
       query: {
         client_id: Joi.string().required(),

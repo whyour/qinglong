@@ -4,6 +4,7 @@ import { HealthService } from '../protos/health';
 import { ApiService } from '../protos/api';
 import { addCron } from '../schedule/addCron';
 import { delCron } from '../schedule/delCron';
+import { setConcurrency } from '../schedule/setConcurrency';
 import { check } from '../schedule/health';
 import * as Api from '../schedule/api';
 import Logger from '../loaders/logger';
@@ -11,30 +12,59 @@ import { promisify } from 'util';
 import config from '../config';
 import { metricsService } from './metrics';
 import { Service } from 'typedi';
+import { initGrpcCerts } from '../config/grpcCerts';
 
 @Service()
 export class GrpcServerService {
   private server: Server = new Server({ 'grpc.enable_http_proxy': 0 });
 
+  private formatGrpcAddress(host: string, port: number): string {
+    if (host === '::') {
+      return `[::]:${port}`;
+    }
+    return `${host}:${port}`;
+  }
+
   async initialize() {
     try {
       this.server.addService(HealthService, { check });
-      this.server.addService(CronService, { addCron, delCron });
+      this.server.addService(CronService, { addCron, delCron, setConcurrency });
       this.server.addService(ApiService, Api);
 
-      const grpcPort = config.grpcPort;
-      const bindAsync = promisify(this.server.bindAsync).bind(this.server);
-      await bindAsync(
-        `0.0.0.0:${grpcPort}`,
-        ServerCredentials.createInsecure(),
+      const tlsConfig = await initGrpcCerts();
+      const credentials = ServerCredentials.createSsl(
+        Buffer.from(tlsConfig.caCert),
+        [{ cert_chain: Buffer.from(tlsConfig.serverCert), private_key: Buffer.from(tlsConfig.serverKey) }],
+        true,
       );
-      Logger.debug(`✌️ gRPC service started successfully`);
 
-      metricsService.record('grpc_service_start', 1, {
-        port: grpcPort.toString(),
-      });
+      const grpcPort = config.grpcPort;
+      const hostsToTry = [
+        config.bindHostGrpc,
+        ...(config.bindHostGrpc === '::' ? ['0.0.0.0'] : [])
+      ];
+      const bindAsync = promisify(this.server.bindAsync).bind(this.server);
 
-      return grpcPort;
+      let lastError: Error | null = null;
+
+      for (const host of hostsToTry) {
+        try {
+          const address = this.formatGrpcAddress(host, grpcPort);
+          await bindAsync(address, credentials);
+          Logger.debug(`[boot] gRPC service started successfully on ${address}`);
+          metricsService.record('grpc_service_start', 1, {
+            port: grpcPort.toString(),
+            host
+          });
+          return grpcPort;
+        } catch (err) {
+          lastError = err as Error;
+          Logger.warn(`Failed to bind gRPC on ${host}:${grpcPort}, trying next...`, err);
+        }
+      }
+
+      Logger.error('Failed to start gRPC service on all hosts');
+      throw lastError || new Error('Failed to start gRPC service');
     } catch (err) {
       Logger.error('Failed to start gRPC service:', err);
       throw err;

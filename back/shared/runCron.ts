@@ -4,15 +4,26 @@ import Logger from '../loaders/logger';
 import { ICron } from '../protos/cron';
 import { CrontabModel, CrontabStatus } from '../data/cron';
 import { killTask } from '../config/util';
+import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
+import dayjs from 'dayjs';
+import { observeChildProcess, asError } from './childProcess';
 
-export function runCron(cmd: string, cron: ICron): Promise<number | void> {
-  return taskLimit.runWithCronLimit(cron, () => {
-    return new Promise(async (resolve: any) => {
+export function runCron(
+  cmd: string,
+  cron: ICron,
+  isCurrent: () => boolean = () => true,
+): Promise<number | void> {
+  const execute = async () => {
+    try {
+      if (!isCurrent()) return;
       // Check if the cron is already running and stop it (only if multiple instances are not allowed)
       try {
         const existingCron = await CrontabModel.findOne({
           where: { id: Number(cron.id) },
         });
+
+        // A mutation may commit while this queued run is reading the database.
+        if (!isCurrent() || !existingCron || existingCron.isDisabled) return;
 
         // Default to single instance mode (0) for backward compatibility
         const allowSingleInstances =
@@ -28,7 +39,18 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
           Logger.info(
             `[schedule][停止已运行任务] 任务ID: ${cron.id}, PID: ${existingCron.pid}`,
           );
-          await killTask(existingCron.pid);
+          await killTask(existingCron.pid, true);
+          // Mark old running instances as stopped
+          const stoppedAt = dayjs().unix();
+          await RunningInstanceModel.update(
+            { status: InstanceStatus.stopped, finished_at: stoppedAt },
+            {
+              where: {
+                cron_id: Number(cron.id),
+                status: InstanceStatus.running,
+              },
+            },
+          );
           // Update the status to idle after killing
           await CrontabModel.update(
             { status: CrontabStatus.idle, pid: undefined },
@@ -39,8 +61,11 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
         Logger.error(
           `[schedule][检查已运行任务失败] 任务ID: ${cron.id}, 错误: ${error}`,
         );
+        throw error;
       }
 
+      // In particular, invalidation can happen while stopping a previous run.
+      if (!isCurrent()) return;
       Logger.info(
         `[schedule][开始执行任务] 参数 ${JSON.stringify({
           ...cron,
@@ -49,33 +74,38 @@ export function runCron(cmd: string, cron: ICron): Promise<number | void> {
       );
       const cp = spawn(cmd, { shell: '/bin/bash' });
 
-      cp.stderr.on('data', (data) => {
-        Logger.info(
-          '[schedule][执行任务失败] 命令: %s, 错误信息: %j',
-          cmd,
-          data.toString(),
-        );
+      const { completed } = observeChildProcess(cp, {
+        onStderr: async (message) => {
+          Logger.info(
+            '[schedule][任务标准错误] 命令: %s, 信息: %s',
+            cmd,
+            message,
+          );
+        },
       });
-      cp.on('error', (err) => {
+      const result = await completed;
+      if (result.error) {
         Logger.error(
-          '[schedule][创建任务失败] 命令: %s, 错误信息: %j',
+          '[schedule][执行任务失败] 命令: %s, 错误: %s',
           cmd,
-          err,
+          result.error.message,
         );
-      });
-
-      cp.on('exit', async (code) => {
-        taskLimit.removeQueuedCron(cron.id);
-        Logger.info(
-          '[schedule][执行任务结束] 参数: %s, 退出码: %j',
-          JSON.stringify({
-            ...cron,
-            command: cmd,
-          }),
-          code,
-        );
-        resolve({ ...cron, command: cmd, pid: cp.pid, code });
-      });
-    });
-  });
+      }
+      Logger.info(
+        '[schedule][执行任务结束] 任务ID: %s, 退出码: %j',
+        cron.id,
+        result.code,
+      );
+      return { ...cron, command: cmd, pid: cp.pid, ...result } as any;
+    } catch (error) {
+      Logger.error(
+        '[schedule][创建任务失败] 命令: %s, 错误: %s',
+        cmd,
+        asError(error).message,
+      );
+    } finally {
+      taskLimit.removeQueuedCron(cron.id, execute);
+    }
+  };
+  return taskLimit.runWithCronLimit(cron, execute, undefined, isCurrent);
 }

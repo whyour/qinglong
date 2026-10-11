@@ -16,12 +16,16 @@ import {
   getPid,
   killTask,
   promiseExecSuccess,
+  concurrentRun,
   getInstallCommand,
   getUninstallCommand,
   getGetCommand,
 } from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
+import { detectOS } from '../config/util';
+import { LINUX_DEPENDENCE_COMMAND } from '../config/const';
+import { t, tf } from '../shared/i18n';
 
 @Service()
 export default class DependenceService {
@@ -107,6 +111,11 @@ export default class DependenceService {
     query: any = {},
   ): Promise<Dependence[]> {
     let condition = query;
+    const dependenceType =
+      type && DependenceTypes[type] !== undefined
+        ? DependenceTypes[type]
+        : undefined;
+    await this.refreshInstalledStatuses(dependenceType);
     if (type && DependenceTypes[type] !== undefined) {
       condition.type = DependenceTypes[type];
     }
@@ -127,6 +136,69 @@ export default class DependenceService {
     } catch (error) {
       throw error;
     }
+  }
+
+  private async refreshInstalledStatuses(type?: DependenceTypes) {
+    const cacheDependenceTypes = [
+      DependenceTypes.nodejs,
+      DependenceTypes.python3,
+    ];
+    if (type !== undefined && !cacheDependenceTypes.includes(type)) {
+      return;
+    }
+
+    const docs = await DependenceModel.findAll({
+      where: {
+        status: DependenceStatus.installed,
+        type: type === undefined ? { [Op.in]: cacheDependenceTypes } : type,
+      },
+    });
+    const checks = await concurrentRun(
+      docs.map((doc) => async () => {
+        return (await this.isDependenceInstalled(doc)) ? undefined : doc.id;
+      }),
+      5,
+    );
+    const missingIds = (checks || []).filter(
+      (id): id is number => id !== undefined,
+    );
+
+    if (missingIds.length) {
+      await DependenceModel.update(
+        { status: DependenceStatus.installFailed },
+        { where: { id: missingIds } },
+      );
+    }
+  }
+
+  private async isDependenceInstalled(dependency: Dependence) {
+    let depName = dependency.name.trim();
+    const depVersionStr = versionDependenceCommandTypes[dependency.type];
+    let depVersion = '';
+    if (depName.includes(depVersionStr)) {
+      const symbolRegx = new RegExp(
+        `(.*)${depVersionStr}([0-9\\.\\-\\+a-zA-Z]*)`,
+      );
+      const [, parsedName, parsedVersion] = depName.match(symbolRegx) || [];
+      if (parsedVersion && parsedName) {
+        depName = parsedName;
+        depVersion = parsedVersion;
+      }
+    }
+
+    const depInfo = (
+      await promiseExecSuccess(getGetCommand(dependency.type, depName))
+    )
+      .replace(/\s{2,}/, ' ')
+      .replace(/\s+$/, '');
+    const nameMatches =
+      (dependency.type === DependenceTypes.nodejs &&
+        depInfo.split(' ')?.[0] === depName) ||
+      dependency.type === DependenceTypes.python3;
+
+    return Boolean(
+      depInfo && nameMatches && (!depVersion || depInfo.includes(depVersion)),
+    );
   }
 
   public installDependenceOneByOne(
@@ -159,8 +231,19 @@ export default class DependenceService {
     const docs = await DependenceModel.findAll({ where: { id: ids } });
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
-      const depInstallCommand = getInstallCommand(doc.type, doc.name);
-      const depUnInstallCommand = getUninstallCommand(doc.type, doc.name);
+      let depInstallCommand = getInstallCommand(doc.type, doc.name);
+      let depUnInstallCommand = getUninstallCommand(doc.type, doc.name);
+      const isLinuxDependence = doc.type === DependenceTypes.linux;
+
+      if (isLinuxDependence) {
+        const osType = await detectOS();
+        if (!osType) {
+          continue;
+        }
+        const linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
+        depInstallCommand = `${linuxCommand.install} ${doc.name.trim()}`;
+        depUnInstallCommand = `${linuxCommand.uninstall} ${doc.name.trim()}`;
+      }
       const pids = await Promise.all([
         getPid(depInstallCommand),
         getPid(depUnInstallCommand),
@@ -217,39 +300,83 @@ export default class DependenceService {
         if (taskLimit.firstDependencyId !== dependency.id) {
           return resolve(null);
         }
-
-        taskLimit.removeQueuedDependency(dependency);
-
         const depIds = [dependency.id!];
+        let depName = dependency.name.trim();
+        const actionText = isInstall ? t('安装') : t('删除');
+        const socketMessageType = isInstall
+          ? 'installDependence'
+          : 'uninstallDependence';
+        const isNodeDependence = dependency.type === DependenceTypes.nodejs;
+        const isLinuxDependence = dependency.type === DependenceTypes.linux;
+        const isPythonDependence = dependency.type === DependenceTypes.python3;
+        const osType = await detectOS();
+        let linuxCommand = {} as typeof LINUX_DEPENDENCE_COMMAND.Alpine;
+        taskLimit.removeQueuedDependency(dependency);
+        if (isLinuxDependence) {
+          if (!osType) {
+            await DependenceModel.update(
+              { status: DependenceStatus.installFailed },
+              { where: { id: depIds } },
+            );
+            const startTime = dayjs();
+            const message = tf(
+              '开始%s依赖 %s，开始时间 %s\n\n当前系统不支持\n\n依赖%s失败，结束时间 %s，耗时 %s 秒',
+              actionText,
+              depName,
+              startTime.format('YYYY-MM-DD HH:mm:ss'),
+              actionText,
+              startTime.format('YYYY-MM-DD HH:mm:ss'),
+              String(startTime.diff(startTime, 'second')),
+            );
+            this.sockService.sendMessage({
+              type: socketMessageType,
+              message,
+              references: depIds,
+              status: DependenceStatus.installFailed,
+            });
+            this.updateLog(depIds, message);
+            return resolve(null);
+          }
+          linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
+        }
+
         const status = isInstall
           ? DependenceStatus.installing
           : DependenceStatus.removing;
         await DependenceModel.update({ status }, { where: { id: depIds } });
 
-        const socketMessageType = isInstall
-          ? 'installDependence'
-          : 'uninstallDependence';
-        let depName = dependency.name.trim();
-        const command = isInstall
+        let command = isInstall
           ? getInstallCommand(dependency.type, depName)
           : getUninstallCommand(dependency.type, depName);
-        const actionText = isInstall ? '安装' : '删除';
+        if (isLinuxDependence) {
+          command = isInstall
+            ? `${linuxCommand.install} ${depName.trim()}`
+            : `${linuxCommand.uninstall} ${depName.trim()}`;
+        }
         const startTime = dayjs();
 
-        const message = `开始${actionText}依赖 ${depName}，开始时间 ${startTime.format(
-          'YYYY-MM-DD HH:mm:ss',
-        )}\n\n`;
+        const message = tf(
+          '开始%s依赖 %s，开始时间 %s\n\n',
+          actionText,
+          depName,
+          startTime.format('YYYY-MM-DD HH:mm:ss'),
+        );
         this.sockService.sendMessage({
           type: socketMessageType,
           message,
           references: depIds,
+          status,
         });
         this.updateLog(depIds, message);
 
         // 判断是否已经安装过依赖
         if (isInstall && !force) {
-          const getCommand = getGetCommand(dependency.type, depName);
+          let getCommand = getGetCommand(dependency.type, depName);
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
+          if (isLinuxDependence) {
+            getCommand = `${linuxCommand.info} ${depName}`;
+          }
+
           let depVersion = '';
           if (depName.includes(depVersionStr)) {
             const symbolRegx = new RegExp(
@@ -261,10 +388,6 @@ export default class DependenceService {
               depVersion = _depVersion;
             }
           }
-          const isNodeDependence = dependency.type === DependenceTypes.nodejs;
-          const isLinuxDependence = dependency.type === DependenceTypes.linux;
-          const isPythonDependence =
-            dependency.type === DependenceTypes.python3;
           const depInfo = (await promiseExecSuccess(getCommand))
             .replace(/\s{2,}/, ' ')
             .replace(/\s+$/, '');
@@ -273,18 +396,24 @@ export default class DependenceService {
             depInfo &&
             ((isNodeDependence && depInfo.split(' ')?.[0] === depName) ||
               (isLinuxDependence &&
-                depInfo.toLocaleLowerCase().includes('installed')) ||
+                linuxCommand.check(depInfo.toLocaleLowerCase())) ||
               isPythonDependence) &&
             (!depVersion || depInfo.includes(depVersion))
           ) {
             const endTime = dayjs();
-            const _message = `检测到已经安装 ${depName}\n\n${depInfo}\n\n跳过安装\n\n依赖${actionText}成功，结束时间 ${endTime.format(
-              'YYYY-MM-DD HH:mm:ss',
-            )}，耗时 ${endTime.diff(startTime, 'second')} 秒`;
+            const _message = tf(
+              '检测到已经安装 %s\n\n%s\n\n跳过安装\n\n依赖%s成功，结束时间 %s，耗时 %s 秒',
+              depName,
+              depInfo,
+              actionText,
+              endTime.format('YYYY-MM-DD HH:mm:ss'),
+              String(endTime.diff(startTime, 'second')),
+            );
             this.sockService.sendMessage({
               type: socketMessageType,
               message: _message,
               references: depIds,
+              status: DependenceStatus.installed,
             });
             this.updateLog(depIds, _message);
             await DependenceModel.update(
@@ -309,6 +438,7 @@ export default class DependenceService {
             type: socketMessageType,
             message: data.toString(),
             references: depIds,
+            status,
           });
           this.updateLog(depIds, data.toString());
         });
@@ -318,6 +448,7 @@ export default class DependenceService {
             type: socketMessageType,
             message: data.toString(),
             references: depIds,
+            status,
           });
           this.updateLog(depIds, data.toString());
         });
@@ -327,6 +458,7 @@ export default class DependenceService {
             type: socketMessageType,
             message: JSON.stringify(err),
             references: depIds,
+            status,
           });
           this.updateLog(depIds, JSON.stringify(err));
         });
@@ -334,28 +466,27 @@ export default class DependenceService {
         cp.on('exit', async (code) => {
           const endTime = dayjs();
           const isSucceed = code === 0;
-          const resultText = isSucceed ? '成功' : '失败';
+          const resultText = isSucceed ? t('成功') : t('失败');
 
-          const message = `\n依赖${actionText}${resultText}，结束时间 ${endTime.format(
-            'YYYY-MM-DD HH:mm:ss',
-          )}，耗时 ${endTime.diff(startTime, 'second')} 秒`;
+          const message =
+            '\n' +
+            tf('依赖%s%s，结束时间 %s，耗时 %s 秒',
+            actionText,
+            resultText,
+            endTime.format('YYYY-MM-DD HH:mm:ss'),
+            String(endTime.diff(startTime, 'second')),
+          );
+          const exitStatus = isSucceed
+            ? (isInstall ? DependenceStatus.installed : DependenceStatus.removed)
+            : (isInstall ? DependenceStatus.installFailed : DependenceStatus.removeFailed);
           this.sockService.sendMessage({
             type: socketMessageType,
             message,
             references: depIds,
+            status: exitStatus,
           });
           this.updateLog(depIds, message);
 
-          let status: number;
-          if (isSucceed) {
-            status = isInstall
-              ? DependenceStatus.installed
-              : DependenceStatus.removed;
-          } else {
-            status = isInstall
-              ? DependenceStatus.installFailed
-              : DependenceStatus.removeFailed;
-          }
           const docs = await DependenceModel.findAll({ where: { id: depIds } });
           const _docIds = docs
             .filter((x) => x.status !== DependenceStatus.cancelled)
@@ -363,7 +494,7 @@ export default class DependenceService {
 
           if (_docIds.length > 0) {
             await DependenceModel.update(
-              { status },
+              { status: exitStatus },
               { where: { id: _docIds } },
             );
           }

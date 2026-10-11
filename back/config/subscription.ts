@@ -1,5 +1,7 @@
 import { Subscription } from '../data/subscription';
 import isNil from 'lodash/isNil';
+import { shellQuote } from '../shared/shellQuote';
+import { getSubscriptionSshAlias } from '../shared/subscriptionPath';
 
 export function formatUrl(doc: Subscription) {
   let url = doc.url;
@@ -7,7 +9,7 @@ export function formatUrl(doc: Subscription) {
   if (doc.type === 'private-repo') {
     if (doc.pull_type === 'ssh-key') {
       host = doc.url!.replace(/.*\@([^\:]+)\:.*/, '$1');
-      url = doc.url!.replace(host, doc.alias);
+      url = doc.url!.replace(host, getSubscriptionSshAlias(doc.alias));
     } else {
       host = doc.url!.replace(/.*\:\/\/([^\/]+)\/.*/, '$1');
       const { username, password } = doc.pull_option as any;
@@ -18,29 +20,24 @@ export function formatUrl(doc: Subscription) {
 }
 
 export function formatCommand(doc: Subscription, url?: string) {
-  let command = `SUB_ID=${doc.id} ql `;
-  let _url = url || formatUrl(doc).url;
-  const {
-    type,
-    whitelist,
-    blacklist,
-    dependences,
-    branch,
-    extensions,
-    proxy,
-    autoAddCron,
-    autoDelCron,
-  } = doc;
-  if (type === 'file') {
-    command += `raw "${_url}" "${proxy || ''}" "${
-      isNil(autoAddCron) ? true : Boolean(autoAddCron)
-    }" "${isNil(autoDelCron) ? true : Boolean(autoDelCron)}"`;
-  } else {
-    command += `repo "${_url}" "${whitelist || ''}" "${blacklist || ''}" "${
-      dependences || ''
-    }" "${branch || ''}" "${extensions || ''}" "${proxy || ''}" "${
-      isNil(autoAddCron) ? true : Boolean(autoAddCron)
-    }" "${isNil(autoDelCron) ? true : Boolean(autoDelCron)}"`;
-  }
-  return command;
+  const args =
+    doc.type === 'file'
+      ? ['raw', url || formatUrl(doc).url, doc.proxy || '']
+      : [
+          'repo',
+          url || formatUrl(doc).url,
+          doc.whitelist || '',
+          doc.blacklist || '',
+          doc.dependences || '',
+          doc.branch || '',
+          doc.extensions || '',
+          doc.proxy || '',
+        ];
+  args.push(
+    String(isNil(doc.autoAddCron) ? true : Boolean(doc.autoAddCron)),
+    String(isNil(doc.autoDelCron) ? true : Boolean(doc.autoDelCron)),
+  );
+  return `SUB_ID=${shellQuote(String(doc.id))} ql ${args
+    .map((arg) => shellQuote(arg!))
+    .join(' ')}`;
 }

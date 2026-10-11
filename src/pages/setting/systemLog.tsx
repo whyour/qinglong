@@ -29,7 +29,9 @@ const SystemLog = ({ height, theme }: any) => {
   const { loading, refresh } = useRequest(
     () => {
       return request.get<Blob>(
-        `${config.apiPrefix}system/log?startTime=${range[0]}&endTime=${range[1]}`,
+        `${config.apiPrefix}system/log?startTime=${range[0]}&endTime=${
+          range[1]
+        }&limit=${1024 * 1024}`,
         {
           responseType: 'blob',
         },
@@ -51,7 +53,7 @@ const SystemLog = ({ height, theme }: any) => {
 
   const deleteLog = () => {
     request.delete(`${config.apiPrefix}system/log`).then((x) => {
-      message.success('删除成功');
+      message.success(intl.get('删除成功'));
       refresh();
     });
   };

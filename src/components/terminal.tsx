@@ -29,10 +29,10 @@ const Terminal = ({
   const lastLineRef = useRef<null | HTMLElement>(null);
 
   // An effect that handles scrolling into view the last line of terminal input or output
-  const performScrolldown = useRef(false);
+  const performScrollDown = useRef(false);
   useEffect(() => {
-    if (performScrolldown.current) {
-      // skip scrolldown when the component first loads
+    if (performScrollDown.current) {
+      // skip scrollDown when the component first loads
       setTimeout(
         () =>
           lastLineRef?.current?.scrollIntoView({
@@ -42,7 +42,7 @@ const Terminal = ({
         500,
       );
     }
-    performScrolldown.current = true;
+    performScrollDown.current = true;
   }, [lineData.length]);
 
   const renderedLineData = lineData.map((ld, i) => {

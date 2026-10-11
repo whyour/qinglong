@@ -1,0 +1,136 @@
+name: Release readiness
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-readiness.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    uses: ./.github/workflows/validate.yml
+
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:front && pnpm build:back && pnpm build:info
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-readiness-static
+          path: static/
+          include-hidden-files: true
+          if-no-files-found: error
+
+  images:
+    needs: [regression, static]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: alpine
+            file: docker/Dockerfile
+            cache: alpine
+            platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          - image: debian
+            file: docker/Dockerfile.debian
+            cache: debian
+            platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
+          - image: alpine-python3.10
+            file: docker/Dockerfile.310
+            cache: alpine-python3.10
+            platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          - image: debian-python3.10
+            file: docker/Dockerfile.debian310
+            cache: debian-python3.10
+            platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Record source
+        id: source
+        env:
+          SOURCE_URL: ${{ github.event.pull_request.head.repo.clone_url || format('https://github.com/{0}.git', github.repository) }}
+          SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "url=$SOURCE_URL" >> "$GITHUB_OUTPUT"
+          echo "branch=$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-readiness-static
+          path: static/
+      - uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+      - uses: docker/setup-buildx-action@v4
+      - name: Build every release architecture
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: ${{ matrix.platforms }}
+          build-args: |
+            QL_URL=${{ steps.source.outputs.url }}
+            QL_BRANCH=${{ steps.source.outputs.branch }}
+            SOURCE_COMMIT=${{ steps.source.outputs.sha }}
+          push: false
+          provenance: false
+          sbom: false
+          cache-from: type=registry,ref=whyour/qinglong:cache-${{ matrix.cache }}
+      - name: Load native image for runtime verification
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64
+          build-args: |
+            QL_URL=${{ steps.source.outputs.url }}
+            QL_BRANCH=${{ steps.source.outputs.branch }}
+            SOURCE_COMMIT=${{ steps.source.outputs.sha }}
+          tags: qinglong-readiness:${{ matrix.image }}
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+      - name: Verify native production runtime without external networking
+        run: |
+          docker run --rm --network none --entrypoint node \
+            qinglong-readiness:${{ matrix.image }} \
+            -e 'const assert=require("node:assert/strict"); const {createRequire}=require("node:module"); for(const [name,want] of Object.entries({"@grpc/grpc-js":"1.14.5",compression:"1.8.2",multer:"2.3.0",sequelize:"6.37.8"}))assert.equal(require(name+"/package.json").version,want); const expressRequire=createRequire(require.resolve("express")); assert.equal(expressRequire("proxy-addr/package.json").version,"2.0.8"); const sockRequire=createRequire(require.resolve("sockjs")); assert.equal(sockRequire("websocket-driver/package.json").version,"0.7.5"); require("sqlite3"); require("nodemailer"); require("undici"); console.log("Minimal production patches and runtime imports verified")'
+      - name: Export native Debian image for isolated dev validation
+        if: matrix.image == 'debian'
+        run: |
+          docker save qinglong-readiness:debian | gzip -1 > release-readiness-debian-image.tar.gz
+          sha256sum release-readiness-debian-image.tar.gz > release-readiness-debian-image.sha256
+          docker image inspect qinglong-readiness:debian > release-readiness-debian-image.json
+      - uses: actions/upload-artifact@v6
+        if: matrix.image == 'debian'
+        with:
+          name: release-readiness-debian-image
+          path: release-readiness-debian-image.*
+          compression-level: 0
+          if-no-files-found: error
