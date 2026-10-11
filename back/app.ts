@@ -1,13 +1,10 @@
 import 'reflect-metadata';
 import cluster, { type Worker } from 'cluster';
-import compression from 'compression';
-import cors from 'cors';
-import express from 'express';
-import helmet from 'helmet';
+import type express from 'express';
 import { Container } from 'typedi';
 import config from './config';
 import Logger from './loaders/logger';
-import { monitoringMiddleware } from './middlewares/monitoring';
+import { errStack } from './shared/errors';
 import { type GrpcServerService } from './services/grpc';
 import { type HttpServerService } from './services/http';
 
@@ -19,23 +16,11 @@ interface WorkerMetadata {
 }
 
 class Application {
-  private app: express.Application;
   private httpServerService?: HttpServerService;
   private grpcServerService?: GrpcServerService;
   private isShuttingDown = false;
   private workerMetadataMap = new Map<number, WorkerMetadata>();
   private httpWorker?: Worker;
-
-  constructor() {
-    this.app = express();
-    // 创建一个全局中间件，删除查询参数中的t
-    this.app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-      if (req.query.t) {
-        delete req.query.t;
-      }
-      next();
-    });
-  }
 
   async start() {
     try {
@@ -48,7 +33,7 @@ class Application {
         await this.startWorkerProcess();
       }
     } catch (error) {
-      Logger.error('Failed to start application:', error);
+      Logger.error(`Failed to start application:\n${errStack(error)}`);
       process.exit(1);
     }
   }
@@ -60,11 +45,11 @@ class Application {
     // Wait for gRPC worker to signal it's ready before starting HTTP worker
     this.waitForWorkerReady(grpcWorker, 30000)
       .then(() => {
-        Logger.info('✌️ gRPC worker is ready, starting HTTP worker');
+        Logger.info('[boot] gRPC worker is ready, starting HTTP worker');
         this.httpWorker = this.forkWorker('http');
       })
       .catch((error) => {
-        Logger.error('✌️ Failed to wait for gRPC worker:', error);
+        Logger.error(`[boot] Failed to wait for gRPC worker:\n${errStack(error)}`);
         process.exit(1);
       });
 
@@ -73,34 +58,39 @@ class Application {
       if (metadata) {
         if (!this.isShuttingDown) {
           Logger.error(
-            `✌️ ${metadata.serviceType} worker ${worker.process.pid} died (${signal || code
+            `${metadata.serviceType} worker ${worker.process.pid} died (${signal || code
             }). Restarting...`,
           );
           // If gRPC worker died, restart it and wait for it to be ready
           if (metadata.serviceType === 'grpc') {
+            try {
+              this.httpWorker?.send('scheduler-unavailable');
+            } catch (error) {
+              Logger.warn('Unable to notify HTTP worker of scheduler exit');
+            }
             const newGrpcWorker = this.forkWorker('grpc');
             this.waitForWorkerReady(newGrpcWorker, 30000)
               .then(() => {
-                Logger.info('✌️ gRPC worker restarted and ready');
+                Logger.info('gRPC worker restarted and ready');
                 // Re-register cron jobs by notifying the HTTP worker
                 if (this.httpWorker) {
                   try {
                     this.httpWorker.send('reregister-crons');
-                    Logger.info('✌️ Sent reregister-crons message to HTTP worker');
+                    Logger.info('Sent reregister-crons message to HTTP worker');
                   } catch (error) {
-                    Logger.error('✌️ Failed to send reregister-crons message:', error);
+                    Logger.error(`Failed to send reregister-crons message:\n${errStack(error)}`);
                   }
                 }
               })
               .catch((error) => {
-                Logger.error('✌️ Failed to restart gRPC worker:', error);
+                Logger.error(`Failed to restart gRPC worker:\n${errStack(error)}`);
                 process.exit(1);
               });
           } else {
             // For HTTP worker, just restart it
             const newWorker = this.forkWorker(metadata.serviceType);
             this.httpWorker = newWorker;
-            Logger.info(`✌️ Restarted ${metadata.serviceType} worker (PID: ${newWorker.process.pid})`);
+            Logger.info(`Restarted ${metadata.serviceType} worker (PID: ${newWorker.process.pid})`);
           }
         }
 
@@ -131,7 +121,14 @@ class Application {
   }
 
   private forkWorker(serviceType: string): Worker {
-    const worker = cluster.fork({ SERVICE_TYPE: serviceType });
+    const workerEnv: NodeJS.ProcessEnv = { SERVICE_TYPE: serviceType };
+    // PM2's fork launcher is inherited by our own cluster workers. Their APM
+    // messages go to this primary, not PM2, and duplicate its sampling work.
+    // Keep primary monitoring and allow restoring the inherited worker APM.
+    if (process.env.pm_id !== undefined && process.env.QL_WORKER_APM !== 'true') {
+      workerEnv.pmx = 'false';
+    }
+    const worker = cluster.fork(workerEnv);
 
     this.workerMetadataMap.set(worker.id, {
       id: worker.id,
@@ -144,17 +141,37 @@ class Application {
   }
 
   private async initializeDatabase() {
-    const dbLoader = await import('./loaders/db');
-    await dbLoader.default();
+    const { runStartupProcess } = await import('./shared/startupProcess');
+    await runStartupProcess(require.resolve('./bootstrap/database'));
   }
 
-  private setupMiddlewares() {
-    this.app.use(helmet({
+  private async setupMiddlewares(): Promise<express.Application> {
+    // Only the HTTP worker needs an Express application and its middleware.
+    const [
+      { default: createExpress },
+      { default: helmet },
+      { default: cors },
+      { default: compression },
+      { monitoringMiddleware },
+    ] = await Promise.all([
+      import('express'),
+      import('helmet'),
+      import('cors'),
+      import('compression'),
+      import('./middlewares/monitoring'),
+    ]);
+    const app = createExpress();
+    app.use((req, res, next) => {
+      if (req.query.t) delete req.query.t;
+      next();
+    });
+    app.use(helmet({
       contentSecurityPolicy: false,
     }));
-    this.app.use(cors(config.cors));
-    this.app.use(compression());
-    this.app.use(monitoringMiddleware);
+    app.use(cors(config.cors));
+    app.use(compression());
+    app.use(monitoringMiddleware);
+    return app;
   }
 
   private setupMasterShutdown() {
@@ -169,17 +186,14 @@ class Application {
         if (worker) {
           const exitPromise = new Promise<void>((resolve) => {
             worker.once('exit', () => {
-              Logger.info(`✌️ Worker ${worker.process.pid} exited`);
+              Logger.info(`Worker ${worker.process.pid} exited`);
               resolve();
             });
 
             try {
               worker.send('shutdown');
             } catch (error) {
-              Logger.warn(
-                `✌️ Failed to send shutdown to worker ${worker.process.pid}:`,
-                error,
-              );
+              Logger.warn(`Failed to send shutdown to worker ${worker.process.pid}:\n${errStack(error)}`);
             }
           });
 
@@ -192,14 +206,14 @@ class Application {
           Promise.all(workerPromises),
           new Promise<void>((resolve) => {
             setTimeout(() => {
-              Logger.warn('✌️ Worker shutdown timeout reached');
+              Logger.warn('Worker shutdown timeout reached');
               resolve();
             }, 10000);
           }),
         ]);
         process.exit(0);
       } catch (error) {
-        Logger.error('✌️ Error during worker shutdown:', error);
+        Logger.error(`Error during worker shutdown:\n${errStack(error)}`);
         process.exit(1);
       }
     };
@@ -211,11 +225,11 @@ class Application {
   private async startWorkerProcess() {
     const serviceType = process.env.SERVICE_TYPE;
     if (!serviceType || !['http', 'grpc'].includes(serviceType)) {
-      Logger.error('✌️ Invalid SERVICE_TYPE:', serviceType);
+      Logger.error('[boot] Invalid SERVICE_TYPE:', serviceType);
       process.exit(1);
     }
 
-    Logger.info(`✌️ ${serviceType} worker started (PID: ${process.pid})`);
+    Logger.info(`[boot] ${serviceType} worker started (PID: ${process.pid})`);
 
     try {
       if (serviceType === 'http') {
@@ -226,22 +240,26 @@ class Application {
 
       process.send?.('ready');
     } catch (error) {
-      Logger.error(`✌️ ${serviceType} worker failed:`, error);
+      Logger.error(`[boot] ${serviceType} worker failed:\n${errStack(error)}`);
       process.exit(1);
     }
   }
 
   private async startHttpService() {
-    this.setupMiddlewares();
+    // 在导入任何 gRPC 客户端模块之前初始化 mTLS 证书
+    const { initGrpcCerts } = await import('./config/grpcCerts');
+    await initGrpcCerts();
+
+    const app = await this.setupMiddlewares();
 
     const { HttpServerService } = await import('./services/http');
     this.httpServerService = Container.get(HttpServerService);
 
     const appLoader = await import('./loaders/app');
-    await appLoader.default({ app: this.app });
+    await appLoader.default({ app });
 
     const server = await this.httpServerService.initialize(
-      this.app,
+      app,
       config.port,
     );
 
@@ -262,17 +280,10 @@ class Application {
     process.on('message', async (msg) => {
       if (msg === 'shutdown') {
         this.gracefulShutdown(serviceType);
-      } else if (msg === 'reregister-crons' && serviceType === 'http') {
-        // Re-register cron jobs when gRPC worker restarts
-        try {
-          Logger.info('✌️ Received reregister-crons message, re-registering cron jobs...');
-          const CronService = (await import('./services/cron')).default;
-          const cronService = Container.get(CronService);
-          await cronService.autosave_crontab();
-          Logger.info('✌️ Cron jobs re-registered successfully');
-        } catch (error) {
-          Logger.error('✌️ Failed to re-register cron jobs:', error);
-        }
+      } else if (serviceType === 'http' &&
+        (msg === 'reregister-crons' || msg === 'scheduler-unavailable')) {
+        const { default: cronClient } = await import('./schedule/client');
+        cronClient.readiness.invalidate();
       }
     });
 
@@ -293,7 +304,7 @@ class Application {
       }
       process.exit(0);
     } catch (error) {
-      Logger.error(`✌️ [${serviceType}] Error during shutdown:`, error);
+      Logger.error(`[${serviceType}] Error during shutdown:\n${errStack(error)}`);
       process.exit(1);
     }
   }
@@ -301,6 +312,6 @@ class Application {
 
 const app = new Application();
 app.start().catch((error) => {
-  Logger.error('🙅‍♀️ Application failed to start:', error);
+  Logger.error(`🙅‍♀️ Application failed to start:\n${errStack(error)}`);
   process.exit(1);
 });

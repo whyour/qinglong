@@ -28,6 +28,7 @@ const CronModal = ({
       const method = cron?.id ? 'put' : 'post';
       const payload = {
         ...values,
+        labels: values.labels || [],
         schedule:
           scheduleType !== ScheduleType.Normal
             ? scheduleTypeMap[scheduleType]
@@ -211,12 +212,14 @@ const CronModal = ({
                   return Promise.reject(intl.get('日志名称不能超过100个字符'));
                 }
                 if (
-                  !/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w.-]+\/)*[\w.-]+\/?$/.test(
+                  !/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w\p{Script=Han}.-]+\/)*[\w\p{Script=Han}.-]+\/?$/u.test(
                     value,
                   )
                 ) {
                   return Promise.reject(
-                    intl.get('日志名称只能包含字母、数字、下划线和连字符'),
+                    intl.get(
+                      '日志名称只能包含中文、字母、数字、下划线、连字符、点和路径分隔符',
+                    ),
                   );
                 }
                 return Promise.resolve();
@@ -228,6 +231,15 @@ const CronModal = ({
             placeholder={intl.get('请输入自定义日志文件夹名称或 /dev/null')}
             maxLength={200}
           />
+        </Form.Item>
+        <Form.Item
+          name="work_dir"
+          label={intl.get('工作目录')}
+          tooltip={intl.get(
+            '脚本执行时的工作目录，留空则自动检测。相对路径基于 scripts 目录，也支持绝对路径',
+          )}
+        >
+          <Input placeholder={intl.get('留空自动检测，或输入相对/绝对路径')} />
         </Form.Item>
         <Form.Item
           name="task_before"

@@ -33,7 +33,7 @@ output_list_add_drop() {
   local list=$1
   local type=$2
   if [[ -s $list ]]; then
-    echo -e "检测到有${type}的定时任务:"
+    t '检测到有%s的定时任务:' "$type"
     cat $list
   fi
 }
@@ -45,7 +45,7 @@ del_cron() {
   local path=$2
   local detail=""
   local ids=""
-  echo -e "\n开始尝试自动删除失效的定时任务..."
+  t '\n开始尝试自动删除失效的定时任务...'
   for cron in $(cat $list_drop); do
     local id=$(cat $list_crontab_user | grep -E "$cmd_task.* $cron" | perl -pe "s|.*ID=(.*) $cmd_task.* $cron\.*|\1|" | head -1 | awk -F " " '{print $1}')
     if [[ $ids ]]; then
@@ -76,7 +76,7 @@ del_cron() {
 add_cron() {
   local list_add=$1
   local path=$2
-  echo -e "\n开始尝试自动添加定时任务..."
+  t '\n开始尝试自动添加定时任务...'
   local detail=""
   cd $dir_scripts
   for file in $(cat $list_add); do
@@ -111,76 +111,6 @@ add_cron() {
   notify_api "$path 新增任务" "$detail"
 }
 
-## 自动安装订阅仓库中的Python依赖
-auto_install_python_deps() {
-  local repo_path="$1"
-  local uniq_path="$2"
-  
-  echo -e "\n检测订阅仓库中的Python依赖文件...\n"
-  
-  get_token
-  
-  # 检查 requirements.txt
-  if [[ -f "${repo_path}/requirements.txt" ]]; then
-    echo -e "发现 requirements.txt，开始自动安装依赖...\n"
-    local req_file="${dir_scripts}/${uniq_path}/requirements.txt"
-    
-    # 确保目标目录存在
-    make_dir "${dir_scripts}/${uniq_path}"
-    
-    # 复制文件并检查结果
-    if cp -f "${repo_path}/requirements.txt" "${req_file}" 2>/dev/null; then
-      # 调用API添加依赖安装任务
-      local dep_name="${uniq_path}/requirements.txt"
-      local currentTimeStamp=$(date +%s)
-      local result=$(curl -s --noproxy "*" "http://127.0.0.1:${ql_port}/open/dependencies?t=$currentTimeStamp" \
-        -X POST \
-        -H "Content-Type: application/json;charset=UTF-8" \
-        -H "Authorization: Bearer ${__ql_token__}" \
-        --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" 2>/dev/null)
-      
-      local code=$(echo "$result" | jq -r '.code' 2>/dev/null)
-      if [[ "$code" == "200" ]]; then
-        echo -e "已添加 requirements.txt 依赖安装任务\n"
-      else
-        echo -e "添加 requirements.txt 依赖失败，请手动添加\n"
-      fi
-    else
-      echo -e "复制 requirements.txt 失败，跳过自动安装\n"
-    fi
-  fi
-  
-  # 检查 pyproject.toml
-  if [[ -f "${repo_path}/pyproject.toml" ]]; then
-    echo -e "发现 pyproject.toml，开始自动安装依赖...\n"
-    local pyproject_file="${dir_scripts}/${uniq_path}/pyproject.toml"
-    
-    # 确保目标目录存在
-    make_dir "${dir_scripts}/${uniq_path}"
-    
-    # 复制文件并检查结果
-    if cp -f "${repo_path}/pyproject.toml" "${pyproject_file}" 2>/dev/null; then
-      # 调用API添加依赖安装任务
-      local dep_name="${uniq_path}/pyproject.toml"
-      local currentTimeStamp=$(date +%s)
-      local result=$(curl -s --noproxy "*" "http://127.0.0.1:${ql_port}/open/dependencies?t=$currentTimeStamp" \
-        -X POST \
-        -H "Content-Type: application/json;charset=UTF-8" \
-        -H "Authorization: Bearer ${__ql_token__}" \
-        --data-raw "[{\"name\":\"${dep_name}\",\"type\":1,\"remark\":\"自动检测：${uniq_path} 订阅依赖\"}]" 2>/dev/null)
-      
-      local code=$(echo "$result" | jq -r '.code' 2>/dev/null)
-      if [[ "$code" == "200" ]]; then
-        echo -e "已添加 pyproject.toml 依赖安装任务\n"
-      else
-        echo -e "添加 pyproject.toml 依赖失败，请手动添加\n"
-      fi
-    else
-      echo -e "复制 pyproject.toml 失败，跳过自动安装\n"
-    fi
-  fi
-}
-
 ## 更新仓库
 update_repo() {
   local url="$1"
@@ -206,14 +136,10 @@ update_repo() {
   git_clone_scripts "${formatUrl}" ${repo_path} "${branch}" "${proxy}"
 
   if [[ $exit_status -eq 0 ]]; then
-    echo -e "拉取 ${uniq_path} 成功...\n"
-    
-    # 自动检测并安装Python依赖
-    auto_install_python_deps "${repo_path}" "${uniq_path}"
-    
+    t '拉取 %s 成功...\n' "${uniq_path}"
     diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions" "$autoAddCron" "$autoDelCron"
   else
-    echo -e "拉取 ${uniq_path} 失败，请检查日志...\n"
+    t '拉取 %s 失败，请检查日志...\n' "${uniq_path}"
   fi
 }
 
@@ -234,7 +160,7 @@ update_raw() {
   local raw_url="$url"
   local suffix="${raw_url##*.}"
   local raw_file_name="${uniq_path}.${suffix}"
-  echo -e "开始下载：${raw_url} \n\n保存路径：$dir_raw/${raw_file_name}\n"
+  t '开始下载：%s 保存路径：%s\n' "${raw_url}" "$dir_raw/${raw_file_name}"
 
   set_proxy "$proxy"
   wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" ${raw_url}
@@ -243,7 +169,7 @@ update_raw() {
 
   if [[ $? -eq 0 ]]; then
     mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}"
-    echo -e "下载 ${raw_file_name} 成功...\n"
+    t '下载 %s 成功...\n' "${raw_file_name}"
     cd $dir_raw
     local filename="raw_${raw_file_name}"
     local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | awk -F " " '{print $1}')
@@ -270,7 +196,7 @@ update_raw() {
       # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
     fi
   else
-    echo -e "下载 ${raw_file_name} 失败，保留之前正常下载的版本...\n"
+    t '下载 %s 失败，保留之前正常下载的版本...\n' "${raw_file_name}"
     [[ -f "$dir_raw/${raw_file_name}.new" ]] && rm -f "$dir_raw/${raw_file_name}.new"
   fi
 
@@ -281,13 +207,67 @@ run_extra_shell() {
   if [[ -f $file_extra_shell ]]; then
     . $file_extra_shell
   else
-    echo -e "$file_extra_shell文件不存在，跳过执行...\n"
+    t '%s文件不存在，跳过执行...\n' "$file_extra_shell"
   fi
+}
+
+## 查看青龙服务日志
+show_service_logs() {
+  local lines="15"
+  local no_stream="false"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --lines)
+      if [[ ! "${2:-}" =~ ^[0-9]+$ ]]; then
+        echo "ql log: --lines requires a non-negative integer" >&2
+        return 2
+      fi
+      lines="$2"
+      shift 2
+      ;;
+    --lines=*)
+      lines="${1#--lines=}"
+      if [[ ! "$lines" =~ ^[0-9]+$ ]]; then
+        echo "ql log: --lines requires a non-negative integer" >&2
+        return 2
+      fi
+      shift
+      ;;
+    --nostream)
+      no_stream="true"
+      shift
+      ;;
+    *)
+      echo "ql log: unknown option: $1" >&2
+      return 2
+      ;;
+    esac
+  done
+
+  local system_log_dir="$dir_data/syslog"
+  local latest_system_log
+  latest_system_log=$(ls -1t "$system_log_dir"/*.log* 2>/dev/null | head -n 1)
+  if [[ "$lines" != "0" ]] && [[ -f "$latest_system_log" ]]; then
+    tail -n "$lines" "$latest_system_log"
+  fi
+
+  if [[ "$no_stream" == "true" ]]; then
+    if [[ -z "$latest_system_log" ]]; then
+      echo "ql log: no system log found in $system_log_dir" >&2
+      return 1
+    fi
+    return 0
+  fi
+
+  # Winston writes the active runtime log by date. Follow the filename so
+  # size-based rotations are handled without involving the PM2 log files.
+  local current_system_log="$system_log_dir/$(date +%F).log"
+  tail -n 0 --retry -F "$current_system_log"
 }
 
 ## 脚本用法
 usage() {
-  echo -e "$cmd_update 命令使用方法："
+  t "$cmd_update 命令使用方法："
   echo -e "1.  $cmd_update update                                                                  # 更新并重启青龙"
   echo -e "2.  $cmd_update extra                                                                   # 运行自定义脚本"
   echo -e "3.  $cmd_update raw <fileurl>                                                           # 更新单个脚本文件"
@@ -295,105 +275,52 @@ usage() {
   echo -e "5.  $cmd_update rmlog <days>                                                            # 删除旧日志"
   echo -e "6.  $cmd_update bot                                                                     # 启动tg-bot"
   echo -e "7.  $cmd_update check                                                                   # 检测青龙环境并修复"
-  echo -e "8.  $cmd_update resetlet                                                                # 重置登录错误次数"
-  echo -e "9.  $cmd_update resettfa                                                                # 禁用两步登录"
-  echo -e "10. $cmd_update resetpwd                                                                # 修改登录密码"
-  echo -e "11. $cmd_update resetname                                                               # 修改登录用户名"
+  echo -e "8.  $cmd_update log [--lines <n>] [--nostream]                                         # 查看青龙运行日志"
+  echo -e "9.  $cmd_update resetlet                                                                # 重置登录错误次数"
+  echo -e "10. $cmd_update resettfa                                                                # 禁用两步登录"
+  echo -e "11. $cmd_update resetpwd                                                                # 修改登录密码"
+  echo -e "12. $cmd_update resetname                                                               # 修改登录用户名"
 }
 
 reload_qinglong() {
-  echo -e "[reload_qinglong] deleting Triggered at $(date)" >>${dir_log}/reload.log
+  local reload_target="${1}"
+  if [[ "$reload_target" == 'system' ]]; then
+    QlPort="${ql_port:-${QlPort:-5700}}" QlBaseUrl="${ql_base_url:-${QlBaseUrl:-/}}" node "$dir_shell/upgrade.cjs" reload
+    return $?
+  fi
+
+  # Data import and a plain service restart retain their existing behavior.
+  echo -e "[reload_qinglong] deleting Triggered at $(date)" >>"${dir_log}/reload.log"
   sleep 3
   delete_pm2
-  echo -e "[reload_qinglong] deleted Triggered at $(date)" >>${dir_log}/reload.log
-
-  local reload_target="${1}"
-  local primary_branch="master"
-  if [[ "${QL_BRANCH}" == "develop" ]] || [[ "${QL_BRANCH}" == "debian" ]] || [[ "${QL_BRANCH}" == "debian-dev" ]]; then
-    primary_branch="${QL_BRANCH}"
-  fi
-
-  if [[ "$reload_target" == 'system' ]]; then
-    rm -rf ${dir_root}/back ${dir_root}/cli ${dir_root}/docker ${dir_root}/sample ${dir_root}/shell ${dir_root}/src
-    mv -f ${dir_tmp}/qinglong-${primary_branch}/* ${dir_root}/
-    rm -rf $dir_static/*
-    mv -f ${dir_tmp}/qinglong-static-${primary_branch}/* ${dir_static}/
-    cp -f $file_config_sample $dir_config/config.sample.sh
-  fi
-
   if [[ "$reload_target" == 'data' ]]; then
-    rm -rf ${dir_data}/*
-    mv -f ${dir_tmp}/data/* ${dir_data}/
+    rm -rf "${dir_data:?}"/*
+    mv -f "$dir_tmp"/data/* "$dir_data"/ || return $?
   fi
-  echo -e "[reload_qinglong] starting Triggered at $(date)" >>${dir_log}/reload.log
   reload_pm2
-  echo -e "[reload_qinglong] started Triggered at $(date)\n" >>${dir_log}/reload.log
 }
 
 ## 更新 qinglong
 update_qinglong() {
-  rm -rf ${dir_tmp}/*
   local mirror="gitee"
-  local downloadQLUrl="https://gitee.com/whyour/qinglong/repository/archive"
-  local downloadStaticUrl="https://gitee.com/whyour/qinglong-static/repository/archive"
-  local githubStatus=$(curl -s --noproxy "*" -m 2 -IL "https://google.com" | grep 200)
-  if [[ ! -z $githubStatus ]]; then
+  if curl --fail --silent --noproxy "*" --max-time 2 --head "https://github.com" >/dev/null; then
     mirror="github"
-    downloadQLUrl="https://github.com/whyour/qinglong/archive/refs/heads"
-    downloadStaticUrl="https://github.com/whyour/qinglong-static/archive/refs/heads"
   fi
-  echo -e "使用 ${mirror} 源更新...\n"
-
-  local primary_branch="master"
-  if [[ "${QL_BRANCH}" == "develop" ]] || [[ "${QL_BRANCH}" == "debian" ]] || [[ "${QL_BRANCH}" == "debian-dev" ]]; then
-    primary_branch="${QL_BRANCH}"
-  fi
-
-  wget -cqO "${dir_tmp}/ql.zip" "${downloadQLUrl}/${primary_branch}.zip"
-  exit_status=$?
-
-  if [[ $exit_status -eq 0 ]]; then
-    echo -e "更新青龙源文件成功...\n"
-
-    unzip -oq ${dir_tmp}/ql.zip -d ${dir_tmp}
-
-    update_qinglong_static
-  else
-    echo -e "更新青龙源文件失败，请检查网络...\n"
-  fi
+  t '使用 %s 源更新...\n' "$mirror"
+  QlPort="${ql_port:-${QlPort:-5700}}" QlBaseUrl="${ql_base_url:-${QlBaseUrl:-/}}" node "$dir_shell/upgrade.cjs" update "$mirror" "$needRestart"
 }
 
-update_qinglong_static() {
-  wget -cqO "${dir_tmp}/static.zip" "${downloadStaticUrl}/${primary_branch}.zip"
-  exit_status=$?
-
-  if [[ $exit_status -eq 0 ]]; then
-    echo -e "更新青龙静态资源成功...\n"
-    unzip -oq ${dir_tmp}/static.zip -d ${dir_tmp}
-
-    check_update_dep
+# Preserve the updater's status through both tee and the final timing output.
+run_update_logged() (
+  set -o pipefail
+  if [[ "$real_time" == 'true' ]]; then
+    "$@"
+  elif [[ "$no_tee" == 'true' ]]; then
+    "$@" >>"$file_path" 2>&1
   else
-    echo -e "更新青龙静态资源失败，请检查网络...\n"
+    "$@" 2>&1 | tee -a "$file_path"
   fi
-}
-
-check_update_dep() {
-  echo -e "\n开始检测依赖...\n"
-  if [[ $(diff $dir_root/package.json ${dir_tmp}/qinglong-${primary_branch}/package.json) ]]; then
-    npm_install_2 "${dir_tmp}/qinglong-${primary_branch}"
-  fi
-
-  if [[ $exit_status -eq 0 ]]; then
-    echo -e "\n依赖检测安装成功...\n"
-    echo -e "更新包下载成功..."
-
-    if [[ "$needRestart" == 'true' ]]; then
-      reload_qinglong "system"
-    fi
-  else
-    echo -e "\n依赖检测安装失败，请检查网络...\n"
-  fi
-}
+)
 
 ## 对比脚本
 diff_scripts() {
@@ -448,23 +375,19 @@ gen_list_repo() {
 
   cd ${repo_path}
 
-  local cmd="find ."
-  local index=0
-  if [[ $6 ]]; then
-    file_extensions="$6"
-    if [[ $file_extensions =~ "|" ]]; then
-      file_extensions=$(echo $file_extensions | sed 's/|/ /g')
+  local extension_string="${6:-$file_extensions}"
+  extension_string="${extension_string//|/ }"
+  extension_string="${extension_string//$'\n'/ }"
+  local -a extensions=() find_args=()
+  IFS=$' \t\n' read -r -a extensions <<< "$extension_string"
+  local extension
+  for extension in "${extensions[@]}"; do
+    if [[ ${#find_args[@]} -gt 0 ]]; then
+      find_args+=(-o)
     fi
-  fi
-  for extension in $file_extensions; do
-    if [[ $index -eq 0 ]]; then
-      cmd="${cmd} -name \"*.${extension}\""
-    else
-      cmd="${cmd} -o -name \"*.${extension}\""
-    fi
-    let index+=1
+    find_args+=(-name "*.${extension}")
   done
-  files=$(eval $cmd | sed 's/^..//')
+  files=$(find . "${find_args[@]}" | sed 's/^..//')
   if [[ $path ]]; then
     files=$(echo "$files" | egrep "$path")
   fi
@@ -477,7 +400,7 @@ gen_list_repo() {
 
   if [[ $dependence ]]; then
     cd ${repo_path}
-    results=$(eval $cmd | sed 's/^..//' | egrep "$dependence")
+    results=$(find . "${find_args[@]}" | sed 's/^..//' | egrep "$dependence")
     for _file in ${results}; do
       file_path=$(dirname $_file)
       make_dir "${dir_scripts}/${uniq_path}/${file_path}"
@@ -545,6 +468,12 @@ main() {
   local p8="${8}"
   local p9="${9}"
   local p10="${10}"
+
+  if [[ "$p1" == "log" ]]; then
+    show_service_logs "${@:2}"
+    return 0
+  fi
+
   local log_dir="${p1}"
   make_dir "$dir_log/$log_dir"
   local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
@@ -571,14 +500,17 @@ main() {
 
   [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
 
+  local command_status=0
   case $p1 in
   update)
     fix_config
     local needRestart=${p2:-"true"}
-    eval update_qinglong $cmd
+    run_update_logged update_qinglong
+    command_status=$?
     ;;
   reload)
-    eval reload_qinglong "$p2" $cmd
+    run_update_logged reload_qinglong "$p2"
+    command_status=$?
     ;;
   extra)
     eval run_extra_shell $cmd
@@ -588,7 +520,7 @@ main() {
     if [[ -n $p2 ]]; then
       update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7" "$p8" "$p9" "$p10"
     else
-      eval echo -e "命令输入错误...\\\n" $cmd
+      t '命令输入错误...\n'
       eval usage $cmd
     fi
     ;;
@@ -597,7 +529,7 @@ main() {
     if [[ -n $p2 ]]; then
       update_raw "$p2" "$p3" "$p4" "$p5"
     else
-      eval echo -e "命令输入错误...\\\n" $cmd
+      t '命令输入错误...\n'
       eval usage $cmd
     fi
     ;;
@@ -623,7 +555,7 @@ main() {
     eval update_auth_config "\\\"username\\\":\\\"$p2\\\"" "重置用户名" $cmd
     ;;
   *)
-    eval echo -e "命令输入错误...\\\n" $cmd
+    t '命令输入错误...\n'
     eval usage $cmd
     ;;
   esac
@@ -637,9 +569,9 @@ main() {
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
     eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒　　　　　" $cmd
   fi
+  return "$command_status"
 }
 
 import_config "$@"
 main "$@"
-
-exit 0
+exit $?

@@ -13,6 +13,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [value, setValue] = useState("");
   const modalRef = useRef<any>();
+  const lastStatusRef = useRef<string | undefined>();
 
   const checkUpgrade = () => {
     if (updateLoading) return;
@@ -166,7 +167,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
 
   useEffect(() => {
     if (!value) return;
-    const updateFailed = value.includes("失败，请检查");
+    const updateFailed = lastStatusRef.current === 'failed';
 
     modalRef.current.update({
       maskClosable: updateFailed,
@@ -184,11 +185,18 @@ const CheckUpdate = ({ systemInfo }: any) => {
   }, [value]);
 
   const handleMessage = useCallback((payload: any) => {
-    let { message: _message } = payload;
-    const updateFailed = _message.includes("失败，请检查");
+    const { message: _message, status } = payload;
 
-    if (updateFailed) {
+    if (status === 'failed') {
+      lastStatusRef.current = 'failed';
       message.error(intl.get("更新失败，请检查网络及日志或稍后再试"));
+    }
+
+    if (status === 'success') {
+      lastStatusRef.current = 'success';
+      setTimeout(() => {
+        showReloadModal();
+      }, 1000);
     }
 
     setTimeout(() => {
@@ -197,13 +205,9 @@ const CheckUpdate = ({ systemInfo }: any) => {
         ?.scrollIntoView({ behavior: "smooth" });
     }, 600);
 
-    if (_message.includes("更新包下载成功")) {
-      setTimeout(() => {
-        showReloadModal();
-      }, 1000);
+    if (_message) {
+      setValue((p) => `${p}${_message}`);
     }
-
-    setValue((p) => `${p}${_message}`);
   }, []);
 
   useEffect(() => {

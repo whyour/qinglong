@@ -6,6 +6,9 @@ import SshKeyService from '../services/sshKey';
 import config from '../config';
 import { fileExist } from '../config/util';
 import { join } from 'path';
+import { t } from '../shared/i18n';
+import Logger from './logger';
+import { assertSubscriptionAlias } from '../shared/subscriptionPath';
 
 export default async () => {
   const systemService = Container.get(SystemService);
@@ -23,9 +26,10 @@ export default async () => {
   if (await fileExist(tokenFile)) {
     tokenCommand = `node ${tokenFile}`;
   }
+  tokenCommand += ' --renew';
   const cron = {
     id: NaN,
-    name: '生成token',
+    name: t('生成token'),
     command: tokenCommand,
     runOrigin: 'system',
   } as ScheduleTaskType;
@@ -44,7 +48,7 @@ export default async () => {
     if (data.info.logRemoveFrequency) {
       const rmlogCron = {
         id: data.id as number,
-        name: '删除日志',
+        name: t('删除日志'),
         command: `ql rmlog ${data.info.logRemoveFrequency}`,
         runOrigin: 'system' as const,
       };
@@ -69,6 +73,12 @@ export default async () => {
   await subscriptionService.setSshConfig();
   const subs = await subscriptionService.list();
   for (const sub of subs) {
-    subscriptionService.handleTask(sub.get({ plain: true }), !sub.is_disabled);
+    try {
+      const doc = sub.get({ plain: true });
+      assertSubscriptionAlias(doc.alias);
+      await subscriptionService.handleTask(doc, !sub.is_disabled);
+    } catch (error) {
+      Logger.warn('跳过订阅 %s 的无效定时配置: %s', sub.id, error);
+    }
   }
 };
