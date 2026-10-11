@@ -18,6 +18,7 @@ async function setup() {
   const clients = new Set();
   const timers = new Set();
   const mocks = {
+    jsonwebtoken: jwt,
     sockjs: {
       createServer: () => ({
         on: (_, fn) => {
