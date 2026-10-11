@@ -23,3 +23,9 @@ Python 3.10 已于 2026-10-01 结束维护。两个兼容 Dockerfile 仍单独�
 源码安装固定 pnpm 10.34.6 和 frozen lock。若升级暂存源码遇到旧 manager，只有同提交、同锁和全部输入哈希匹配的静态工具归档才可在临时 prefix 完成安装；无受控归档时明确失败，不再回退到 npm 无锁解析。旧 Node20/PNPM8 容器应拉取新镜像并重建；宿主机先升级 Node，再重新安装完整 npm 包。Termux 的无锁源码回退也不再支持。CLI 的远程 API 模式仍仅需 Node >=22.12。
 
 依据：[Node 发布计划](https://github.com/nodejs/Release/blob/main/schedule.json)、[Node 22.23.3 发布与下载](https://nodejs.org/en/blog/release/v22.23.3)、[官方 Node 发布者公钥](https://github.com/nodejs/release-keys)、[Python 支持周期](https://devguide.python.org/versions/)、[Python 3.11.17 Trixie 镜像元数据](https://github.com/docker-library/repo-info/blob/master/repos/python/remote/3.11.17-slim-trixie.md)、[Python 3.11.17 Alpine 镜像元数据](https://github.com/docker-library/repo-info/blob/master/repos/python/remote/3.11.17-alpine3.24.md)。
+
+## 前端构建运行时
+
+后端继续在 Node 22 和 24 上验收。现有 Umi 4.4.4 构建依赖加载 spdy/http-deceiver，仍使用 Node 24 已移除的 `http_parser`。因此 `build:front` 通过 pnpm 单次命令参数固定使用 Node 22.23.3；这不会改变后端、全局 Node 或其他脚本的运行时。使用 `pnpm build:front` 或 `npm run build:front`，不要直接在 Node 24 下调用 `max build`。pnpm 会从官方 Node 发布站下载构建运行时，首次前端构建需要网络访问；前端构建不属于容器运行时离线验收阶段。Node 22/24 CI 均执行该构建入口，覆盖宿主 Node 24 的场景。此范围待前端工具链升级后再放宽。
+
+相关设置：[pnpm 10 Node.js 运行时设置](https://github.com/pnpm/pnpm.io/blob/main/versioned_docs/version-10.x/settings.md#usenodeversion)。

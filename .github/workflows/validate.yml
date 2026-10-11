@@ -28,6 +28,7 @@ jobs:
       - run: cp .env.example .env
       - run: pnpm test
       - run: pnpm build:back
+      - run: pnpm build:front
       - run: pnpm benchmark:execution -- --runs=10 --output=execution-baseline.json
       - uses: actions/upload-artifact@v6
         with:

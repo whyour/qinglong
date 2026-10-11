@@ -23,7 +23,7 @@
     "start": "concurrently -n w: npm:start:*",
     "start:back": "nodemon ./back/app.ts",
     "start:front": "max dev",
-    "build:front": "max build",
+    "build:front": "pnpm --use-node-version=22.23.3 exec max build",
     "build:back": "tsc -p back/tsconfig.json",
     "test": "TS_NODE_PROJECT=back/tsconfig.json node -r ts-node/register/transpile-only --test test/back/*.test.cjs test/front/*.test.cjs",
     "benchmark:execution": "TS_NODE_PROJECT=back/tsconfig.json node -r ts-node/register/transpile-only scripts/benchmark-execution.cjs",
