@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/release-readiness.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
 
 permissions:

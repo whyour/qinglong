@@ -26,6 +26,28 @@ get_token() {
   create_token
 }
 
+# Check the cached token before every authenticated API request. A rejected
+# token is refreshed and retried once; other failures are never retried.
+# Arguments are curl options, including the URL, method and optional body.
+ql_api_request() {
+  local api=""
+  local attempt
+  get_token || return $?
+  for attempt in 1 2; do
+    api=$(curl -s --noproxy "*" \
+      -H "Authorization: Bearer ${__ql_token__}" \
+      -H "Content-Type: application/json;charset=UTF-8" \
+      "$@" \
+      --compressed)
+    if [[ "$attempt" == 2 || "$api" == '{"code":200}' ]] ||
+      [[ "$(jq -r '.code' <<< "$api" 2>/dev/null)" != 401 ]]; then
+      break
+    fi
+    create_token || return $?
+  done
+  printf '%s' "$api"
+}
+
 # Read the status response once; preserve multiline error messages and the
 # legacy code/message variables used by the shell API callers.
 ql_parse_status_response() {
@@ -63,13 +85,10 @@ add_cron_api() {
     sub_id="null"
   fi
 
-  local api=$(
-    curl -s --noproxy "*" "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"sub_id\":$sub_id}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
+    --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"sub_id\":$sub_id}" \
+    -X POST)
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
@@ -93,14 +112,10 @@ update_cron_api() {
     local id="$4"
   fi
 
-  local api=$(
-    curl -s --noproxy "*" "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"id\":\"$id\"}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"id\":\"$id\"}")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
@@ -120,14 +135,10 @@ update_cron_command_api() {
     local id="$2"
   fi
 
-  local api=$(
-    curl -s --noproxy "*" "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"command\":\"${command//\"/\\\"}\",\"id\":\"$id\"}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "{\"command\":\"${command//\"/\\\"}\",\"id\":\"$id\"}")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
@@ -140,14 +151,10 @@ update_cron_command_api() {
 del_cron_api() {
   local ids="$1"
   local currentTimeStamp=$(date +%s)
-  local api=$(
-    curl -s --noproxy "*" "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
-      -X 'DELETE' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "[$ids]" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
+    -X DELETE \
+    --data-raw "[$ids]")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
@@ -171,14 +178,10 @@ update_cron() {
     dataRaw="${dataRaw},\"exit_code\":$exitCode"
   fi
   dataRaw="${dataRaw}}"
-  local api=$(
-    curl -s --noproxy "*" "http://localhost:${ql_port}/open/crons/status?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "$dataRaw" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons/status?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "$dataRaw")
   ql_parse_status_response "$api" || true
   if [[ $code != 200 ]]; then
     if [[ ! $message ]]; then
@@ -192,14 +195,10 @@ notify_api() {
   local title="$1"
   local content="$2"
   local currentTimeStamp=$(date +%s)
-  local api=$(
-    curl -s --noproxy "*" "http://localhost:${ql_port}/open/system/notify?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"title\":\"${title//\"/\\\"}\",\"content\":\"${content//\"/\\\"}\"}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/system/notify?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "{\"title\":\"${title//\"/\\\"}\",\"content\":\"${content//\"/\\\"}\"}")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
@@ -212,12 +211,9 @@ notify_api() {
 find_cron_api() {
   local params="$1"
   local currentTimeStamp=$(date +%s)
-  local api=$(
-    curl -s --noproxy "*" "http://localhost:${ql_port}/open/crons/detail?$params&t=$currentTimeStamp" \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons/detail?$params&t=$currentTimeStamp" \
+    -X GET)
   data=$(echo "$api" | jq -r .data)
   if [[ $data == 'null' ]]; then
     echo -e ""
@@ -231,14 +227,10 @@ update_auth_config() {
   local body="$1"
   local tip="$2"
   local currentTimeStamp=$(date +%s)
-  local api=$(
-    curl -s --noproxy "*" "http://localhost:${ql_port}/open/system/auth/reset?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{$body}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/system/auth/reset?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "{$body}")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
@@ -254,14 +246,10 @@ record_cron_stat() {
   local elapsed="${3:-0}"
   [[ $ref_id ]] && [[ $ref_id -gt 0 ]] 2>/dev/null || return
 
-  local api=$(
-    curl -s --noproxy "*" "http://localhost:${ql_port:-5700}/open/dashboard/record" \
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port:-5700}/open/dashboard/record" \
     -X POST \
-    -H "Authorization: Bearer ${__ql_token__}" \
-    -H "Content-Type: application/json;charset=UTF-8" \
-    --data-raw "{\"ref_id\":$ref_id,\"code\":$exit_code,\"elapsed\":$elapsed}" \
-    --compressed
-  )
+    --data-raw "{\"ref_id\":$ref_id,\"code\":$exit_code,\"elapsed\":$elapsed}")
   ql_parse_status_response "$api" || true
   if [[ $code != 200 ]]; then
     if [[ ! $message ]]; then
@@ -270,5 +258,3 @@ record_cron_stat() {
     echo -e "${message}"
   fi
 }
-
-get_token

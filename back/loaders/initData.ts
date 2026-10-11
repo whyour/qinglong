@@ -13,12 +13,11 @@ import { AuthDataType, SystemModel } from '../data/system';
 import SystemService from '../services/system';
 import UserService from '../services/user';
 import { writeFile, readFile } from 'fs/promises';
-import { createRandomString, fileExist, isDemoEnv, safeJSONParse } from '../config/util';
+import { fileExist, isDemoEnv, safeJSONParse } from '../config/util';
 import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
 import Logger from './logger';
 import cronClient from '../schedule/client';
-import { AppModel } from '../data/open';
 import { InstanceStatus, RunningInstanceModel } from '../data/runningInstance';
 import { setLang, systemLang } from '../shared/i18n';
 
@@ -31,24 +30,7 @@ export default async () => {
   const openService = Container.get(OpenService);
 
   // 初始化增加系统配置
-  let systemApp = (
-    await AppModel.findOne({
-      where: { name: 'system' },
-    })
-  )?.get({ plain: true });
-  if (!systemApp) {
-    systemApp = await AppModel.create({
-      name: 'system',
-      scopes: ['crons', 'system', 'dashboard'],
-      client_id: createRandomString(12, 12),
-      client_secret: createRandomString(24, 24),
-    });
-  } else if (!systemApp.scopes.includes('dashboard')) {
-    await AppModel.update(
-      { scopes: [...systemApp.scopes, 'dashboard'] },
-      { where: { name: 'system' } },
-    );
-  }
+  await openService.initializeSystemApp();
   const [systemConfig] = await SystemModel.findOrCreate({
     where: { type: AuthDataType.systemConfig },
   });
@@ -250,9 +232,6 @@ export default async () => {
   await envService.set_envs();
 
   const authInfo = await userService.getAuthInfo();
-  const apps = await openService.findApps();
   await shareStore.updateAuthInfo(authInfo);
-  if (apps?.length) {
-    await shareStore.updateApps(apps);
-  }
+  await openService.refreshApps();
 };

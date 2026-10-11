@@ -26,6 +26,7 @@ export default async () => {
   if (await fileExist(tokenFile)) {
     tokenCommand = `node ${tokenFile}`;
   }
+  tokenCommand += ' --renew';
   const cron = {
     id: NaN,
     name: t('生成token'),
