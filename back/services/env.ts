@@ -13,10 +13,11 @@ import {
   stepPosition,
 } from '../data/env';
 import { writeFileWithLock } from '../shared/utils';
+import { sequelize } from '../data';
 
 @Service()
 export default class EnvService {
-  constructor(@Inject('logger') private logger: winston.Logger) {}
+  constructor(@Inject('logger') private logger: winston.Logger) { }
 
   public async create(payloads: Env[]): Promise<Env[]> {
     const envs = await this.envs();
@@ -26,7 +27,7 @@ export default class EnvService {
       envs.length > 0 &&
       typeof envs[envs.length - 1].position === 'number'
     ) {
-      position = envs[envs.length - 1].position!;
+      position = this.getPrecisionPosition(envs[envs.length - 1].position!);
     }
     const tabs = payloads.map((x) => {
       position = position - stepPosition;
@@ -99,7 +100,7 @@ export default class EnvService {
   }
 
   private async checkPosition(position: number, edge: number = 0) {
-    const precisionPosition = parseFloat(position.toPrecision(16));
+    const precisionPosition = this.getPrecisionPosition(position);
     if (
       precisionPosition < minPosition ||
       precisionPosition > maxPosition ||
@@ -115,7 +116,7 @@ export default class EnvService {
   }
 
   private getPrecisionPosition(position: number): number {
-    return parseFloat(position.toPrecision(16));
+    return Math.trunc(parseFloat(position.toPrecision(16)));
   }
 
   public async envs(searchText: string = '', query: any = {}): Promise<Env[]> {
@@ -146,7 +147,7 @@ export default class EnvService {
     }
     try {
       const result = await this.find(condition, [
-        ['isPinned', 'DESC'],
+        [sequelize.literal('COALESCE(`isPinned`, 0)'), 'DESC'],
         ['position', 'DESC'],
         ['createdAt', 'ASC'],
       ]);
@@ -198,6 +199,44 @@ export default class EnvService {
     await EnvModel.update({ isPinned: 0 }, { where: { id: ids } });
   }
 
+  public async addLabels(ids: number[], labels: string[]) {
+    await sequelize.transaction(async (transaction) => {
+      const docs = await EnvModel.findAll({
+        where: { id: ids },
+        transaction,
+      });
+      for (const doc of docs) {
+        const env = doc.get({ plain: true });
+        await EnvModel.update(
+          { labels: Array.from(new Set([...(env.labels || []), ...labels])) },
+          { where: { id: env.id }, transaction },
+        );
+      }
+    });
+    return await this.find({ id: ids });
+  }
+
+  public async removeLabels(ids: number[], labels: string[]) {
+    await sequelize.transaction(async (transaction) => {
+      const docs = await EnvModel.findAll({
+        where: { id: ids },
+        transaction,
+      });
+      for (const doc of docs) {
+        const env = doc.get({ plain: true });
+        await EnvModel.update(
+          {
+            labels: (env.labels || []).filter(
+              (label: string) => !labels.includes(label),
+            ),
+          },
+          { where: { id: env.id }, transaction },
+        );
+      }
+    });
+    return await this.find({ id: ids });
+  }
+
   public async set_envs() {
     const envs = await this.envs('', {
       name: { [Op.not]: null },
@@ -223,10 +262,9 @@ export default class EnvService {
             .map((x) => x.value)
             .join('&')
             .replace(/\\/g, '\\\\')}`;
-          js_env_string += `process.env.${key}=\`${_env_value.replace(
-            /\`/g,
-            '\\`',
-          )}\`;\n`;
+          js_env_string += `process.env[${JSON.stringify(key)}]=${JSON.stringify(
+            group.map((x) => x.value).join('&'),
+          )};\n`;
           py_env_string += `os.environ['${key}']='''${_env_value.replace(
             /\'/g,
             "\\'",

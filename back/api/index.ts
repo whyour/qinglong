@@ -10,7 +10,10 @@ import dependence from './dependence';
 import system from './system';
 import subscription from './subscription';
 import update from './update';
+import dashboard from './dashboard';
 import health from './health';
+import clientIp from './clientIp';
+import retention from './retention';
 
 export default () => {
   const app = Router();
@@ -25,7 +28,10 @@ export default () => {
   system(app);
   subscription(app);
   update(app);
+  dashboard(app);
   health(app);
+  clientIp(app);
+  retention(app);
 
   return app;
 };

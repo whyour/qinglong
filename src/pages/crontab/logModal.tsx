@@ -16,11 +16,12 @@ import {
   CheckCircleOutlined,
 } from "@ant-design/icons";
 import { PageLoading } from "@ant-design/pro-layout";
-import { logEnded } from "@/utils";
 import { CrontabStatus } from "./type";
 import Ansi from "ansi-to-react";
 
 const { Countdown } = Statistic;
+const LOG_CHUNK_BYTES = 256 * 1024;
+const MAX_LOG_VIEW_CHARS = 1024 * 1024;
 
 const CronLogModal = ({
   cron,
@@ -38,37 +39,60 @@ const CronLogModal = ({
   const [executing, setExecuting] = useState<any>(true);
   const [isPhone, setIsPhone] = useState(false);
   const scrollInfoRef = useRef({ value: 0, down: true });
+  const logOffsetRef = useRef<number>();
+  const valueRef = useRef(value);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const uniqPath = logUrl ? logUrl : String(cron?.id);
 
   const getCronLog = (isFirst?: boolean) => {
     if (isFirst) {
       setLoading(true);
     }
+    const baseUrl = logUrl ? logUrl : `${config.apiPrefix}crons/${cron.id}/log`;
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    const offset = isFirst ? undefined : logOffsetRef.current;
+    const pagination = `${separator}limit=${LOG_CHUNK_BYTES}${
+      isFirst ? "&tail=true" : offset !== undefined ? `&offset=${offset}` : ""
+    }`;
     request
-      .get(logUrl ? logUrl : `${config.apiPrefix}crons/${cron.id}/log`)
-      .then(({ code, data }) => {
-        if (
-          code === 200 &&
-          localStorage.getItem("logCron") === uniqPath &&
-          data !== value
-        ) {
-          const log = data as string;
-          setValue(log || intl.get("暂无日志"));
-          const hasNext = Boolean(
-            log && !logEnded(log) && !log.includes("日志不存在") && !log.includes("日志设置为忽略"),
+      .get(`${baseUrl}${pagination}`)
+      .then(({ code, data, logStatus, nextOffset, total }) => {
+        if (code !== 200 || localStorage.getItem("logCron") !== uniqPath) {
+          return;
+        }
+
+        const isRunning = logStatus === "running";
+        // A completed process can still have multiple unread chunks. Drain
+        // them before stopping, without presenting it as a running task.
+        const hasUnread =
+          typeof nextOffset === "number" &&
+          typeof total === "number" &&
+          nextOffset > (offset ?? 0) &&
+          nextOffset < total;
+        const hasNext = isRunning || hasUnread;
+        const chunk = (data as string) || "";
+        let log = isFirst ? chunk : `${valueRef.current}${chunk}`;
+        if (!log && !hasNext) {
+          log = intl.get("暂无日志");
+        }
+        if (log.length > MAX_LOG_VIEW_CHARS) {
+          log = log.slice(-MAX_LOG_VIEW_CHARS);
+        }
+        valueRef.current = log;
+        setValue(log);
+        if (typeof nextOffset === "number") {
+          logOffsetRef.current = nextOffset;
+        }
+        setExecuting(isRunning);
+
+        if (chunk || !hasNext) {
+          autoScroll();
+        }
+        if (hasNext) {
+          pollTimerRef.current = setTimeout(
+            () => getCronLog(),
+            hasUnread ? 0 : 2000,
           );
-          if (!hasNext && !logEnded(value) && value !== intl.get("启动中...")) {
-            setTimeout(() => {
-              autoScroll();
-            });
-          }
-          setExecuting(hasNext);
-          if (hasNext) {
-            setTimeout(() => {
-              autoScroll();
-              getCronLog();
-            }, 2000);
-          }
         }
       })
       .finally(() => {
@@ -91,6 +115,9 @@ const CronLogModal = ({
   };
 
   const cancel = () => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+    }
     localStorage.removeItem("logCron");
     handleCancel();
   };
@@ -119,12 +146,19 @@ const CronLogModal = ({
 
   useEffect(() => {
     if (cron && cron.id) {
+      logOffsetRef.current = undefined;
       getCronLog(true);
     }
+    return () => {
+      if (pollTimerRef.current) {
+        clearTimeout(pollTimerRef.current);
+      }
+    };
   }, [cron]);
 
   useEffect(() => {
     if (data) {
+      valueRef.current = data;
       setValue(data);
     }
   }, [data]);

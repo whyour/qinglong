@@ -195,12 +195,14 @@ export SMTP_SERVER=""
 ## SMTP 发送邮件服务器是否使用 SSL，填写 true 或 false
 export SMTP_SSL=""
 
-## smtp_email 填写 SMTP 收发件邮箱，通知将会由自己发给自己
+## smtp_email 填写 SMTP 发件邮箱
 export SMTP_EMAIL=""
 ## smtp_password 填写 SMTP 登录密码，也可能为特殊口令，视具体邮件服务商说明而定
 export SMTP_PASSWORD=""
 ## smtp_name 填写 SMTP 收发件人姓名，可随意填写
 export SMTP_NAME=""
+## smtp_email_to 填写 SMTP 收件邮箱，多个用英文;分隔，不填默认发给发件邮箱
+export SMTP_EMAIL_TO=""
 
 ## 17. PushMe
 ## 官方说明文档：https://push.i-i.me/
@@ -239,14 +241,19 @@ export NTFY_PASSWORD=""
 export NTFY_ACTIONS=""
 
 ## 21. wxPusher
-## 官方文档: https://wxpusher.zjiecode.com/docs/
-## 管理后台: https://wxpusher.zjiecode.com/admin/
+### 方式一：标准发送（更强大）
+#### 官方文档: https://wxpusher.zjiecode.com/docs/
+#### 管理后台: https://wxpusher.zjiecode.com/admin/
 ## wxPusher 的 appToken
 export WXPUSHER_APP_TOKEN=""
 ## wxPusher 的 topicIds，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
 export WXPUSHER_TOPIC_IDS=""
 ## wxPusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
 export WXPUSHER_UIDS=""
+### 方式二：极简发送（最简单，简单好用，一键配置，更推荐） 
+#### wxPusher 的 SPT（极简推送），扫码获取 https://wxpusher.zjiecode.com/docs/#/?id=spt
+#### 多个用英文逗号,分隔，最多10个；与上面的 appToken 方式二选一即可
+export WXPUSHER_SPT_LIST=""
 
 ## 22. 自定义通知
 ## 自定义通知 接收回调的URL
@@ -259,4 +266,23 @@ export WEBHOOK_METHOD=""
 ## 支持 text/plain、application/json、multipart/form-data、application/x-www-form-urlencoded
 export WEBHOOK_CONTENT_TYPE=""
 
+## 23. OpeniLink
+## 官方文档: https://openilink.com/docs/hub/apps
+## 在 OpeniLink Hub 后台安装 App 后获取 app_token
+export OPENILINK_APP_TOKEN=""
+## OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
+export OPENILINK_HUB_URL=""
+## OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
+export OPENILINK_CONTEXT_TOKEN=""
+
 ## 其他需要的变量，脚本中需要的变量使用 export 变量名= 声明即可
+
+## 23. WPUSH
+## 官方文档: https://wpush.cn/docs
+## WPUSH_APIKEY (必填) 在 https://wpush.cn/settings 获取，以 WPUSH 开头
+export WPUSH_APIKEY=""
+## 推送渠道，支持 wechat/app/sms/mail/webhook/dingtalk/feishu/wechat_work/clawbot/qqbot，默认 wechat
+export WPUSH_CHANNEL="wechat"
+## 可选，Topic 广播编码；填写后按 Topic 推送
+export WPUSH_TOPIC_CODE=""
+

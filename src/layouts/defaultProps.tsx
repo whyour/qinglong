@@ -1,5 +1,5 @@
 import intl from 'react-intl-universal';
-import { SettingOutlined } from '@ant-design/icons';
+import { SettingOutlined, DashboardOutlined } from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
 import { BasicLayoutProps } from '@ant-design/pro-layout';
 
@@ -23,6 +23,12 @@ export default {
         path: '/error',
         hideInMenu: true,
         component: '@/pages/error/index',
+      },
+      {
+        path: '/dashboard',
+        name: intl.get('仪表盘'),
+        icon: <DashboardOutlined />,
+        component: '@/pages/dashboard/index',
       },
       {
         path: '/crontab',

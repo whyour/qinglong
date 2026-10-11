@@ -1,21 +1,8 @@
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
-import chokidar from 'chokidar';
 import config from '../config/index';
 import Logger from './logger';
-
-async function linkToNodeModule(src: string, dst?: string) {
-  const target = path.join(config.rootPath, 'node_modules', dst || src);
-  const source = path.join(config.rootPath, src);
-
-  try {
-    const stats = await fs.lstat(target);
-    if (!stats) {
-      await fs.symlink(source, target, 'dir');
-    }
-  } catch (error) { }
-}
 
 async function linkCommand() {
   const homeDir = os.homedir();
@@ -30,6 +17,50 @@ async function linkCommand() {
 }
 
 async function linkCommandToDir(commandDir: string) {
+  const cliRoot = process.env.QL_CLI_ROOT;
+  if (cliRoot) {
+    if (!path.isAbsolute(cliRoot)) {
+      throw new Error('QL_CLI_ROOT must be an absolute CLI installation path');
+    }
+    const { installCliEntrypoints } = require(path.join(
+      cliRoot,
+      'dist/local/entrypoints.js',
+    ));
+    await installCliEntrypoints(commandDir, cliRoot);
+    const { installCronEntrypoint } = require(path.join(
+      cliRoot,
+      'dist/local/cronEntrypoint.js',
+    ));
+    await installCronEntrypoint(commandDir, cliRoot, config.crontabFile, {
+      ...process.env,
+      QL_DIR: config.rootPath,
+      QL_DATA_DIR: config.dataPath,
+    });
+    // Container-wide legacy links may precede ~/bin. Ensure panel children use
+    // the explicitly selected entries without changing system-wide links.
+    process.env.PATH = [
+      commandDir,
+      ...(process.env.PATH?.split(path.delimiter) ?? []).filter(
+        (entry) => entry !== commandDir,
+      ),
+    ].join(path.delimiter);
+    return;
+  }
+
+  const cronBridge = path.join(commandDir, 'crontab');
+  try {
+    if (
+      (await fs.lstat(cronBridge)).isFile() &&
+      (await fs.readFile(cronBridge, 'utf8')).includes(
+        '// QingLong CLI crontab bridge',
+      )
+    ) {
+      await fs.unlink(cronBridge);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+
   const linkShell = [
     {
       src: 'update.sh',
@@ -52,24 +83,13 @@ async function linkCommandToDir(commandDir: string) {
       if (stats) {
         await fs.unlink(tmpTarget);
       }
-    } catch (error) { }
+    } catch (error) {}
 
     await fs.symlink(source, tmpTarget);
     await fs.rename(tmpTarget, target);
   }
 }
 
-export default async (src: string = 'deps') => {
+export default async () => {
   await linkCommand();
-  await linkToNodeModule(src);
-
-  const source = path.join(config.rootPath, src);
-  const watcher = chokidar.watch(source, {
-    ignored: /(^|[\/\\])\../, // ignore dotfiles
-    persistent: true,
-  });
-
-  watcher
-    .on('add', () => linkToNodeModule(src))
-    .on('change', () => linkToNodeModule(src));
 };

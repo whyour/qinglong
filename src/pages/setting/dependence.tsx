@@ -75,12 +75,9 @@ const Dependence = () => {
   };
 
   const handleMessage = (payload: any) => {
-    const { message } = payload;
-    setLog((p) => `${p}${message}`);
-    if (
-      message.includes('update node mirror end') ||
-      message.includes('update linux mirror end')
-    ) {
+    const { message, status } = payload;
+    if (message) setLog((p) => `${p}${message}`);
+    if (status === 'completed') {
       setLoading(false);
     }
   };
@@ -109,7 +106,7 @@ const Dependence = () => {
     ws.subscribe('updateLinuxMirror', handleMessage);
 
     return () => {
-      ws.subscribe('updateNodeMirror', handleMessage);
+      ws.unsubscribe('updateNodeMirror', handleMessage);
       ws.unsubscribe('updateLinuxMirror', handleMessage);
     };
   }, []);
@@ -215,12 +212,12 @@ const Dependence = () => {
         <Form.Item
           label={intl.get('Linux 软件包镜像源')}
           name="linux"
-          tooltip={intl.get('alpine linux 镜像源')}
+          tooltip={intl.get('debian linux 镜像源')}
         >
           <Input.Group compact>
             <Input
               style={{ width: 250 }}
-              placeholder={'https://mirrors.aliyun.com'}
+              placeholder={'http://mirrors.aliyun.com'}
               value={systemConfig?.linuxMirror}
               onChange={(e) => {
                 setSystemConfig({

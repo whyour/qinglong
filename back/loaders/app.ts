@@ -6,23 +6,25 @@ import { Application } from 'express';
 import linkDeps from './deps';
 import initTask from './initTask';
 import initFile from './initFile';
+import { initializeTrustProxy } from '../shared/trustProxy';
 
 export default async ({ app }: { app: Application }) => {
   depInjectorLoader();
-  Logger.info('✌️ Dependency loaded');
+  Logger.info('[boot] Dependency loaded');
 
   await linkDeps();
-  Logger.info('✌️ Link deps loaded');
+  Logger.info('[boot] Link deps loaded');
 
-  initFile();
-  Logger.info('✌️ Init file loaded');
+  await initFile();
+  Logger.info('[boot] Init file loaded');
 
   await initData();
-  Logger.info('✌️ Init data loaded');
+  Logger.info('[boot] Init data loaded');
 
   initTask();
-  Logger.info('✌️ Init task loaded');
+  Logger.info('[boot] Init task loaded');
 
   expressLoader({ app });
-  Logger.info('✌️ Express loaded');
+  await initializeTrustProxy(app);
+  Logger.info('[boot] Express loaded');
 };

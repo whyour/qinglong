@@ -1,47 +1,15 @@
-version: 2.20.0
-changeLogLink: https://t.me/jiao_long/432
-publishTime: 2025-12-10 01:05
+version: 2.23.0
+changeLogLink: https://github.com/whyour/qinglong/blob/master/docs/releases/2.23.0.md
+publishTime: "2026-10-11 12:27:02"
 changeLog: |
-  1. 定时任务（cron / task）相关的大量修复 & 增强
-
-  修复 cron 解析错误（修复 parse cron / 升级 cron-parser）
-  修复集群模式下定时任务可能不执行（race condition）
-  定时任务支持订阅筛选
-  定时任务支持排序调整
-  定时任务支持自定义日志文件或无日志
-  修复任务实例默认值
-  任务支持单实例 / 多实例模式
-  修复 task 命令软链可能失败问题
-
-  2. 日志系统相关的大更新
-
-  修复日志目录逻辑
-  修复 pm2 日志目录
-  优化日志写入（stream pooling）
-
-  3. 环境变量（env）系统的改进与修复
-
-  修复环境变量复制到剪贴板时可能失败
-  添加环境变量“置顶”功能
-  修复 QlPort 与 QlGrpcPort 环境变量在 host network 模式下被忽略
-  增加全局 SSH 私钥配置
-
-  4. Docker / 非 root 用户 / Alpine 兼容性增强
-
-  新增非 root Docker 用户支持，自动初始化命令
-  修复 Alpine 容器 DNS 解析失败（设置 ndots:0）
-  修复 PM2 在 ARM 路由器（Node.js 不兼容）上的启动失败
-  移除 nginx（可能是考虑更轻量的镜像运行）
-
-  5. API 安全与校验增强
-
-  Dependencies GET endpoint 增加校验
-  Script API routes 增加输入校验
-  修复 JWT 认证问题
-  Feishu 机器人通知增加签名校验
-  QLAPI 增加 cron task 管理功能
-  修复 URIError（错误 cookie 导致白屏）
-
-  6. 系统设置
-
-  新增多终端/多平台的并发登录会话支持
+  1. 新增脚本历史版本查看、对比与恢复，支持 CLI 和 OpenAPI；恢复前检查当前内容哈希，避免覆盖并发修改
+  2. 普通任务与订阅调度迁移到 node-cron，保留旧规则兼容及日期/星期 OR 语义，补充宏和夏令时说明
+  3. 修复已失效排队任务仍被执行的问题，完善任务进程超时、停止和 Shell 环境传递
+  4. 修复系统令牌主动续期与认证缓存并发更新；Shell API 遇到 401 时刷新令牌并重试一次
+  5. 降低任务启动开销，JS/Python 通知依赖改为首次调用时加载
+  6. 加固环境变量、订阅参数、文件访问和 SSH 配置输入，改善资源冲突与 CLI 错误反馈
+  7. 修复页面升级、ql update 与静态资源版本同步，完善离线备份和升级产物校验
+  8. 修复 Debian 依赖安装、通知与调度回归，补齐前端中英文翻译
+  9. 最小修补 HTTP 压缩、上传、gRPC、代理 IP、WebSocket 和 JSON 查询相关依赖漏洞
+  10. 远程 CLI 更新至 0.1.2，新增脚本历史命令，最低 Node.js 版本仍为 22.12
+  11. 本次为 Python 3.10 兼容镜像的最后一个版本，发布后停止维护；升级前备份完整数据并验证脚本、依赖和通知
