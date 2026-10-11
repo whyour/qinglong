@@ -20,6 +20,8 @@ export enum NotificationMode {
   'chronocat' = 'Chronocat',
   'ntfy' = 'ntfy',
   'wxPusherBot' = 'wxPusherBot',
+  'openiLink' = 'openiLink',
+  'wpush' = 'wpush',
 }
 
 abstract class NotificationBaseInfo {
@@ -142,6 +144,7 @@ export class WebhookNotification extends NotificationBaseInfo {
 
 export class LarkNotification extends NotificationBaseInfo {
   public larkKey = '';
+  public larkSecret = '';
 }
 
 export class NtfyNotification extends NotificationBaseInfo {
@@ -158,6 +161,22 @@ export class WxPusherBotNotification extends NotificationBaseInfo {
   public wxPusherBotAppToken = '';
   public wxPusherBotTopicIds = '';
   public wxPusherBotUids = '';
+}
+
+export class WxPusherSptNotification extends NotificationBaseInfo {
+  public wxPusherSptList = '';
+}
+
+export class OpeniLinkNotification extends NotificationBaseInfo {
+  public openiLinkAppToken = '';
+  public openiLinkHubUrl = '';
+  public openiLinkContextToken = '';
+}
+
+export class WpushNotification extends NotificationBaseInfo {
+  public wpushApiKey = '';
+  public wpushChannel = '';
+  public wpushTopicCode = '';
 }
 
 export interface NotificationInfo
@@ -181,4 +200,7 @@ export interface NotificationInfo
     ChronocatNotification,
     LarkNotification,
     NtfyNotification,
-    WxPusherBotNotification {}
+    WxPusherBotNotification,
+    WxPusherSptNotification,
+    OpeniLinkNotification,
+    WpushNotification {}

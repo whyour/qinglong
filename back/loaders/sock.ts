@@ -1,56 +1,118 @@
-import sockJs from 'sockjs';
+import sockJs, { Connection } from 'sockjs';
 import { Server } from 'http';
 import { Container } from 'typedi';
 import SockService from '../services/sock';
 import { getPlatform } from '../config/util';
 import { shareStore } from '../shared/store';
-import jwt from 'jsonwebtoken';
+import { isValidToken } from '../shared/auth';
 import config from '../config';
+import jwt from 'jsonwebtoken';
 
 export default async ({ server }: { server: Server }) => {
-  const echo = sockJs.createServer({ prefix: '/api/ws', log: () => {} });
+  const echo = sockJs.createServer({
+    prefix: `${config.baseUrl}/api/ws`,
+    log: () => {},
+  });
   const sockService = Container.get(SockService);
+  const sessions = new Map<Connection, { token: string; platform: string }>();
+  let sessionTimer: ReturnType<typeof setInterval> | undefined;
+  let checking = false;
+
+  const validateSession = async (
+    authInfo: any,
+    token: string,
+    platform: string,
+  ) => {
+    if (isValidToken(authInfo, token, platform, config.jwt.secret)) return true;
+    const claims = jwt.decode(token);
+    if (
+      !claims ||
+      typeof claims === 'string' ||
+      !Number.isSafeInteger(claims.userId) ||
+      claims.userId <= 0
+    )
+      return false;
+    const { default: UserManagementService } = await import(
+      '../services/userManagement'
+    );
+    const account = await Container.get(UserManagementService).validateToken(
+      token,
+      platform,
+    );
+    return account?.role === 0;
+  };
+
+  const checkSessions = async () => {
+    if (checking || sessions.size === 0) return;
+    checking = true;
+    // Connections accepted during this read must not use an older snapshot.
+    const batch = [...sessions];
+    try {
+      const current = await shareStore.getAuthInfo();
+      // Reuse validation only within this synchronous check of one auth snapshot.
+      const validated = new Map<string, Map<string, boolean>>();
+      for (const [conn, { token, platform }] of batch) {
+        if (!sessions.has(conn)) continue;
+        let platforms = validated.get(token);
+        if (!platforms) {
+          platforms = new Map();
+          validated.set(token, platforms);
+        }
+        let valid = platforms.get(platform);
+        if (valid === undefined) {
+          valid = await validateSession(current, token, platform);
+          platforms.set(platform, valid);
+        }
+        if (!valid) conn.close('401');
+      }
+    } catch {
+      for (const [conn] of batch) {
+        if (sessions.has(conn)) conn.close('401');
+      }
+    } finally {
+      checking = false;
+    }
+  };
 
   echo.on('connection', async (conn) => {
     if (!conn.headers || !conn.url || !conn.pathname) {
       conn.close('404');
+      return;
     }
 
+    let closed = false;
+    conn.on('close', () => {
+      closed = true;
+      sessions.delete(conn);
+      sockService.removeClient(conn);
+      if (sessions.size === 0 && sessionTimer) {
+        clearInterval(sessionTimer);
+        sessionTimer = undefined;
+      }
+    });
+
+    let authInfo;
+    try {
+      authInfo = await shareStore.getAuthInfo();
+    } catch {
+      if (!closed) conn.close('401');
+      return;
+    }
+    if (closed) return;
     const platform = getPlatform(conn.headers['user-agent'] || '') || 'desktop';
     const headerToken = conn.url.replace(`${conn.pathname}?token=`, '');
-    
-    let isAuthenticated = false;
 
-    // First try to verify JWT token (for regular users)
-    if (headerToken) {
-      try {
-        jwt.verify(headerToken, config.jwt.secret, { algorithms: ['HS384'] });
-        isAuthenticated = true;
-      } catch (error) {
-        // JWT verification failed, will try authInfo check next
-      }
-    }
-
-    // Also check against stored token for system admin
-    if (!isAuthenticated) {
-      const authInfo = await shareStore.getAuthInfo();
-      if (authInfo) {
-        const { token = '', tokens = {} } = authInfo;
-        if (headerToken === token || tokens[platform] === headerToken) {
-          isAuthenticated = true;
-        }
-      }
-    }
-
-    if (isAuthenticated) {
+    if (await validateSession(authInfo, headerToken, platform)) {
+      if (closed) return;
       sockService.addClient(conn);
+      sessions.set(conn, { token: headerToken, platform });
+      if (!sessionTimer) {
+        sessionTimer = setInterval(checkSessions, 1000);
+        sessionTimer.unref();
+      }
 
       conn.on('data', (message) => {
         conn.write(message);
-      });
-
-      conn.on('close', function () {
-        sockService.removeClient(conn);
       });
 
       return;

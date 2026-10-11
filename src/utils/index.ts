@@ -1,6 +1,6 @@
 import intl from 'react-intl-universal';
 import { LANG_MAP, LOG_END_SYMBOL } from './const';
-import cron_parser from 'cron-parser';
+import CronExpressionParser from 'cron-parser';
 import { ICrontab } from '@/pages/crontab/type';
 
 export default function browserType() {
@@ -155,9 +155,9 @@ export default function browserType() {
     shell === 'none'
       ? {}
       : {
-          shell, // wechat qq uc 360 2345 sougou liebao maxthon
-          shellVs,
-        },
+        shell, // wechat qq uc 360 2345 sougou liebao maxthon
+        shellVs,
+      },
   );
 
   console.log(
@@ -179,7 +179,7 @@ export default function browserType() {
 /**
  * 获取第一个表格的可视化高度
  * @param {*} extraHeight 额外的高度(表格底部的内容高度 Number类型,默认为74)
- * @param {*} id 当前页面中有多个table时需要制定table的id
+ * @param {*} id 当前页面中有多个table时需要指定table的id
  */
 export function getTableScroll({
   extraHeight,
@@ -208,7 +208,7 @@ export function getTableScroll({
 }
 
 // 自动触发点击事件
-function automaticClick(elment: HTMLElement) {
+function automaticClick(element: HTMLElement) {
   const ev = document.createEvent('MouseEvents');
   ev.initMouseEvent(
     'click',
@@ -227,7 +227,7 @@ function automaticClick(elment: HTMLElement) {
     0,
     null,
   );
-  elment.dispatchEvent(ev);
+  element.dispatchEvent(ev);
 }
 
 // 导出文件
@@ -333,11 +333,11 @@ export function getCommandScript(
 
 export function parseCrontab(schedule: string): Date | null {
   try {
-    const time = cron_parser.parseExpression(schedule);
+    const time = CronExpressionParser.parse(schedule);
     if (time) {
       return time.next().toDate();
     }
-  } catch (error) {}
+  } catch (error) { }
 
   return null;
 }

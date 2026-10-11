@@ -1,5 +1,5 @@
 import { Joi } from 'celebrate';
-import cron_parser from 'cron-parser';
+import { isValidCronSchedule } from '../shared/cronSchedule';
 import { ScheduleType } from '../interface/schedule';
 import path from 'path';
 import config from '../config';
@@ -12,13 +12,7 @@ const validateSchedule = (value: string, helpers: any) => {
     return value;
   }
 
-  try {
-    if (cron_parser.parseExpression(value).hasNext()) {
-      return value;
-    }
-  } catch (e) {
-    return helpers.error('any.invalid');
-  }
+  if (isValidCronSchedule(value)) return value;
   return helpers.error('any.invalid');
 };
 
@@ -34,7 +28,7 @@ export const commonCronSchema = {
   name: Joi.string().optional(),
   command: Joi.string().required(),
   schedule: scheduleSchema,
-  labels: Joi.array().optional(),
+  labels: Joi.array().optional().allow(null),
   sub_id: Joi.number().optional().allow(null),
   extra_schedules: Joi.array().optional().allow(null),
   task_before: Joi.string().optional().allow('').allow(null),
@@ -64,7 +58,11 @@ export const commonCronSchema = {
         return value;
       }
 
-      if (!/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w.-]+\/)*[\w.-]+\/?$/.test(value)) {
+      if (
+        !/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w\p{Script=Han}.-]+\/)*[\w\p{Script=Han}.-]+\/?$/u.test(
+          value,
+        )
+      ) {
         return helpers.error('string.pattern.base');
       }
       if (value.length > 100) {
@@ -73,8 +71,10 @@ export const commonCronSchema = {
       return value;
     })
     .messages({
-      'string.pattern.base': '日志名称只能包含字母、数字、下划线和连字符',
+      'string.pattern.base': '日志名称只能包含中文、字母、数字、下划线、连字符、点和路径分隔符',
       'string.max': '日志名称不能超过100个字符',
       'string.unsafePath': '绝对路径必须在日志目录内或使用 /dev/null',
     }),
+  allow_multiple_instances: Joi.number().optional().valid(0, 1).allow(null),
+  work_dir: Joi.string().optional().allow('').allow(null),
 };

@@ -12,12 +12,12 @@ import {
 } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
-import cron_parser from 'cron-parser';
+import CronExpressionParser from 'cron-parser';
 import isNil from 'lodash/isNil';
 
 const { Option } = Select;
 const repoUrlRegx = /([^\/\:]+\/[^\/]+)(?=\.git)/;
-const fileUrlRegx = /([^\/\:]+\/[^\/\.]+)\.[a-z]+$/;
+const fileUrlRegx = /([^\/\:]+\/[^\/\.]+)\.[a-z]+(\?[^\s]*)?(#.*)?$/;
 
 const SubscriptionModal = ({
   subscription,
@@ -205,27 +205,53 @@ const SubscriptionModal = ({
     );
   };
 
+  const parseArgs = (text: string): string[] => {
+    const args: string[] = [];
+    let current = '';
+    let inDouble = false;
+    let inSingle = false;
+    let justClosed = false;
+    for (const ch of text) {
+      if (inDouble) {
+        if (ch === '"') { inDouble = false; justClosed = true; continue; }
+        current += ch;
+      } else if (inSingle) {
+        if (ch === "'") { inSingle = false; justClosed = true; continue; }
+        current += ch;
+      } else if (ch === '"') {
+        inDouble = true;
+        justClosed = false;
+      } else if (ch === "'") {
+        inSingle = true;
+        justClosed = false;
+      } else if (ch === ' ' || ch === '\t') {
+        if (current || justClosed) { args.push(current); current = ''; justClosed = false; }
+      } else {
+        current += ch;
+        justClosed = false;
+      }
+    }
+    if (current || justClosed) args.push(current);
+    return args;
+  };
+
   const onPaste = useCallback((e: any) => {
     const text = e.clipboardData.getData('text') as string;
     if (text.startsWith('ql ')) {
-      const [
-        ,
-        type,
-        url,
-        whitelist,
-        blacklist,
-        dependences,
-        branch,
-        extensions,
-      ] = text
-        .split(' ')
-        .map((x) => x.trim().replace(/\"/g, '').replace(/\'/, ''));
+      const args = parseArgs(text);
+      const type = args[1];
+      const url = args[2] || '';
+      const whitelist = args[3] || '';
+      const blacklist = args[4] || '';
+      const dependences = args[5] || '';
+      const branch = args[6] || '';
+      const extensions = args[7] || '';
       const _type =
         type === 'raw'
           ? 'file'
           : url.startsWith('http')
-          ? 'public-repo'
-          : 'private-repo';
+            ? 'public-repo'
+            : 'private-repo';
 
       form.setFieldsValue({
         type: _type,
@@ -378,13 +404,17 @@ const SubscriptionModal = ({
             { required: true },
             {
               validator: (rule, value) => {
-                if (
-                  scheduleType === 'interval' ||
-                  !value ||
-                  cron_parser.parseExpression(value).hasNext()
-                ) {
-                  return Promise.resolve();
-                } else {
+                try {
+                  if (
+                    scheduleType === 'interval' ||
+                    !value ||
+                    CronExpressionParser.parse(value).hasNext()
+                  ) {
+                    return Promise.resolve();
+                  } else {
+                    return Promise.reject(intl.get('Subscription表达式格式有误'));
+                  }
+                } catch (e) {
                   return Promise.reject(intl.get('Subscription表达式格式有误'));
                 }
               },

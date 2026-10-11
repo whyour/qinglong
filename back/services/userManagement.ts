@@ -1,125 +1,160 @@
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import { User, UserModel, UserRole, UserStatus } from '../data/user';
+import { User, UserModel, UserStatus } from '../data/user';
 import { Op } from 'sequelize';
-import bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'crypto';
+import jwt from 'jsonwebtoken';
+import config from '../config';
+import {
+  hashPassword,
+  verifyPassword,
+  isPasswordHash,
+} from '../shared/password';
+import { serializeAuthMutation } from '../shared/authMutation';
+import { shareStore } from '../shared/store';
+
+type PublicUser = Omit<User, 'password' | 'sessions'>;
+function publicUser(user: User): PublicUser {
+  const { password, sessions, ...result } = user;
+  return result;
+}
+function digest(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 @Service()
 export default class UserManagementService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
-  private async hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
+  public async list(searchText?: string): Promise<PublicUser[]> {
+    const where = searchText
+      ? { username: { [Op.like]: `%${searchText}%` } }
+      : {};
+    return (await UserModel.findAll({ where })).map((x) =>
+      publicUser(x.get({ plain: true })),
+    );
   }
-
-  private async verifyPassword(password: string, hash: string): Promise<boolean> {
-    return bcrypt.compare(password, hash);
-  }
-
-  public async list(searchText?: string): Promise<User[]> {
-    let query: any = {};
-    if (searchText) {
-      query = {
-        username: { [Op.like]: `%${searchText}%` },
-      };
-    }
-    const docs = await UserModel.findAll({ where: query });
-    return docs.map((x) => x.get({ plain: true }));
-  }
-
-  public async get(id: number): Promise<User> {
+  public async get(id: number): Promise<PublicUser> {
     const doc = await UserModel.findByPk(id);
-    if (!doc) {
-      throw new Error('用户不存在');
-    }
-    return doc.get({ plain: true });
+    if (!doc) throw Object.assign(new Error('用户不存在'), { status: 404 });
+    return publicUser(doc.get({ plain: true }));
   }
-
   public async getByUsername(username: string): Promise<User | null> {
-    const doc = await UserModel.findOne({ where: { username } });
-    if (!doc) {
-      return null;
-    }
-    return doc.get({ plain: true });
+    return (
+      (await UserModel.findOne({ where: { username } }))?.get({
+        plain: true,
+      }) || null
+    );
   }
-
-  public async create(payload: User): Promise<User> {
-    const existingUser = await this.getByUsername(payload.username);
-    if (existingUser) {
-      throw new Error('用户名已存在');
-    }
-    
-    if (payload.password.length < 6) {
-      throw new Error('密码长度至少为6位');
-    }
-
-    // Hash the password before storing
-    const hashedPassword = await this.hashPassword(payload.password);
-    const userWithHashedPassword = { ...payload, password: hashedPassword };
-    
-    const doc = await UserModel.create(userWithHashedPassword);
-    return doc.get({ plain: true });
-  }
-
-  public async update(payload: User): Promise<User> {
-    if (!payload.id) {
-      throw new Error('缺少用户ID');
-    }
-
-    const existingUser = await this.get(payload.id);
-    if (!existingUser) {
-      throw new Error('用户不存在');
-    }
-
-    if (payload.password && payload.password.length < 6) {
-      throw new Error('密码长度至少为6位');
-    }
-
-    // Check if username is being changed and if new username already exists
-    if (payload.username !== existingUser.username) {
-      const userWithSameUsername = await this.getByUsername(payload.username);
-      if (userWithSameUsername && userWithSameUsername.id !== payload.id) {
-        throw new Error('用户名已存在');
-      }
-    }
-
-    // Hash the password if it's being updated
-    const updatePayload = { ...payload };
-    if (payload.password) {
-      updatePayload.password = await this.hashPassword(payload.password);
-    }
-
-    const [, [updated]] = await UserModel.update(updatePayload, {
-      where: { id: payload.id },
-      returning: true,
+  @serializeAuthMutation
+  public async create(payload: User): Promise<PublicUser> {
+    const auth = await shareStore.getAuthInfo();
+    if (
+      auth?.username === payload.username ||
+      (await this.getByUsername(payload.username))
+    )
+      throw Object.assign(new Error('用户名已存在'), { status: 400 });
+    if (!payload.password || payload.password.length < 6)
+      throw Object.assign(new Error('密码长度至少为6位'), { status: 400 });
+    const user = new User({
+      ...payload,
+      password: await hashPassword(payload.password),
+      sessions: [],
     });
-    return updated.get({ plain: true });
+    return publicUser((await UserModel.create(user)).get({ plain: true }));
   }
-
+  @serializeAuthMutation
+  public async update(
+    payload: Partial<User> & { id: number },
+  ): Promise<PublicUser> {
+    const existing = await this.get(payload.id);
+    if (payload.username && payload.username !== existing.username) {
+      const auth = await shareStore.getAuthInfo();
+      if (
+        auth?.username === payload.username ||
+        (await this.getByUsername(payload.username))
+      )
+        throw Object.assign(new Error('用户名已存在'), { status: 400 });
+    }
+    const changes: Partial<User> = {};
+    for (const key of ['username', 'role', 'status'] as const)
+      if (payload[key] !== undefined) (changes as any)[key] = payload[key];
+    if (payload.password) {
+      if (payload.password.length < 6)
+        throw Object.assign(new Error('密码长度至少为6位'), { status: 400 });
+      changes.password = await hashPassword(payload.password);
+    }
+    if (Object.keys(changes).length) changes.sessions = [];
+    await UserModel.update(changes, { where: { id: payload.id } });
+    return this.get(payload.id);
+  }
+  @serializeAuthMutation
   public async delete(ids: number[]): Promise<number> {
-    const count = await UserModel.destroy({ where: { id: ids } });
-    return count;
+    return UserModel.destroy({ where: { id: ids } });
   }
-
   public async authenticate(
     username: string,
     password: string,
   ): Promise<User | null> {
     const user = await this.getByUsername(username);
-    if (!user) {
+    if (
+      !user ||
+      user.status !== UserStatus.active ||
+      !isPasswordHash(user.password)
+    )
+      return null;
+    return (await verifyPassword(password, user.password)) ? user : null;
+  }
+  // Caller holds the shared account mutation queue during authentication and issuance.
+  public async issueToken(user: User, platform: string): Promise<string> {
+    const token = jwt.sign(
+      { userId: user.id, nonce: randomBytes(32).toString('hex') },
+      config.jwt.secret,
+      { expiresIn: config.jwt.expiresIn || '20d', algorithm: 'HS384' },
+    );
+    const sessions = [
+      ...(user.sessions || []).filter((x) => x.platform !== platform),
+      { digest: digest(token), platform },
+    ].slice(-10);
+    await UserModel.update({ sessions }, { where: { id: user.id } });
+    return token;
+  }
+  public async validateToken(
+    token: string,
+    platform: string,
+  ): Promise<PublicUser | null> {
+    try {
+      const payload = jwt.verify(token, config.jwt.secret, {
+        algorithms: ['HS384'],
+      });
+      if (
+        typeof payload === 'string' ||
+        !Number.isSafeInteger(payload.userId) ||
+        payload.userId <= 0
+      )
+        return null;
+      const user = (await UserModel.findByPk(payload.userId))?.get({
+        plain: true,
+      });
+      if (
+        !user ||
+        user.status !== UserStatus.active ||
+        !user.sessions?.some(
+          (x) => x.digest === digest(token) && x.platform === platform,
+        )
+      )
+        return null;
+      return publicUser(user);
+    } catch {
       return null;
     }
-
-    const isPasswordValid = await this.verifyPassword(password, user.password);
-    if (!isPasswordValid) {
-      return null;
-    }
-
-    if (user.status === UserStatus.disabled) {
-      throw new Error('用户已被禁用');
-    }
-
-    return user;
+  }
+  @serializeAuthMutation
+  public async revokeToken(id: number, token: string): Promise<void> {
+    const user = await UserModel.findByPk(id);
+    if (!user) return;
+    await user.update({
+      sessions: (user.sessions || []).filter((x) => x.digest !== digest(token)),
+    });
   }
 }

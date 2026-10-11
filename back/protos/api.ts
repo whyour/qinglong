@@ -43,6 +43,8 @@ export enum NotificationMode {
   chronocat = 18,
   ntfy = 19,
   wxPusherBot = 20,
+  wxPusherSpt = 21,
+  wpush = 22,
   UNRECOGNIZED = -1,
 }
 
@@ -111,6 +113,12 @@ export function notificationModeFromJSON(object: any): NotificationMode {
     case 20:
     case "wxPusherBot":
       return NotificationMode.wxPusherBot;
+    case 21:
+    case "wxPusherSpt":
+      return NotificationMode.wxPusherSpt;
+    case 22:
+    case "wpush":
+      return NotificationMode.wpush;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -162,6 +170,10 @@ export function notificationModeToJSON(object: NotificationMode): string {
       return "ntfy";
     case NotificationMode.wxPusherBot:
       return "wxPusherBot";
+    case NotificationMode.wxPusherSpt:
+      return "wxPusherSpt";
+    case NotificationMode.wpush:
+      return "wpush";
     case NotificationMode.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -281,6 +293,26 @@ export interface DeleteCronsRequest {
   ids: number[];
 }
 
+export interface GetCronsRequest {
+  searchValue?: string | undefined;
+}
+
+export interface GetCronByIdRequest {
+  id: number;
+}
+
+export interface EnableCronsRequest {
+  ids: number[];
+}
+
+export interface DisableCronsRequest {
+  ids: number[];
+}
+
+export interface RunCronsRequest {
+  ids: number[];
+}
+
 export interface CronsResponse {
   code: number;
   data: CronItem[];
@@ -362,6 +394,7 @@ export interface NotificationInfo {
   webhookMethod?: string | undefined;
   webhookContentType?: string | undefined;
   larkKey?: string | undefined;
+  larkSecret?: string | undefined;
   ntfyUrl?: string | undefined;
   ntfyTopic?: string | undefined;
   ntfyPriority?: string | undefined;
@@ -372,6 +405,10 @@ export interface NotificationInfo {
   wxPusherBotAppToken?: string | undefined;
   wxPusherBotTopicIds?: string | undefined;
   wxPusherBotUids?: string | undefined;
+  wxPusherSptList?: string | undefined;
+  wpushApiKey?: string | undefined;
+  wpushChannel?: string | undefined;
+  wpushTopicCode?: string | undefined;
 }
 
 export interface SystemNotifyRequest {
@@ -2207,6 +2244,332 @@ export const DeleteCronsRequest: MessageFns<DeleteCronsRequest> = {
   },
 };
 
+function createBaseGetCronsRequest(): GetCronsRequest {
+  return { searchValue: undefined };
+}
+
+export const GetCronsRequest: MessageFns<GetCronsRequest> = {
+  encode(message: GetCronsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.searchValue !== undefined) {
+      writer.uint32(10).string(message.searchValue);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetCronsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetCronsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.searchValue = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetCronsRequest {
+    return { searchValue: isSet(object.searchValue) ? globalThis.String(object.searchValue) : undefined };
+  },
+
+  toJSON(message: GetCronsRequest): unknown {
+    const obj: any = {};
+    if (message.searchValue !== undefined) {
+      obj.searchValue = message.searchValue;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetCronsRequest>, I>>(base?: I): GetCronsRequest {
+    return GetCronsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetCronsRequest>, I>>(object: I): GetCronsRequest {
+    const message = createBaseGetCronsRequest();
+    message.searchValue = object.searchValue ?? undefined;
+    return message;
+  },
+};
+
+function createBaseGetCronByIdRequest(): GetCronByIdRequest {
+  return { id: 0 };
+}
+
+export const GetCronByIdRequest: MessageFns<GetCronByIdRequest> = {
+  encode(message: GetCronByIdRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== 0) {
+      writer.uint32(8).int32(message.id);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetCronByIdRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetCronByIdRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.id = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetCronByIdRequest {
+    return { id: isSet(object.id) ? globalThis.Number(object.id) : 0 };
+  },
+
+  toJSON(message: GetCronByIdRequest): unknown {
+    const obj: any = {};
+    if (message.id !== 0) {
+      obj.id = Math.round(message.id);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetCronByIdRequest>, I>>(base?: I): GetCronByIdRequest {
+    return GetCronByIdRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetCronByIdRequest>, I>>(object: I): GetCronByIdRequest {
+    const message = createBaseGetCronByIdRequest();
+    message.id = object.id ?? 0;
+    return message;
+  },
+};
+
+function createBaseEnableCronsRequest(): EnableCronsRequest {
+  return { ids: [] };
+}
+
+export const EnableCronsRequest: MessageFns<EnableCronsRequest> = {
+  encode(message: EnableCronsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    writer.uint32(10).fork();
+    for (const v of message.ids) {
+      writer.int32(v);
+    }
+    writer.join();
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): EnableCronsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEnableCronsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag === 8) {
+            message.ids.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 10) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.ids.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): EnableCronsRequest {
+    return { ids: globalThis.Array.isArray(object?.ids) ? object.ids.map((e: any) => globalThis.Number(e)) : [] };
+  },
+
+  toJSON(message: EnableCronsRequest): unknown {
+    const obj: any = {};
+    if (message.ids?.length) {
+      obj.ids = message.ids.map((e) => Math.round(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EnableCronsRequest>, I>>(base?: I): EnableCronsRequest {
+    return EnableCronsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EnableCronsRequest>, I>>(object: I): EnableCronsRequest {
+    const message = createBaseEnableCronsRequest();
+    message.ids = object.ids?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseDisableCronsRequest(): DisableCronsRequest {
+  return { ids: [] };
+}
+
+export const DisableCronsRequest: MessageFns<DisableCronsRequest> = {
+  encode(message: DisableCronsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    writer.uint32(10).fork();
+    for (const v of message.ids) {
+      writer.int32(v);
+    }
+    writer.join();
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DisableCronsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDisableCronsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag === 8) {
+            message.ids.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 10) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.ids.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DisableCronsRequest {
+    return { ids: globalThis.Array.isArray(object?.ids) ? object.ids.map((e: any) => globalThis.Number(e)) : [] };
+  },
+
+  toJSON(message: DisableCronsRequest): unknown {
+    const obj: any = {};
+    if (message.ids?.length) {
+      obj.ids = message.ids.map((e) => Math.round(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DisableCronsRequest>, I>>(base?: I): DisableCronsRequest {
+    return DisableCronsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DisableCronsRequest>, I>>(object: I): DisableCronsRequest {
+    const message = createBaseDisableCronsRequest();
+    message.ids = object.ids?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseRunCronsRequest(): RunCronsRequest {
+  return { ids: [] };
+}
+
+export const RunCronsRequest: MessageFns<RunCronsRequest> = {
+  encode(message: RunCronsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    writer.uint32(10).fork();
+    for (const v of message.ids) {
+      writer.int32(v);
+    }
+    writer.join();
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RunCronsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRunCronsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag === 8) {
+            message.ids.push(reader.int32());
+
+            continue;
+          }
+
+          if (tag === 10) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.ids.push(reader.int32());
+            }
+
+            continue;
+          }
+
+          break;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RunCronsRequest {
+    return { ids: globalThis.Array.isArray(object?.ids) ? object.ids.map((e: any) => globalThis.Number(e)) : [] };
+  },
+
+  toJSON(message: RunCronsRequest): unknown {
+    const obj: any = {};
+    if (message.ids?.length) {
+      obj.ids = message.ids.map((e) => Math.round(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RunCronsRequest>, I>>(base?: I): RunCronsRequest {
+    return RunCronsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RunCronsRequest>, I>>(object: I): RunCronsRequest {
+    const message = createBaseRunCronsRequest();
+    message.ids = object.ids?.map((e) => e) || [];
+    return message;
+  },
+};
+
 function createBaseCronsResponse(): CronsResponse {
   return { code: 0, data: [], message: undefined };
 }
@@ -2601,6 +2964,7 @@ function createBaseNotificationInfo(): NotificationInfo {
     webhookMethod: undefined,
     webhookContentType: undefined,
     larkKey: undefined,
+    larkSecret: undefined,
     ntfyUrl: undefined,
     ntfyTopic: undefined,
     ntfyPriority: undefined,
@@ -2611,6 +2975,10 @@ function createBaseNotificationInfo(): NotificationInfo {
     wxPusherBotAppToken: undefined,
     wxPusherBotTopicIds: undefined,
     wxPusherBotUids: undefined,
+    wxPusherSptList: undefined,
+    wpushApiKey: undefined,
+    wpushChannel: undefined,
+    wpushTopicCode: undefined,
   };
 }
 
@@ -2790,6 +3158,9 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     if (message.larkKey !== undefined) {
       writer.uint32(466).string(message.larkKey);
     }
+    if (message.larkSecret !== undefined) {
+      writer.uint32(554).string(message.larkSecret);
+    }
     if (message.ntfyUrl !== undefined) {
       writer.uint32(474).string(message.ntfyUrl);
     }
@@ -2819,6 +3190,18 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     }
     if (message.wxPusherBotUids !== undefined) {
       writer.uint32(546).string(message.wxPusherBotUids);
+    }
+    if (message.wxPusherSptList !== undefined) {
+      writer.uint32(562).string(message.wxPusherSptList);
+    }
+    if (message.wpushApiKey !== undefined) {
+      writer.uint32(570).string(message.wpushApiKey);
+    }
+    if (message.wpushChannel !== undefined) {
+      writer.uint32(578).string(message.wpushChannel);
+    }
+    if (message.wpushTopicCode !== undefined) {
+      writer.uint32(586).string(message.wpushTopicCode);
     }
     return writer;
   },
@@ -3294,6 +3677,14 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
           message.larkKey = reader.string();
           continue;
         }
+        case 69: {
+          if (tag !== 554) {
+            break;
+          }
+
+          message.larkSecret = reader.string();
+          continue;
+        }
         case 59: {
           if (tag !== 474) {
             break;
@@ -3374,6 +3765,38 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
           message.wxPusherBotUids = reader.string();
           continue;
         }
+        case 70: {
+          if (tag !== 562) {
+            break;
+          }
+
+          message.wxPusherSptList = reader.string();
+          continue;
+        }
+        case 71: {
+          if (tag !== 570) {
+            break;
+          }
+
+          message.wpushApiKey = reader.string();
+          continue;
+        }
+        case 72: {
+          if (tag !== 578) {
+            break;
+          }
+
+          message.wpushChannel = reader.string();
+          continue;
+        }
+        case 73: {
+          if (tag !== 586) {
+            break;
+          }
+
+          message.wpushTopicCode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3451,6 +3874,7 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
       webhookMethod: isSet(object.webhookMethod) ? globalThis.String(object.webhookMethod) : undefined,
       webhookContentType: isSet(object.webhookContentType) ? globalThis.String(object.webhookContentType) : undefined,
       larkKey: isSet(object.larkKey) ? globalThis.String(object.larkKey) : undefined,
+      larkSecret: isSet(object.larkSecret) ? globalThis.String(object.larkSecret) : undefined,
       ntfyUrl: isSet(object.ntfyUrl) ? globalThis.String(object.ntfyUrl) : undefined,
       ntfyTopic: isSet(object.ntfyTopic) ? globalThis.String(object.ntfyTopic) : undefined,
       ntfyPriority: isSet(object.ntfyPriority) ? globalThis.String(object.ntfyPriority) : undefined,
@@ -3465,6 +3889,10 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
         ? globalThis.String(object.wxPusherBotTopicIds)
         : undefined,
       wxPusherBotUids: isSet(object.wxPusherBotUids) ? globalThis.String(object.wxPusherBotUids) : undefined,
+      wxPusherSptList: isSet(object.wxPusherSptList) ? globalThis.String(object.wxPusherSptList) : undefined,
+      wpushApiKey: isSet(object.wpushApiKey) ? globalThis.String(object.wpushApiKey) : undefined,
+      wpushChannel: isSet(object.wpushChannel) ? globalThis.String(object.wpushChannel) : undefined,
+      wpushTopicCode: isSet(object.wpushTopicCode) ? globalThis.String(object.wpushTopicCode) : undefined,
     };
   },
 
@@ -3644,6 +4072,9 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     if (message.larkKey !== undefined) {
       obj.larkKey = message.larkKey;
     }
+    if (message.larkSecret !== undefined) {
+      obj.larkSecret = message.larkSecret;
+    }
     if (message.ntfyUrl !== undefined) {
       obj.ntfyUrl = message.ntfyUrl;
     }
@@ -3673,6 +4104,18 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     }
     if (message.wxPusherBotUids !== undefined) {
       obj.wxPusherBotUids = message.wxPusherBotUids;
+    }
+    if (message.wxPusherSptList !== undefined) {
+      obj.wxPusherSptList = message.wxPusherSptList;
+    }
+    if (message.wpushApiKey !== undefined) {
+      obj.wpushApiKey = message.wpushApiKey;
+    }
+    if (message.wpushChannel !== undefined) {
+      obj.wpushChannel = message.wpushChannel;
+    }
+    if (message.wpushTopicCode !== undefined) {
+      obj.wpushTopicCode = message.wpushTopicCode;
     }
     return obj;
   },
@@ -3740,6 +4183,7 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     message.webhookMethod = object.webhookMethod ?? undefined;
     message.webhookContentType = object.webhookContentType ?? undefined;
     message.larkKey = object.larkKey ?? undefined;
+    message.larkSecret = object.larkSecret ?? undefined;
     message.ntfyUrl = object.ntfyUrl ?? undefined;
     message.ntfyTopic = object.ntfyTopic ?? undefined;
     message.ntfyPriority = object.ntfyPriority ?? undefined;
@@ -3750,6 +4194,10 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     message.wxPusherBotAppToken = object.wxPusherBotAppToken ?? undefined;
     message.wxPusherBotTopicIds = object.wxPusherBotTopicIds ?? undefined;
     message.wxPusherBotUids = object.wxPusherBotUids ?? undefined;
+    message.wxPusherSptList = object.wxPusherSptList ?? undefined;
+    message.wpushApiKey = object.wpushApiKey ?? undefined;
+    message.wpushChannel = object.wpushChannel ?? undefined;
+    message.wpushTopicCode = object.wpushTopicCode ?? undefined;
     return message;
   },
 };
@@ -3976,6 +4424,51 @@ export const ApiService = {
     responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
     responseDeserialize: (value: Buffer) => Response.decode(value),
   },
+  getCrons: {
+    path: "/com.ql.api.Api/GetCrons",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetCronsRequest) => Buffer.from(GetCronsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer) => GetCronsRequest.decode(value),
+    responseSerialize: (value: CronsResponse) => Buffer.from(CronsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer) => CronsResponse.decode(value),
+  },
+  getCronById: {
+    path: "/com.ql.api.Api/GetCronById",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetCronByIdRequest) => Buffer.from(GetCronByIdRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer) => GetCronByIdRequest.decode(value),
+    responseSerialize: (value: CronResponse) => Buffer.from(CronResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer) => CronResponse.decode(value),
+  },
+  enableCrons: {
+    path: "/com.ql.api.Api/EnableCrons",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: EnableCronsRequest) => Buffer.from(EnableCronsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer) => EnableCronsRequest.decode(value),
+    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseDeserialize: (value: Buffer) => Response.decode(value),
+  },
+  disableCrons: {
+    path: "/com.ql.api.Api/DisableCrons",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: DisableCronsRequest) => Buffer.from(DisableCronsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer) => DisableCronsRequest.decode(value),
+    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseDeserialize: (value: Buffer) => Response.decode(value),
+  },
+  runCrons: {
+    path: "/com.ql.api.Api/RunCrons",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: RunCronsRequest) => Buffer.from(RunCronsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer) => RunCronsRequest.decode(value),
+    responseSerialize: (value: Response) => Buffer.from(Response.encode(value).finish()),
+    responseDeserialize: (value: Buffer) => Response.decode(value),
+  },
 } as const;
 
 export interface ApiServer extends UntypedServiceImplementation {
@@ -3993,6 +4486,11 @@ export interface ApiServer extends UntypedServiceImplementation {
   createCron: handleUnaryCall<CreateCronRequest, CronResponse>;
   updateCron: handleUnaryCall<UpdateCronRequest, CronResponse>;
   deleteCrons: handleUnaryCall<DeleteCronsRequest, Response>;
+  getCrons: handleUnaryCall<GetCronsRequest, CronsResponse>;
+  getCronById: handleUnaryCall<GetCronByIdRequest, CronResponse>;
+  enableCrons: handleUnaryCall<EnableCronsRequest, Response>;
+  disableCrons: handleUnaryCall<DisableCronsRequest, Response>;
+  runCrons: handleUnaryCall<RunCronsRequest, Response>;
 }
 
 export interface ApiClient extends Client {
@@ -4202,6 +4700,81 @@ export interface ApiClient extends Client {
   ): ClientUnaryCall;
   deleteCrons(
     request: DeleteCronsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Response) => void,
+  ): ClientUnaryCall;
+  getCrons(
+    request: GetCronsRequest,
+    callback: (error: ServiceError | null, response: CronsResponse) => void,
+  ): ClientUnaryCall;
+  getCrons(
+    request: GetCronsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: CronsResponse) => void,
+  ): ClientUnaryCall;
+  getCrons(
+    request: GetCronsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: CronsResponse) => void,
+  ): ClientUnaryCall;
+  getCronById(
+    request: GetCronByIdRequest,
+    callback: (error: ServiceError | null, response: CronResponse) => void,
+  ): ClientUnaryCall;
+  getCronById(
+    request: GetCronByIdRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: CronResponse) => void,
+  ): ClientUnaryCall;
+  getCronById(
+    request: GetCronByIdRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: CronResponse) => void,
+  ): ClientUnaryCall;
+  enableCrons(
+    request: EnableCronsRequest,
+    callback: (error: ServiceError | null, response: Response) => void,
+  ): ClientUnaryCall;
+  enableCrons(
+    request: EnableCronsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Response) => void,
+  ): ClientUnaryCall;
+  enableCrons(
+    request: EnableCronsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Response) => void,
+  ): ClientUnaryCall;
+  disableCrons(
+    request: DisableCronsRequest,
+    callback: (error: ServiceError | null, response: Response) => void,
+  ): ClientUnaryCall;
+  disableCrons(
+    request: DisableCronsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Response) => void,
+  ): ClientUnaryCall;
+  disableCrons(
+    request: DisableCronsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Response) => void,
+  ): ClientUnaryCall;
+  runCrons(
+    request: RunCronsRequest,
+    callback: (error: ServiceError | null, response: Response) => void,
+  ): ClientUnaryCall;
+  runCrons(
+    request: RunCronsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Response) => void,
+  ): ClientUnaryCall;
+  runCrons(
+    request: RunCronsRequest,
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: Response) => void,

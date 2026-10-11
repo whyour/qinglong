@@ -1,23 +1,20 @@
 import { Joi, celebrate } from 'celebrate';
 import { NextFunction, Request, Response, Router } from 'express';
-import fs from 'fs';
 import multer from 'multer';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
-import config from '../config';
-import { safeJSONParse } from '../config/util';
+import { t } from '../shared/i18n';
 import EnvService from '../services/env';
 const route = Router();
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, config.scriptPath);
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname);
-  },
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
 });
-const upload = multer({ storage: storage });
+const labelSchema = Joi.array()
+  .items(Joi.string().trim().required())
+  .min(1)
+  .required();
 
 export default (app: Router) => {
   app.use('/envs', route);
@@ -26,7 +23,7 @@ export default (app: Router) => {
     const logger: Logger = Container.get('logger');
     try {
       const envService = Container.get(EnvService);
-      const data = await envService.envs(req.query.searchValue as string, {}, req.user?.userId);
+      const data = await envService.envs(req.query.searchValue as string);
       return res.send({ code: 200, data });
     } catch (e) {
       logger.error('🔥 error: %o', e);
@@ -44,6 +41,7 @@ export default (app: Router) => {
             .required()
             .pattern(/^[a-zA-Z_][0-9a-zA-Z_]*$/),
           remarks: Joi.string().optional().allow(''),
+          labels: Joi.array().items(Joi.string().trim()).optional().allow(null),
         }),
       ),
     }),
@@ -52,9 +50,9 @@ export default (app: Router) => {
       try {
         const envService = Container.get(EnvService);
         if (!req.body?.length) {
-          return res.send({ code: 400, message: '参数不正确' });
+          return res.send({ code: 400, message: t('参数不正确') });
         }
-        const data = await envService.create(req.body, req.user?.userId);
+        const data = await envService.create(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);
@@ -70,6 +68,7 @@ export default (app: Router) => {
         name: Joi.string().required(),
         remarks: Joi.string().optional().allow('').allow(null),
         id: Joi.number().required(),
+        labels: Joi.array().items(Joi.string().trim()).optional().allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -93,10 +92,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.remove(req.body, req.user?.userId);
+        const data = await envService.remove(req.body);
         return res.send({ code: 200, data });
-      } catch (e: any) {
-        return res.send({ code: 400, message: e.message });
+      } catch (e) {
+        return next(e);
       }
     },
   );
@@ -132,10 +131,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.disabled(req.body, req.user?.userId);
+        const data = await envService.disabled(req.body);
         return res.send({ code: 200, data });
-      } catch (e: any) {
-        return res.send({ code: 400, message: e.message });
+      } catch (e) {
+        return next(e);
       }
     },
   );
@@ -149,10 +148,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.enabled(req.body, req.user?.userId);
+        const data = await envService.enabled(req.body);
         return res.send({ code: 200, data });
-      } catch (e: any) {
-        return res.send({ code: 400, message: e.message });
+      } catch (e) {
+        return next(e);
       }
     },
   );
@@ -169,10 +168,10 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.updateNames(req.body, req.user?.userId);
+        const data = await envService.updateNames(req.body);
         return res.send({ code: 200, data });
-      } catch (e: any) {
-        return res.send({ code: 400, message: e.message });
+      } catch (e) {
+        return next(e);
       }
     },
   );
@@ -231,30 +230,80 @@ export default (app: Router) => {
   );
 
   route.post(
+    '/labels',
+    celebrate({
+      body: Joi.object({
+        ids: Joi.array().items(Joi.number().required()).min(1).required(),
+        labels: labelSchema,
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.addLabels(req.body.ids, req.body.labels);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.delete(
+    '/labels',
+    celebrate({
+      body: Joi.object({
+        ids: Joi.array().items(Joi.number().required()).min(1).required(),
+        labels: labelSchema,
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const envService = Container.get(EnvService);
+        const data = await envService.removeLabels(req.body.ids, req.body.labels);
+        return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
     '/upload',
     upload.single('env'),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const envService = Container.get(EnvService);
-        const fileContent = await fs.promises.readFile(req!.file!.path, 'utf8');
-        const parseContent = safeJSONParse(fileContent);
+        let parseContent: unknown;
+        try {
+          parseContent = JSON.parse(req.file?.buffer.toString('utf8') || '');
+        } catch {
+          return res.status(400).send({ code: 400, message: t('参数错误') });
+        }
         const data = Array.isArray(parseContent)
           ? parseContent
           : [parseContent];
-        if (data.every((x) => x.name && x.value)) {
+        if (
+          data.length > 0 &&
+          data.every((x) =>
+            x && typeof x.name === 'string' &&
+            /^[a-zA-Z_][0-9a-zA-Z_]*$/.test(x.name) &&
+            typeof x.value === 'string' && x.value.length > 0,
+          )
+        ) {
           const result = await envService.create(
             data.map((x) => ({
               name: x.name,
               value: x.value,
               remarks: x.remarks,
+              labels: x.labels,
             })),
           );
           return res.send({ code: 200, data: result });
         } else {
           return res.send({
             code: 400,
-            message: '每条数据 name 或者 value 字段不能为空，参考导出文件格式',
+            message: t('每条数据 name 或者 value 字段不能为空，参考导出文件格式'),
           });
         }
       } catch (e) {

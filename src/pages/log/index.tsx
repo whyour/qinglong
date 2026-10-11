@@ -59,7 +59,7 @@ const Log = () => {
       .get(
         `${config.apiPrefix}logs/detail?file=${node.title}&path=${
           node.parent || ''
-        }`,
+        }&tail=true&limit=${1024 * 1024}`,
       )
       .then(({ code, data }) => {
         if (code === 200) {
@@ -131,7 +131,7 @@ const Log = () => {
 
   const deleteFile = () => {
     Modal.confirm({
-      title: `确认删除`,
+      title: intl.get('确认删除'),
       content: (
         <>
           {intl.get('确认删除')}
@@ -155,7 +155,7 @@ const Log = () => {
           })
           .then(({ code }) => {
             if (code === 200) {
-              message.success(`删除成功`);
+              message.success(intl.get('删除成功'));
               let newData = [...data];
               if (currentNode.parent) {
                 newData = depthFirstSearch(

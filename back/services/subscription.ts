@@ -20,17 +20,28 @@ import {
 } from '../config/util';
 import fs from 'fs/promises';
 import { FindOptions, Op } from 'sequelize';
-import path, { join } from 'path';
+import path from 'path';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
 import SockService from './sock';
+import { t, tf } from '../shared/i18n';
 import SshKeyService from './sshKey';
 import dayjs from 'dayjs';
 import { LOG_END_SYMBOL } from '../config/const';
 import { formatCommand, formatUrl } from '../config/subscription';
 import { CrontabModel } from '../data/cron';
+import { assertSubscriptionAlias } from '../shared/subscriptionPath';
+import { resolveLogPath } from '../shared/logPath';
+import {
+  getSubscriptionStorageCandidates,
+  isSubscriptionStorageName,
+  resolveSubscriptionStoragePath,
+} from '../shared/subscriptionStorage';
+import { withSubscriptionMutation } from '../shared/subscriptionMutationLock';
 import CrontabService from './cron';
 import taskLimit from '../shared/pLimit';
+import { logStreamManager } from '../shared/logStreamManager';
+import { LogReadOptions, readLogChunk } from '../shared/logReader';
 
 @Service()
 export default class SubscriptionService {
@@ -42,37 +53,11 @@ export default class SubscriptionService {
     private crontabService: CrontabService,
   ) {}
 
-  private addUserIdFilter(query: any, userId?: number) {
-    if (userId !== undefined) {
-      query.userId = userId;
-    }
-    return query;
-  }
-
-  private async checkOwnership(ids: number[], userId?: number): Promise<void> {
-    if (userId === undefined) {
-      // Admin can access all subscriptions
-      return;
-    }
-    const subscriptions = await SubscriptionModel.findAll({
-      where: { id: ids },
-      attributes: ['id', 'userId'],
-    });
-    const unauthorized = subscriptions.filter(
-      (sub) => sub.userId !== undefined && sub.userId !== userId
-    );
-    if (unauthorized.length > 0) {
-      throw new Error('无权限操作该订阅');
-    }
-  }
-
   public async list(
     searchText?: string,
     ids?: string,
-    userId?: number,
   ): Promise<SubscriptionInstance[]> {
-    let query: any = {};
-    this.addUserIdFilter(query, userId);
+    let query = {};
     const subIds = JSON.parse(ids || '[]');
     if (searchText) {
       const reg = {
@@ -111,9 +96,11 @@ export default class SubscriptionService {
     needCreate = true,
     runImmediately = false,
   ) {
-    const { url } = formatUrl(doc);
-
-    doc.command = formatCommand(doc, url as string);
+    // Cancelling by ID must also work for invalid historical subscriptions.
+    if (needCreate) {
+      const { url } = formatUrl(doc);
+      doc.command = formatCommand(doc, url as string);
+    }
 
     if (doc.schedule_type === 'crontab') {
       this.scheduleService.cancelCronTask(doc as any);
@@ -155,14 +142,14 @@ export default class SubscriptionService {
         );
         const absolutePath = await handleLogPath(
           logPath as string,
-          `## 开始执行... ${startTime.format('YYYY-MM-DD HH:mm:ss')}\n`,
+          tf('## 开始执行... %s\n', startTime.format('YYYY-MM-DD HH:mm:ss')),
         );
 
         // 执行sub_before
         let beforeStr = '';
         try {
           if (doc.sub_before) {
-            await fs.appendFile(absolutePath, `\n## 执行before命令...\n\n`);
+            await logStreamManager.write(absolutePath, `\n## ${t('执行before命令...')}\n\n`);
             beforeStr = await promiseExec(doc.sub_before);
           }
         } catch (error: any) {
@@ -170,7 +157,7 @@ export default class SubscriptionService {
             (error.stderr && error.stderr.toString()) || JSON.stringify(error);
         }
         if (beforeStr) {
-          await fs.appendFile(absolutePath, `${beforeStr}\n`);
+          await logStreamManager.write(absolutePath, `${beforeStr}\n`);
         }
       },
       onStart: async (cp: ChildProcessWithoutNullStreams, startTime) => {
@@ -182,61 +169,77 @@ export default class SubscriptionService {
         );
       },
       onEnd: async (cp, endTime, diff) => {
-        const sub = await this.getDb({ id: doc.id });
-        const absolutePath = await handleLogPath(sub.log_path as string);
-
-        // 执行 sub_after
-        let afterStr = '';
+        let absolutePath: string | undefined;
         try {
-          if (sub.sub_after) {
-            await fs.appendFile(absolutePath, `\n\n## 执行after命令...\n\n`);
-            afterStr = await promiseExec(sub.sub_after);
+          const sub = await this.getDb({ id: doc.id });
+          absolutePath = await handleLogPath(sub.log_path as string);
+
+          // 执行 sub_after
+          let afterStr = '';
+          try {
+            if (sub.sub_after) {
+              await logStreamManager.write(
+                absolutePath,
+                `\n\n## ${t('执行after命令...')}\n\n`,
+              );
+              afterStr = await promiseExec(sub.sub_after);
+            }
+          } catch (error: any) {
+            afterStr =
+              (error.stderr && error.stderr.toString()) || JSON.stringify(error);
           }
-        } catch (error: any) {
-          afterStr =
-            (error.stderr && error.stderr.toString()) || JSON.stringify(error);
+          if (afterStr) {
+            await logStreamManager.write(absolutePath, `${afterStr}\n`);
+          }
+
+          await logStreamManager.write(
+            absolutePath,
+            '\n' +
+              tf(
+                '## 执行结束... %s  耗时 %s 秒',
+                endTime.format('YYYY-MM-DD HH:mm:ss'),
+                String(diff),
+              ) +
+              LOG_END_SYMBOL,
+          );
+        } finally {
+          try {
+            if (absolutePath) await logStreamManager.closeStream(absolutePath);
+          } finally {
+            await SubscriptionModel.update(
+              { status: SubscriptionStatus.idle, pid: null } as any,
+              { where: { id: doc.id } },
+            );
+            this.sockService.sendMessage({
+              type: 'runSubscriptionEnd',
+              message: t('订阅执行完成'),
+              references: [doc.id as number],
+            });
+          }
         }
-        if (afterStr) {
-          await fs.appendFile(absolutePath, `${afterStr}\n`);
-        }
-
-        await fs.appendFile(
-          absolutePath,
-          `\n## 执行结束... ${endTime.format(
-            'YYYY-MM-DD HH:mm:ss',
-          )}  耗时 ${diff} 秒${LOG_END_SYMBOL}`,
-        );
-
-        await SubscriptionModel.update(
-          { status: SubscriptionStatus.idle, pid: undefined },
-          { where: { id: sub.id } },
-        );
-
-        this.sockService.sendMessage({
-          type: 'runSubscriptionEnd',
-          message: '订阅执行完成',
-          references: [doc.id as number],
-        });
       },
       onError: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
         const absolutePath = await handleLogPath(sub.log_path as string);
-        await fs.appendFile(absolutePath, `\n${message}`);
+        await logStreamManager.write(absolutePath, `\n${message}`);
       },
       onLog: async (message: string) => {
         const sub = await this.getDb({ id: doc.id });
         const absolutePath = await handleLogPath(sub.log_path as string);
-        await fs.appendFile(absolutePath, `\n${message}`);
+        await logStreamManager.write(absolutePath, `\n${message}`);
       },
     };
   }
 
   public async create(payload: Subscription): Promise<Subscription> {
-    const tab = new Subscription(payload);
-    const doc = await this.insert(tab);
-    await this.handleTask(doc.get({ plain: true }));
-    await this.setSshConfig();
-    return doc;
+    assertSubscriptionAlias(payload.alias);
+    return withSubscriptionMutation(async () => {
+      const tab = new Subscription(payload);
+      const doc = await this.insert(tab);
+      await this.handleTask(doc.get({ plain: true }));
+      await this.setSshConfig();
+      return doc;
+    });
   }
 
   public async insert(payload: Subscription): Promise<SubscriptionInstance> {
@@ -244,12 +247,27 @@ export default class SubscriptionService {
   }
 
   public async update(payload: Subscription): Promise<Subscription> {
-    const doc = await this.getDb({ id: payload.id });
-    const tab = new Subscription({ ...doc, ...payload });
-    const newDoc = await this.updateDb(tab);
-    await this.handleTask(newDoc, !newDoc.is_disabled);
-    await this.setSshConfig();
-    return newDoc;
+    assertSubscriptionAlias(payload.alias);
+    return withSubscriptionMutation(async () => {
+      const doc = await this.getDb({ id: payload.id });
+      const tab = new Subscription({ ...doc, ...payload });
+      const newDoc = await this.updateDb(tab);
+      await this.handleTask(newDoc, !newDoc.is_disabled);
+      await this.removeSshConfigForSubscription(doc);
+      await this.setSshConfig();
+      return newDoc;
+    });
+  }
+
+  private async removeSshConfigForSubscription(doc: Subscription) {
+    if (doc.type !== 'private-repo' || doc.pull_type !== 'ssh-key') return;
+    // Invalid historical rows must remain deletable without deriving unsafe paths.
+    try {
+      assertSubscriptionAlias(doc.alias);
+    } catch {
+      return;
+    }
+    await this.sshKeyService.removeSSHKey(doc.alias, '');
   }
 
   public async updateDb(payload: Subscription): Promise<Subscription> {
@@ -272,6 +290,7 @@ export default class SubscriptionService {
     last_running_time: number;
     last_execution_time: number;
   }) {
+    if (log_path) resolveLogPath(config.logPath, log_path);
     const options: any = {
       status,
       pid,
@@ -288,27 +307,72 @@ export default class SubscriptionService {
     );
   }
 
-  public async remove(ids: number[], query: { force?: boolean }, userId?: number) {
-    await this.checkOwnership(ids, userId);
-    const docs = await SubscriptionModel.findAll({ where: { id: ids } });
-    for (const doc of docs) {
-      await this.handleTask(doc.get({ plain: true }), false);
-    }
-    await SubscriptionModel.destroy({ where: { id: ids } });
-    await this.setSshConfig();
-
-    if (query?.force === true) {
-      const crons = await CrontabModel.findAll({ where: { sub_id: ids } });
-      if (crons?.length) {
-        await this.crontabService.remove(crons.map((x) => x.id!), userId);
+  public async remove(ids: number[], query: { force?: boolean }) {
+    return withSubscriptionMutation(async () => {
+      const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+      const storagePaths: string[] = [];
+      const retainedPaths: string[] = [];
+      const collectPaths = (
+        doc: Subscription,
+        targets: string[],
+        deleting = false,
+      ) => {
+        for (const names of getSubscriptionStorageCandidates(doc)) {
+          // A URL accepted by one engine can produce an invalid name in another.
+          // Validate each candidate independently, retaining the safe candidate.
+          if (!Object.values(names).every(isSubscriptionStorageName)) continue;
+          const resolve = deleting ? resolveSubscriptionStoragePath : path.resolve;
+          const scriptPath = resolve(config.scriptPath, names.script);
+          if (scriptPath) targets.push(scriptPath);
+          if (names.repo) {
+            const repoPath = resolve(config.repoPath, names.repo);
+            if (repoPath) targets.push(repoPath);
+          }
+          if (names.raw) {
+            const rawPath = resolve(path.join(config.dataPath, 'raw'), names.raw);
+            if (rawPath) targets.push(rawPath);
+          }
+        }
+      };
+      // Validate all deletion targets before changing rows or removing any files.
+      if (query?.force === true) {
+        for (const doc of docs) {
+          assertSubscriptionAlias(doc.alias);
+          resolveSubscriptionStoragePath(config.scriptPath, doc.alias);
+          resolveSubscriptionStoragePath(config.repoPath, doc.alias);
+          collectPaths(doc, storagePaths, true);
+        }
+        const remaining = await SubscriptionModel.findAll({ where: {} });
+        for (const doc of remaining) {
+          if (!ids.includes(doc.id!)) collectPaths(doc, retainedPaths);
+        }
       }
       for (const doc of docs) {
-        const filePath = join(config.scriptPath, doc.alias);
-        const repoPath = join(config.repoPath, doc.alias);
-        await rmPath(filePath);
-        await rmPath(repoPath);
+        await this.handleTask(doc.get({ plain: true }), false);
       }
-    }
+      await SubscriptionModel.destroy({ where: { id: ids } });
+      for (const doc of docs) {
+        await this.removeSshConfigForSubscription(doc);
+      }
+      await this.setSshConfig();
+
+      if (query?.force === true) {
+        const crons = await CrontabModel.findAll({ where: { sub_id: ids } });
+        if (crons?.length) {
+          await this.crontabService.remove(crons.map((x) => x.id!));
+        }
+        for (const storagePath of new Set(storagePaths)) {
+          // rm is recursive: an ancestor must also be retained if a surviving
+          // subscription uses a nested branch, and vice versa.
+          const shared = retainedPaths.some((retained) =>
+            retained === storagePath ||
+            retained.startsWith(`${storagePath}${path.sep}`) ||
+            storagePath.startsWith(`${retained}${path.sep}`),
+          );
+          if (!shared) await rmPath(storagePath);
+        }
+      }
+    });
   }
 
   public async getDb(
@@ -321,8 +385,7 @@ export default class SubscriptionService {
     return doc.get({ plain: true });
   }
 
-  public async run(ids: number[], userId?: number) {
-    await this.checkOwnership(ids, userId);
+  public async run(ids: number[]) {
     await SubscriptionModel.update(
       { status: SubscriptionStatus.queued },
       { where: { id: ids } },
@@ -332,23 +395,24 @@ export default class SubscriptionService {
     });
   }
 
-  public async stop(ids: number[], userId?: number) {
-    await this.checkOwnership(ids, userId);
+  public async stop(ids: number[]) {
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
+    let failure: unknown;
     for (const doc of docs) {
-      if (doc.pid) {
-        try {
-          await killTask(doc.pid);
-        } catch (error) {
-          this.logger.error(error);
+      try {
+        if (doc.pid) {
+          await killTask(doc.pid, true);
         }
+        await SubscriptionModel.update(
+          { status: SubscriptionStatus.idle, pid: null } as any,
+          { where: { id: doc.id, pid: doc.pid ?? null } },
+        );
+      } catch (error) {
+        this.logger.error(error);
+        failure ??= error;
       }
     }
-
-    await SubscriptionModel.update(
-      { status: SubscriptionStatus.idle, pid: undefined },
-      { where: { id: ids } },
-    );
+    if (failure) throw failure;
   }
 
   private async runSingle(subscriptionId: number) {
@@ -368,8 +432,7 @@ export default class SubscriptionService {
     });
   }
 
-  public async disabled(ids: number[], userId?: number) {
-    await this.checkOwnership(ids, userId);
+  public async disabled(ids: number[]) {
     await SubscriptionModel.update({ is_disabled: 1 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     await this.setSshConfig();
@@ -378,8 +441,7 @@ export default class SubscriptionService {
     }
   }
 
-  public async enabled(ids: number[], userId?: number) {
-    await this.checkOwnership(ids, userId);
+  public async enabled(ids: number[]) {
     await SubscriptionModel.update({ is_disabled: 0 }, { where: { id: ids } });
     const docs = await SubscriptionModel.findAll({ where: { id: ids } });
     await this.setSshConfig();
@@ -388,14 +450,20 @@ export default class SubscriptionService {
     }
   }
 
-  public async log(id: number) {
+  public async log(id: number, options: LogReadOptions = {}) {
     const doc = await this.getDb({ id });
     if (!doc || !doc.log_path) {
-      return '';
+      return {
+        content: '',
+        offset: 0,
+        nextOffset: 0,
+        total: 0,
+        truncated: false,
+      };
     }
 
     const absolutePath = await handleLogPath(doc.log_path as string);
-    return await getFileContentByName(absolutePath);
+    return await readLogChunk(absolutePath, options);
   }
 
   public async logs(id: number) {
@@ -406,7 +474,7 @@ export default class SubscriptionService {
 
     if (doc.log_path) {
       const relativeDir = path.dirname(`${doc.log_path}`);
-      const dir = path.resolve(config.logPath, relativeDir);
+      const dir = path.dirname(resolveLogPath(config.logPath, doc.log_path));
       const _exist = await fileExist(dir);
       if (_exist) {
         let files = await fs.readdir(dir);

@@ -6,8 +6,12 @@ import { AppModel } from '../data/open';
 import { SystemModel } from '../data/system';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
-import { UserModel } from '../data/user';
+import { CrontabStatModel } from '../data/cronStats';
+import { RunningInstanceModel } from '../data/runningInstance';
 import { sequelize } from '../data';
+import { UserModel } from '../data/user';
+import { migrateUserSchema } from '../shared/userSchemaMigrations';
+import { migrateSchema } from '../shared/schemaMigrations';
 
 export default async () => {
   try {
@@ -18,71 +22,16 @@ export default async () => {
     await EnvModel.sync();
     await SubscriptionModel.sync();
     await CrontabViewModel.sync();
+    await CrontabStatModel.sync();
+    await RunningInstanceModel.sync();
+
     await UserModel.sync();
+    await migrateSchema(sequelize);
+    await migrateUserSchema(sequelize);
 
-    // 初始化新增字段
-    try {
-      await sequelize.query(
-        'alter table CrontabViews add column filterRelation VARCHAR(255)',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Subscriptions add column proxy VARCHAR(255)',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table CrontabViews add column type NUMBER');
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Subscriptions add column autoAddCron NUMBER',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Subscriptions add column autoDelCron NUMBER',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Crontabs add column sub_id NUMBER');
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Crontabs add column extra_schedules JSON',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Crontabs add column task_before TEXT');
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Crontabs add column task_after TEXT');
-    } catch (error) {}
-    try {
-      await sequelize.query(
-        'alter table Crontabs add column log_name VARCHAR(255)',
-      );
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Envs add column isPinned NUMBER');
-    } catch (error) {}
-    
-    // Multi-user support: Add userId columns
-    try {
-      await sequelize.query('alter table Crontabs add column userId NUMBER');
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Envs add column userId NUMBER');
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Subscriptions add column userId NUMBER');
-    } catch (error) {}
-    try {
-      await sequelize.query('alter table Dependences add column userId NUMBER');
-    } catch (error) {}
-
-    Logger.info('✌️ DB loaded');
+    Logger.info('[boot] DB loaded');
   } catch (error) {
-    Logger.error('✌️ DB load failed', error);
+    Logger.error('[boot] DB load failed', error);
+    throw error;
   }
 };

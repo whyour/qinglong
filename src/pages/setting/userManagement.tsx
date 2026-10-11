@@ -11,11 +11,7 @@ import {
   message,
   Tag,
 } from 'antd';
-import {
-  EditOutlined,
-  DeleteOutlined,
-  PlusOutlined,
-} from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 
@@ -68,7 +64,7 @@ const UserManagement: React.FC<{ height: number }> = ({ height }) => {
       title: intl.get('创建时间'),
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (text: string) => text ? new Date(text).toLocaleString() : '-',
+      render: (text: string) => (text ? new Date(text).toLocaleString() : '-'),
     },
     {
       title: intl.get('操作'),
@@ -99,7 +95,7 @@ const UserManagement: React.FC<{ height: number }> = ({ height }) => {
     setLoading(true);
     try {
       const { code, data } = await request.get(
-        `${config.apiPrefix}user-management`
+        `${config.apiPrefix}user-management`,
       );
       if (code === 200) {
         setUsers(data);
@@ -123,6 +119,7 @@ const UserManagement: React.FC<{ height: number }> = ({ height }) => {
 
   const handleEdit = (record: User) => {
     setEditingUser(record);
+    form.resetFields();
     form.setFieldsValue({
       username: record.username,
       role: record.role,
@@ -139,7 +136,7 @@ const UserManagement: React.FC<{ height: number }> = ({ height }) => {
         try {
           const { code, message: msg } = await request.delete(
             `${config.apiPrefix}user-management`,
-            { data: ids }
+            { data: ids },
           );
           if (code === 200) {
             message.success(msg || intl.get('删除成功'));
@@ -157,12 +154,12 @@ const UserManagement: React.FC<{ height: number }> = ({ height }) => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      
+
       if (editingUser) {
         // Update user
         const { code, message: msg } = await request.put(
           `${config.apiPrefix}user-management`,
-          { ...values, id: editingUser.id }
+          { ...values, id: editingUser.id },
         );
         if (code === 200) {
           message.success(msg || intl.get('更新成功'));
@@ -175,7 +172,7 @@ const UserManagement: React.FC<{ height: number }> = ({ height }) => {
         // Create user
         const { code, message: msg } = await request.post(
           `${config.apiPrefix}user-management`,
-          values
+          values,
         );
         if (code === 200) {
           message.success(msg || intl.get('创建成功'));
@@ -193,11 +190,7 @@ const UserManagement: React.FC<{ height: number }> = ({ height }) => {
   return (
     <>
       <div style={{ marginBottom: 16 }}>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleAdd}
-        >
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
           {intl.get('新增用户')}
         </Button>
       </div>

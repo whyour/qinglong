@@ -11,6 +11,7 @@ export class Env {
   remarks?: string;
   userId?: number;
   isPinned?: 1 | 0;
+  labels?: string[];
 
   constructor(options: Env) {
     this.value = options.value;
@@ -25,6 +26,7 @@ export class Env {
     this.remarks = options.remarks || '';
     this.userId = options.userId;
     this.isPinned = options.isPinned || 0;
+    this.labels = options.labels || [];
   }
 }
 
@@ -48,4 +50,5 @@ export const EnvModel = sequelize.define<EnvInstance>('Env', {
   remarks: DataTypes.STRING,
   userId: { type: DataTypes.NUMBER, allowNull: true },
   isPinned: DataTypes.NUMBER,
+  labels: DataTypes.JSON,
 });

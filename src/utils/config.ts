@@ -15,29 +15,6 @@ export default {
       exclude: [/(\/(en|zh))*\/login/],
     },
   ],
-
-  /* I18n configuration, `languages` and `defaultLanguage` are required currently. */
-  i18n: {
-    /* Countrys flags: https://www.flaticon.com/packs/countrys-flags */
-    languages: [
-      {
-        key: 'pt-br',
-        title: 'Português',
-        flag: '/portugal.svg',
-      },
-      {
-        key: 'en',
-        title: 'English',
-        flag: '/america.svg',
-      },
-      {
-        key: 'zh',
-        title: intl.get('中文'),
-        flag: '/china.svg',
-      },
-    ],
-    defaultLanguage: 'en',
-  },
   scopes: [
     {
       name: intl.get('定时任务'),
@@ -71,6 +48,10 @@ export default {
       name: intl.get('系统信息'),
       value: 'system',
     },
+    {
+      name: intl.get('仪表盘'),
+      value: 'dashboard',
+    },
   ],
   scopesMap: {
     crons: intl.get('定时任务'),
@@ -81,6 +62,7 @@ export default {
     logs: intl.get('日志管理'),
     dependencies: intl.get('依赖管理'),
     system: intl.get('系统信息'),
+    dashboard: intl.get('仪表盘'),
   },
   notificationModes: [
     { value: 'gotify', label: 'Gotify' },
@@ -98,6 +80,9 @@ export default {
     { value: 'pushPlus', label: 'PushPlus' },
     { value: 'wePlusBot', label: intl.get('微加机器人') },
     { value: 'wxPusherBot', label: 'wxPusher' },
+    { value: 'wxPusherSpt', label: 'WxPusher(极简推送SPT-推荐)' },
+    { value: 'openiLink', label: 'OpeniLink' },
+    { value: 'wpush', label: 'WPUSH' },
     { value: 'chat', label: intl.get('群晖chat') },
     { value: 'email', label: intl.get('邮箱') },
     { value: 'lark', label: intl.get('飞书机器人') },
@@ -387,6 +372,55 @@ export default {
         required: false,
       },
     ],
+    wxPusherSpt: [
+      {
+        label: 'wxPusherSptList',
+        tip: intl.get('wxPusherSpt的SPT'),
+        required: true,
+      },
+    ],
+    wpush: [
+      {
+        label: 'wpushApiKey',
+        tip: intl.get(
+          'WPUSH的API Key，在 https://wpush.cn/settings 获取，参考 https://wpush.cn/docs',
+        ),
+        required: true,
+      },
+      {
+        label: 'wpushChannel',
+        tip: intl.get(
+          '推送渠道，支持 wechat/app/sms/mail/webhook/dingtalk/feishu/wechat_work/clawbot/qqbot，默认 wechat',
+        ),
+      },
+      {
+        label: 'wpushTopicCode',
+        tip: intl.get(
+          '可选，Topic 广播编码；填写后按 Topic 推送，参考 https://wpush.cn/docs',
+        ),
+      },
+    ],
+    openiLink: [
+      {
+        label: 'openiLinkAppToken',
+        tip: intl.get(
+          'OpeniLink的app_token，在OpeniLink Hub后台安装App后获取，参考 https://openilink.com/docs/hub/apps',
+        ),
+        required: true,
+      },
+      {
+        label: 'openiLinkHubUrl',
+        tip: intl.get(
+          'OpeniLink Hub地址，默认为 https://hub.openilink.com，自建Hub时填写自己的地址',
+        ),
+      },
+      {
+        label: 'openiLinkContextToken',
+        tip: intl.get(
+          'OpeniLink的context_token，用于标识消息会话上下文，可从消息事件中获取',
+        ),
+      },
+    ],
     lark: [
       {
         label: 'larkKey',
@@ -394,6 +428,12 @@ export default {
           '飞书群组机器人：https://www.feishu.cn/hc/zh-CN/articles/360024984973',
         ),
         required: true,
+      },
+      {
+        label: 'larkSecret',
+        tip: intl.get(
+          '飞书群组机器人加签密钥，安全设置中开启签名校验后获得',
+        ),
       },
     ],
     email: [
@@ -507,6 +547,7 @@ export default {
     '/setting': intl.get('系统设置'),
     '/error': intl.get('错误日志'),
     '/dependence': intl.get('依赖管理'),
+    '/dashboard': intl.get('仪表盘'),
   },
   dependenceTypes: ['nodejs', 'python3', 'linux'],
 };

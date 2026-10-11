@@ -2,7 +2,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { celebrate, Joi } from 'celebrate';
 import UserManagementService from '../services/userManagement';
-import { UserRole } from '../data/user';
+import { UserRole, UserStatus } from '../data/user';
+import { EnvModel } from '../data/env';
+import { CrontabModel } from '../data/cron';
+import { SubscriptionModel } from '../data/subscription';
 
 const route = Router();
 
@@ -24,10 +27,49 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const userManagementService = Container.get(UserManagementService);
-        const data = await userManagementService.list(req.query.searchValue as string);
+        const data = await userManagementService.list(
+          req.query.searchValue as string,
+        );
         res.send({ code: 200, data });
       } catch (e) {
         return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/:id/resources',
+    requireAdmin,
+    celebrate({
+      params: Joi.object({ id: Joi.number().integer().positive().required() }),
+      body: Joi.object({
+        resource: Joi.string()
+          .valid('envs', 'crons', 'subscriptions')
+          .required(),
+        ids: Joi.array()
+          .min(1)
+          .max(200)
+          .unique()
+          .items(Joi.number().integer().positive())
+          .required(),
+      }),
+    }),
+    async (req, res, next) => {
+      try {
+        const id = Number(req.params.id);
+        await Container.get(UserManagementService).get(id);
+        const models: Record<string, any> = {
+          envs: EnvModel,
+          crons: CrontabModel,
+          subscriptions: SubscriptionModel,
+        };
+        const [count] = await models[req.body.resource].update(
+          { userId: id },
+          { where: { id: req.body.ids } },
+        );
+        return res.json({ code: 200, data: { assigned: count } });
+      } catch (error) {
+        return next(error);
       }
     },
   );
@@ -36,6 +78,7 @@ export default (app: Router) => {
   route.get(
     '/:id',
     requireAdmin,
+    celebrate({ params: Joi.object({ id: Joi.number().integer().positive().required() }) }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const userManagementService = Container.get(UserManagementService);
@@ -53,10 +96,14 @@ export default (app: Router) => {
     requireAdmin,
     celebrate({
       body: Joi.object({
-        username: Joi.string().required(),
-        password: Joi.string().required(),
-        role: Joi.number().valid(UserRole.admin, UserRole.user).default(UserRole.user),
-        status: Joi.number().optional(),
+        username: Joi.string().trim().max(255).required(),
+        password: Joi.string().min(6).max(1024).required(),
+        role: Joi.number()
+          .valid(UserRole.admin, UserRole.user)
+          .default(UserRole.user),
+        status: Joi.number()
+          .valid(UserStatus.active, UserStatus.disabled)
+          .optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -76,11 +123,13 @@ export default (app: Router) => {
     requireAdmin,
     celebrate({
       body: Joi.object({
-        id: Joi.number().required(),
-        username: Joi.string().required(),
-        password: Joi.string().required(),
+        id: Joi.number().integer().positive().required(),
+        username: Joi.string().trim().max(255).required(),
+        password: Joi.string().min(6).max(1024).optional().allow(''),
         role: Joi.number().valid(UserRole.admin, UserRole.user),
-        status: Joi.number().optional(),
+        status: Joi.number()
+          .valid(UserStatus.active, UserStatus.disabled)
+          .optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -99,7 +148,12 @@ export default (app: Router) => {
     '/',
     requireAdmin,
     celebrate({
-      body: Joi.array().items(Joi.number()).required(),
+      body: Joi.array()
+        .min(1)
+        .max(200)
+        .unique()
+        .items(Joi.number().integer().positive())
+        .required(),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {

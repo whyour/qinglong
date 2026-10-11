@@ -2,15 +2,15 @@
 
 /**
  * Multi-User Data Migration Script
- * 
- * This script migrates existing data (Cron, Env, Subscription, Dependence) 
+ *
+ * This script migrates existing data (Cron, Env, Subscription, Dependence)
  * to be associated with specific users.
- * 
+ *
  * Usage:
  *   node migrate-to-multiuser.js --userId=1
  *   node migrate-to-multiuser.js --username=admin
  *   node migrate-to-multiuser.js --list-users
- * 
+ *
  * Options:
  *   --userId=<id>        Assign all legacy data to user with this ID
  *   --username=<name>    Assign all legacy data to user with this username
@@ -28,9 +28,19 @@ require('dotenv').config();
 
 // Configuration
 const config = {
-  dbPath: process.env.QL_DATA_DIR || path.join(__dirname, '../data'),
+  dbPath: path.join(
+    process.env.QL_DATA_DIR ||
+      path.join(process.env.QL_DIR || __dirname, 'data'),
+    'db',
+  ),
   rootPath: __dirname,
 };
+
+if (!fs.existsSync(path.join(config.dbPath, 'database.sqlite'))) {
+  throw new Error(
+    'Existing database not found; start the panel and verify QL_DATA_DIR before migration.',
+  );
+}
 
 // Initialize Sequelize
 const sequelize = new Sequelize({
@@ -43,33 +53,33 @@ const sequelize = new Sequelize({
 const UserModel = sequelize.define('User', {
   username: Sequelize.STRING,
   password: Sequelize.STRING,
-  role: Sequelize.NUMBER,
-  status: Sequelize.NUMBER,
+  role: Sequelize.INTEGER,
+  status: Sequelize.INTEGER,
 });
 
 const CrontabModel = sequelize.define('Crontab', {
   name: Sequelize.STRING,
   command: Sequelize.STRING,
   schedule: Sequelize.STRING,
-  userId: Sequelize.NUMBER,
+  userId: Sequelize.INTEGER,
 });
 
 const EnvModel = sequelize.define('Env', {
   name: Sequelize.STRING,
   value: Sequelize.STRING,
-  userId: Sequelize.NUMBER,
+  userId: Sequelize.INTEGER,
 });
 
 const SubscriptionModel = sequelize.define('Subscription', {
   name: Sequelize.STRING,
   url: Sequelize.STRING,
-  userId: Sequelize.NUMBER,
+  userId: Sequelize.INTEGER,
 });
 
 const DependenceModel = sequelize.define('Dependence', {
   name: Sequelize.STRING,
-  type: Sequelize.NUMBER,
-  userId: Sequelize.NUMBER,
+  type: Sequelize.INTEGER,
+  userId: Sequelize.INTEGER,
 });
 
 // Parse command line arguments
@@ -82,7 +92,7 @@ function parseArgs() {
     help: false,
   };
 
-  process.argv.slice(2).forEach(arg => {
+  process.argv.slice(2).forEach((arg) => {
     if (arg.startsWith('--userId=')) {
       args.userId = parseInt(arg.split('=')[1]);
     } else if (arg.startsWith('--username=')) {
@@ -137,18 +147,20 @@ Data already assigned to users will not be changed.
 // List all users
 async function listUsers() {
   const users = await UserModel.findAll();
-  
+
   if (users.length === 0) {
     console.log('\nNo users found in the database.');
-    console.log('Please create users first using the User Management interface.');
+    console.log(
+      'Please create users first using the User Management interface.',
+    );
     return;
   }
 
   console.log('\nUsers in the system:');
   console.log('ID\tUsername\tRole\t\tStatus');
   console.log('--\t--------\t----\t\t------');
-  
-  users.forEach(user => {
+
+  users.forEach((user) => {
     const role = user.role === 0 ? 'Admin' : 'User';
     const status = user.status === 0 ? 'Enabled' : 'Disabled';
     console.log(`${user.id}\t${user.username}\t\t${role}\t\t${status}`);
@@ -164,14 +176,14 @@ async function getStatistics() {
     subscriptions: await SubscriptionModel.count({ where: { userId: null } }),
     dependences: await DependenceModel.count({ where: { userId: null } }),
   };
-  
+
   return stats;
 }
 
 // Migrate data to a specific user
 async function migrateData(userId, dryRun = false) {
   const stats = await getStatistics();
-  
+
   console.log('\nLegacy Data Statistics:');
   console.log(`  Cron tasks: ${stats.crons}`);
   console.log(`  Environment variables: ${stats.envs}`);
@@ -179,7 +191,10 @@ async function migrateData(userId, dryRun = false) {
   console.log(`  Dependencies: ${stats.dependences}`);
   console.log('');
 
-  if (stats.crons + stats.envs + stats.subscriptions + stats.dependences === 0) {
+  if (
+    stats.crons + stats.envs + stats.subscriptions + stats.dependences ===
+    0
+  ) {
     console.log('No legacy data found. All data is already assigned to users.');
     return;
   }
@@ -193,13 +208,13 @@ async function migrateData(userId, dryRun = false) {
   console.log(`Migrating data to user ID ${userId}...`);
 
   const transaction = await sequelize.transaction();
-  
+
   try {
     // Migrate crons
     if (stats.crons > 0) {
       await CrontabModel.update(
         { userId },
-        { where: { userId: null }, transaction }
+        { where: { userId: null }, transaction },
       );
       console.log(`✓ Migrated ${stats.crons} cron tasks`);
     }
@@ -208,7 +223,7 @@ async function migrateData(userId, dryRun = false) {
     if (stats.envs > 0) {
       await EnvModel.update(
         { userId },
-        { where: { userId: null }, transaction }
+        { where: { userId: null }, transaction },
       );
       console.log(`✓ Migrated ${stats.envs} environment variables`);
     }
@@ -217,7 +232,7 @@ async function migrateData(userId, dryRun = false) {
     if (stats.subscriptions > 0) {
       await SubscriptionModel.update(
         { userId },
-        { where: { userId: null }, transaction }
+        { where: { userId: null }, transaction },
       );
       console.log(`✓ Migrated ${stats.subscriptions} subscriptions`);
     }
@@ -226,7 +241,7 @@ async function migrateData(userId, dryRun = false) {
     if (stats.dependences > 0) {
       await DependenceModel.update(
         { userId },
-        { where: { userId: null }, transaction }
+        { where: { userId: null }, transaction },
       );
       console.log(`✓ Migrated ${stats.dependences} dependencies`);
     }
@@ -268,36 +283,35 @@ async function main() {
 
     // Get user ID
     let userId = args.userId;
-    
+
     if (args.username) {
       const user = await UserModel.findOne({
-        where: { username: args.username }
+        where: { username: args.username },
       });
-      
+
       if (!user) {
         console.error(`\nError: User '${args.username}' not found.`);
         console.log('Use --list-users to see available users.');
         process.exit(1);
       }
-      
+
       userId = user.id;
       console.log(`Found user '${args.username}' with ID ${userId}`);
     } else {
       // Verify user exists
       const user = await UserModel.findByPk(userId);
-      
+
       if (!user) {
         console.error(`\nError: User with ID ${userId} not found.`);
         console.log('Use --list-users to see available users.');
         process.exit(1);
       }
-      
+
       console.log(`Found user '${user.username}' with ID ${userId}`);
     }
 
     // Perform migration
     await migrateData(userId, args.dryRun);
-
   } catch (error) {
     console.error('\nError:', error.message);
     process.exit(1);
@@ -308,7 +322,7 @@ async function main() {
 
 // Run the script
 if (require.main === module) {
-  main().catch(error => {
+  main().catch((error) => {
     console.error('Fatal error:', error);
     process.exit(1);
   });

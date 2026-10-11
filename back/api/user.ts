@@ -8,8 +8,8 @@ import path from 'path';
 import { v4 as uuidV4 } from 'uuid';
 import rateLimit from 'express-rate-limit';
 import config from '../config';
-import { isDemoEnv } from '../config/util';
-import { UserRole } from '../data/user';
+import { t } from '../shared/i18n';
+import { isDemoEnv, getToken } from '../config/util';
 const route = Router();
 
 const storage = multer.diskStorage({
@@ -22,7 +22,25 @@ const storage = multer.diskStorage({
     cb(null, key + ext);
   },
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const imageTypes: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.avif': 'image/avif',
+    };
+    if (imageTypes[ext] !== file.mimetype) {
+      return cb(new Error(t('仅支持 PNG、JPEG、GIF、WebP、AVIF 图片')));
+    }
+    cb(null, true);
+  },
+});
 
 export default (app: Router) => {
   app.use('/user', route);
@@ -35,8 +53,8 @@ export default (app: Router) => {
     }),
     celebrate({
       body: Joi.object({
-        username: Joi.string().required(),
-        password: Joi.string().required(),
+        username: Joi.string().max(1024).required(),
+        password: Joi.string().max(1024).required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -57,7 +75,18 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         const userService = Container.get(UserService);
-        await userService.logout(req.platform);
+        const token = getToken(req);
+        if (req.user?.userId) {
+          const { default: UserManagementService } = await import(
+            '../services/userManagement'
+          );
+          await Container.get(UserManagementService).revokeToken(
+            req.user.userId,
+            token,
+          );
+        } else {
+          await userService.logout(req.platform, token);
+        }
         res.send({ code: 200 });
       } catch (e) {
         return next(e);
@@ -69,18 +98,28 @@ export default (app: Router) => {
     '/',
     celebrate({
       body: Joi.object({
-        username: Joi.string().required(),
-        password: Joi.string().required(),
+        username: Joi.string().max(1024).required(),
+        password: Joi.string().max(1024).required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (isDemoEnv()) {
-          return res.send({ code: 450, message: '未知错误' });
+          return res.send({ code: 450, message: t('未知错误') });
         }
         const userService = Container.get(UserService);
-        await userService.updateUsernameAndPassword(req.body);
-        res.send({ code: 200, message: '更新成功' });
+        if (req.user?.userId) {
+          const { default: UserManagementService } = await import(
+            '../services/userManagement'
+          );
+          await Container.get(UserManagementService).update({
+            id: req.user.userId,
+            ...req.body,
+          });
+          return res.send({ code: 200 });
+        }
+        const result = await userService.updateUsernameAndPassword(req.body);
+        res.send(result);
       } catch (e) {
         return next(e);
       }
@@ -91,14 +130,31 @@ export default (app: Router) => {
     const logger: Logger = Container.get('logger');
     try {
       const userService = Container.get(UserService);
+      if (req.user?.userId) {
+        const { default: UserManagementService } = await import(
+          '../services/userManagement'
+        );
+        const account = await Container.get(UserManagementService).get(
+          req.user.userId,
+        );
+        return res.send({
+          code: 200,
+          data: {
+            username: account.username,
+            role: account.role,
+            id: account.id,
+            readOnly: account.role === 1,
+          },
+        });
+      }
       const authInfo = await userService.getAuthInfo();
       res.send({
         code: 200,
         data: {
+          role: 0,
           username: authInfo.username,
           avatar: authInfo.avatar,
           twoFactorActivated: authInfo.twoFactorActivated,
-          role: req.user?.role,
         },
       });
     } catch (e) {
@@ -141,12 +197,12 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/two-factor/deactive',
+    '/two-factor/deactivate',
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const userService = Container.get(UserService);
-        const data = await userService.deactiveTwoFactor();
+        const data = await userService.deactivateTwoFactor();
         res.send({ code: 200, data });
       } catch (e) {
         return next(e);
@@ -156,11 +212,12 @@ export default (app: Router) => {
 
   route.put(
     '/two-factor/login',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
     celebrate({
       body: Joi.object({
         code: Joi.string().required(),
-        username: Joi.string().required(),
-        password: Joi.string().required(),
+        username: Joi.string().max(1024).required(),
+        password: Joi.string().max(1024).required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -180,17 +237,62 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
-        // Only admin can view login logs
-        if (req.user?.role !== UserRole.admin) {
-          return res.send({
-            code: 403,
-            message: '暂无权限',
-          });
-        }
-        
         const userService = Container.get(UserService);
         const data = await userService.getLoginLog();
         res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/ip-blacklist',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const userService = Container.get(UserService);
+        const data = await userService.getIpBlacklist();
+        res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.put(
+    '/ip-blacklist',
+    celebrate({
+      body: Joi.object({
+        ip: Joi.string()
+          .ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' })
+          .required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const userService = Container.get(UserService);
+        const data = await userService.blockIp(req.body.ip);
+        res.send({ code: 200, data, message: t('已加入 IP 黑名单') });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.delete(
+    '/ip-blacklist',
+    celebrate({
+      body: Joi.object({
+        ip: Joi.string()
+          .ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' })
+          .required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const userService = Container.get(UserService);
+        const data = await userService.unblockIp(req.body.ip);
+        res.send({ code: 200, data, message: t('已移出 IP 黑名单') });
       } catch (e) {
         return next(e);
       }
@@ -227,18 +329,19 @@ export default (app: Router) => {
 
   route.put(
     '/init',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
     celebrate({
       body: Joi.object({
-        username: Joi.string().required(),
-        password: Joi.string().required(),
+        username: Joi.string().max(1024).required(),
+        password: Joi.string().max(1024).required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const userService = Container.get(UserService);
-        await userService.updateUsernameAndPassword(req.body);
-        res.send({ code: 200, message: '更新成功' });
+        const result = await userService.initializeUser(req.body);
+        res.send(result);
       } catch (e) {
         return next(e);
       }

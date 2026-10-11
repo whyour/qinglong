@@ -8,14 +8,69 @@ import { getPlatform, getToken } from '../config/util';
 import rewrite from 'express-urlrewrite';
 import { errors } from 'celebrate';
 import { serveEnv } from '../config/serverEnv';
-import { IKeyvStore, shareStore } from '../shared/store';
+import { shareStore } from '../shared/store';
+import { isValidToken, isDefaultAuthInfo } from '../shared/auth';
+import { AuthInfo } from '../data/system';
 import path from 'path';
+import { t } from '../shared/i18n';
+import { Container } from 'typedi';
+import jwt from 'jsonwebtoken';
+import { AppScope } from '../data/open';
+import uniqueConstraintError from '../middlewares/uniqueConstraintError';
+import protectedPathCase from '../middlewares/protectedPathCase';
+
+function resolveTrustProxy(value = process.env.QL_TRUST_PROXY) {
+  const setting = value?.trim();
+  if (!setting) {
+    return 'loopback';
+  }
+  if (setting === 'true' || setting === 'false') {
+    return setting === 'true';
+  }
+  if (/^\d+$/.test(setting)) {
+    return Number(setting);
+  }
+  return setting;
+}
 
 export default ({ app }: { app: Application }) => {
-  app.set('trust proxy', 'loopback');
+  // Security: Enable strict routing to prevent case-insensitive path bypass
+  app.set('case sensitive routing', true);
+  app.set('strict routing', true);
+  app.set('trust proxy', resolveTrustProxy());
   app.use(cors());
+
+  // Security: Reject case variations under protected API namespaces before
+  // authentication checks can interpret the request differently from routing.
+  app.use(protectedPathCase);
+
+  // Rewrite URLs to strip baseUrl prefix if configured
+  // This allows the rest of the app to work without baseUrl awareness
+  if (config.baseUrl) {
+    app.use(rewrite(`${config.baseUrl}/*`, '/$1'));
+  }
+
   app.get(`${config.api.prefix}/env.js`, serveEnv);
-  app.use(`${config.api.prefix}/static`, express.static(config.uploadPath));
+  app.use(
+    `${config.api.prefix}/static`,
+    express.static(config.uploadPath, {
+      setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+      },
+    }),
+  );
+
+  const credentialPaths = ['/api', '/open'].flatMap((prefix) =>
+    ['/user/login', '/user/init', '/user/two-factor/login'].map(
+      (route) => `${prefix}${route}`,
+    ),
+  );
+  app.use(
+    credentialPaths,
+    bodyParser.json({ limit: '16kb' }),
+    bodyParser.urlencoded({ limit: '16kb', extended: false }),
+  );
 
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
@@ -28,7 +83,7 @@ export default ({ app }: { app: Application }) => {
       secret: config.jwt.secret,
       algorithms: ['HS384'],
     }).unless({
-      path: [...config.apiWhiteList, /^\/(?!api\/).*/],
+      path: [...config.apiWhiteList, /^(\/(?!api\/).*)$/i],
     }),
   );
 
@@ -42,44 +97,45 @@ export default ({ app }: { app: Application }) => {
     return next();
   });
 
-  // Extract userId and role from JWT
-  app.use((req: Request, res, next) => {
-    if (req.auth) {
-      const payload = req.auth as any;
-      req.user = {
-        userId: payload.userId,
-        role: payload.role,
-      };
-    }
-    return next();
-  });
-
   app.use(async (req: Request, res, next) => {
-    if (!['/open/', '/api/'].some((x) => req.path.startsWith(x))) {
+    const pathLower = req.path.toLowerCase();
+    if (!['/open/', '/api/'].some((x) => pathLower.startsWith(x))) {
       return next();
     }
 
     const headerToken = getToken(req);
-    if (req.path.startsWith('/open/')) {
+    if (pathLower.startsWith('/open/')) {
       const apps = await shareStore.getApps();
       const doc = apps?.filter((x) =>
         x.tokens?.find((y) => y.value === headerToken),
       )?.[0];
       if (doc && doc.tokens && doc.tokens.length > 0) {
         const currentToken = doc.tokens.find((x) => x.value === headerToken);
-        const keyMatch = req.path.match(/\/open\/([a-z]+)\/*/);
+        const keyMatch = pathLower.match(/\/open\/([a-z]+)\/*/);
         const key = keyMatch && keyMatch[1];
-        if (
-          doc.scopes.includes(key as any) &&
-          currentToken &&
-          currentToken.expiration >= Math.round(Date.now() / 1000)
-        ) {
-          return next();
+
+        if (!doc.scopes.includes(key as AppScope)) {
+          const err = new UnauthorizedError('credentials_bad_scheme', {
+            message: t('暂无权限'),
+          });
+          return next(err);
         }
+
+        if (
+          !currentToken ||
+          currentToken.expiration < Math.round(Date.now() / 1000)
+        ) {
+          const err = new UnauthorizedError('invalid_token', {
+            message: t('Token 已失效'),
+          });
+          return next(err);
+        }
+
+        return next();
       }
     }
 
-    const originPath = `${req.baseUrl}${req.path === '/' ? '' : req.path}`;
+    const originPath = `${req.baseUrl}${pathLower === '/' ? '' : pathLower}`;
     if (
       !headerToken &&
       originPath &&
@@ -88,54 +144,70 @@ export default ({ app }: { app: Application }) => {
       return next();
     }
 
-    // If JWT has been successfully verified by expressjwt middleware, allow the request
-    // This handles regular users whose tokens are not stored in authInfo
-    if (req.auth) {
+    const authInfo = await shareStore.getAuthInfo();
+    if (isValidToken(authInfo, headerToken, req.platform, config.jwt.secret)) {
+      req.user = { role: 0 };
+      return next();
+    }
+    const claims = jwt.decode(headerToken);
+    let account = null;
+    if (
+      typeof claims === 'object' &&
+      Number.isSafeInteger(claims?.userId) &&
+      claims!.userId > 0
+    ) {
+      const { default: UserManagementService } = await import(
+        '../services/userManagement'
+      );
+      account = await Container.get(UserManagementService).validateToken(
+        headerToken,
+        req.platform,
+      );
+    }
+    if (account) {
+      req.user = { userId: account.id, role: account.role };
       return next();
     }
 
-    // For system admin, also check against stored token
-    const authInfo = await shareStore.getAuthInfo();
-    if (authInfo && headerToken) {
-      const { token = '', tokens = {} } = authInfo;
-      if (headerToken === token || tokens[req.platform] === headerToken) {
-        return next();
-      }
-    }
-
     const errorCode = headerToken ? 'invalid_token' : 'credentials_required';
-    const errorMessage = headerToken
-      ? 'jwt malformed'
-      : 'No authorization token was found';
+    const errorMessage = headerToken ? t('Token 已失效') : t('请先登录');
     const err = new UnauthorizedError(errorCode, { message: errorMessage });
     next(err);
   });
 
   app.use(async (req, res, next) => {
-    if (!['/api/user/init', '/api/user/notification/init'].includes(req.path)) {
+    const pathLower = req.path.toLowerCase();
+    if (
+      ![
+        '/api/user/init',
+        '/api/user/notification/init',
+        '/open/user/init',
+        '/open/user/notification/init',
+      ].includes(pathLower)
+    ) {
       return next();
     }
-    const authInfo =
-      (await shareStore.getAuthInfo()) || ({} as IKeyvStore['authInfo']);
+    const authInfo = (await shareStore.getAuthInfo()) || ({} as AuthInfo);
 
-    let isInitialized = true;
-    if (
-      Object.keys(authInfo).length === 2 &&
-      authInfo.username === 'admin' &&
-      authInfo.password === 'admin'
-    ) {
-      isInitialized = false;
-    }
+    let isInitialized = !isDefaultAuthInfo(authInfo);
 
     if (isInitialized) {
-      return res.send({ code: 450, message: '未知错误' });
+      return res.send({ code: 450, message: t('未知错误') });
     } else {
       return next();
     }
   });
 
   app.use(rewrite('/open/*', '/api/$1'));
-  app.use(config.api.prefix, routes());
+  app.use(
+    config.api.prefix,
+    async (req, res, next) => {
+      if (!req.user || req.user.role === 0) return next();
+      const { userAccess } = await import('../middlewares/userAccess');
+      return userAccess(req, res, next);
+    },
+    routes(),
+  );
 
   app.get('*', (_, res, next) => {
     const indexPath = path.join(frontendPath, 'index.html');
@@ -149,6 +221,7 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(errors());
+  app.use(uniqueConstraintError);
 
   app.use(
     (

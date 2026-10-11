@@ -35,6 +35,7 @@ import './index.less';
 import useResizeObserver from '@react-hook/resize-observer';
 import SystemLog from './systemLog';
 import Dependence from './dependence';
+import ClientIp from './clientIp';
 import UserManagement from './userManagement';
 
 const { Text } = Typography;
@@ -47,6 +48,7 @@ const Setting = () => {
     user,
     theme,
     reloadUser,
+    reloadSystemConfig,
     reloadTheme,
     systemInfo,
   } = useOutletContext<SharedContext>();
@@ -334,29 +336,26 @@ const Setting = () => {
               label: intl.get('通知设置'),
               children: <NotificationSetting data={notificationInfo} />,
             },
-            ...(user?.role === 0
-              ? [
-                  {
-                    key: 'syslog',
-                    label: intl.get('系统日志'),
-                    children: <SystemLog height={height} theme={theme} />,
-                  },
-                  {
-                    key: 'login',
-                    label: intl.get('登录日志'),
-                    children: <LoginLog height={height} data={loginLogData} />,
-                  },
-                ]
-              : []),
-            ...(user?.role === 0 && !isDemoEnv
-              ? [
-                  {
-                    key: 'user-management',
-                    label: intl.get('用户管理'),
-                    children: <UserManagement height={height} />,
-                  },
-                ]
-              : []),
+            {
+              key: 'syslog',
+              label: intl.get('系统日志'),
+              children: <SystemLog height={height} theme={theme} />,
+            },
+            {
+              key: 'login',
+              label: intl.get('登录日志'),
+              children: <LoginLog height={height} data={loginLogData} />,
+            },
+            {
+              key: 'user-management',
+              label: intl.get('用户管理'),
+              children: <UserManagement height={height} />,
+            },
+            {
+              key: 'client-ip',
+              label: intl.get('客户端 IP'),
+              children: <ClientIp />,
+            },
             {
               key: 'dependence',
               label: intl.get('依赖设置'),
@@ -366,7 +365,11 @@ const Setting = () => {
               key: 'other',
               label: intl.get('其他设置'),
               children: (
-                <Other reloadTheme={reloadTheme} systemInfo={systemInfo} />
+                <Other
+                  reloadSystemConfig={reloadSystemConfig}
+                  reloadTheme={reloadTheme}
+                  systemInfo={systemInfo}
+                />
               ),
             },
             {

@@ -16,13 +16,13 @@ export default (app: Router) => {
           searchValue: Joi.string().optional().allow(''),
           type: Joi.string().optional().allow(''),
           status: Joi.string().optional().allow(''),
-        }),
+        }).unknown(true),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.dependencies(req.query as any, [], {}, req.user?.userId);
+        const data = await dependenceService.dependencies(req.query as any);
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
@@ -45,7 +45,7 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.create(req.body, req.user?.userId);
+        const data = await dependenceService.create(req.body);
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);
@@ -82,10 +82,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.remove(req.body, false, req.user?.userId);
+        const data = await dependenceService.remove(req.body);
         return res.send({ code: 200, data });
-      } catch (e: any) {
-        return res.send({ code: 400, message: e.message });
+      } catch (e) {
+        return next(e);
       }
     },
   );
@@ -98,10 +98,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.remove(req.body, true, req.user?.userId);
+        const data = await dependenceService.remove(req.body, true);
         return res.send({ code: 200, data });
-      } catch (e: any) {
-        return res.send({ code: 400, message: e.message });
+      } catch (e) {
+        return next(e);
       }
     },
   );
@@ -132,10 +132,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        const data = await dependenceService.reInstall(req.body, req.user?.userId);
+        const data = await dependenceService.reInstall(req.body);
         return res.send({ code: 200, data });
-      } catch (e: any) {
-        return res.send({ code: 400, message: e.message });
+      } catch (e) {
+        return next(e);
       }
     },
   );
@@ -148,10 +148,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const dependenceService = Container.get(DependenceService);
-        await dependenceService.cancel(req.body, req.user?.userId);
+        await dependenceService.cancel(req.body);
         return res.send({ code: 200 });
-      } catch (e: any) {
-        return res.send({ code: 400, message: e.message });
+      } catch (e) {
+        return next(e);
       }
     },
   );

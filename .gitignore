@@ -28,3 +28,13 @@ __pycache__
 /shell/preload/notify.*
 /shell/preload/*-notify.json
 /shell/preload/__ql_notify__.*
+/shell/preload/lang_env.sh
+
+.deepseek/
+.claude/
+
+# local Kubernetes overlays
+/deploy/kubernetes/overlays/local/
+
+# Local security audit artifacts
+/audit/

@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import psTreeFun from 'ps-tree';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
@@ -10,8 +10,39 @@ import Logger from '../loaders/logger';
 import { writeFileWithLock } from '../shared/utils';
 import { DependenceTypes } from '../data/dependence';
 import { FormData } from 'undici';
+import os from 'os';
+import { maybeSudo, isInContainer } from './container';
+import { resolveFileAccess } from '../shared/fileAccess';
 
 export * from './share';
+
+let osType: 'Debian' | 'Ubuntu' | 'Alpine' | undefined;
+
+function getOsTypeSync(): 'Debian' | 'Ubuntu' | 'Alpine' | undefined {
+  // 1. 环境变量覆盖
+  const envOs = process.env.QL_OS_TYPE?.toLowerCase();
+  if (envOs === 'alpine') return 'Alpine';
+  if (envOs === 'debian') return 'Debian';
+  if (envOs === 'ubuntu') return 'Ubuntu';
+
+  // 2. 模块缓存（由 detectOS 设置）
+  if (osType) return osType;
+
+  // 3. 能力检测：检查包管理器二进制
+  try {
+    execSync('which apt-get', { stdio: 'ignore' });
+    return 'Debian';
+  } catch {
+    try {
+      execSync('which apk', { stdio: 'ignore' });
+      return 'Alpine';
+    } catch {
+      // macOS / 未知系统
+    }
+  }
+
+  return undefined;
+}
 
 export async function getFileContentByName(fileName: string) {
   const _exsit = await fileExist(fileName);
@@ -114,7 +145,8 @@ export async function handleLogPath(
   logPath: string,
   data: string = '',
 ): Promise<string> {
-  const absolutePath = path.resolve(config.logPath, logPath);
+  const absolutePath = resolveFileAccess(config.logPath, [logPath]);
+  if (!absolutePath) throw new Error('Log path is outside the log directory');
   const logFileExist = await fileExist(absolutePath);
   if (!logFileExist) {
     await createFile(absolutePath, data);
@@ -184,48 +216,105 @@ export function dirSort(a: IFile, b: IFile): number {
   }
 }
 
+const FILE_SYSTEM_READ_CONCURRENCY = 32;
+
+type FileSystemTaskRunner = <T>(task: () => Promise<T>) => Promise<T>;
+
+function createFileSystemTaskRunner(concurrency: number): FileSystemTaskRunner {
+  let activeCount = 0;
+  const queue: Array<() => void> = [];
+
+  const runNext = () => {
+    while (activeCount < concurrency && queue.length > 0) {
+      activeCount += 1;
+      queue.shift()?.();
+    }
+  };
+
+  return <T>(task: () => Promise<T>) =>
+    new Promise<T>((resolve, reject) => {
+      queue.push(() => {
+        task()
+          .then(resolve, reject)
+          .finally(() => {
+            activeCount -= 1;
+            runNext();
+          });
+      });
+      runNext();
+    });
+}
+
+async function readDirsWithRunner(
+  dir: string,
+  baseDir: string,
+  blacklist: string[],
+  sort: (a: IFile, b: IFile) => number,
+  runFileSystemTask: FileSystemTaskRunner,
+): Promise<IFile[]> {
+  const relativePath = path.relative(baseDir, dir);
+  const entries = await runFileSystemTask(() =>
+    fs.readdir(dir, { withFileTypes: true }),
+  );
+
+  const items = await Promise.all(
+    entries.map(async (entry): Promise<IFile | undefined> => {
+      if (blacklist.includes(entry.name) || entry.isSymbolicLink()) {
+        return undefined;
+      }
+
+      const subPath = path.join(dir, entry.name);
+      const stats = await runFileSystemTask(() => fs.lstat(subPath));
+      if (stats.isSymbolicLink()) {
+        return undefined;
+      }
+      const key = path.join(relativePath, entry.name);
+
+      if (stats.isDirectory()) {
+        const children = await readDirsWithRunner(
+          subPath,
+          baseDir,
+          blacklist,
+          sort,
+          runFileSystemTask,
+        );
+        return {
+          title: entry.name,
+          key,
+          type: 'directory',
+          parent: relativePath,
+          createTime: stats.birthtime.getTime(),
+          children,
+        };
+      }
+
+      return {
+        title: entry.name,
+        type: 'file',
+        key,
+        parent: relativePath,
+        size: stats.size,
+        createTime: stats.birthtime.getTime(),
+      };
+    }),
+  );
+
+  return items.filter((item): item is IFile => Boolean(item)).sort(sort);
+}
+
 export async function readDirs(
   dir: string,
   baseDir: string = '',
   blacklist: string[] = [],
   sort: (a: IFile, b: IFile) => number = dirSort,
 ): Promise<IFile[]> {
-  const relativePath = path.relative(baseDir, dir);
-  const files = await fs.readdir(dir);
-  const result: IFile[] = [];
-
-  for (const file of files) {
-    const subPath = path.join(dir, file);
-    const stats = await fs.lstat(subPath);
-    const key = path.join(relativePath, file);
-
-    if (blacklist.includes(file) || stats.isSymbolicLink()) {
-      continue;
-    }
-
-    if (stats.isDirectory()) {
-      const children = await readDirs(subPath, baseDir, blacklist, sort);
-      result.push({
-        title: file,
-        key,
-        type: 'directory',
-        parent: relativePath,
-        createTime: stats.birthtime.getTime(),
-        children: children.sort(sort),
-      });
-    } else {
-      result.push({
-        title: file,
-        type: 'file',
-        key,
-        parent: relativePath,
-        size: stats.size,
-        createTime: stats.birthtime.getTime(),
-      });
-    }
-  }
-
-  return result.sort(sort);
+  return readDirsWithRunner(
+    dir,
+    baseDir,
+    blacklist,
+    sort,
+    createFileSystemTaskRunner(FILE_SYSTEM_READ_CONCURRENCY),
+  );
 }
 
 export async function readDir(
@@ -233,7 +322,10 @@ export async function readDir(
   baseDir: string = '',
   blacklist: string[] = [],
 ): Promise<IFile[]> {
-  const absoluteDir = path.join(baseDir, dir);
+  const absoluteDir = path.resolve(baseDir, dir);
+  if (!absoluteDir.startsWith(path.resolve(baseDir))) {
+    return [];
+  }
   const relativePath = path.relative(baseDir, absoluteDir);
 
   try {
@@ -397,24 +489,96 @@ export function psTree(pid: number): Promise<number[]> {
   });
 }
 
-export async function killTask(pid: number) {
-  const pids = await psTree(pid);
-
-  if (pids.length) {
+export async function killTask(pid: number, waitForExit = false) {
+  const descendants = await psTree(pid);
+  const signal = (target: number, sig: NodeJS.Signals) => {
     try {
-      [pid, ...pids].reverse().forEach((x) => {
-        process.kill(x, 15);
-      });
-    } catch (error) {}
-  } else {
-    process.kill(pid, 2);
+      process.kill(target, sig);
+    } catch (error: any) {
+      if (error.code !== 'ESRCH') throw error;
+    }
+  };
+  if (!waitForExit) {
+    if (descendants.length) {
+      // A child may exit after psTree; keep signalling the remaining tree.
+      for (const target of [pid, ...descendants].reverse()) {
+        signal(target, 'SIGTERM');
+      }
+    } else signal(pid, 'SIGINT');
+    return;
   }
+  const pids = [...descendants.reverse(), pid];
+  for (const target of pids) signal(target, 'SIGTERM');
+  const alive = async (target: number) => {
+    try {
+      process.kill(target, 0);
+    } catch (error: any) {
+      if (error.code === 'ESRCH') return false;
+      throw error;
+    }
+    if (process.platform === 'linux') {
+      try {
+        const stat = await fs.readFile(`/proc/${target}/stat`, 'utf8');
+        // The command field may contain spaces and parentheses. Zombies have
+        // exited even while their parent has not reaped the PID yet.
+        const state = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[0];
+        if (['Z', 'X', 'x'].includes(state)) return false;
+      } catch {
+        // /proc may be unavailable, or the process may have just exited.
+        // Retain the portable signal probe rather than assuming it is dead.
+        try {
+          process.kill(target, 0);
+        } catch (error: any) {
+          if (error.code === 'ESRCH') return false;
+          throw error;
+        }
+      }
+    }
+    return true;
+  };
+  const wait = async () => {
+    const deadline = Date.now() + 1000;
+    let remaining = pids;
+    while (true) {
+      const states = await Promise.all(remaining.map(alive));
+      remaining = remaining.filter((_, index) => states[index]);
+      if (!remaining.length || Date.now() >= deadline) return remaining;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  let remaining = await wait();
+  if (!remaining.length) return;
+  for (const target of remaining) signal(target, 'SIGKILL');
+  remaining = await wait();
+  if (remaining.length)
+    throw new Error(`Task processes did not exit: ${remaining.join(', ')}`);
 }
 
 export async function getPid(cmd: string) {
   const taskCommand = `ps -eo pid,command | grep "${cmd}" | grep -v grep | awk '{print $1}' | head -1 | xargs echo -n`;
   const pid = await promiseExec(taskCommand);
   return pid ? Number(pid) : undefined;
+}
+
+export async function getAllPids(cmd: string): Promise<number[]> {
+  const taskCommand = `ps -eo pid,command | grep "${cmd}" | grep -v grep | awk '{print $1}'`;
+  const pidsStr = await promiseExec(taskCommand);
+  if (!pidsStr) return [];
+  return pidsStr
+    .split('\n')
+    .map((p) => Number(p.trim()))
+    .filter((p) => !isNaN(p) && p > 0);
+}
+
+export async function killAllTasks(cmd: string): Promise<void> {
+  const pids = await getAllPids(cmd);
+  for (const pid of pids) {
+    try {
+      await killTask(pid);
+    } catch (error) {
+      // Ignore errors if process already terminated
+    }
+  }
 }
 
 interface IVersion {
@@ -482,10 +646,12 @@ export function safeJSONParse(value?: string) {
   try {
     return JSON.parse(value);
   } catch (error) {
-    Logger.error('[safeJSONParse失败]', error);
+    Logger.error('[safeJSONParse error]', error);
     return {};
   }
 }
+
+export { errStack } from '../shared/errors';
 
 export async function rmPath(path: string) {
   try {
@@ -494,7 +660,7 @@ export async function rmPath(path: string) {
       await fs.rm(path, { force: true, recursive: true, maxRetries: 5 });
     }
   } catch (error) {
-    Logger.error('[rmPath失败]', error);
+    Logger.error('[rmPath error]', error);
   }
 }
 
@@ -504,12 +670,12 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
       throw new Error('Invalid timezone');
     }
 
-    await promiseExec(`ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`);
-    await promiseExec(`echo "${timezone}" > /etc/timezone`);
+    await promiseExec(maybeSudo(`ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`));
+    await promiseExec(`echo "${timezone}" | ${maybeSudo('tee /etc/timezone')}`);
 
     return true;
   } catch (error) {
-    Logger.error('[setSystemTimezone失败]', error);
+    Logger.error('[setSystemTimezone error]', error);
     return false;
   }
 }
@@ -529,7 +695,9 @@ except:
     spec=u.find_spec(name)
     print(name if spec else '')
 ''')"`,
-    [DependenceTypes.linux]: `apk info -es ${name}`,
+    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
+      ? `apk info -es ${name}`
+      : maybeSudo(`dpkg-query -s ${name}`),
   };
 
   return baseCommands[type];
@@ -540,7 +708,9 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
     [DependenceTypes.nodejs]: 'pnpm add -g',
     [DependenceTypes.python3]:
       'pip3 install --disable-pip-version-check --root-user-action=ignore',
-    [DependenceTypes.linux]: 'apk add --no-check-certificate',
+    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
+      ? 'apk add --no-check-certificate'
+      : maybeSudo('apt-get install -y'),
   };
 
   let command = baseCommands[type];
@@ -560,7 +730,9 @@ export function getUninstallCommand(
     [DependenceTypes.nodejs]: 'pnpm remove -g',
     [DependenceTypes.python3]:
       'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
-    [DependenceTypes.linux]: 'apk del',
+    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
+      ? 'apk del'
+      : maybeSudo('apt-get remove -y'),
   };
 
   return `${baseCommands[type]} ${name.trim()}`;
@@ -568,4 +740,149 @@ export function getUninstallCommand(
 
 export function isDemoEnv() {
   return process.env.DeployEnv === 'demo';
+}
+
+async function getOSReleaseInfo(): Promise<string> {
+  const osRelease = await fs.readFile('/etc/os-release', 'utf8');
+  return osRelease;
+}
+
+function isDebian(osReleaseInfo: string): boolean {
+  return osReleaseInfo.includes('Debian');
+}
+
+function isUbuntu(osReleaseInfo: string): boolean {
+  return osReleaseInfo.includes('Ubuntu');
+}
+
+function isCentOS(osReleaseInfo: string): boolean {
+  return osReleaseInfo.includes('CentOS') || osReleaseInfo.includes('Red Hat');
+}
+
+function isAlpine(osReleaseInfo: string): boolean {
+  return osReleaseInfo.includes('Alpine');
+}
+
+export async function detectOS(): Promise<
+  'Debian' | 'Ubuntu' | 'Alpine' | undefined
+> {
+  if (osType) return osType;
+
+  const envOs = process.env.QL_OS_TYPE?.toLowerCase();
+  if (envOs === 'alpine') {
+    osType = 'Alpine';
+    return osType;
+  }
+  if (envOs === 'debian') {
+    osType = 'Debian';
+    return osType;
+  }
+  if (envOs === 'ubuntu') {
+    osType = 'Ubuntu';
+    return osType;
+  }
+
+  const platform = os.platform();
+
+  if (platform === 'linux') {
+    const osReleaseInfo = await getOSReleaseInfo();
+    if (isDebian(osReleaseInfo)) {
+      osType = 'Debian';
+    } else if (isUbuntu(osReleaseInfo)) {
+      osType = 'Ubuntu';
+    } else if (isAlpine(osReleaseInfo)) {
+      osType = 'Alpine';
+    } else {
+      Logger.error(`Unknown Linux Distribution: ${osReleaseInfo}`);
+      console.error(`Unknown Linux Distribution: ${osReleaseInfo}`);
+    }
+  } else if (platform === 'darwin') {
+    osType = undefined;
+  } else {
+    Logger.error(`Unsupported platform: ${platform}`);
+    console.error(`Unsupported platform: ${platform}`);
+  }
+
+  return osType;
+}
+
+async function getCurrentMirrorDomain(
+  filePath: string,
+): Promise<string | null> {
+  const fileContent = await fs.readFile(filePath, 'utf8');
+  const lines = fileContent.split('\n');
+  for (const line of lines) {
+    if (line.trim().startsWith('#')) {
+      continue;
+    }
+    const match = line.match(/https?:\/\/[^\/]+/);
+    if (match) {
+      return match[0];
+    }
+  }
+  return null;
+}
+
+async function replaceDomainInFile(
+  filePath: string,
+  oldDomainWithScheme: string,
+  newDomainWithScheme: string,
+): Promise<void> {
+  let fileContent = await fs.readFile(filePath, 'utf8');
+  let updatedContent = fileContent.replace(
+    new RegExp(oldDomainWithScheme, 'g'),
+    newDomainWithScheme,
+  );
+
+  if (!newDomainWithScheme.endsWith('/')) {
+    newDomainWithScheme += '/';
+  }
+
+  await writeFileWithLock(filePath, updatedContent);
+}
+
+async function _updateLinuxMirror(
+  osType: string,
+  mirrorDomainWithScheme: string,
+): Promise<string> {
+  const S = isInContainer() ? 'sudo ' : '';
+  // APT otherwise returns zero when index downloads fail with transient errors.
+  const aptUpdate = `${S}apt-get update --error-on=any`;
+  let filePath: string, currentDomainWithScheme: string | null;
+  switch (osType) {
+    case 'Debian':
+      filePath = '/etc/apt/sources.list.d/debian.sources';
+      currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
+      if (currentDomainWithScheme) {
+        return `${S}sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://deb.debian.org'}|g' ${filePath} || (${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | ${S}tee ${filePath}) && ${aptUpdate}`;
+      } else {
+        return `${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | ${S}tee ${filePath} && ${aptUpdate}`;
+      }
+    case 'Ubuntu':
+      filePath = '/etc/apt/sources.list.d/ubuntu.sources';
+      currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
+      if (currentDomainWithScheme) {
+        return `${S}sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}|g' ${filePath} || (${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | ${S}tee ${filePath}) && ${aptUpdate}`;
+      } else {
+        return `${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | ${S}tee ${filePath} && ${aptUpdate}`;
+      }
+    case 'Alpine':
+      filePath = '/etc/apk/repositories';
+      currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
+      if (currentDomainWithScheme) {
+        return `sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org'}|g' ${filePath} || (mkdir -p /etc/apk && echo -e "\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/main\\n\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/community" | sed "s|^|${mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org'}/alpine/v|" | tee ${filePath}) && apk update`;
+      } else {
+        return `mkdir -p /etc/apk && echo -e "\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/main\\n\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/community" | sed "s|^|${mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org'}/alpine/v|" | tee ${filePath} && apk update`;
+      }
+    default:
+      throw Error('Unsupported OS type for updating mirrors.');
+  }
+}
+
+export async function updateLinuxMirrorFile(mirror: string): Promise<string> {
+  const detectedOS = await detectOS();
+  if (!detectedOS) {
+    throw Error(`Unknown Linux Distribution`);
+  }
+  return await _updateLinuxMirror(detectedOS, mirror);
 }
