@@ -38,6 +38,28 @@ output_list_add_drop() {
   fi
 }
 
+# Explicit synchronization exclusions are separate from task blacklists.
+# One exact repository-relative path per line; a trailing / protects a directory.
+subscription_file_is_skipped() {
+  local candidate="${1#./}" protected
+  while IFS= read -r protected || [[ -n "$protected" ]]; do
+    protected=${protected%$'\r'}
+    protected=${protected#./}
+    [[ -z "$protected" ]] && continue
+    if [[ "$candidate" == "$protected" || ( "$protected" == */ && "$candidate" == "$protected"* ) ]]; then
+      return 0
+    fi
+  done <<< "${QL_SUB_SKIP_FILES:-}"
+  return 1
+}
+
+copy_subscription_file() {
+  local source="$1" relative="${2#./}"
+  subscription_file_is_skipped "$relative" && return 0
+  mkdir -p "$(dirname "${dir_scripts}/${uniq_path}/${relative}")"
+  cp -f "$source" "${dir_scripts}/${uniq_path}/${relative}"
+}
+
 ## 自动删除失效的脚本与定时任务，需要：1.AutoDelCron 设置为 true；2.正常更新js脚本，没有报错；3.存在失效任务
 ## $1：失效任务清单文件路径
 del_cron() {
@@ -56,7 +78,9 @@ del_cron() {
     cron_file="$dir_scripts/${cron}"
     if [[ -f $cron_file ]]; then
       cron_name=$(grep "new Env" $cron_file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
-      rm -f $cron_file
+      if ! subscription_file_is_skipped "${cron#${path}/}"; then
+        rm -f "$cron_file"
+      fi
     fi
     [[ -z $cron_name ]] && cron_name="$cron"
     if [[ $detail ]]; then
@@ -99,7 +123,9 @@ add_cron() {
       cron_name=$(grep "new Env" $file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
       [[ -z $cron_name ]] && cron_name=$(grep "name:" $file | awk -F ":" '{print $2}' | head -1 | xargs)
       [[ -z $cron_name ]] && cron_name=$(basename "$file_name")
-      result=$(add_cron_api "${cron_line}:${cmd_task} ${file}:${cron_name}:${SUB_ID}")
+      cron_name=${cron_name//$'\r'/}
+      cron_line=${cron_line//$'\r'/}
+      result=$(add_cron_api "$cron_line" "${cmd_task} ${file}" "$cron_name" "$SUB_ID")
       echo -e "$result"
       if [[ $detail ]]; then
         detail="${detail}${result}\n"
@@ -190,7 +216,9 @@ update_raw() {
       [[ -z $cron_line ]] && cron_line=$(grep "cron:" $raw_file_name | awk -F ":" '{print $2}' | head -1 | xargs)
       [[ -z $cron_line ]] && cron_line=$(grep "cron " $raw_file_name | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | head -1 | xargs)
       [[ -z $cron_line ]] && cron_line="$default_cron"
-      result=$(add_cron_api "${cron_line}:${cmd_task} ${filename}:${cron_name}:${SUB_ID}")
+      cron_name=${cron_name//$'\r'/}
+      cron_line=${cron_line//$'\r'/}
+      result=$(add_cron_api "$cron_line" "${cmd_task} ${filename}" "$cron_name" "$SUB_ID")
       echo -e "$result\n"
       notify_api "新增任务通知" "\n$result"
       # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
@@ -395,8 +423,8 @@ gen_list_repo() {
     files=$(echo "$files" | egrep -v "$blackword")
   fi
 
-  cp -f $file_notify_js "${dir_scripts}/${uniq_path}"
-  cp -f $file_notify_py "${dir_scripts}/${uniq_path}"
+  copy_subscription_file "$file_notify_js" "$(basename "$file_notify_js")"
+  copy_subscription_file "$file_notify_py" "$(basename "$file_notify_py")"
 
   if [[ $dependence ]]; then
     cd ${repo_path}
@@ -404,12 +432,14 @@ gen_list_repo() {
     for _file in ${results}; do
       file_path=$(dirname $_file)
       make_dir "${dir_scripts}/${uniq_path}/${file_path}"
-      cp -f $_file "${dir_scripts}/${uniq_path}/${file_path}"
+      copy_subscription_file "$_file" "$_file"
     done
   fi
 
   if [[ -d $dir_dep ]]; then
-    cp -rf $dir_dep/* "${dir_scripts}/${uniq_path}" &>/dev/null
+    while IFS= read -r -d '' dep_file; do
+      copy_subscription_file "$dep_file" "${dep_file#${dir_dep}/}"
+    done < <(find "$dir_dep" -type f -print0)
   fi
 
   for file in ${files}; do
@@ -420,7 +450,8 @@ gen_list_repo() {
       mkdir -p "${dir_scripts}/${uniq_path}/${dirPath}"
       filePath="${uniq_path}/${dirPath}/${filename}"
     fi
-    cp -f $file "${dir_scripts}/$filePath"
+    copy_subscription_file "$file" "$file"
+    [[ -f "${dir_scripts}/$filePath" ]] || continue
     echo "$filePath" >>"$dir_list_tmp/${uniq_path}_scripts.list"
     # cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* ${uniq_path}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task.* ${uniq_path}_${filename}\.*|\1|" | head -1 | awk -F " " '{print $1}')
     # if [[ $cron_id ]]; then

@@ -346,7 +346,7 @@ test('subscription copy precedence preserves local dependencies while selected s
     path.resolve(__dirname, '../../../shell/update.sh'),
     'utf8',
   );
-  const definition = original.match(/^gen_list_repo\(\) \{[\s\S]*?^\}/m)?.[0];
+  const definition = ['subscription_file_is_skipped', 'copy_subscription_file', 'gen_list_repo'].map(name => original.match(new RegExp(`^${name}\\(\\) \\{[\\s\\S]*?^\\}`, 'm'))?.[0]).join('\n');
   assert.ok(definition);
   execFileSync(
     '/bin/bash',
@@ -409,7 +409,7 @@ test('cron metadata precedence agrees with unchanged legacy add_cron', (t) => {
         '--noprofile',
         '--norc',
         '-c',
-        `${definition}\nt() { :; }\nnotify_api() { :; }\nadd_cron_api() { printf '%s' "$1"; }\nadd_cron "$dir_scripts/list" repo`,
+        `${definition}\nt() { :; }\nnotify_api() { :; }\nadd_cron_api() { printf '%s:%s:%s:%s' "$1" "$2" "$3" "$4"; }\nadd_cron "$dir_scripts/list" repo`,
       ],
       {
         encoding: 'utf8',

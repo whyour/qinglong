@@ -1,6 +1,7 @@
 import { Sequelize, Transaction } from 'sequelize';
 import config from '../config/index';
 import { join } from 'path';
+import { configureSqliteParsers } from '../shared/sqliteCompatibility';
 
 export const sequelize = new Sequelize({
   dialect: 'sqlite',
@@ -19,5 +20,7 @@ export const sequelize = new Sequelize({
   },
   transactionType: Transaction.TYPES.IMMEDIATE,
 });
+
+configureSqliteParsers(sequelize);
 
 export type ResponseType<T> = { code: number; data?: T; message?: string };

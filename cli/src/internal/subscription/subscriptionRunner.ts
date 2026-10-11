@@ -10,6 +10,7 @@ import { isRecord } from '../../shared/record';
 import { fail } from '../../shared/errors';
 import { operationOutput } from '../runtime/output';
 import { matchSubscriptionPaths } from './subscriptionFilter';
+import { fileExcludedFromSync } from './syncExclusions';
 
 export interface SubscriptionInput {
   url: string;
@@ -202,7 +203,8 @@ async function reconcile(
       obsolete.map((row) => row.id),
     );
     for (const row of obsolete) {
-      await fs.rm(
+      const relative = taskPath(row.command)!.slice(namespace.length);
+      if (!namespace.endsWith('/') || !fileExcludedFromSync(relative, context.env.QL_SUB_SKIP_FILES)) await fs.rm(
         within(context.paths.dir_scripts!, taskPath(row.command)!, context.env),
         {
           force: true,
@@ -298,33 +300,31 @@ export async function syncRepository(
         path.join(destination, file),
         within(scripts, file, context.env),
       );
+    const copyIncoming = async (source: string, relative: string) => {
+      if (fileExcludedFromSync(relative, context.env.QL_SUB_SKIP_FILES)) return;
+      await copyRegular(source, within(scripts, relative, context.env));
+    };
     for (const key of ['file_notify_js', 'file_notify_py']) {
       const source = context.paths[key]!;
       if ((await fs.stat(source).catch(() => undefined))?.isFile())
-        await copyRegular(source, path.join(scripts, path.basename(source)));
+        await copyIncoming(source, path.basename(source));
     }
     // Preserve gen_list_repo precedence: notification defaults, repository
     // dependencies, local dependency overrides, then selected task scripts.
     for (const file of candidates.filter((file) => dependencies.has(file)))
-      await copyRegular(
-        path.join(checkout, file),
-        within(scripts, file, context.env),
-      );
+      await copyIncoming(path.join(checkout, file), file);
     for (const file of await regularFiles(context.paths.dir_dep!))
-      await copyRegular(
-        path.join(context.paths.dir_dep!, file),
-        within(scripts, file, context.env),
-      );
+      await copyIncoming(path.join(context.paths.dir_dep!, file), file);
     for (const file of selected)
-      await copyRegular(
-        path.join(checkout, file),
-        within(scripts, file, context.env),
-      );
+      await copyIncoming(path.join(checkout, file), file);
     await replaceDirectory(scripts, destination);
     await replaceDirectory(checkout, repoDestination);
-    const relativePaths = selected.map((file) =>
-      path.posix.join(name, file.split(path.sep).join('/')),
-    );
+    const relativePaths: string[] = [];
+    for (const file of selected) {
+      // Excluded files absent locally must not become tasks with no script.
+      if (!(await fs.stat(within(destination, file, context.env)).catch(() => undefined))?.isFile()) continue;
+      relativePaths.push(path.posix.join(name, file.split(path.sep).join('/')));
+    }
     const changes = await reconcile(context, input, `${name}/`, relativePaths);
     return { repository: name, files: relativePaths, ...changes };
   } finally {
