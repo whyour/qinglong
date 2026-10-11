@@ -53,12 +53,9 @@ const ScenarioPage: React.FC = () => {
   const fetchScenarios = async (search?: string) => {
     setLoading(true);
     try {
-      const { code, data } = await request.get(
-        `${config.apiPrefix}scenarios`,
-        {
-          params: { searchValue: search || searchValue },
-        },
-      );
+      const { code, data } = await request.get(`${config.apiPrefix}scenarios`, {
+        params: { searchValue: search ?? searchValue },
+      });
       if (code === 200) {
         setScenarios(data?.data || []);
       }
@@ -132,19 +129,27 @@ const ScenarioPage: React.FC = () => {
       const isEdit = !!editingScenario?.id;
       const endpoint = `${config.apiPrefix}scenarios`;
       const method = isEdit ? 'put' : 'post';
-      const payload = isEdit ? { ...values, id: editingScenario.id } : values;
+      const payload = {
+        name: values.name,
+        description: values.description,
+        ...(isEdit ? { id: editingScenario.id } : {}),
+      };
 
       const { code } = await request[method](endpoint, payload);
       if (code === 200) {
         message.success(
-          `${isEdit ? intl.get('编辑') : intl.get('新建')}${intl.get('场景')}成功`,
+          `${isEdit ? intl.get('编辑') : intl.get('新建')}${intl.get(
+            '场景',
+          )}成功`,
         );
         setIsModalVisible(false);
         fetchScenarios();
       }
     } catch (error) {
       message.error(
-        `${editingScenario ? intl.get('编辑') : intl.get('新建')}${intl.get('场景')}失败`,
+        `${editingScenario ? intl.get('编辑') : intl.get('新建')}${intl.get(
+          '场景',
+        )}失败`,
       );
     }
   };
@@ -244,8 +249,7 @@ const ScenarioPage: React.FC = () => {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 200,
-      render: (date: string) =>
-        date ? new Date(date).toLocaleString() : '-',
+      render: (date: string) => (date ? new Date(date).toLocaleString() : '-'),
     },
     {
       title: intl.get('操作'),
@@ -291,31 +295,26 @@ const ScenarioPage: React.FC = () => {
           }}
           allowClear
         />,
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleCreate}
-        >
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           {intl.get('新建场景')}
         </Button>,
       ]}
     >
       <div className="scenario-page">
+        <Typography.Paragraph type="secondary">
+          {intl.get('场景支持工作流编辑与保存，自动执行功能尚未提供')}
+        </Typography.Paragraph>
         {selectedRowKeys.length > 0 && (
           <div className="scenario-toolbar">
             <Button
               type="primary"
-              onClick={() =>
-                handleStatusChange(selectedRowKeys as number[], 1)
-              }
+              onClick={() => handleStatusChange(selectedRowKeys as number[], 1)}
             >
               {intl.get('批量启用')}
             </Button>
             <Button
               type="primary"
-              onClick={() =>
-                handleStatusChange(selectedRowKeys as number[], 0)
-              }
+              onClick={() => handleStatusChange(selectedRowKeys as number[], 0)}
             >
               {intl.get('批量禁用')}
             </Button>
@@ -337,7 +336,8 @@ const ScenarioPage: React.FC = () => {
           rowSelection={rowSelection}
           pagination={{
             showSizeChanger: true,
-            showTotal: (total) => `${intl.get('共')} ${total} ${intl.get('条')}`,
+            showTotal: (total) =>
+              `${intl.get('共')} ${total} ${intl.get('条')}`,
           }}
         />
 

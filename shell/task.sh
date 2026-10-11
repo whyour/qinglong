@@ -3,11 +3,26 @@
 dir_shell=$QL_DIR/shell
 . $dir_shell/share.sh
 . $dir_shell/api.sh
+. $dir_shell/task-timeout.sh
 
-trap "single_hanle" 2 3 20 15 14 19 1
+trap 'single_hanle SIGINT'  INT
+trap 'single_hanle SIGTERM' TERM
+trap 'single_hanle SIGHUP'  HUP
+trap 'single_hanle SIGALRM' ALRM
+trap 'single_hanle SIGTSTP' TSTP
+trap 'single_hanle SIGQUIT' QUIT
+
 single_hanle() {
-  eval MANUAL=true handle_task_end "$@" "$cmd"
+  _task_exit_code="${_task_exit_code:-$?}"
+  [[ "$_task_exit_code" == "0" ]] && _task_exit_code="1"
+  eval MANUAL=true handle_task_end "$@"
   exit 1
+}
+
+run_shell_script() {
+  # Preserve inherited variables/functions, but contain exit, exec and shell
+  # options so the task wrapper can run after hooks and report completion.
+  ( . "$@" )
 }
 
 define_program() {
@@ -17,7 +32,7 @@ define_program() {
   elif [[ $file_param == *.py ]] || [[ $file_param == *.pyc ]]; then
     which_program="python3"
   elif [[ $file_param == *.sh ]]; then
-    which_program="."
+    which_program="run_shell_script"
   elif [[ $file_param == *.ts ]]; then
     which_program="ts-node-transpile-only"
   else
@@ -44,8 +59,14 @@ handle_log_path() {
     fi
   fi
 
-  time=$(date "+$mtime_format")
-  log_time=$(format_log_time "$mtime_format" "$time")
+  if [[ $is_macos -ne 1 && $mtime_format == '%Y-%m-%d %H:%M:%S.%3N' ]]; then
+    # Render both representations from one clock snapshot, without parsing it
+    # again in a second date process.
+    IFS='|' read -r time log_time < <(date "+$mtime_format|%Y-%m-%d-%H-%M-%S-%3N")
+  else
+    time=$(date "+$mtime_format")
+    log_time=$(format_log_time "$mtime_format" "$time")
+  fi
   if [[ -z $log_name ]]; then
     log_dir_tmp="${file_param##*/}"
     if [[ $file_param =~ "/" ]]; then
@@ -92,11 +113,6 @@ format_params() {
     mtime_format="%Y-%m-%d %H:%M:%S.%3N"
   fi
   timeoutCmd=""
-  if [[ $command_timeout_time ]]; then
-    if type timeout &>/dev/null; then
-      timeoutCmd="timeout --foreground -s 2 -k 10s $command_timeout_time "
-    fi
-  fi
   # params=$(echo "$@" | sed -E 's/([^ ])&([^ ])/\1\\\&\2/g')
 
   # 分割 task 内置参数和脚本参数
@@ -116,7 +132,11 @@ format_params() {
 }
 
 init_begin_time() {
-  begin_time=$(format_time "$time_format" "$time")
+  if [[ $is_macos -ne 1 && $mtime_format == '%Y-%m-%d %H:%M:%S.%3N' && $time_format == '%Y-%m-%d %H:%M:%S' ]]; then
+    begin_time=${time%.*}
+  else
+    begin_time=$(format_time "$time_format" "$time")
+  fi
   begin_timestamp=$(format_timestamp "$time_format" "$time")
 }
 

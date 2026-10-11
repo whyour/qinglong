@@ -1,9 +1,10 @@
-import { Service, Inject } from 'typedi';
-import path, { join } from 'path';
+import { Service } from 'typedi';
 import config from '../config';
 import { getFileContentByName } from '../config/util';
+import { t } from '../shared/i18n';
 import { Response } from 'express';
 import { request } from 'undici';
+import { resolveFileAccess } from '../shared/fileAccess';
 
 @Service()
 export default class ConfigService {
@@ -11,19 +12,16 @@ export default class ConfigService {
 
   public async getFile(filePath: string, res: Response) {
     let content = '';
-    const avaliablePath = [config.rootPath, config.configPath].map((x) =>
-      path.resolve(x, filePath),
+    if (!filePath || filePath.startsWith('data/scripts/')) {
+      return res.send({ code: 403, message: t('文件无法访问') });
+    }
+    const resolved = resolveFileAccess(
+      config.configPath,
+      [filePath],
+      config.blackFileList,
     );
-
-    if (
-      config.blackFileList.includes(filePath) ||
-      avaliablePath.every(
-        (x) =>
-          !x.startsWith(config.scriptPath) && !x.startsWith(config.configPath),
-      ) ||
-      !filePath
-    ) {
-      return res.send({ code: 403, message: '文件无法访问' });
+    if (!resolved) {
+      return res.send({ code: 403, message: t('文件无法访问') });
     }
 
     if (filePath.startsWith('sample/')) {
@@ -31,10 +29,8 @@ export default class ConfigService {
         `https://gitlab.com/whyour/qinglong/-/raw/master/${filePath}`,
       );
       content = await res.body.text();
-    } else if (filePath.startsWith('data/scripts/')) {
-      content = await getFileContentByName(join(config.rootPath, filePath));
     } else {
-      content = await getFileContentByName(join(config.configPath, filePath));
+      content = await getFileContentByName(resolved);
     }
 
     res.send({ code: 200, data: content });

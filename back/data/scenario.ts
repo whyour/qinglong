@@ -1,42 +1,17 @@
 import { sequelize } from '.';
 import { DataTypes, Model } from 'sequelize';
 
-interface WorkflowNode {
+export interface WorkflowNode {
   id: string;
-  type: 'http' | 'script' | 'condition' | 'delay' | 'loop';
-  label: string;
-  x?: number;
-  y?: number;
-  config: {
-    // HTTP Request node
-    url?: string;
-    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-    headers?: Record<string, string>;
-    body?: string;
-    
-    // Script node
-    scriptId?: number;
-    scriptPath?: string;
-    scriptContent?: string;
-    
-    // Condition node
-    condition?: string;
-    trueNext?: string;
-    falseNext?: string;
-    
-    // Delay node
-    delayMs?: number;
-    
-    // Loop node
-    iterations?: number;
-    loopBody?: string[];
-  };
-  next?: string | string[]; // ID(s) of next node(s)
+  type: string;
+  data?: Record<string, any>;
+  blocks?: WorkflowNode[];
+  [key: string]: any;
 }
 
-interface WorkflowGraph {
+export interface WorkflowGraph {
   nodes: WorkflowNode[];
-  startNode?: string;
+  [key: string]: any;
 }
 
 export class Scenario {
@@ -59,9 +34,7 @@ export class Scenario {
   }
 }
 
-export interface ScenarioInstance
-  extends Model<Scenario, Scenario>,
-    Scenario {}
+export interface ScenarioInstance extends Model<Scenario, Scenario>, Scenario {}
 
 export const ScenarioModel = sequelize.define<ScenarioInstance>(
   'Scenario',

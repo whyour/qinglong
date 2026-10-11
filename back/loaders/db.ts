@@ -6,8 +6,11 @@ import { AppModel } from '../data/open';
 import { SystemModel } from '../data/system';
 import { SubscriptionModel } from '../data/subscription';
 import { CrontabViewModel } from '../data/cronView';
-import { ScenarioModel } from '../data/scenario';
+import { CrontabStatModel } from '../data/cronStats';
+import { RunningInstanceModel } from '../data/runningInstance';
 import { sequelize } from '../data';
+import { ScenarioModel } from '../data/scenario';
+import { migrateSchema } from '../shared/schemaMigrations';
 
 export default async () => {
   try {
@@ -18,45 +21,15 @@ export default async () => {
     await EnvModel.sync();
     await SubscriptionModel.sync();
     await CrontabViewModel.sync();
+    await CrontabStatModel.sync();
+    await RunningInstanceModel.sync();
+
     await ScenarioModel.sync();
+    await migrateSchema(sequelize);
 
-    // 初始化新增字段
-    const migrations = [
-      {
-        table: 'CrontabViews',
-        column: 'filterRelation',
-        type: 'VARCHAR(255)',
-      },
-      { table: 'Subscriptions', column: 'proxy', type: 'VARCHAR(255)' },
-      { table: 'CrontabViews', column: 'type', type: 'NUMBER' },
-      { table: 'Subscriptions', column: 'autoAddCron', type: 'NUMBER' },
-      { table: 'Subscriptions', column: 'autoDelCron', type: 'NUMBER' },
-      { table: 'Crontabs', column: 'sub_id', type: 'NUMBER' },
-      { table: 'Crontabs', column: 'extra_schedules', type: 'JSON' },
-      { table: 'Crontabs', column: 'task_before', type: 'TEXT' },
-      { table: 'Crontabs', column: 'task_after', type: 'TEXT' },
-      { table: 'Crontabs', column: 'log_name', type: 'VARCHAR(255)' },
-      {
-        table: 'Crontabs',
-        column: 'allow_multiple_instances',
-        type: 'NUMBER',
-      },
-      { table: 'Envs', column: 'isPinned', type: 'NUMBER' },
-      { table: 'Scenarios', column: 'status', type: 'INTEGER DEFAULT 0' },
-    ];
-
-    for (const migration of migrations) {
-      try {
-        await sequelize.query(
-          `alter table ${migration.table} add column ${migration.column} ${migration.type}`,
-        );
-      } catch (error) {
-        // Column already exists or other error, continue
-      }
-    }
-
-    Logger.info('✌️ DB loaded');
+    Logger.info('[boot] DB loaded');
   } catch (error) {
-    Logger.error('✌️ DB load failed', error);
+    Logger.error('[boot] DB load failed', error);
+    throw error;
   }
 };

@@ -43,6 +43,8 @@ export enum NotificationMode {
   chronocat = 18,
   ntfy = 19,
   wxPusherBot = 20,
+  wxPusherSpt = 21,
+  wpush = 22,
   UNRECOGNIZED = -1,
 }
 
@@ -111,6 +113,12 @@ export function notificationModeFromJSON(object: any): NotificationMode {
     case 20:
     case "wxPusherBot":
       return NotificationMode.wxPusherBot;
+    case 21:
+    case "wxPusherSpt":
+      return NotificationMode.wxPusherSpt;
+    case 22:
+    case "wpush":
+      return NotificationMode.wpush;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -162,6 +170,10 @@ export function notificationModeToJSON(object: NotificationMode): string {
       return "ntfy";
     case NotificationMode.wxPusherBot:
       return "wxPusherBot";
+    case NotificationMode.wxPusherSpt:
+      return "wxPusherSpt";
+    case NotificationMode.wpush:
+      return "wpush";
     case NotificationMode.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -382,6 +394,7 @@ export interface NotificationInfo {
   webhookMethod?: string | undefined;
   webhookContentType?: string | undefined;
   larkKey?: string | undefined;
+  larkSecret?: string | undefined;
   ntfyUrl?: string | undefined;
   ntfyTopic?: string | undefined;
   ntfyPriority?: string | undefined;
@@ -392,6 +405,10 @@ export interface NotificationInfo {
   wxPusherBotAppToken?: string | undefined;
   wxPusherBotTopicIds?: string | undefined;
   wxPusherBotUids?: string | undefined;
+  wxPusherSptList?: string | undefined;
+  wpushApiKey?: string | undefined;
+  wpushChannel?: string | undefined;
+  wpushTopicCode?: string | undefined;
 }
 
 export interface SystemNotifyRequest {
@@ -2947,6 +2964,7 @@ function createBaseNotificationInfo(): NotificationInfo {
     webhookMethod: undefined,
     webhookContentType: undefined,
     larkKey: undefined,
+    larkSecret: undefined,
     ntfyUrl: undefined,
     ntfyTopic: undefined,
     ntfyPriority: undefined,
@@ -2957,6 +2975,10 @@ function createBaseNotificationInfo(): NotificationInfo {
     wxPusherBotAppToken: undefined,
     wxPusherBotTopicIds: undefined,
     wxPusherBotUids: undefined,
+    wxPusherSptList: undefined,
+    wpushApiKey: undefined,
+    wpushChannel: undefined,
+    wpushTopicCode: undefined,
   };
 }
 
@@ -3136,6 +3158,9 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     if (message.larkKey !== undefined) {
       writer.uint32(466).string(message.larkKey);
     }
+    if (message.larkSecret !== undefined) {
+      writer.uint32(554).string(message.larkSecret);
+    }
     if (message.ntfyUrl !== undefined) {
       writer.uint32(474).string(message.ntfyUrl);
     }
@@ -3165,6 +3190,18 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     }
     if (message.wxPusherBotUids !== undefined) {
       writer.uint32(546).string(message.wxPusherBotUids);
+    }
+    if (message.wxPusherSptList !== undefined) {
+      writer.uint32(562).string(message.wxPusherSptList);
+    }
+    if (message.wpushApiKey !== undefined) {
+      writer.uint32(570).string(message.wpushApiKey);
+    }
+    if (message.wpushChannel !== undefined) {
+      writer.uint32(578).string(message.wpushChannel);
+    }
+    if (message.wpushTopicCode !== undefined) {
+      writer.uint32(586).string(message.wpushTopicCode);
     }
     return writer;
   },
@@ -3640,6 +3677,14 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
           message.larkKey = reader.string();
           continue;
         }
+        case 69: {
+          if (tag !== 554) {
+            break;
+          }
+
+          message.larkSecret = reader.string();
+          continue;
+        }
         case 59: {
           if (tag !== 474) {
             break;
@@ -3720,6 +3765,38 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
           message.wxPusherBotUids = reader.string();
           continue;
         }
+        case 70: {
+          if (tag !== 562) {
+            break;
+          }
+
+          message.wxPusherSptList = reader.string();
+          continue;
+        }
+        case 71: {
+          if (tag !== 570) {
+            break;
+          }
+
+          message.wpushApiKey = reader.string();
+          continue;
+        }
+        case 72: {
+          if (tag !== 578) {
+            break;
+          }
+
+          message.wpushChannel = reader.string();
+          continue;
+        }
+        case 73: {
+          if (tag !== 586) {
+            break;
+          }
+
+          message.wpushTopicCode = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3797,6 +3874,7 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
       webhookMethod: isSet(object.webhookMethod) ? globalThis.String(object.webhookMethod) : undefined,
       webhookContentType: isSet(object.webhookContentType) ? globalThis.String(object.webhookContentType) : undefined,
       larkKey: isSet(object.larkKey) ? globalThis.String(object.larkKey) : undefined,
+      larkSecret: isSet(object.larkSecret) ? globalThis.String(object.larkSecret) : undefined,
       ntfyUrl: isSet(object.ntfyUrl) ? globalThis.String(object.ntfyUrl) : undefined,
       ntfyTopic: isSet(object.ntfyTopic) ? globalThis.String(object.ntfyTopic) : undefined,
       ntfyPriority: isSet(object.ntfyPriority) ? globalThis.String(object.ntfyPriority) : undefined,
@@ -3811,6 +3889,10 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
         ? globalThis.String(object.wxPusherBotTopicIds)
         : undefined,
       wxPusherBotUids: isSet(object.wxPusherBotUids) ? globalThis.String(object.wxPusherBotUids) : undefined,
+      wxPusherSptList: isSet(object.wxPusherSptList) ? globalThis.String(object.wxPusherSptList) : undefined,
+      wpushApiKey: isSet(object.wpushApiKey) ? globalThis.String(object.wpushApiKey) : undefined,
+      wpushChannel: isSet(object.wpushChannel) ? globalThis.String(object.wpushChannel) : undefined,
+      wpushTopicCode: isSet(object.wpushTopicCode) ? globalThis.String(object.wpushTopicCode) : undefined,
     };
   },
 
@@ -3990,6 +4072,9 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     if (message.larkKey !== undefined) {
       obj.larkKey = message.larkKey;
     }
+    if (message.larkSecret !== undefined) {
+      obj.larkSecret = message.larkSecret;
+    }
     if (message.ntfyUrl !== undefined) {
       obj.ntfyUrl = message.ntfyUrl;
     }
@@ -4019,6 +4104,18 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     }
     if (message.wxPusherBotUids !== undefined) {
       obj.wxPusherBotUids = message.wxPusherBotUids;
+    }
+    if (message.wxPusherSptList !== undefined) {
+      obj.wxPusherSptList = message.wxPusherSptList;
+    }
+    if (message.wpushApiKey !== undefined) {
+      obj.wpushApiKey = message.wpushApiKey;
+    }
+    if (message.wpushChannel !== undefined) {
+      obj.wpushChannel = message.wpushChannel;
+    }
+    if (message.wpushTopicCode !== undefined) {
+      obj.wpushTopicCode = message.wpushTopicCode;
     }
     return obj;
   },
@@ -4086,6 +4183,7 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     message.webhookMethod = object.webhookMethod ?? undefined;
     message.webhookContentType = object.webhookContentType ?? undefined;
     message.larkKey = object.larkKey ?? undefined;
+    message.larkSecret = object.larkSecret ?? undefined;
     message.ntfyUrl = object.ntfyUrl ?? undefined;
     message.ntfyTopic = object.ntfyTopic ?? undefined;
     message.ntfyPriority = object.ntfyPriority ?? undefined;
@@ -4096,6 +4194,10 @@ export const NotificationInfo: MessageFns<NotificationInfo> = {
     message.wxPusherBotAppToken = object.wxPusherBotAppToken ?? undefined;
     message.wxPusherBotTopicIds = object.wxPusherBotTopicIds ?? undefined;
     message.wxPusherBotUids = object.wxPusherBotUids ?? undefined;
+    message.wxPusherSptList = object.wxPusherSptList ?? undefined;
+    message.wpushApiKey = object.wpushApiKey ?? undefined;
+    message.wpushChannel = object.wpushChannel ?? undefined;
+    message.wpushTopicCode = object.wpushTopicCode ?? undefined;
     return message;
   },
 };

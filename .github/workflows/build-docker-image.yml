@@ -2,58 +2,531 @@ name: Build And Push Docker Image
 
 on:
   push:
-    paths-ignore:
-      - "*.md"
+    paths:
+      - "**"
+      - "!*.md"
+      # CLI is verified separately; its shared Bash upgrade engine ships in images.
+      - "!cli/**"
+      - "cli/src/internal/maintenance/upgradeArtifacts.cjs"
+      - "!.github/workflows/cli-package.yml"
     branches:
       - "master"
       - "develop"
     tags:
       - "v*"
-  schedule:
-    - cron: "00 20 * * *"
   workflow_dispatch:
+    inputs:
+      static_sync_only:
+        description: Synchronize an existing static snapshot to GitLab and verify Gitee
+        type: boolean
+        default: false
+      static_ref:
+        description: Static branch or version name, for example v2.22.0
+        type: string
+        default: ''
+      static_ref_type:
+        description: Synchronize a branch, or a version branch and Git tag
+        type: choice
+        options: [branch, tag]
+        default: branch
+
+permissions:
+  contents: read
 
 jobs:
-  code_gitlab:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: Yikun/hub-mirror-action@master
-        with:
-          src: github/whyour
-          dst: gitlab/whyour
-          dst_key: ${{ secrets.GITLAB_SSH_PK }}
-          dst_token: ${{ secrets.GITLAB_TOKEN }}
-          static_list: "qinglong"
-          force_update: true
+  validate:
+    if: ${{ !inputs.static_sync_only }}
+    uses: ./.github/workflows/validate.yml
 
-  code_gitee:
+  code_gitlab:
+    if: ${{ !inputs.static_sync_only }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: Yikun/hub-mirror-action@master
-        with:
-          src: github/whyour
-          dst: gitee/whyour
-          dst_key: ${{ secrets.GITLAB_SSH_PK }}
-          dst_token: ${{ secrets.GITEE_TOKEN }}
-          static_list: "qinglong"
-          force_update: true
+      - name: Push to GitLab
+        run: |
+          set +e
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.GITLAB_SSH_PK }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -T 10 gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
+          git remote add gitlab git@gitlab.com:whyour/qinglong.git 2>/dev/null
+          git push --force --all gitlab 2>&1 || echo "::warning::GitLab push failed"
+          git push --force --tags gitlab 2>&1 || echo "::warning::GitLab tags push failed"
 
   build-static:
+    if: ${{ !inputs.static_sync_only }}
+    needs: validate
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "8.3.1"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: build front and back
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:front
+          pnpm build:back
+          pnpm build:info
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
+          if-no-files-found: error
+          include-hidden-files: true
+
+      - name: copy to static repo
+        env:
+          GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
+          GITHUB_BRANCH: ${{ github.ref_name }}
+          GITHUB_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          bash scripts/publish-static.sh "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" "$GITHUB_BRANCH" "$GITHUB_REF_TYPE"
+
+  static_gitlab:
+    needs: build-static
+    runs-on: ubuntu-latest
+    concurrency:
+      group: static-gitlab-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - name: Push qinglong-static to GitLab
+        env:
+          STATIC_BRANCH: ${{ github.ref_name }}
+          STATIC_REF_TYPE: ${{ github.ref_type }}
+          MIRROR_SSH_KEY: ${{ secrets.GITLAB_SSH_PK }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$MIRROR_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -T 10 gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
+          bash scripts/sync-static.sh git@gitlab.com:whyour/qinglong-static.git "$STATIC_BRANCH" "$STATIC_REF_TYPE"
+
+  verify-gitee-mirrors:
+    needs: build-static
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        repository: [qinglong, qinglong-static]
+    steps:
+      - uses: actions/checkout@v6
+      # Gitee Pull mirrors and GitHub push webhooks own synchronization.
+      # Verification runs alongside Docker builds and needs no Gitee credentials.
+      - name: Wait for Gitee Pull mirror
+        if: ${{ matrix.repository == 'qinglong' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QL_MIRROR_NOTIFY_REPO: whyour/qinglong
+          MIRROR_REPOSITORY: ${{ matrix.repository }}
+          MIRROR_REF: ${{ github.ref_name }}
+          MIRROR_REF_TYPE: ${{ github.ref_type }}
+          QL_MIRROR_INCLUDE_VERSION_BRANCH: ${{ matrix.repository == 'qinglong-static' }}
+          QL_MIRROR_NOTIFY_ON_START: 'false'
+        run: |
+          bash scripts/wait-for-mirror.sh "https://github.com/whyour/$MIRROR_REPOSITORY.git" "https://gitee.com/whyour/$MIRROR_REPOSITORY.git" "$MIRROR_REF" "$MIRROR_REF_TYPE"
+      - name: Notify and wait for Gitee static mirror
+        if: ${{ matrix.repository == 'qinglong-static' }}
+        env:
+          GH_TOKEN: ${{ secrets.API_TOKEN }}
+          QL_MIRROR_NOTIFY_REPO: whyour/qinglong-static
+          MIRROR_REF: ${{ github.ref_name }}
+          MIRROR_REF_TYPE: ${{ github.ref_type }}
+          QL_MIRROR_INCLUDE_VERSION_BRANCH: 'true'
+        run: |
+          bash scripts/wait-for-mirror.sh https://github.com/whyour/qinglong-static.git https://gitee.com/whyour/qinglong-static.git "$MIRROR_REF" "$MIRROR_REF_TYPE"
+
+  sync-existing-static:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.static_sync_only }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mirror: [gitlab]
+    concurrency:
+      group: static-${{ matrix.mirror }}-${{ inputs.static_ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - name: Synchronize existing static snapshot
+        env:
+          STATIC_REF: ${{ inputs.static_ref }}
+          STATIC_REF_TYPE: ${{ inputs.static_ref_type }}
+          MIRROR_HOST: ${{ matrix.mirror }}.com
+          MIRROR_SSH_KEY: ${{ secrets.GITLAB_SSH_PK }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$MIRROR_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -T 10 "$MIRROR_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          bash scripts/sync-static.sh "git@$MIRROR_HOST:whyour/qinglong-static.git" "$STATIC_REF" "$STATIC_REF_TYPE"
+
+  verify-existing-static-gitee:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.static_sync_only }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v6
+      - name: Wait for existing Gitee static snapshot
+        env:
+          GH_TOKEN: ${{ secrets.API_TOKEN }}
+          QL_MIRROR_NOTIFY_REPO: whyour/qinglong-static
+          MIRROR_REF: ${{ inputs.static_ref }}
+          MIRROR_REF_TYPE: ${{ inputs.static_ref_type }}
+          QL_MIRROR_INCLUDE_VERSION_BRANCH: 'true'
+        run: |
+          bash scripts/wait-for-mirror.sh https://github.com/whyour/qinglong-static.git https://gitee.com/whyour/qinglong-static.git "$MIRROR_REF" "$MIRROR_REF_TYPE"
+
+  build-alpine:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    needs: build-static
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "8.3.1"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Read version from version.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup timezone
+        run: sudo timedatectl set-timezone Asia/Shanghai
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ${{ github.repository }}
+            ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch,enable=${{ github.ref == format('refs/heads/{0}', 'develop') }}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=semver,pattern={{version}}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push (Alpine)
+        uses: docker/build-push-action@v7
+        with:
+          build-args: |
+            QL_MAINTAINER=${{ github.repository_owner }}
+            QL_BRANCH=${{ github.ref_name }}
+            SOURCE_COMMIT=${{ github.sha }}
+          network: host
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=whyour/qinglong:cache-alpine
+          cache-to: type=registry,ref=whyour/qinglong:cache-alpine,mode=max
+
+  build-debian:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    needs: build-static
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "8.3.1"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Read version from version.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup timezone
+        run: sudo timedatectl set-timezone Asia/Shanghai
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ${{ github.repository }}
+            ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=debian-dev,enable=${{ github.ref == format('refs/heads/{0}', 'develop') }}
+            type=raw,value=debian,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=raw,value=${{ steps.version.outputs.version }}-debian,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push (Debian)
+        uses: docker/build-push-action@v7
+        with:
+          build-args: |
+            QL_MAINTAINER=${{ github.repository_owner }}
+            QL_BRANCH=${{ github.ref_name }}
+            SOURCE_COMMIT=${{ github.sha }}
+          network: host
+          # Keep s390x on Debian: npm can hang under QEMU with Alpine (nodejs/docker-node#1973).
+          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
+          context: .
+          file: ./docker/Dockerfile.debian
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=whyour/qinglong:cache-debian
+          cache-to: type=registry,ref=whyour/qinglong:cache-debian,mode=max
+
+  build-alpine310:
+    if: ${{ github.ref_name == 'master' }}
+    needs: build-static
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "8.3.1"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Read version from version.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup timezone
+        run: sudo timedatectl set-timezone Asia/Shanghai
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push (Alpine Python 3.10)
+        uses: docker/build-push-action@v7
+        with:
+          build-args: |
+            QL_MAINTAINER=${{ github.repository_owner }}
+            QL_BRANCH=${{ github.ref_name }}
+            SOURCE_COMMIT=${{ github.sha }}
+          network: host
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          context: .
+          file: ./docker/Dockerfile.310
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: |
+            whyour/qinglong:python3.10
+            whyour/qinglong:${{ steps.version.outputs.version }}-python3.10
+          cache-from: type=registry,ref=whyour/qinglong:cache-alpine-python3.10
+          cache-to: type=registry,ref=whyour/qinglong:cache-alpine-python3.10,mode=max
+
+  build-debian310:
+    if: ${{ github.ref_name == 'master' }}
+    needs: build-static
+    runs-on: ubuntu-22.04
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-static-${{ github.sha }}
+          path: static/
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "8.3.1"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Read version from version.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' version.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup timezone
+        run: sudo timedatectl set-timezone Asia/Shanghai
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push (Debian Python 3.10)
+        uses: docker/build-push-action@v7
+        with:
+          build-args: |
+            QL_MAINTAINER=${{ github.repository_owner }}
+            QL_BRANCH=${{ github.ref_name }}
+            SOURCE_COMMIT=${{ github.sha }}
+          network: host
+          # Keep s390x on Debian: npm can hang under QEMU with Alpine (nodejs/docker-node#1973).
+          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
+          context: .
+          file: ./docker/Dockerfile.debian310
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: |
+            whyour/qinglong:debian-python3.10
+            whyour/qinglong:${{ steps.version.outputs.version }}-debian-python3.10
+          cache-from: type=registry,ref=whyour/qinglong:cache-debian-python3.10
+          cache-to: type=registry,ref=whyour/qinglong:cache-debian-python3.10,mode=max
+
+  publish:
+    if: ${{ github.repository == 'whyour/qinglong' && github.ref == 'refs/heads/master' }}
+    needs: [build-alpine, build-debian, build-alpine310, build-debian310]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v3
         with:
           version: "8.3.1"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v3
         with:
+          node-version: "20"
           cache: "pnpm"
 
       - name: build front and back
@@ -62,202 +535,25 @@ jobs:
           pnpm build:front
           pnpm build:back
 
-      - name: copy to static repo
-        env:
-          GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
-          GITHUB_BRANCH: ${{ github.ref_name }}
-          REPO_GITEE: git@gitee.com:whyour/qinglong-static.git
-          REPO_GITLAB: git@gitlab.com:whyour/qinglong-static.git
-          PRIVATE_KEY: ${{ secrets.GITLAB_SSH_PK }}
+      - name: Set up Node for trusted publishing
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Publish npm package with OIDC
+        shell: bash
         run: |
-          mkdir -p tmp
-          cd ./tmp
-          cp -rf ../static/* ./
-          git init -b ${GITHUB_BRANCH} && git add .
-          git config --local user.name 'github-actions[bot]'
-          git config --local user.email 'github-actions[bot]@users.noreply.github.com'
-          git commit --allow-empty -m "copy static at $(date +'%Y-%m-%d %H:%M:%S')"
-          git push --force --quiet "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" ${GITHUB_BRANCH}:${GITHUB_BRANCH}
-  
-  static_gitlab:
-    needs: build-static
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: Yikun/hub-mirror-action@master
-        with:
-          src: github/whyour
-          dst: gitlab/whyour
-          dst_key: ${{ secrets.GITLAB_SSH_PK }}
-          dst_token: ${{ secrets.GITLAB_TOKEN }}
-          static_list: "qinglong-static"
-          force_update: true
-
-  static_gitee:
-    needs: build-static
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: Yikun/hub-mirror-action@master
-        with:
-          src: github/whyour
-          dst: gitee/whyour
-          dst_key: ${{ secrets.GITLAB_SSH_PK }}
-          dst_token: ${{ secrets.GITEE_TOKEN }}
-          static_list: "qinglong-static"
-          force_update: true
-
-  build:
-    needs: build-static
-
-    runs-on: ubuntu-22.04
-
-    permissions:
-      packages: write
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: "8.3.1"
-      - uses: actions/setup-node@v4
-        with:
-          cache: "pnpm"
-
-      - name: Setup timezone
-        uses: szenius/set-timezone@v2.0
-        with:
-          timezoneLinux: Asia/Shanghai
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ github.repository }}
-            ghcr.io/${{ github.repository }}
-          # generate Docker tags based on the following events/attributes
-          #   nightly, master, pr-2, 1.2.3, 1.2, 1
-          flavor: |
-            latest=false
-          tags: |
-            type=schedule,pattern=nightly
-            type=edge
-            type=ref,event=pr
-            type=ref,event=branch,enable=${{ github.ref != format('refs/heads/{0}', 'master') }}
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push
-        id: docker_build
-        uses: docker/build-push-action@v6
-        with:
-          build-args: |
-            MAINTAINER=${{ github.repository_owner }}
-            QL_BRANCH=${{ github.ref_name }}
-            SOURCE_COMMIT=${{ github.sha }}
-          network: host
-          # linux/s390x npm 暂不可用
-          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/386
-          context: .
-          file: ./docker/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=whyour/qinglong:cache
-          cache-to: type=registry,ref=whyour/qinglong:cache,mode=max
-
-      - name: Image digest
-        run: |
-          echo ${{ steps.docker_build.outputs.digest }}
-
-  build310:
-    if: ${{ github.ref_name == 'master' }}
-    needs: build-static
-
-    runs-on: ubuntu-22.04
-
-    permissions:
-      packages: write
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: "8.3.1"
-      - uses: actions/setup-node@v4
-        with:
-          cache: "pnpm"
-
-      - name: Setup timezone
-        uses: szenius/set-timezone@v2.0
-        with:
-          timezoneLinux: Asia/Shanghai
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push python3.10
-        id: docker_build_310
-        uses: docker/build-push-action@v6
-        with:
-          build-args: |
-            MAINTAINER=${{ github.repository_owner }}
-            QL_BRANCH=${{ github.ref_name }}
-            SOURCE_COMMIT=${{ github.sha }}
-          network: host
-          # linux/s390x npm 暂不可用
-          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/386
-          context: .
-          file: ./docker/310.Dockerfile
-          push: true
-          tags: whyour/qinglong:python3.10
-          cache-from: type=registry,ref=whyour/qinglong:cache-python3.10
-          cache-to: type=registry,ref=whyour/qinglong:cache-python3.10,mode=max
-
-      - name: Image digest
-        run: |
-          echo ${{ steps.docker_build_310.outputs.digest }}
+          set -euo pipefail
+          name=$(node -p 'require("./package.json").name')
+          version=$(node -p 'require("./package.json").version')
+          if npm view "$name@$version" version --json --registry=https://registry.npmjs.org > "$RUNNER_TEMP/npm-version.json" 2> "$RUNNER_TEMP/npm-version-error.log"; then
+            jq -e --arg version "$version" '. == $version' "$RUNNER_TEMP/npm-version.json" > /dev/null
+            echo "::notice::$name@$version is already published; skipping npm publication for this image rebuild."
+          elif jq -e '.error.code == "E404"' "$RUNNER_TEMP/npm-version.json" > /dev/null; then
+            npm publish --access public --registry=https://registry.npmjs.org
+          else
+            echo '::error::Could not check the published npm version; refusing to publish.'
+            exit 1
+          fi

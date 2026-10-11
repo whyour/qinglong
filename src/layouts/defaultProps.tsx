@@ -1,5 +1,9 @@
 import intl from 'react-intl-universal';
-import { SettingOutlined, ApartmentOutlined } from '@ant-design/icons';
+import {
+  SettingOutlined,
+  DashboardOutlined,
+  ApartmentOutlined,
+} from '@ant-design/icons';
 import IconFont from '@/components/iconfont';
 import { BasicLayoutProps } from '@ant-design/pro-layout';
 
@@ -25,6 +29,12 @@ export default {
         component: '@/pages/error/index',
       },
       {
+        path: '/dashboard',
+        name: intl.get('仪表盘'),
+        icon: <DashboardOutlined />,
+        component: '@/pages/dashboard/index',
+      },
+      {
         path: '/crontab',
         name: intl.get('定时任务'),
         icon: <IconFont type="ql-icon-crontab" />,
@@ -35,12 +45,6 @@ export default {
         name: intl.get('订阅管理'),
         icon: <IconFont type="ql-icon-subs" />,
         component: '@/pages/subscription/index',
-      },
-      {
-        path: '/scenario',
-        name: intl.get('场景管理'),
-        icon: <ApartmentOutlined />,
-        component: '@/pages/scenario/index',
       },
       {
         path: '/env',
@@ -77,6 +81,12 @@ export default {
         name: intl.get('对比工具'),
         icon: <IconFont type="ql-icon-diff" />,
         component: '@/pages/diff/index',
+      },
+      {
+        path: '/scenario',
+        name: intl.get('场景管理'),
+        icon: <ApartmentOutlined />,
+        component: '@/pages/scenario/index',
       },
       {
         path: '/setting',

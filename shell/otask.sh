@@ -24,7 +24,13 @@ random_delay() {
     done
 
     local delay_second=$(($(gen_random_num "$random_delay_max") + 1))
-    echo -e "任务随机延迟 $delay_second 秒，配置文件参数 RandomDelay 置空可取消延迟 \n"
+    local start_time
+    if [[ $is_macos -eq 1 ]]; then
+      start_time=$(date -v "+${delay_second}S" "+%Y-%m-%d %H:%M:%S")
+    else
+      start_time=$(date -d "+${delay_second} seconds" "+%Y-%m-%d %H:%M:%S")
+    fi
+    t '任务随机延迟 %s 秒，将于 %s 开始，配置文件参数 RandomDelay 置空可取消延迟\n' "$delay_second" "$start_time"
     sleep $delay_second
   fi
 }
@@ -78,8 +84,71 @@ env_str_to_array() {
 }
 
 clear_non_sh_env() {
-  if [[ $file_param != *.sh ]]; then
+  # Only automatic Node/Python preloads reconstruct the generated environment.
+  # Explicit interpreters and other commands must keep the shell-loaded values.
+  if [[ $isJsOrPythonFile == 'true' ]]; then
     clear_env
+  fi
+}
+
+append_node_dependency_path() {
+  export PREV_NODE_PATH="${NODE_PATH:=}"
+
+  # 用户依赖目录加入 NODE_PATH，替代 symlink 到 node_modules 的方式
+  export NODE_PATH="${NODE_PATH:+${NODE_PATH}:}${dir_dep}"
+
+  local pnpm_global_path
+  if [[ -f "$dir_shell/node_path_cache.sh" ]]; then
+    . "$dir_shell/node_path_cache.sh"
+    pnpm_global_path=$(ql_get_node_global_path) || true
+  else
+    pnpm_global_path=$(pnpm root -g 2>/dev/null) || true
+  fi
+  if [[ -n "$pnpm_global_path" ]]; then
+    export QL_NODE_GLOBAL_PATH="$pnpm_global_path"
+    export NODE_PATH="${NODE_PATH:+${NODE_PATH}:}${pnpm_global_path}"
+  fi
+}
+
+enter_script_workdir() {
+  local use_dot_prefix="$1"
+
+  # 如果定时任务显式指定了工作目录，优先使用
+  if [[ -n "${work_dir:=}" ]]; then
+    local _target_dir
+    if [[ "${work_dir}" == /* ]]; then
+      _target_dir="${work_dir}"
+    else
+      _target_dir="${dir_scripts}/${work_dir}"
+    fi
+    if [[ -d "${_target_dir}" ]]; then
+      cd "${_target_dir}"
+      if [[ ${file_param} =~ "/" ]]; then
+        local script_name="${file_param##*/}"
+        if [[ "${use_dot_prefix}" == "true" ]]; then
+          file_param="./${script_name}"
+        else
+          file_param="${script_name}"
+        fi
+      fi
+      return
+    fi
+    t '警告：工作目录不存在 %s' "${_target_dir}"
+  fi
+
+  cd $dir_scripts
+  if [[ ${file_param} =~ "/" ]]; then
+    local script_dir="${file_param%/*}"
+    local script_name="${file_param##*/}"
+
+    if [[ -d ${script_dir} ]]; then
+      cd ${script_dir}
+      if [[ "${use_dot_prefix}" == "true" ]]; then
+        file_param="./${script_name}"
+      else
+        file_param="${script_name}"
+      fi
+    fi
   fi
 }
 
@@ -90,17 +159,12 @@ run_normal() {
     random_delay "$file_param"
   fi
 
-  cd $dir_scripts
-  local relative_path="${file_param%/*}"
-  if [[ ${file_param} != /* ]] && [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
-    cd ${relative_path}
-    file_param=${file_param/$relative_path\//}
-  fi
+  enter_script_workdir
 
   if [[ $isJsOrPythonFile == 'false' ]]; then
     clear_non_sh_env
   fi
-  $timeoutCmd $which_program $file_param "${script_params[@]}"
+  run_task_command $which_program $file_param "${script_params[@]}"
 }
 
 handle_env_split() {
@@ -120,7 +184,7 @@ run_concurrent() {
   local env_param="$2"
   local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
   if [[ ! $env_param ]]; then
-    echo -e "\n 缺少并发运行的环境变量参数"
+    t '\n缺少并发运行的环境变量参数'
     exit 1
   fi
 
@@ -128,12 +192,7 @@ run_concurrent() {
   time=$(date "+$mtime_format")
   single_log_time=$(format_log_time "$mtime_format" "$time")
 
-  cd $dir_scripts
-  local relative_path="${file_param%/*}"
-  if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
-    cd ${relative_path}
-    file_param=${file_param/$relative_path\//}
-  fi
+  enter_script_workdir
 
   local j=0
   for i in ${array_run[@]}; do
@@ -144,7 +203,7 @@ run_concurrent() {
       export "${env_param}=${array[$i - 1]}"
       clear_non_sh_env
     fi
-    eval envParam="${env_param}" numParam="${i}" $timeoutCmd $which_program $file_param "${script_params[@]}" &>$single_log_path &
+    eval envParam="${env_param}" numParam="${i}" run_task_command $which_program $file_param "${script_params[@]}" &>$single_log_path &
   done
 
   wait
@@ -162,7 +221,7 @@ run_designated() {
   local env_param="$2"
   local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
   if [[ ! $env_param ]]; then
-    echo -e "\n 缺少单独运行的参数 task xxx.js desi Test"
+    t '\n缺少单独运行的参数 task xxx.js desi Test'
     exit 1
   fi
 
@@ -182,31 +241,65 @@ run_designated() {
     clear_non_sh_env
   fi
 
-  cd $dir_scripts
-  local relative_path="${file_param%/*}"
-  if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
-    cd ${relative_path}
-    file_param=${file_param/$relative_path\//}
-  fi
+  enter_script_workdir
 
-  envParam="${env_param}" numParam="${num_param}" $timeoutCmd $which_program $file_param "${script_params[@]}"
+  envParam="${env_param}" numParam="${num_param}" run_task_command $which_program $file_param "${script_params[@]}"
 }
 
 ## 运行其他命令
 run_else() {
   local file_param="$1"
 
-  cd $dir_scripts
-  local relative_path="${file_param%/*}"
-  if [[ ! -z ${relative_path} ]] && [[ ${file_param} =~ "/" ]]; then
-    cd ${relative_path}
-    file_param=${file_param/$relative_path\//.\/}
+  # 判断 file_param 本身是否是脚本文件
+  local is_file_script="false"
+  if [[ "$file_param" == *.js || "$file_param" == *.mjs ||
+        "$file_param" == *.py || "$file_param" == *.pyc ||
+        "$file_param" == *.sh || "$file_param" == *.ts ]]; then
+    is_file_script="true"
   fi
 
-  shift
+  if [[ "$is_file_script" != "true" ]]; then
+    # file_param 不是脚本，从后续参数中查找脚本路径来确定工作目录
+    local script_for_dir=""
+    for arg in "$@"; do
+      if [[ "$arg" == *.js || "$arg" == *.mjs ||
+            "$arg" == *.py || "$arg" == *.pyc ||
+            "$arg" == *.sh || "$arg" == *.ts ]]; then
+        script_for_dir="$arg"
+        break
+      fi
+    done
+
+    if [[ -n "$script_for_dir" ]]; then
+      local saved_file_param="$file_param"
+      file_param="$script_for_dir"
+      enter_script_workdir true
+      local adjusted_script="$file_param"
+      file_param="$saved_file_param"
+
+      shift
+      local new_args=()
+      for arg in "$@"; do
+        if [[ "$arg" == "$script_for_dir" ]]; then
+          new_args+=("$adjusted_script")
+        else
+          new_args+=("$arg")
+        fi
+      done
+      set -- "${new_args[@]}"
+    else
+      # 没有找到脚本参数，只 cd 到 scripts 目录
+      enter_script_workdir true
+      shift
+    fi
+  else
+    # file_param 本身就是脚本，直接用 enter_script_workdir 处理
+    enter_script_workdir true
+    shift
+  fi
 
   clear_non_sh_env
-  $timeoutCmd $which_program $file_param "$@"
+  run_task_command $which_program $file_param "$@"
 }
 
 check_file() {
@@ -242,11 +335,7 @@ check_nounset() {
 }
 
 main() {
-  if [[ $1 == *.js ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
-    if [[ $1 == *.sh ]]; then
-      timeoutCmd=""
-    fi
-
+  if [[ $1 == *.js ]] || [[ $1 == *.mjs ]] || [[ $1 == *.py ]] || [[ $1 == *.pyc ]] || [[ $1 == *.sh ]] || [[ $1 == *.ts ]]; then
     case $# in
     1)
       run_normal "$1"
@@ -278,15 +367,19 @@ main() {
 
 handle_task_start "${task_shell_params[@]}"
 check_file "${task_shell_params[@]}"
+append_node_dependency_path
 if [[ $isJsOrPythonFile == 'false' ]]; then
   run_task_before "${task_shell_params[@]}"
 fi
 set_u_on="false"
 check_nounset
 main "${task_shell_params[@]}"
+_task_exit_code=$?
 if [[ "$set_u_on" == 'true' ]]; then
   set -u
 fi
+export NODE_PATH="${PREV_NODE_PATH}"
+unset QL_NODE_GLOBAL_PATH
 if [[ $isJsOrPythonFile == 'true' ]]; then
   export NODE_OPTIONS="${PREV_NODE_OPTIONS}"
   export PYTHONPATH="${PREV_PYTHONPATH}"

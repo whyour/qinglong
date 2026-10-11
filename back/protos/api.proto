@@ -151,6 +151,8 @@ enum NotificationMode {
   chronocat = 18;
   ntfy = 19;
   wxPusherBot = 20;
+  wxPusherSpt = 21;
+  wpush = 22;
 }
 
 message NotificationInfo {
@@ -231,6 +233,7 @@ message NotificationInfo {
   optional string webhookContentType = 57;
 
   optional string larkKey = 58;
+  optional string larkSecret = 69;
 
   optional string ntfyUrl = 59;
   optional string ntfyTopic = 60;
@@ -243,6 +246,12 @@ message NotificationInfo {
   optional string wxPusherBotAppToken = 66;
   optional string wxPusherBotTopicIds = 67;
   optional string wxPusherBotUids = 68;
+
+  optional string wxPusherSptList = 70;
+
+  optional string wpushApiKey = 71;
+  optional string wpushChannel = 72;
+  optional string wpushTopicCode = 73;
 }
 
 message SystemNotifyRequest {

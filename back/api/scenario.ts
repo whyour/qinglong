@@ -13,8 +13,8 @@ export default (app: Router) => {
     celebrate({
       query: Joi.object({
         searchValue: Joi.string().optional().allow(''),
-        page: Joi.number().optional(),
-        size: Joi.number().optional(),
+        page: Joi.number().integer().min(1).default(1),
+        size: Joi.number().integer().min(1).max(200).default(50),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -37,10 +37,27 @@ export default (app: Router) => {
     '/',
     celebrate({
       body: Joi.object({
-        name: Joi.string().required(),
-        description: Joi.string().optional().allow(''),
-        workflowGraph: Joi.object().optional(),
-        status: Joi.number().optional(),
+        name: Joi.string().trim().max(255).required(),
+        description: Joi.string().max(8192).optional().allow(''),
+        workflowGraph: Joi.object({
+          nodes: Joi.array()
+            .max(500)
+            .required()
+            .items(
+              Joi.object({
+                id: Joi.string().max(255).required(),
+                type: Joi.string().max(100).required(),
+              }).unknown(true),
+            ),
+        })
+          .unknown(true)
+          .custom((graph, helpers) => {
+            return Buffer.byteLength(JSON.stringify(graph)) <= 1024 * 1024
+              ? graph
+              : helpers.error('any.invalid');
+          })
+          .optional(),
+        status: Joi.number().valid(0, 1).optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -58,11 +75,28 @@ export default (app: Router) => {
     '/',
     celebrate({
       body: Joi.object({
-        id: Joi.number().required(),
-        name: Joi.string().required(),
-        description: Joi.string().optional().allow(''),
-        workflowGraph: Joi.object().optional(),
-        status: Joi.number().optional(),
+        id: Joi.number().integer().positive().required(),
+        name: Joi.string().trim().max(255).required(),
+        description: Joi.string().max(8192).optional().allow(''),
+        workflowGraph: Joi.object({
+          nodes: Joi.array()
+            .max(500)
+            .required()
+            .items(
+              Joi.object({
+                id: Joi.string().max(255).required(),
+                type: Joi.string().max(100).required(),
+              }).unknown(true),
+            ),
+        })
+          .unknown(true)
+          .custom((graph, helpers) => {
+            return Buffer.byteLength(JSON.stringify(graph)) <= 1024 * 1024
+              ? graph
+              : helpers.error('any.invalid');
+          })
+          .optional(),
+        status: Joi.number().valid(0, 1).optional(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -79,7 +113,12 @@ export default (app: Router) => {
   route.delete(
     '/',
     celebrate({
-      body: Joi.array().items(Joi.number().required()),
+      body: Joi.array()
+        .min(1)
+        .max(200)
+        .unique()
+        .required()
+        .items(Joi.number().integer().positive().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -95,7 +134,12 @@ export default (app: Router) => {
   route.put(
     '/disable',
     celebrate({
-      body: Joi.array().items(Joi.number().required()),
+      body: Joi.array()
+        .min(1)
+        .max(200)
+        .unique()
+        .required()
+        .items(Joi.number().integer().positive().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -111,7 +155,12 @@ export default (app: Router) => {
   route.put(
     '/enable',
     celebrate({
-      body: Joi.array().items(Joi.number().required()),
+      body: Joi.array()
+        .min(1)
+        .max(200)
+        .unique()
+        .required()
+        .items(Joi.number().integer().positive().required()),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
@@ -128,13 +177,15 @@ export default (app: Router) => {
     '/:id',
     celebrate({
       params: Joi.object({
-        id: Joi.number().required(),
+        id: Joi.number().integer().positive().required(),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const scenarioService = Container.get(ScenarioService);
-        const data = await scenarioService.getDb({ id: parseInt(req.params.id) });
+        const data = await scenarioService.getDb({
+          id: parseInt(req.params.id),
+        });
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);

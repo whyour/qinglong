@@ -13,6 +13,7 @@ export class Crontab {
   pid?: number;
   isDisabled?: 1 | 0;
   log_path?: string;
+  queued_token?: string | null;
   isPinned?: 1 | 0;
   labels?: string[];
   last_running_time?: number;
@@ -23,6 +24,7 @@ export class Crontab {
   task_after?: string;
   log_name?: string;
   allow_multiple_instances?: 1 | 0;
+  work_dir?: string;
 
   constructor(options: Crontab) {
     this.name = options.name;
@@ -49,14 +51,15 @@ export class Crontab {
     this.task_after = options.task_after;
     this.log_name = options.log_name;
     this.allow_multiple_instances = options.allow_multiple_instances || 0;
+    this.work_dir = options.work_dir;
   }
 }
 
 export enum CrontabStatus {
   'running' = 0,
-  'queued' = 0.5,
   'idle' = 1,
-  'disabled',
+  'disabled' = 2,
+  'queued' = 3,
 }
 
 export interface CronInstance extends Model<Crontab, Crontab>, Crontab {}
@@ -81,6 +84,7 @@ export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
   isDisabled: DataTypes.NUMBER,
   isPinned: DataTypes.NUMBER,
   log_path: DataTypes.STRING,
+  queued_token: DataTypes.STRING,
   labels: DataTypes.JSON,
   last_running_time: DataTypes.NUMBER,
   last_execution_time: DataTypes.NUMBER,
@@ -90,4 +94,5 @@ export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
   task_after: DataTypes.STRING,
   log_name: DataTypes.STRING,
   allow_multiple_instances: DataTypes.NUMBER,
+  work_dir: DataTypes.STRING,
 });

@@ -70,7 +70,7 @@ const NotificationSetting = ({ data }: any) => {
             key={x.label}
             label={x.label}
             name={x.label}
-            extra={x.tip}
+            extra={<span dangerouslySetInnerHTML={{ __html: x.tip }} />}
             rules={[{ required: x.required }]}
             style={{ maxWidth: 400 }}
           >

@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 
-import { usePlayground, usePlaygroundTools, useRefresh } from '@flowgram.ai/fixed-layout-editor';
+import {
+  usePlayground,
+  usePlaygroundTools,
+  useRefresh,
+} from '@flowgram.ai/fixed-layout-editor';
 import { Tooltip, Button } from 'antd';
 
 import { ZoomSelect } from './zoom-select';
@@ -22,7 +26,9 @@ export const DemoTools = () => {
   const refresh = useRefresh();
 
   useEffect(() => {
-    const disposable = playground.config.onReadonlyOrDisabledChange(() => refresh());
+    const disposable = playground.config.onReadonlyOrDisabledChange(() =>
+      refresh(),
+    );
     return () => disposable.dispose();
   }, [playground]);
 
@@ -33,7 +39,10 @@ export const DemoTools = () => {
         <SwitchVertical />
         <ZoomSelect />
         <FitView fitView={tools.fitView} />
-        <MinimapSwitch minimapVisible={minimapVisible} setMinimapVisible={setMinimapVisible} />
+        <MinimapSwitch
+          minimapVisible={minimapVisible}
+          setMinimapVisible={setMinimapVisible}
+        />
         <Minimap visible={minimapVisible} />
         <Readonly />
         <Tooltip title="Undo">
@@ -50,8 +59,6 @@ export const DemoTools = () => {
             onClick={() => tools.redo()}
           />
         </Tooltip>
-        <Save disabled={playground.config.readonly} />
-        <Run />
       </ToolSection>
     </ToolContainer>
   );

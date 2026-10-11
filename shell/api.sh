@@ -10,16 +10,61 @@ create_token() {
 }
 
 get_token() {
-  if [[ -f $file_auth_token ]]; then
-    __ql_token__=$(cat $file_auth_token | jq -r .value)
-    local expiration=$(cat $file_auth_token | jq -r .expiration)
-    local currentTimeStamp=$(date +%s)
-    if [[ $currentTimeStamp -ge $expiration ]]; then
-      create_token
+  local token_data expiration token_value
+  local currentTimeStamp=${EPOCHSECONDS:-$(date +%s)}
+  if [[ -f "$file_auth_token" ]] && token_data=$(jq -er \
+    'select((.expiration | type) == "number" and (.value | type) == "string" and (.value | length) > 0 and (.value | test("[\r\n]") | not)) | .expiration, .value' \
+    "$file_auth_token" 2>/dev/null); then
+    expiration=${token_data%%$'\n'*}
+    token_value=${token_data#*$'\n'}
+    if [[ "$expiration" =~ ^[1-9][0-9]{0,10}$ && -n "$token_value" && "$token_value" != *$'\n'* && "$token_value" != *$'\r'* ]] && \
+      (( currentTimeStamp < expiration )); then
+      __ql_token__=$token_value
+      return 0
     fi
-  else
-    create_token
   fi
+  create_token
+}
+
+# Check the cached token before every authenticated API request. A rejected
+# token is refreshed and retried once; other failures are never retried.
+# Arguments are curl options, including the URL, method and optional body.
+ql_api_request() {
+  local api=""
+  local attempt
+  get_token || return $?
+  for attempt in 1 2; do
+    api=$(curl -s --noproxy "*" \
+      -H "Authorization: Bearer ${__ql_token__}" \
+      -H "Content-Type: application/json;charset=UTF-8" \
+      "$@" \
+      --compressed)
+    if [[ "$attempt" == 2 || "$api" == '{"code":200}' ]] ||
+      [[ "$(jq -r '.code' <<< "$api" 2>/dev/null)" != 401 ]]; then
+      break
+    fi
+    create_token || return $?
+  done
+  printf '%s' "$api"
+}
+
+# Read the status response once; preserve multiline error messages and the
+# legacy code/message variables used by the shell API callers.
+ql_parse_status_response() {
+  # Both task status and statistics endpoints normally return this exact body.
+  # Match the whole document; all other JSON and malformed responses still
+  # use jq. Keep its missing-message result for existing callers.
+  if [[ "$1" == '{"code":200}' ]]; then
+    code=200
+    message=null
+    return 0
+  fi
+  local parsed
+  code=""
+  message=""
+  parsed=$(jq -r '.code, .message' <<< "$1") || return $?
+  code=${parsed%%$'\n'*}
+  message=${parsed#*$'\n'}
 }
 
 add_cron_api() {
@@ -40,19 +85,16 @@ add_cron_api() {
     sub_id="null"
   fi
 
-  local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:${ql_port}/open/crons?t=$currentTimeStamp" \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"sub_id\":$sub_id}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
+    --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"sub_id\":$sub_id}" \
+    -X POST)
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "$name -> 添加成功"
+    t '%s -> 添加成功' "$name"
   else
-    echo -e "$name -> 添加失败(${message})"
+    t '%s -> 添加失败(%s)' "$name" "$message"
   fi
 }
 
@@ -70,20 +112,16 @@ update_cron_api() {
     local id="$4"
   fi
 
-  local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:${ql_port}/open/crons?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"id\":\"$id\"}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"id\":\"$id\"}")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "$name -> 更新成功"
+    t '%s -> 更新成功' "$name"
   else
-    echo -e "$name -> 更新失败(${message})"
+    t '%s -> 更新失败(%s)' "$name" "$message"
   fi
 }
 
@@ -97,40 +135,32 @@ update_cron_command_api() {
     local id="$2"
   fi
 
-  local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:${ql_port}/open/crons?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"command\":\"${command//\"/\\\"}\",\"id\":\"$id\"}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "{\"command\":\"${command//\"/\\\"}\",\"id\":\"$id\"}")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "$command -> 更新成功"
+    t '%s -> 更新成功' "$command"
   else
-    echo -e "$command -> 更新失败(${message})"
+    t '%s -> 更新失败(%s)' "$command" "$message"
   fi
 }
 
 del_cron_api() {
   local ids="$1"
   local currentTimeStamp=$(date +%s)
-  local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:${ql_port}/open/crons?t=$currentTimeStamp" \
-      -X 'DELETE' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "[$ids]" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
+    -X DELETE \
+    --data-raw "[$ids]")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "成功"
+    t '成功'
   else
-    echo -e "失败(${message})"
+    t '失败(%s)' "$message"
   fi
 }
 
@@ -141,17 +171,18 @@ update_cron() {
   local logPath="$4"
   local lastExecutingTime="${5:-0}"
   local runningTime="${6:-0}"
-  local currentTimeStamp=$(date +%s)
-  local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:${ql_port}/open/crons/status?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime}" \
-      --compressed
-  )
-  code=$(echo "$api" | jq -r .code)
-  message=$(echo "$api" | jq -r .message)
+  local exitCode="${7:-}"
+  local currentTimeStamp=${EPOCHSECONDS:-$(date +%s)}
+  local dataRaw="{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime"
+  if [[ -n $exitCode ]]; then
+    dataRaw="${dataRaw},\"exit_code\":$exitCode"
+  fi
+  dataRaw="${dataRaw}}"
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons/status?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "$dataRaw")
+  ql_parse_status_response "$api" || true
   if [[ $code != 200 ]]; then
     if [[ ! $message ]]; then
       message="$api"
@@ -164,32 +195,25 @@ notify_api() {
   local title="$1"
   local content="$2"
   local currentTimeStamp=$(date +%s)
-  local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:${ql_port}/open/system/notify?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{\"title\":\"${title//\"/\\\"}\",\"content\":\"${content//\"/\\\"}\"}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/system/notify?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "{\"title\":\"${title//\"/\\\"}\",\"content\":\"${content//\"/\\\"}\"}")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "通知发送成功🎉"
+    t '通知发送成功🎉'
   else
-    echo -e "通知失败(${message})"
+    t '通知失败(%s)' "$message"
   fi
 }
 
 find_cron_api() {
   local params="$1"
   local currentTimeStamp=$(date +%s)
-  local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:${ql_port}/open/crons/detail?$params&t=$currentTimeStamp" \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/crons/detail?$params&t=$currentTimeStamp" \
+    -X GET)
   data=$(echo "$api" | jq -r .data)
   if [[ $data == 'null' ]]; then
     echo -e ""
@@ -203,21 +227,34 @@ update_auth_config() {
   local body="$1"
   local tip="$2"
   local currentTimeStamp=$(date +%s)
-  local api=$(
-    curl -s --noproxy "*" "http://0.0.0.0:${ql_port}/open/system/auth/reset?t=$currentTimeStamp" \
-      -X 'PUT' \
-      -H "Authorization: Bearer ${__ql_token__}" \
-      -H "Content-Type: application/json;charset=UTF-8" \
-      --data-raw "{$body}" \
-      --compressed
-  )
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port}/open/system/auth/reset?t=$currentTimeStamp" \
+    -X PUT \
+    --data-raw "{$body}")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
-    echo -e "${tip}成功🎉"
+    t '%s成功🎉' "$tip"
   else
-    echo -e "${tip}失败(${message})"
+    t '%s失败(%s)' "$tip" "$message"
   fi
 }
 
-get_token
+record_cron_stat() {
+  local ref_id="$1"
+  local exit_code="${2:-0}"
+  local elapsed="${3:-0}"
+  [[ $ref_id ]] && [[ $ref_id -gt 0 ]] 2>/dev/null || return
+
+  local api=$(ql_api_request \
+    "http://localhost:${ql_port:-5700}/open/dashboard/record" \
+    -X POST \
+    --data-raw "{\"ref_id\":$ref_id,\"code\":$exit_code,\"elapsed\":$elapsed}")
+  ql_parse_status_response "$api" || true
+  if [[ $code != 200 ]]; then
+    if [[ ! $message ]]; then
+      message="$api"
+    fi
+    echo -e "${message}"
+  fi
+}

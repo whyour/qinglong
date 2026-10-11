@@ -1,6 +1,40 @@
 const { execSync } = require('child_process');
+const Module = require('module');
+const path = require('path');
 const client = require('./client.js');
 require(`./env.js`);
+
+// 注册 ESM loader，使全局安装的包也可通过 import 导入
+try {
+  Module.register(new URL('esm-loader.mjs', `file://${__dirname}/`).href);
+} catch (_) {}
+
+function preferGlobalNodeModules() {
+  const { QL_NODE_GLOBAL_PATH } = process.env;
+  if (!QL_NODE_GLOBAL_PATH || Module._qlGlobalPathPatched) {
+    return;
+  }
+
+  const originalResolveFilename = Module._resolveFilename;
+  Module._resolveFilename = function (request, parent, isMain, options) {
+    if (
+      !Module.builtinModules.includes(request) &&
+      !request.startsWith('node:') &&
+      !request.startsWith('.') &&
+      !path.isAbsolute(request)
+    ) {
+      try {
+        return originalResolveFilename.call(this, request, parent, isMain, {
+          ...options,
+          paths: [QL_NODE_GLOBAL_PATH],
+        });
+      } catch (error) {}
+    }
+
+    return originalResolveFilename.call(this, request, parent, isMain, options);
+  };
+  Module._qlGlobalPathPatched = true;
+}
 
 function expandRange(rangeStr, max) {
   const tempRangeStr = rangeStr
@@ -64,7 +98,11 @@ function run() {
       const newEnvObject = JSON.parse(envStr);
       if (typeof newEnvObject === 'object' && newEnvObject !== null) {
         for (const key in newEnvObject) {
-          if (Object.prototype.hasOwnProperty.call(newEnvObject, key)) {
+          if (
+            Object.prototype.hasOwnProperty.call(newEnvObject, key) &&
+            key !== 'NODE_PATH' &&
+            key !== 'QL_NODE_GLOBAL_PATH'
+          ) {
             process.env[key] = newEnvObject[key];
           }
         }
@@ -113,15 +151,21 @@ try {
     return;
   }
 
+  preferGlobalNodeModules();
+
   process.on('SIGTERM', (code) => {
     process.exit(15);
   });
 
   run();
 
-  const { sendNotify } = require('./__ql_notify__.js');
   global.QLAPI = {
-    notify: sendNotify,
+    notify(...args) {
+      // Keep notification dependencies out of ordinary script startup.
+      // require caches the module after the first notification.
+      const { sendNotify } = require('./__ql_notify__.js');
+      return sendNotify.apply(this, args);
+    },
     ...client,
   };
 } catch (error) {

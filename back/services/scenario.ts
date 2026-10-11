@@ -36,8 +36,8 @@ export default class ScenarioService {
 
   public async list(
     searchText?: string,
-    page?: number,
-    size?: number,
+    page = 1,
+    size = 50,
   ): Promise<{ data: Scenario[]; total: number }> {
     const where: any = {};
     if (searchText) {
@@ -52,7 +52,7 @@ export default class ScenarioService {
       where,
       order: [['createdAt', 'DESC']],
       limit: size,
-      offset: page && size ? (page - 1) * size : undefined,
+      offset: (page - 1) * size,
     });
 
     return {
@@ -61,12 +61,14 @@ export default class ScenarioService {
     };
   }
 
-  public async getDb(
-    query: FindOptions<Scenario>['where'],
-  ): Promise<Scenario> {
+  public async getDb(query: FindOptions<Scenario>['where']): Promise<Scenario> {
     const doc: any = await ScenarioModel.findOne({ where: { ...query } });
     if (!doc) {
-      throw new Error(`Scenario ${JSON.stringify(query)} not found`);
+      const error = new Error('Scenario not found') as Error & {
+        status: number;
+      };
+      error.status = 404;
+      throw error;
     }
     return doc.get({ plain: true });
   }

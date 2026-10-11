@@ -1,3 +1,5 @@
+import { maybeSudo } from './container';
+
 export const LOG_END_SYMBOL = '　　　　　';
 
 export const TASK_COMMAND = 'task';
@@ -48,4 +50,41 @@ export const NotificationModeStringMap = {
   18: 'chronocat',
   19: 'ntfy',
   20: 'wxPusherBot',
+  21: 'wxPusherSpt',
+  22: 'wpush',
 } as const;
+
+export const LINUX_DEPENDENCE_COMMAND: Record<
+  'Debian' | 'Ubuntu' | 'Alpine',
+  {
+    install: string;
+    uninstall: string;
+    info: string;
+    check(info: string): boolean;
+  }
+> = {
+  Debian: {
+    install: maybeSudo('apt-get install -y'),
+    uninstall: maybeSudo('apt-get remove -y'),
+    info: maybeSudo('dpkg-query -s'),
+    check(info: string) {
+      return info.includes('install ok installed');
+    },
+  },
+  Ubuntu: {
+    install: maybeSudo('apt-get install -y'),
+    uninstall: maybeSudo('apt-get remove -y'),
+    info: maybeSudo('dpkg-query -s'),
+    check(info: string) {
+      return info.includes('install ok installed');
+    },
+  },
+  Alpine: {
+    install: 'apk add --no-check-certificate',
+    uninstall: 'apk del',
+    info: 'apk info -es',
+    check(info: string) {
+      return info.includes('installed');
+    },
+  },
+};

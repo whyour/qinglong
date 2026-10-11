@@ -16,7 +16,7 @@ export default (app: Router) => {
           searchValue: Joi.string().optional().allow(''),
           type: Joi.string().optional().allow(''),
           status: Joi.string().optional().allow(''),
-        }),
+        }).unknown(true),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');

@@ -5,11 +5,30 @@ import CronService from '../services/cron';
 import CronViewService from '../services/cronView';
 import { celebrate, Joi } from 'celebrate';
 import { commonCronSchema } from '../validation/schedule';
+import {
+  RunningInstanceModel,
+  InstanceStatus,
+} from '../data/runningInstance';
+import { t } from '../shared/i18n';
+import cronClient from '../schedule/client';
 
 const route = Router();
 
 export default (app: Router) => {
   app.use('/crons', route);
+
+  route.use(async (req, res, next) => {
+    // Keep stop/status callbacks available even when the scheduler is down.
+    if (['POST', 'PUT', 'DELETE'].includes(req.method) &&
+      ['/', '/run', '/enable', '/disable', '/views/enable', '/views/disable'].includes(req.path)) {
+      try {
+        await cronClient.readiness.ensureReady();
+      } catch (error) {
+        return next(error);
+      }
+    }
+    return next();
+  });
 
   route.get(
     '/views',
@@ -60,7 +79,7 @@ export default (app: Router) => {
       try {
         const cronViewService = Container.get(CronViewService);
         if (req.body.type === 1) {
-          return res.send({ code: 400, message: '参数错误' });
+          return res.send({ code: 400, message: t('参数错误') });
         } else {
           const data = await cronViewService.update(req.body);
           return res.send({ code: 200, data });
@@ -302,13 +321,35 @@ export default (app: Router) => {
       params: Joi.object({
         id: Joi.number().required(),
       }),
+      query: Joi.object({
+        offset: Joi.number().integer().min(0).optional(),
+        limit: Joi.number()
+          .integer()
+          .min(1)
+          .max(1024 * 1024)
+          .optional(),
+        tail: Joi.boolean().optional(),
+        t: Joi.string().optional(),
+      }).unknown(true),
     }),
     async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {
         const cronService = Container.get(CronService);
-        const data = await cronService.log(req.params.id);
-        return res.send({ code: 200, data });
+        const result = await cronService.log(req.params.id, {
+          offset: req.query.offset as unknown as number,
+          limit: req.query.limit as unknown as number,
+          tail: req.query.tail as unknown as boolean,
+        });
+        return res.send({
+          code: 200,
+          data: result.content,
+          logStatus: result.status,
+          offset: result.offset,
+          nextOffset: result.nextOffset,
+          total: result.total,
+          truncated: result.truncated,
+        });
       } catch (e) {
         return next(e);
       }
@@ -429,6 +470,7 @@ export default (app: Router) => {
         log_path: Joi.string().optional().allow(null),
         last_running_time: Joi.number().optional().allow(null),
         last_execution_time: Joi.number().optional().allow(null),
+        exit_code: Joi.number().optional().allow(null),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -440,6 +482,48 @@ export default (app: Router) => {
           pid: req.body.pid ? parseInt(req.body.pid) : undefined,
         });
         return res.send({ code: 200, data });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/:id/instances',
+    celebrate({
+      params: Joi.object({
+        id: Joi.number().required(),
+      }),
+    }),
+    async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
+      try {
+        const instances = await RunningInstanceModel.findAll({
+          where: {
+            cron_id: req.params.id,
+          },
+          order: [['started_at', 'DESC']],
+          raw: true,
+        });
+        return res.send({ code: 200, data: instances });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/:id/instances/:instanceId/stop',
+    celebrate({
+      params: Joi.object({
+        id: Joi.number().required(),
+        instanceId: Joi.number().required(),
+      }),
+    }),
+    async (req: Request<{ id: number; instanceId: number }>, res: Response, next: NextFunction) => {
+      try {
+        const cronService = Container.get(CronService);
+        const data = await cronService.stopInstance(req.params.instanceId);
+        return res.send(data);
       } catch (e) {
         return next(e);
       }
