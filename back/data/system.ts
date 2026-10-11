@@ -31,6 +31,8 @@ export enum AuthDataType {
 }
 
 export interface SystemConfigInfo {
+  lang?: string;
+  panelTitle?: string;
   logRemoveFrequency?: number;
   cronConcurrency?: number;
   dependenceProxy?: string;
@@ -39,6 +41,8 @@ export interface SystemConfigInfo {
   linuxMirror?: string;
   timezone?: string;
   globalSshKey?: string;
+  runningInstanceRetentionDays?: number;
+  cronStatRetentionDays?: number;
 }
 
 export interface LoginLogInfo {
@@ -71,11 +75,14 @@ export interface AuthInfo {
   lastaddr: string;
   platform: string;
   isTwoFactorChecking: boolean;
+  twoFactorExpiresAt?: number;
+  lastTwoFactorStep?: number;
   token: string;
   tokens: Record<string, string | TokenInfo[]>;
   twoFactorActivated: boolean;
   twoFactorSecret: string;
   avatar: string;
+  blockedIps?: string[];
 }
 
 export type SystemModelInfo = SystemConfigInfo &

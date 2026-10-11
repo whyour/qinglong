@@ -1,3 +1,5 @@
+import { maybeSudo } from './container';
+
 export const LOG_END_SYMBOL = '　　　　　';
 
 export const TASK_COMMAND = 'task';
@@ -49,6 +51,8 @@ export const NotificationModeStringMap = {
   18: 'chronocat',
   19: 'ntfy',
   20: 'wxPusherBot',
+  21: 'wxPusherSpt',
+  22: 'wpush',
 } as const;
 
 export const LINUX_DEPENDENCE_COMMAND: Record<
@@ -61,17 +65,17 @@ export const LINUX_DEPENDENCE_COMMAND: Record<
   }
 > = {
   Debian: {
-    install: 'sudo apt-get install -y',
-    uninstall: 'sudo apt-get remove -y',
-    info: 'sudo dpkg-query -s',
+    install: maybeSudo('apt-get install -y'),
+    uninstall: maybeSudo('apt-get remove -y'),
+    info: maybeSudo('dpkg-query -s'),
     check(info: string) {
       return info.includes('install ok installed');
     },
   },
   Ubuntu: {
-    install: 'sudo apt-get install -y',
-    uninstall: 'sudo apt-get remove -y',
-    info: 'sudo dpkg-query -s',
+    install: maybeSudo('apt-get install -y'),
+    uninstall: maybeSudo('apt-get remove -y'),
+    info: maybeSudo('dpkg-query -s'),
     check(info: string) {
       return info.includes('install ok installed');
     },

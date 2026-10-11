@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { Inject, Service } from 'typedi';
 import { parseBody, parseHeaders } from '../config/util';
 import { NotificationInfo } from '../data/notify';
+import { t } from '../shared/i18n';
 import UserService from './user';
 import { httpClient } from '../config/http';
 import { ProxyAgent } from 'undici';
@@ -34,7 +35,9 @@ export default class NotificationService {
     ['chronocat', this.chronocat],
     ['ntfy', this.ntfy],
     ['wxPusherBot', this.wxPusherBot],
+    ['wxPusherSpt', this.wxPusherSpt],
     ['openiLink', this.openiLink],
+    ['wpush', this.wpush],
   ]);
 
   private title = '';
@@ -364,7 +367,7 @@ export default class NotificationService {
           {
             title: `${this.title}`,
             thumb_media_id,
-            author: `智能助手`,
+            author: t('智能助手'),
             content_source_url: ``,
             content: `${this.content.replace(/\n/g, '<br/>')}`,
             digest: `${this.content}`,
@@ -380,7 +383,7 @@ export default class NotificationService {
             title: `${this.title}`,
             description: `${this.content}`,
             url: 'https://github.com/whyour/qinglong',
-            btntxt: '更多',
+            btntxt: t('更多'),
           },
         };
         break;
@@ -431,7 +434,7 @@ export default class NotificationService {
           roomName: `${aibotkName}`,
           message: {
             type: 1,
-            content: `【青龙快讯】\n\n${this.title}\n${this.content}`,
+            content: `【${t('青龙快讯')}】\n\n${this.title}\n${this.content}`,
           },
         };
         break;
@@ -442,7 +445,7 @@ export default class NotificationService {
           name: `${aibotkName}`,
           message: {
             type: 1,
-            content: `【青龙快讯】\n\n${this.title}\n${this.content}`,
+            content: `【${t('青龙快讯')}】\n\n${this.title}\n${this.content}`,
           },
         };
         break;
@@ -612,7 +615,7 @@ export default class NotificationService {
       });
 
       const info = await transporter.sendMail({
-        from: `"青龙快讯" <${emailUser}>`,
+        from: `"${t('青龙快讯')}" <${emailUser}>`,
         to: recipients,
         subject: `${this.title}`,
         html: `${this.content.replace(/\n/g, '<br/>')}`,
@@ -727,7 +730,7 @@ export default class NotificationService {
 
     // topic_ids 和 uids 至少要有一个
     if (!topicIds.length && !uids.length) {
-      throw new Error('wxPusher 服务的 TopicIds 和 Uids 至少配置一个才行');
+      throw new Error(t('wxPusher 服务的 TopicIds 和 Uids 至少配置一个才行'));
     }
 
     const url = `https://wxpusher.zjiecode.com/api/send/message`;
@@ -743,6 +746,52 @@ export default class NotificationService {
           uids: uids,
           verifyPayType: 0,
         },
+      });
+
+      if (res.code === 1000) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
+  private async wxPusherSpt() {
+    const { wxPusherSptList } = this.params;
+    // 处理 SPT，将逗号分隔的字符串转为数组
+    const spts = wxPusherSptList
+      ? wxPusherSptList
+          .split(',')
+          .map((spt) => spt.trim())
+          .filter((spt) => spt)
+      : [];
+
+    if (!spts.length) {
+      throw new Error(t('wxPusher SPT 不能为空'));
+    }
+    if (spts.length > 10) {
+      throw new Error(t('wxPusher SPT 最多支持 10 个'));
+    }
+
+    const url = `https://wxpusher.zjiecode.com/api/send/message/simple-push`;
+    const json: any = {
+      content: `<h1>${this.title}</h1><br/><div style='white-space: pre-wrap;'>${this.content}</div>`,
+      summary: this.title,
+      contentType: 2,
+    };
+    // 单个 SPT 用 spt，多个用 sptList
+    if (spts.length === 1) {
+      json.spt = spts[0];
+    } else {
+      json.sptList = spts;
+    }
+
+    try {
+      const res = await httpClient.post(url, {
+        ...this.gotOption,
+        json,
       });
 
       if (res.code === 1000) {
@@ -823,7 +872,7 @@ export default class NotificationService {
     } = this.params;
 
     if (!webhookUrl?.includes('$title') && !webhookBody?.includes('$title')) {
-      throw new Error('Url 或者 Body 中必须包含 $title');
+      throw new Error(t('Url 或者 Body 中必须包含 $title'));
     }
 
     const headers = parseHeaders(webhookHeaders);
@@ -899,4 +948,31 @@ export default class NotificationService {
       throw new Error(error.response ? error.response.body : error);
     }
   }
+  private async wpush() {
+    const { wpushApiKey, wpushChannel, wpushTopicCode } = this.params;
+    const url = 'https://api.wpush.cn/api/v1/send';
+    const json: Record<string, string> = {
+      apikey: `${wpushApiKey}`,
+      title: `${this.title}`,
+      content: `${this.content}`,
+      channel: `${wpushChannel || 'wechat'}`,
+    };
+    if (wpushTopicCode) {
+      json.topic_code = `${wpushTopicCode}`;
+    }
+    try {
+      const res = await httpClient.post(url, {
+        ...this.gotOption,
+        json,
+      });
+      if (res.code === 0) {
+        return true;
+      } else {
+        throw new Error(JSON.stringify(res));
+      }
+    } catch (error: any) {
+      throw new Error(error.response ? error.response.body : error);
+    }
+  }
+
 }

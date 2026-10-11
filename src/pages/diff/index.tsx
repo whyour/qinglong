@@ -25,13 +25,16 @@ const Diff = () => {
   const [language, setLanguage] = useState<string>('shell');
 
   const getConfig = () => {
-    request
-      .get(`${config.apiPrefix}configs/detail?path=${encodeURIComponent(current)}`)
-      .then(({ code, data }) => {
-        if (code === 200) {
-          setCurrentValue(data);
-        }
-      });
+    const url = current.startsWith('data/scripts/')
+      ? `${config.apiPrefix}scripts/detail?file=${encodeURIComponent(
+          current.slice('data/scripts/'.length),
+        )}`
+      : `${config.apiPrefix}configs/detail?path=${encodeURIComponent(current)}`;
+    request.get(url).then(({ code, data }) => {
+      if (code === 200) {
+        setCurrentValue(data);
+      }
+    });
   };
 
   const getSample = () => {
@@ -49,16 +52,20 @@ const Diff = () => {
       ? editorRef.current.getModel().modified.getValue().replace(/\r\n/g, '\n')
       : currentValue;
 
-    request
-      .post(`${config.apiPrefix}configs/save`, {
-        content,
-        name: current,
-      })
-      .then(({ code, data }) => {
-        if (code === 200) {
-          message.success(intl.get('保存成功'));
-        }
-      });
+    const saving = current.startsWith('data/scripts/')
+      ? request.post(`${config.apiPrefix}scripts`, {
+          content,
+          filename: current.slice('data/scripts/'.length),
+        })
+      : request.post(`${config.apiPrefix}configs/save`, {
+          content,
+          name: current,
+        });
+    saving.then(({ code }) => {
+      if (code === 200) {
+        message.success(intl.get('保存成功'));
+      }
+    });
   };
 
   const getFiles = () => {

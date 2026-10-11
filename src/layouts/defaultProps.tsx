@@ -26,7 +26,7 @@ export default {
       },
       {
         path: '/dashboard',
-        name: intl.get('统计面板'),
+        name: intl.get('仪表盘'),
         icon: <DashboardOutlined />,
         component: '@/pages/dashboard/index',
       },

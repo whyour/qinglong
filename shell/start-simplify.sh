@@ -1,68 +1,42 @@
 #!/usr/bin/env bash
-
-# 简化版启动脚本：跳过系统依赖和 npm 全局安装
-# 前置要求：已安装 nodejs、npm/pnpm、python3、nginx、jq
 set -e
-set -x
 
-if [[ ! $QL_DIR ]]; then
-  echo -e "请先设置 export QL_DIR=<qinglong目录>"
-  exit 1
-fi
-
-if [[ ! $QL_DATA_DIR ]]; then
-  export QL_DATA_DIR="${QL_DIR}/data"
-fi
-
-if [[ $QL_DATA_DIR != */data ]]; then
-  echo -e "QL_DATA_DIR 必须以 /data 结尾，例如 /ql/data"
-  exit 1
-fi
-
+: "${QL_DIR:?Please set QL_DIR}"
+: "${QL_DATA_DIR:?Please set QL_DATA_DIR}"
+[[ "$QL_DIR" = /* && "$QL_DATA_DIR" = /*/data ]] || { echo "QL_DIR and QL_DATA_DIR must be absolute paths (data directory ends in /data)" >&2; exit 1; }
 command="$1"
 
-# 从 .env 文件读取 PYTHON_VENV_DIR
-if [[ -z "${PYTHON_VENV_DIR:-}" ]] && [[ -f "${QL_DIR}/.env" ]]; then
-  env_venv_dir=$(grep -E '^PYTHON_VENV_DIR=' "${QL_DIR}/.env" | tail -1 | cut -d'=' -f2 | xargs)
-  if [[ -n "$env_venv_dir" ]]; then
-    if [[ "$env_venv_dir" != /* ]]; then
-      env_venv_dir="${QL_DIR}/${env_venv_dir}"
-    fi
-    export PYTHON_VENV_DIR="$env_venv_dir"
+export PNPM_HOME="${PNPM_HOME:-${QL_DATA_DIR}/dep_cache/node}"
+if [[ -n "${PYTHON_VENV_DIR:-}" ]]; then
+  [[ "$PYTHON_VENV_DIR" = /* ]] || PYTHON_VENV_DIR="${QL_DIR}/${PYTHON_VENV_DIR}"
+  export PYTHON_VENV_DIR
+  if [[ ! -x "$PYTHON_VENV_DIR/bin/python3" ]]; then
+    python3 -m venv "$PYTHON_VENV_DIR"
   fi
+  [[ -x "$PYTHON_VENV_DIR/bin/python3" ]] || { echo "Invalid Python venv" >&2; exit 1; }
+  unset PYTHON_HOME PYTHONUSERBASE PYTHONPATH
+  export PATH="${PYTHON_VENV_DIR}/bin:${PATH}:${PNPM_HOME}"
+  export PIP_CACHE_DIR="${PYTHON_VENV_DIR}/pip"
+else
+  export PYTHON_SHORT_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+  export PYTHON_HOME="${PYTHON_HOME:-${QL_DATA_DIR}/dep_cache/python3}"
+  export PYTHONUSERBASE="$PYTHON_HOME"
+  export PATH="${PATH}:${PNPM_HOME}:${PYTHON_HOME}/bin"
+  export PIP_CACHE_DIR="${PYTHON_HOME}/pip"
+  export PYTHONPATH="${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages"
 fi
+export NODE_PATH="${NODE_PATH:-/usr/local/bin:/usr/local/lib/node_modules:${PNPM_HOME}/global/5/node_modules}"
+mkdir -p "$PIP_CACHE_DIR"
 
-export PNPM_HOME=${QL_DIR}/data/dep_cache/node
-
-# ===== Python venv =====
-export PYTHON_VENV_DIR="${PYTHON_VENV_DIR:-${QL_DIR}/.venv}"
-if [[ ! -f "${PYTHON_VENV_DIR}/bin/python3" ]]; then
-  echo "正在创建 Python venv: ${PYTHON_VENV_DIR}"
-  python3 -m venv "${PYTHON_VENV_DIR}"
+cd "${QL_DIR}"
+if [[ ! -e .env ]]; then
+  # Preserve user configuration, including a file created concurrently.
+  (umask 077; set -C; cat .env.example > .env)
 fi
+chmod u+x "${QL_DIR}"/shell/*.sh
 
-export PATH=${PYTHON_VENV_DIR}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}
-export NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules:${PNPM_HOME}/global/5/node_modules
-export PIP_CACHE_DIR=${PYTHON_VENV_DIR}/pip
-mkdir -p "${PIP_CACHE_DIR}"
-
-if [[ $command != "reload" ]]; then
-  ${PYTHON_VENV_DIR}/bin/pip3 install requests
-fi
-
-cd ${QL_DIR}
-# 仅在 .env 不存在时从 .env.example 复制
-if [[ ! -f .env ]] && [[ -f .env.example ]]; then
-  cp -f .env.example .env
-fi
-chmod 777 ${QL_DIR}/shell/*.sh
-
-# 确保 task/ql 命令指向当前部署目录（覆盖 npm 全局安装可能指向旧路径的软链接）
-ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/task 2>/dev/null || true
-ln -sf ${QL_DIR}/shell/update.sh /usr/local/bin/ql 2>/dev/null || true
-
-. ${QL_DIR}/shell/share.sh
-. ${QL_DIR}/shell/env.sh
+. "${QL_DIR}/shell/share.sh"
+. "${QL_DIR}/shell/env.sh"
 
 log_with_style() {
   local level="$1"

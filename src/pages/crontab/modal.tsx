@@ -28,6 +28,7 @@ const CronModal = ({
       const method = cron?.id ? 'put' : 'post';
       const payload = {
         ...values,
+        labels: values.labels || [],
         schedule:
           scheduleType !== ScheduleType.Normal
             ? scheduleTypeMap[scheduleType]
@@ -211,12 +212,14 @@ const CronModal = ({
                   return Promise.reject(intl.get('日志名称不能超过100个字符'));
                 }
                 if (
-                  !/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w.-]+\/)*[\w.-]+\/?$/.test(
+                  !/^(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?:\/)?(?:[\w\p{Script=Han}.-]+\/)*[\w\p{Script=Han}.-]+\/?$/u.test(
                     value,
                   )
                 ) {
                   return Promise.reject(
-                    intl.get('日志名称只能包含字母、数字、下划线和连字符'),
+                    intl.get(
+                      '日志名称只能包含中文、字母、数字、下划线、连字符、点和路径分隔符',
+                    ),
                   );
                 }
                 return Promise.resolve();

@@ -4,6 +4,11 @@ const path = require('path');
 const client = require('./client.js');
 require(`./env.js`);
 
+// 注册 ESM loader，使全局安装的包也可通过 import 导入
+try {
+  Module.register(new URL('esm-loader.mjs', `file://${__dirname}/`).href);
+} catch (_) {}
+
 function preferGlobalNodeModules() {
   const { QL_NODE_GLOBAL_PATH } = process.env;
   if (!QL_NODE_GLOBAL_PATH || Module._qlGlobalPathPatched) {
@@ -93,7 +98,11 @@ function run() {
       const newEnvObject = JSON.parse(envStr);
       if (typeof newEnvObject === 'object' && newEnvObject !== null) {
         for (const key in newEnvObject) {
-          if (Object.prototype.hasOwnProperty.call(newEnvObject, key)) {
+          if (
+            Object.prototype.hasOwnProperty.call(newEnvObject, key) &&
+            key !== 'NODE_PATH' &&
+            key !== 'QL_NODE_GLOBAL_PATH'
+          ) {
             process.env[key] = newEnvObject[key];
           }
         }
@@ -150,9 +159,13 @@ try {
 
   run();
 
-  const { sendNotify } = require('./__ql_notify__.js');
   global.QLAPI = {
-    notify: sendNotify,
+    notify(...args) {
+      // Keep notification dependencies out of ordinary script startup.
+      // require caches the module after the first notification.
+      const { sendNotify } = require('./__ql_notify__.js');
+      return sendNotify.apply(this, args);
+    },
     ...client,
   };
 } catch (error) {

@@ -3,8 +3,14 @@ import { Container } from 'typedi';
 import { fn, col, where, Op } from 'sequelize';
 import { CrontabModel } from '../data/cron';
 import { CrontabStatModel } from '../data/cronStats';
+import {
+  RunningInstanceModel,
+  InstanceStatus,
+} from '../data/runningInstance';
 import dayjs from 'dayjs';
 import os from 'os';
+import { isEmpty } from 'lodash';
+import { t, tf } from '../shared/i18n';
 
 const route = Router();
 
@@ -101,6 +107,46 @@ export default (app: Router) => {
     },
   );
 
+  for (const isSuccess of [false, true]) {
+    route.get(
+      isSuccess ? '/successes' : '/failures',
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const countColumn = isSuccess ? 'success_count' : 'fail_count';
+          const rows = (await CrontabStatModel.findAll({
+            attributes: ['ref_id', [fn('SUM', col(countColumn)), 'result_count']],
+            where: { date: dayjs().format('YYYY-MM-DD'), [countColumn]: { [Op.gt]: 0 } },
+            group: ['ref_id'],
+            order: [[fn('SUM', col(countColumn)), 'DESC'], ['ref_id', 'ASC']],
+            raw: true,
+          })) as any[];
+          const crons = rows.length > 0 ? await CrontabModel.findAll({
+            attributes: ['id', 'name', 'command'],
+            where: { id: { [Op.in]: rows.map((row) => Number(row.ref_id)) } },
+            raw: true,
+          }) : [];
+          const cronMap = new Map(crons.map((cron) => [cron.id, cron]));
+          res.send({
+            code: 200,
+            data: rows.map((row) => {
+              const id = Number(row.ref_id);
+              const cron = cronMap.get(id);
+              return {
+                id,
+                name: cron?.name || cron?.command || tf('任务#%s', id),
+                command: cron?.command || '',
+                [isSuccess ? 'successCount' : 'failCount']: Number(row.result_count),
+                deleted: !cron,
+              };
+            }),
+          });
+        } catch (e) {
+          next(e);
+        }
+      },
+    );
+  }
+
   route.get(
     '/trend',
     async (req: Request, res: Response, next: NextFunction) => {
@@ -177,7 +223,7 @@ export default (app: Router) => {
 
         const data = rows.map((r: any, i) => ({
           rank: i + 1,
-          name: nameMap[Number(r.ref_id)] || `任务#${r.ref_id}`,
+          name: nameMap[Number(r.ref_id)] || tf('任务#%s', r.ref_id),
           avgTime: Math.round(Number(r.total_time) / Number(r.run_count)),
           maxTime: Number(r.max_time),
         }));
@@ -219,7 +265,7 @@ export default (app: Router) => {
 
         const data = rows.map((r: any, i) => ({
           rank: i + 1,
-          name: nameMap[Number(r.ref_id)] || `任务#${r.ref_id}`,
+          name: nameMap[Number(r.ref_id)] || tf('任务#%s', r.ref_id),
           runCount: Number(r.run_count),
           avgTime: Math.round(Number(r.total_time) / Number(r.run_count)),
           successRate:
@@ -239,9 +285,9 @@ export default (app: Router) => {
     '/runtime',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const runningCrons = await CrontabModel.findAll({
+        const runningInstances = await RunningInstanceModel.findAll({
           where: {
-            status: 0, // running
+            status: InstanceStatus.running,
           },
           raw: true,
         });
@@ -253,15 +299,31 @@ export default (app: Router) => {
           raw: true,
         });
 
-        const running = runningCrons.map((c: any) => ({
-          id: c.id,
-          name: c.name || c.command || `任务#${c.id}`,
-          pid: c.pid,
-          elapsed: c.last_execution_time
-            ? Math.floor((Date.now() / 1000) - c.last_execution_time)
-            : 0,
-          logPath: c.log_path,
-        }));
+        // Fetch cron names for running instances
+        const cronIds = [
+          ...new Set(runningInstances.map((i: any) => i.cron_id)),
+        ];
+        const crons =
+          cronIds.length > 0
+            ? await CrontabModel.findAll({
+              where: { id: cronIds },
+              raw: true,
+            })
+            : [];
+        const cronMap = new Map(crons.map((c: any) => [c.id, c]));
+
+        const now = dayjs().unix();
+        const running = runningInstances.map((inst: any) => {
+          const cron = cronMap.get(inst.cron_id);
+          return {
+            instanceId: inst.id,
+            id: inst.cron_id,
+            name: cron?.name || cron?.command || tf('任务#%s', inst.cron_id),
+            pid: inst.pid,
+            elapsed: inst.started_at ? now - inst.started_at : 0,
+            logPath: inst.log_path,
+          };
+        });
 
         const dayAgo = dayjs().subtract(24, 'hour').unix();
         const idleTasks = await CrontabModel.findAll({
@@ -283,7 +345,7 @@ export default (app: Router) => {
             running,
             idleTasks: idleTasks.map((c: any) => ({
               id: c.id,
-              name: c.name || c.command || `任务#${c.id}`,
+              name: c.name || c.command || tf('任务#%s', c.id),
               lastRun: c.last_execution_time
                 ? dayjs.unix(c.last_execution_time).format('MM-DD HH:mm')
                 : '-',
@@ -304,17 +366,22 @@ export default (app: Router) => {
         const [crons, stats] = (await Promise.all([
           CrontabModel.findAll({ where: { isDisabled: 0 }, raw: true }),
           CrontabStatModel.findAll({ where: { date: today }, raw: true }),
-        ])) as any[];
+        ]));
 
         const statMap: Record<number, any> = {};
         stats.forEach((s: any) => { statMap[s.ref_id] = s; });
 
         const labelMap: Record<string, { count: number; runs: number; success: number; totalTime: number }> = {};
-        crons.forEach((c: any) => {
+        crons.forEach((c) => {
           let rawLabels = c.labels;
           if (typeof rawLabels === 'string') rawLabels = JSON.parse(rawLabels);
-          const labels: string[] = Array.isArray(rawLabels) && rawLabels.length > 0 ? rawLabels : ['未分类'];
-          const st = statMap[c.id];
+          const labels: string[] = Array.isArray(rawLabels)
+            ? [...new Set((rawLabels as string[]).filter((l: string) => !isEmpty(l)))]
+            : [];
+          if (labels.length === 0) {
+            labels.push(t('未分类'));
+          }
+          const st = statMap[c.id!];
           labels.forEach((label: string) => {
             if (!labelMap[label]) labelMap[label] = { count: 0, runs: 0, success: 0, totalTime: 0 };
             labelMap[label].count += 1;
@@ -352,7 +419,7 @@ export default (app: Router) => {
           code: 200,
           data: {
             platform: os.platform(),
-            uptime: Math.floor(os.uptime()),
+            uptime: Math.floor(process.uptime()),
             memTotal: os.totalmem(),
             memFree: os.freemem(),
             memUsagePercent: ((1 - os.freemem() / os.totalmem()) * 100).toFixed(1),

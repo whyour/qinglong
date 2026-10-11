@@ -21,6 +21,7 @@ export enum NotificationMode {
   'ntfy' = 'ntfy',
   'wxPusherBot' = 'wxPusherBot',
   'openiLink' = 'openiLink',
+  'wpush' = 'wpush',
 }
 
 abstract class NotificationBaseInfo {
@@ -162,10 +163,20 @@ export class WxPusherBotNotification extends NotificationBaseInfo {
   public wxPusherBotUids = '';
 }
 
+export class WxPusherSptNotification extends NotificationBaseInfo {
+  public wxPusherSptList = '';
+}
+
 export class OpeniLinkNotification extends NotificationBaseInfo {
   public openiLinkAppToken = '';
   public openiLinkHubUrl = '';
   public openiLinkContextToken = '';
+}
+
+export class WpushNotification extends NotificationBaseInfo {
+  public wpushApiKey = '';
+  public wpushChannel = '';
+  public wpushTopicCode = '';
 }
 
 export interface NotificationInfo
@@ -190,4 +201,6 @@ export interface NotificationInfo
     LarkNotification,
     NtfyNotification,
     WxPusherBotNotification,
-    OpeniLinkNotification {}
+    WxPusherSptNotification,
+    OpeniLinkNotification,
+    WpushNotification {}

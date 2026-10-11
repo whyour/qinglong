@@ -35,7 +35,7 @@ const EnvModal = ({
         payload = [{ value, name, remarks, labels: labels || [] }];
       }
     } else {
-      payload = { ...values, id: env.id };
+      payload = { ...values, labels: values.labels || [], id: env.id };
     }
     try {
       const { code, data } = await request[method](

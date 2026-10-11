@@ -1,0 +1,161 @@
+name: CLI package
+
+on:
+  pull_request:
+    paths:
+      - 'cli/**'
+      - 'shell/**'
+      - 'back/api/**'
+      - 'back/loaders/deps.ts'
+      - 'package.json'
+      - '.github/workflows/cli-package.yml'
+  push:
+    branches: [develop, master]
+    paths:
+      - 'cli/**'
+      - 'shell/**'
+      - 'back/api/**'
+      - 'back/loaders/deps.ts'
+      - 'package.json'
+      - '.github/workflows/cli-package.yml'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified CLI package (master stable / develop prerelease)
+        type: boolean
+        default: false
+      prerelease_version:
+        description: Develop only, e.g. 0.1.2-beta.0 (alpha/beta/rc)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  # Keep validation runs separate from releases; never interrupt a running release.
+  # Master push releases share the same group as manually requested releases.
+  group: >-
+    cli-package-${{ github.workflow }}-${{ github.ref }}-${{
+      ((github.event_name == 'workflow_dispatch' && inputs.publish) ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/master')) && 'publish' || 'check' }}
+  cancel-in-progress: >-
+    ${{ github.ref != 'refs/heads/master' &&
+        !(github.event_name == 'workflow_dispatch' && inputs.publish) }}
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.12.0', '24']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: cli/package-lock.json
+      - name: Install test interpreters and tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bash ca-certificates curl git jq perl procps python3 unzip zip
+          npm install --global --ignore-scripts --no-audit --no-fund ts-node@10.9.2 typescript@5.2.2
+      - name: Set requested prerelease version before verification
+        if: github.event_name == 'workflow_dispatch' && inputs.prerelease_version != ''
+        working-directory: cli
+        env:
+          PRERELEASE_VERSION: ${{ inputs.prerelease_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/develop ||
+                ! "$PRERELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$ ]]; then
+            echo '::error::Prereleases require develop and an explicit alpha/beta/rc version.'
+            exit 1
+          fi
+          npm version "$PRERELEASE_VERSION" --no-git-tag-version --ignore-scripts
+      - run: npm ci --prefix cli --no-audit --no-fund
+      - run: npm run check:cli
+      - run: npm run test:cli
+      - name: Verify offline package installation
+        env:
+          QL_CLI_PACKAGE_OUTPUT: ${{ runner.temp }}/cli-package
+        run: node cli/scripts/verify-package.cjs
+      - name: Upload verified npm archive
+        if: matrix.node == '24'
+        uses: actions/upload-artifact@v6
+        with:
+          name: qinglong-cli-${{ github.sha }}
+          path: ${{ runner.temp }}/cli-package/*.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: package
+    if: >-
+      github.repository == 'whyour/qinglong' &&
+      ((github.ref == 'refs/heads/master' &&
+        (github.event_name == 'push' ||
+         (github.event_name == 'workflow_dispatch' && inputs.publish))) ||
+       (github.ref == 'refs/heads/develop' && github.event_name == 'workflow_dispatch' &&
+        inputs.publish && inputs.prerelease_version != ''))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-cli-${{ github.sha }}
+          path: cli-package
+      - name: Publish verified npm archive
+        env:
+          PRERELEASE_VERSION: ${{ inputs.prerelease_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          archives=(cli-package/*.tgz)
+          if [ "${#archives[@]}" -ne 1 ]; then
+            echo '::error::Expected exactly one verified CLI archive.'
+            exit 1
+          fi
+          archive="${archives[0]}"
+          metadata=$(tar -xOf "$archive" package/package.json)
+          name=$(jq -er '.name | select(. == "@whyour/qinglong-cli")' <<< "$metadata")
+          version=$(jq -er '.version | select(type == "string")' <<< "$metadata")
+          if [[ "$GITHUB_REF" == refs/heads/develop ]]; then
+            if [[ "$version" != "$PRERELEASE_VERSION" ||
+                  ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$ ]]; then
+              echo '::error::Archive version does not match the requested prerelease.'
+              exit 1
+            fi
+            tag="${BASH_REMATCH[1]}"
+          elif [[ "$GITHUB_REF" == refs/heads/master && "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tag=latest
+          else
+            echo '::error::Refusing to publish this branch/version combination.'
+            exit 1
+          fi
+          if npm view "$name@$version" version --json --registry=https://registry.npmjs.org > version.json 2> version-error.log; then
+            jq -e --arg version "$version" '. == $version' version.json > /dev/null
+            if [[ "$tag" != latest ]]; then
+              echo '::error::Prerelease version already exists; choose a new version to test this build.'
+              exit 1
+            fi
+            echo "::notice::$name@$version is already published; bump cli/package.json and its lockfile to release changes."
+            exit 0
+          elif ! jq -e '.error.code == "E404"' version.json > /dev/null; then
+            echo '::error::Could not check the published CLI version; refusing to publish.'
+            exit 1
+          fi
+          npm publish "./$archive" --access public --tag "$tag" --ignore-scripts --registry=https://registry.npmjs.org

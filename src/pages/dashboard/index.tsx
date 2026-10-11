@@ -14,7 +14,9 @@ import { Area, Gauge } from '@ant-design/plots';
 import intl from 'react-intl-universal';
 import { SharedContext } from '@/layouts';
 import { request } from '@/utils/http';
+import config from '@/utils/config';
 import CronLogModal from '../crontab/logModal';
+import TaskResultModal from './taskResultModal';
 
 interface Overview {
   total: number;
@@ -46,7 +48,7 @@ interface TopItem {
 interface Runtime {
   runningCount: number;
   queuedCount: number;
-  running: Array<{ id: number; name: string; pid: number; elapsed: number; logPath: string }>;
+  running: Array<{ instanceId: number; id: number; name: string; pid: number; elapsed: number; logPath: string }>;
   idleTasks: Array<{ id: number; name: string; lastRun: string }>;
 }
 
@@ -92,18 +94,19 @@ const Dashboard = () => {
   const [labels, setLabels] = useState<any[]>([]);
   const [logCron, setLogCron] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState<'success' | 'failure' | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       const [overviewRes, trendRes, topTimeRes, topCountRes, runtimeRes, systemRes, labelsRes] =
         await Promise.allSettled([
-          request.get('/api/dashboard/overview'),
-          request.get('/api/dashboard/trend'),
-          request.get('/api/dashboard/top-time'),
-          request.get('/api/dashboard/top-count'),
-          request.get('/api/dashboard/runtime'),
-          request.get('/api/dashboard/system'),
-          request.get('/api/dashboard/labels'),
+          request.get(`${config.apiPrefix}dashboard/overview`),
+          request.get(`${config.apiPrefix}dashboard/trend`),
+          request.get(`${config.apiPrefix}dashboard/top-time`),
+          request.get(`${config.apiPrefix}dashboard/top-count`),
+          request.get(`${config.apiPrefix}dashboard/runtime`),
+          request.get(`${config.apiPrefix}dashboard/system`),
+          request.get(`${config.apiPrefix}dashboard/labels`),
         ]);
 
       if (overviewRes.status === 'fulfilled' && overviewRes.value.code === 200)
@@ -171,7 +174,7 @@ const Dashboard = () => {
 
   return (
     <PageContainer
-      title={intl.get('统计面板')}
+      title={intl.get('仪表盘')}
       header={{ style: headerStyle }}
       className={'ql-container-wrapper dashboard-wrapper'}
     >
@@ -189,10 +192,28 @@ const Dashboard = () => {
           <Card size="small"><Statistic title={intl.get('成功率')} value={`${overview?.successRate || '0'}%`} valueStyle={{ color: '#52c41a' }} /></Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={3}>
-          <Card size="small"><Statistic title={intl.get('今日成功')} value={overview?.todaySuccess || 0} valueStyle={{ color: '#52c41a' }} prefix={<CheckCircleOutlined />} /></Card>
+          <Card size="small" hoverable role="button" tabIndex={0}
+            aria-label={intl.get('今日成功')}
+            onClick={() => setResult('success')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setResult('success');
+              }
+            }}
+          ><Statistic title={intl.get('今日成功')} value={overview?.todaySuccess || 0} valueStyle={{ color: '#52c41a' }} prefix={<CheckCircleOutlined />} /></Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={3}>
-          <Card size="small"><Statistic title={intl.get('今日失败')} value={overview?.todayFail || 0} valueStyle={{ color: '#ff4d4f' }} prefix={<CloseCircleOutlined />} /></Card>
+          <Card size="small" hoverable role="button" tabIndex={0}
+            aria-label={intl.get('今日失败')}
+            onClick={() => setResult('failure')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setResult('failure');
+              }
+            }}
+          ><Statistic title={intl.get('今日失败')} value={overview?.todayFail || 0} valueStyle={{ color: '#ff4d4f' }} prefix={<CloseCircleOutlined />} /></Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={3}>
           <Card size="small"><Statistic title={intl.get('平均耗时')} value={overview?.avgTime ? `${(overview.avgTime / 1000).toFixed(1)}s` : '-'} prefix={<ClockCircleOutlined />} /></Card>
@@ -282,12 +303,15 @@ const Dashboard = () => {
           >
             <Table
               dataSource={runtime?.running || []}
-              rowKey="id"
+              rowKey="instanceId"
               pagination={runtime && runtime.running.length > 5 ? runtimePagination : false}
               size="small"
               locale={{ emptyText: <Empty description={intl.get('暂无运行中任务')} /> }}
               columns={[
-                { title: intl.get('定时任务'), dataIndex: 'name', ellipsis: true },
+                { title: intl.get('定时任务'), dataIndex: 'name', ellipsis: true, render: (name: string, record) => {
+                  const sameTaskCount = (runtime?.running || []).filter(r => r.id === record.id).length;
+                  return sameTaskCount > 1 ? <span>{name} <Tag color="processing" style={{ fontSize: 10, lineHeight: '16px' }}>×{sameTaskCount}</Tag></span> : name;
+                } },
                 { title: 'PID', dataIndex: 'pid', width: 80 },
                 { title: intl.get('已运行'), dataIndex: 'elapsed', width: 100, render: (v: number) => v ? formatSeconds(v) : '-' },
                 { title: intl.get('日志'), dataIndex: 'id', width: 60, render: (id, record) => <a onClick={() => { localStorage.setItem('logCron', String(id)); setLogCron({ id, name: record.name }); }}>{intl.get('查看')}</a> },
@@ -346,6 +370,7 @@ const Dashboard = () => {
           </Card>
         </Col>
       </Row>
+      {result && <TaskResultModal key={result} result={result} onCancel={() => setResult(null)} />}
       {logCron && (
         <CronLogModal
           cron={logCron}

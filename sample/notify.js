@@ -147,16 +147,26 @@ const push_config = {
   NTFY_PASSWORD: '', // 推送用户密码,可选
   NTFY_ACTIONS: '', // 推送用户动作,可选
 
+  // 方式一：标准发送（更强大）
   // 官方文档: https://wxpusher.zjiecode.com/docs/
   // 管理后台: https://wxpusher.zjiecode.com/admin/
   WXPUSHER_APP_TOKEN: '', // wxpusher 的 appToken
   WXPUSHER_TOPIC_IDS: '', // wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
   WXPUSHER_UIDS: '', // wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+  // 方式二：极简发送（最简单，简单好用，一键配置，更推荐） 
+  // wxPusher 的 SPT（极简推送），扫码获取 https://wxpusher.zjiecode.com/docs/#/?id=spt
+  // 多个用英文逗号,分隔，最多10个；与上面的 appToken 方式二选一即可
+  WXPUSHER_SPT_LIST: '', // wxpusher 的 SPT（极简推送），多个用英文逗号,分隔，最多10个
 
   // 官方文档: https://openilink.com/docs/hub/apps
   OPENILINK_APP_TOKEN: '', // OpeniLink 的 app_token，在 OpeniLink Hub 后台安装 App 后获取
   OPENILINK_HUB_URL: '', // OpeniLink Hub 地址，默认为 https://hub.openilink.com，自建 Hub 时填写自己的地址
   OPENILINK_CONTEXT_TOKEN: '', // OpeniLink 的 context_token，用于标识消息会话上下文，可从消息事件中获取
+
+  // WPUSH 官方文档: https://wpush.cn/docs
+  WPUSH_APIKEY: '', // WPUSH 的 API Key，在 https://wpush.cn/settings 获取
+  WPUSH_CHANNEL: 'wechat', // 推送渠道，支持 wechat/app/sms/mail/webhook/dingtalk/feishu/wechat_work/clawbot/qqbot
+  WPUSH_TOPIC_CODE: '', // 可选，Topic 广播编码
 };
 
 for (const key in push_config) {
@@ -1431,6 +1441,112 @@ function wxPusherNotify(text, desp) {
   });
 }
 
+function wxPusherSptNotify(text, desp) {
+  return new Promise((resolve) => {
+    const { WXPUSHER_SPT_LIST } = push_config;
+    if (WXPUSHER_SPT_LIST) {
+      // 处理 SPT，将逗号分隔的字符串转为数组
+      const spts = WXPUSHER_SPT_LIST.split(',')
+        .map((spt) => spt.trim())
+        .filter((spt) => spt);
+
+      if (!spts.length) {
+        console.log('wxpusher SPT 不能为空!!');
+        return resolve();
+      }
+      if (spts.length > 10) {
+        console.log('wxpusher SPT 最多支持 10 个!!');
+        return resolve();
+      }
+
+      const body = {
+        content: `<h1>${text}</h1><br/><div style='white-space: pre-wrap;'>${desp}</div>`,
+        summary: text,
+        contentType: 2,
+        // 单个 SPT 用 spt，多个用 sptList
+        ...(spts.length === 1 ? { spt: spts[0] } : { sptList: spts }),
+      };
+
+      const options = {
+        url: 'https://wxpusher.zjiecode.com/api/send/message/simple-push',
+        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout,
+      };
+
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('wxpusher SPT 发送通知消息失败！\n', err);
+          } else {
+            if (data.code === 1000) {
+              console.log('wxpusher SPT 发送通知消息完成！');
+            } else {
+              console.log(`wxpusher SPT 发送通知消息异常：${data.msg}`);
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(data);
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
+
+
+function wpushNotify(text, desp) {
+  return new Promise((resolve) => {
+    const { WPUSH_APIKEY, WPUSH_CHANNEL, WPUSH_TOPIC_CODE } = push_config;
+    if (WPUSH_APIKEY) {
+      const body = {
+        apikey: `${WPUSH_APIKEY}`,
+        title: `${text}`,
+        content: `${desp}`,
+        channel: `${WPUSH_CHANNEL || 'wechat'}`,
+      };
+      if (WPUSH_TOPIC_CODE) {
+        body.topic_code = WPUSH_TOPIC_CODE;
+      }
+      const options = {
+        url: `https://api.wpush.cn/api/v1/send`,
+        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout,
+      };
+      $.post(options, (err, resp, data) => {
+        try {
+          if (err) {
+            console.log('WPUSH 发送通知消息失败！\n', err);
+          } else {
+            if (data.code === 0) {
+              console.log('WPUSH 发送通知消息成功！');
+            } else {
+              console.log(
+                `WPUSH 发送通知消息异常：${data.message || JSON.stringify(data)}`,
+              );
+            }
+          }
+        } catch (e) {
+          $.logErr(e, resp);
+        } finally {
+          resolve(data);
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
 function openiLinkNotify(text, desp) {
   return new Promise((resolve) => {
     const { OPENILINK_APP_TOKEN, OPENILINK_HUB_URL, OPENILINK_CONTEXT_TOKEN } =
@@ -1609,7 +1725,9 @@ async function sendNotify(text, desp, params = {}) {
     qmsgNotify(text, desp), // 自定义通知
     ntfyNotify(text, desp), // Ntfy
     wxPusherNotify(text, desp), // wxpusher
+    wxPusherSptNotify(text, desp), // wxpusher SPT
     openiLinkNotify(text, desp), // OpeniLink
+    wpushNotify(text, desp), // WPUSH
   ]);
 }
 

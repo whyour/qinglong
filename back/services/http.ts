@@ -12,7 +12,7 @@ export class HttpServerService {
   async initialize(expressApp: express.Application, port: number) {
     const hostsToTry = [
       config.bindHost,
-      ...(config.bindHost !== '0.0.0.0' ? ['0.0.0.0'] : [])
+      ...(config.bindHost === '::' ? ['0.0.0.0'] : [])
     ];
 
     let lastError: Error | null = null;
@@ -20,7 +20,7 @@ export class HttpServerService {
     for (const host of hostsToTry) {
       try {
         const server = await this.tryListen(expressApp, port, host);
-        Logger.debug(`✌️ HTTP service started successfully on ${host}:${port}`);
+        Logger.debug(`[boot] HTTP service started successfully on ${host}:${port}`);
         metricsService.record('http_service_start', 1, {
           port: port.toString(),
           host
@@ -39,7 +39,13 @@ export class HttpServerService {
 
   private async tryListen(expressApp: express.Application, port: number, host: string): Promise<Server> {
     return new Promise((resolve, reject) => {
-      const server = expressApp.listen(port, host, () => {
+      // There is one HTTP worker; accepting here avoids primary IPC handoff
+      // for every connection. Restore shared listening for custom clusters.
+      const server = expressApp.listen({
+        port,
+        host,
+        exclusive: process.env.QL_HTTP_SHARED_LISTEN !== 'true',
+      }, () => {
         resolve(server);
       });
 

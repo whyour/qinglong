@@ -4,6 +4,7 @@ import { AuthDataType, SystemModel } from '../data/system';
 import Logger from '../loaders/logger';
 import { Dependence } from '../data/dependence';
 import NotificationService from '../services/notify';
+import { t, tf } from '../shared/i18n';
 import {
   ICronFn,
   IDependencyFn,
@@ -14,6 +15,7 @@ import {
 import config from '../config';
 import { credentials } from '@grpc/grpc-js';
 import { ApiClient } from '../protos/api';
+import { getGrpcCerts } from '../config/grpcCerts';
 
 class TaskLimit {
   private dependenyLimit = new PQueue({ concurrency: 1 });
@@ -36,11 +38,24 @@ class TaskLimit {
   private systemLimit = new PQueue({
     concurrency: Math.max(os.cpus().length, 4),
   });
-  private client = new ApiClient(
-    `localhost:${config.grpcPort}`,
-    credentials.createInsecure(),
-    { 'grpc.enable_http_proxy': 0 },
-  );
+  private _client: ApiClient | null = null;
+
+  private get client(): ApiClient {
+    if (!this._client) {
+      const tlsConfig = getGrpcCerts();
+      const creds = tlsConfig
+        ? credentials.createSsl(
+            Buffer.from(tlsConfig.caCert),
+            Buffer.from(tlsConfig.clientKey),
+            Buffer.from(tlsConfig.clientCert),
+          )
+        : credentials.createInsecure();
+      this._client = new ApiClient(`localhost:${config.grpcPort}`, creds, {
+        'grpc.enable_http_proxy': 0,
+      });
+    }
+    return this._client;
+  }
 
   get cronLimitActiveCount() {
     return this.cronLimit.pending;
@@ -96,12 +111,15 @@ class TaskLimit {
     }
   }
 
-  public removeQueuedCron(id: string) {
+  public removeQueuedCron(id: string, completed?: ICronFn<any>) {
     if (this.queuedCrons.has(id)) {
       const runs = this.queuedCrons.get(id);
       if (runs && runs.length > 0) {
-        runs.pop();
-        this.queuedCrons.set(id, runs);
+        const remaining = completed
+          ? runs.filter((run) => run !== completed)
+          : runs.slice(0, -1);
+        if (remaining.length) this.queuedCrons.set(id, remaining);
+        else this.queuedCrons.delete(id);
       }
     }
   }
@@ -126,9 +144,15 @@ class TaskLimit {
     cron: TCron,
     fn: ICronFn<T>,
     options?: Partial<QueueAddOptions>,
+    isCurrent: () => boolean = () => true,
   ): Promise<T | void> {
+    if (!isCurrent()) return;
     fn.cron = cron;
-    let runs = this.queuedCrons.get(cron.id);
+    fn.isCurrent = isCurrent;
+    // Invalidated snapshots must not consume the new revision's repeat budget.
+    const runs = this.queuedCrons
+      .get(cron.id)
+      ?.filter((run) => run.isCurrent?.() !== false);
     const result = runs?.length ? [...runs, fn] : [fn];
     const repeatTimes = this.repeatCronNotifyMap.get(cron.id) || 0;
     if (result?.length > 5) {
@@ -136,8 +160,14 @@ class TaskLimit {
         this.repeatCronNotifyMap.set(cron.id, repeatTimes + 1);
         this.client.systemNotify(
           {
-            title: '任务重复运行',
-            content: `任务：${cron.name}，命令：${cron.command}，定时：${cron.schedule}，处于运行中的超过 5 个，请检查定时设置`,
+            title: t('任务重复运行'),
+            content: tf(
+              '任务：%s，命令：%s，定时：%s，处于运行中的超过 %d 个，请检查定时设置',
+              cron.name || '',
+              cron.command || '',
+              cron.schedule || '',
+              5,
+            ),
           },
           (err, res) => {
             if (err) {

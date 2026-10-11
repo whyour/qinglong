@@ -1,0 +1,31 @@
+name: Validate
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: pnpm test
+      - run: pnpm build:back
+      - run: pnpm benchmark:execution -- --runs=10 --output=execution-baseline.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: execution-baseline
+          path: execution-baseline.json

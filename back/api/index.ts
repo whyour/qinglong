@@ -12,6 +12,8 @@ import subscription from './subscription';
 import update from './update';
 import dashboard from './dashboard';
 import health from './health';
+import clientIp from './clientIp';
+import retention from './retention';
 
 export default () => {
   const app = Router();
@@ -28,6 +30,8 @@ export default () => {
   update(app);
   dashboard(app);
   health(app);
+  clientIp(app);
+  retention(app);
 
   return app;
 };
