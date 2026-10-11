@@ -1,4 +1,5 @@
 import * as fs from 'fs/promises';
+import { statSync } from 'fs';
 import * as path from 'path';
 import { exec, execSync } from 'child_process';
 import psTreeFun from 'ps-tree';
@@ -744,7 +745,14 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
       const file = [config.scriptPath, config.repoPath]
         .filter(Boolean)
         .map((root) => resolveFileAccess(root, [name]))
-        .find(Boolean);
+        .find((file) => {
+          if (!file) return false;
+          try {
+            return statSync(file).isFile();
+          } catch {
+            return false;
+          }
+        });
       if (!file)
         throw new Error(
           'Python dependency file must be inside scripts or repo',
@@ -775,7 +783,14 @@ export function getUninstallCommand(
       const file = [config.scriptPath, config.repoPath]
         .filter(Boolean)
         .map((root) => resolveFileAccess(root, [name]))
-        .find(Boolean);
+        .find((file) => {
+          if (!file) return false;
+          try {
+            return statSync(file).isFile();
+          } catch {
+            return false;
+          }
+        });
       if (!file)
         throw new Error(
           'Python dependency file must be inside scripts or repo',
