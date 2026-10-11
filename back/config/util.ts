@@ -850,6 +850,9 @@ async function _updateLinuxMirror(
         throw new Error('Cannot determine Alpine repository version');
       content = `${defaults.Alpine}/v${version}/main\n${defaults.Alpine}/v${version}/community\n`;
     } else {
+      // The fallback may have read an empty legacy .list. Deb822 stanzas must
+      // be written to a .sources file, leaving the legacy file untouched.
+      file = `/etc/apt/sources.list.d/${osType.toLowerCase()}.sources`;
       const codename = release.match(/^VERSION_CODENAME=["']?([\w-]+)/m)?.[1];
       if (!codename)
         throw new Error('Cannot determine APT repository codename');

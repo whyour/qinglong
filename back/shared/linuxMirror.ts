@@ -51,14 +51,60 @@ export function replaceMirrorUrl(current: string, mirror: string): string {
 export function rewriteMirrorSources(content: string, mirror: string): string {
   normalizeMirror(mirror);
   return content
-    .split('\n')
-    .map((line) => {
-      if (!/^\s*(?:URIs:|deb(?:-src)?\s|https?:\/\/)/.test(line)) return line;
-      return line.replace(/https?:\/\/[^\s#]+/g, (url) =>
-        replaceMirrorUrl(url, mirror),
-      );
+    .split(/(\r?\n[ \t]*\r?\n)/)
+    .map((stanza) => {
+      const signedBy = stanza.match(/^Signed-By:\s*([^\r\n]*)/im)?.[1];
+      return stanza
+        .split('\n')
+        .map((line) => {
+          if (!/^\s*(?:URIs:|deb(?:-src)?\s|https?:\/\/)/.test(line))
+            return line;
+          const legacy = /^\s*deb(?:-src)?\s/.test(line);
+          const key = legacy
+            ? line.match(/\bsigned-by=([^\]\s]+)/i)?.[1]
+            : signedBy;
+          // In .list files a # starts an inline comment; its URLs are metadata.
+          const comment = legacy ? line.indexOf('#') : -1;
+          const source = comment < 0 ? line : line.slice(0, comment);
+          const rewritten = source.replace(/https?:\/\/[^\s#]+/g, (url) =>
+            isSystemRepository(url, key) ? replaceMirrorUrl(url, mirror) : url,
+          );
+          return rewritten + (comment < 0 ? '' : line.slice(comment));
+        })
+        .join('\n');
     })
-    .join('\n');
+    .join('');
+}
+
+function isSystemRepository(url: string, signedBy?: string): boolean {
+  const keys =
+    signedBy
+      ?.trim()
+      .split(/[\s,]+/)
+      .filter(Boolean) || [];
+  const archiveKeyring =
+    keys.length > 0 &&
+    keys.every((key) =>
+      /\/(?:debian|ubuntu|armbian)-archive-keyring\.(?:gpg|asc)$/.test(key),
+    );
+  // A separate signing key identifies a third-party archive, even if its
+  // repository happens to be called /debian or /ubuntu.
+  if (keys.length > 0 && !archiveKeyring) return false;
+  const segments = new URL(url).pathname.split('/').filter(Boolean);
+  const repositoryIndex = segments.findIndex((part) =>
+    repositoryNames.test(part),
+  );
+  if (repositoryIndex < 0) return false;
+  // Without archive metadata, accept only conventional archive roots. A
+  // vendor path such as Docker's /linux/debian is not the Debian archive.
+  return (
+    archiveKeyring ||
+    repositoryIndex === 0 ||
+    segments
+      .slice(0, repositoryIndex)
+      .every((part) => /^mirrors?$/.test(part)) ||
+    segments[repositoryIndex] === 'alpine'
+  );
 }
 
 export function mirrorWriteCommand(
