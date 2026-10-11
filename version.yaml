@@ -1,6 +1,6 @@
 version: 2.23.0
 changeLogLink: https://github.com/whyour/qinglong/blob/master/docs/releases/2.23.0.md
-publishTime: ""
+publishTime: "2026-10-11 12:27:02"
 changeLog: |
   1. 新增脚本历史版本查看、对比与恢复，支持 CLI 和 OpenAPI；恢复前检查当前内容哈希，避免覆盖并发修改
   2. 普通任务与订阅调度迁移到 node-cron，保留旧规则兼容及日期/星期 OR 语义，补充宏和夏令时说明
