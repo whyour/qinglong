@@ -77,7 +77,7 @@ test('isolated initialization creates a fresh database and does not retain ORM m
   try {
     const tables = await db.getQueryInterface().showAllTables();
     for (const table of ['Crontabs', 'Envs', 'RunningInstances', 'SchemaMigrations']) assert.ok(tables.includes(table), table);
-    assert.equal((await db.query('SELECT id FROM SchemaMigrations', { type: QueryTypes.SELECT })).length, 17);
+    assert.equal((await db.query('SELECT id FROM SchemaMigrations', { type: QueryTypes.SELECT })).length, 15);
   } finally { await db.close(); }
 });
 
@@ -96,7 +96,7 @@ test('isolated initialization upgrades an existing database and remains idempote
     const rows = await db.query('SELECT * FROM Crontabs', { type: QueryTypes.SELECT });
     assert.equal(rows[0].name, 'keep-me');
     assert.ok(Object.hasOwn(rows[0], 'queued_token'));
-    assert.equal((await db.query('SELECT id FROM SchemaMigrations', { type: QueryTypes.SELECT })).length, 17);
+    assert.equal((await db.query('SELECT id FROM SchemaMigrations', { type: QueryTypes.SELECT })).length, 15);
   } finally { await db.close(); }
 });
 

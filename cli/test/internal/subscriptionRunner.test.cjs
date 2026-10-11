@@ -346,7 +346,7 @@ test('subscription copy precedence preserves local dependencies while selected s
     path.resolve(__dirname, '../../../shell/update.sh'),
     'utf8',
   );
-  const definition = ['subscription_file_is_skipped', 'copy_subscription_file', 'gen_list_repo'].map(name => original.match(new RegExp(`^${name}\\(\\) \\{[\\s\\S]*?^\\}`, 'm'))?.[0]).join('\n');
+  const definition = original.match(/^gen_list_repo\(\) \{[\s\S]*?^\}/m)?.[0];
   assert.ok(definition);
   execFileSync(
     '/bin/bash',

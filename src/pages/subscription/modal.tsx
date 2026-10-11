@@ -449,9 +449,7 @@ const SubscriptionModal = ({
             <Form.Item
               name="blacklist"
               label={intl.get('黑名单')}
-              tooltip={intl.get(
-                '不创建匹配文件的定时任务，依赖文件仍会同步。多个关键词竖线分割，支持正则表达式',
-              )}
+              tooltip={intl.get('多个关键词竖线分割，支持正则表达式')}
             >
               <Input.TextArea
                 rows={4}
@@ -475,15 +473,6 @@ const SubscriptionModal = ({
                 )}
                 onPaste={onNamePaste}
               />
-            </Form.Item>
-            <Form.Item
-              name="skipFiles"
-              label={intl.get('不同步文件')}
-              tooltip={intl.get(
-                '保留本地文件，不从订阅覆盖或删除。每行一个仓库相对路径，目录以斜杠结尾。例如 env.js 或 config/。空值保持原有同步行为。',
-              )}
-            >
-              <Input.TextArea rows={3} placeholder={'env.js\nconfig/'} />
             </Form.Item>
             <Form.Item
               name="extensions"

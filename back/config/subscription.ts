@@ -37,10 +37,7 @@ export function formatCommand(doc: Subscription, url?: string) {
     String(isNil(doc.autoAddCron) ? true : Boolean(doc.autoAddCron)),
     String(isNil(doc.autoDelCron) ? true : Boolean(doc.autoDelCron)),
   );
-  const skipFiles = doc.skipFiles
-    ? `QL_SUB_SKIP_FILES=${shellQuote(doc.skipFiles)} `
-    : '';
-  return `${skipFiles}SUB_ID=${shellQuote(String(doc.id))} ql ${args
+  return `SUB_ID=${shellQuote(String(doc.id))} ql ${args
     .map((arg) => shellQuote(arg!))
     .join(' ')}`;
 }

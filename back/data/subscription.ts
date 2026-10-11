@@ -13,7 +13,6 @@ export class Subscription {
   url?: string;
   whitelist?: string;
   blacklist?: string;
-  skipFiles?: string;
   dependences?: string;
   branch?: string;
   status?: SubscriptionStatus;
@@ -45,7 +44,6 @@ export class Subscription {
     this.url = options.url;
     this.whitelist = options.whitelist;
     this.blacklist = options.blacklist;
-    this.skipFiles = options.skipFiles;
     this.dependences = options.dependences;
     this.branch = options.branch;
     this.pull_type = options.pull_type;
@@ -97,7 +95,6 @@ export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
     type: DataTypes.STRING,
     whitelist: DataTypes.STRING,
     blacklist: DataTypes.STRING,
-    skipFiles: DataTypes.TEXT,
     status: DataTypes.NUMBER,
     dependences: DataTypes.STRING,
     extensions: DataTypes.STRING,

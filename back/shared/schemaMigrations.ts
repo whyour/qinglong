@@ -25,7 +25,6 @@ const columns = [
   { table: 'Envs', column: 'isPinned', type: 'NUMBER' },
   { table: 'Envs', column: 'labels', type: 'JSON' },
   { table: 'Crontabs', column: 'queued_token', type: 'VARCHAR(255)' },
-  { table: 'Subscriptions', column: 'skipFiles', type: 'TEXT' },
 ];
 
 export async function migrateSchema(database: Sequelize): Promise<void> {
@@ -67,54 +66,5 @@ export async function migrateSchema(database: Sequelize): Promise<void> {
         );
       }
     }
-    await migrateDependencyIdentity(database, transaction);
   });
-}
-
-async function migrateDependencyIdentity(
-  database: Sequelize,
-  transaction: any,
-) {
-  const tables = await database.query<{ name: string }>(
-    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Dependences'",
-    { type: QueryTypes.SELECT, transaction },
-  );
-  if (!tables.length) return;
-  const id = 'deduplicate-dependency-identity';
-  const applied = await database.query(
-    'SELECT id FROM SchemaMigrations WHERE id = :id',
-    { replacements: { id }, type: QueryTypes.SELECT, transaction },
-  );
-  if (applied.length) return;
-  // Archive complete original rows before normalizing or removing duplicates.
-  // Keep an installed row where possible, otherwise the oldest row/ID.
-  await database.query(
-    'CREATE TABLE IF NOT EXISTS DependenceDuplicates AS SELECT * FROM Dependences WHERE 0',
-    { transaction },
-  );
-  const duplicates = `SELECT d.id FROM Dependences d WHERE EXISTS (
-    SELECT 1 FROM Dependences keep WHERE keep.type = d.type AND trim(keep.name) = trim(d.name)
-    AND (CASE WHEN keep.status = 1 THEN 0 ELSE 1 END < CASE WHEN d.status = 1 THEN 0 ELSE 1 END
-    OR (CASE WHEN keep.status = 1 THEN 0 ELSE 1 END = CASE WHEN d.status = 1 THEN 0 ELSE 1 END AND keep.id < d.id)))`;
-  await database.query(
-    `INSERT INTO DependenceDuplicates SELECT * FROM Dependences WHERE id IN (${duplicates})`,
-    { transaction },
-  );
-  await database.query(`DELETE FROM Dependences WHERE id IN (${duplicates})`, {
-    transaction,
-  });
-  await database.query('UPDATE Dependences SET name = trim(name)', {
-    transaction,
-  });
-  await database.query(
-    'CREATE UNIQUE INDEX IF NOT EXISTS dependence_type_name ON Dependences (type, name)',
-    { transaction },
-  );
-  await database.query(
-    'INSERT INTO SchemaMigrations (id, applied_at) VALUES (:id, :appliedAt)',
-    {
-      replacements: { id, appliedAt: new Date().toISOString() },
-      transaction,
-    },
-  );
 }

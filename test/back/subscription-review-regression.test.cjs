@@ -274,8 +274,6 @@ function updateFixture(t) {
   for (const file of ['notify.js', 'notify.py', 'crontab'])
     fs.writeFileSync(path.join(root, file), '');
   const helpers = [
-    'subscription_file_is_skipped',
-    'copy_subscription_file',
     'update_repo',
     'diff_scripts',
     'gen_list_repo',

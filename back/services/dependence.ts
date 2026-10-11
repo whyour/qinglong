@@ -45,15 +45,7 @@ export default class DependenceService {
   }
 
   public async insert(payloads: Dependence[]): Promise<Dependence[]> {
-    const docs: Dependence[] = [];
-    for (const payload of payloads) {
-      // The database unique index also covers simultaneous API requests.
-      const [doc, created] = await DependenceModel.findCreateFind({
-        where: { name: payload.name.trim(), type: payload.type },
-        defaults: payload,
-      });
-      if (created) docs.push(doc);
-    }
+    const docs = await DependenceModel.bulkCreate(payloads);
     return docs;
   }
 
