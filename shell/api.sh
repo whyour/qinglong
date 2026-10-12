@@ -85,9 +85,13 @@ add_cron_api() {
     sub_id="null"
   fi
 
+  local payload
+  payload=$(jq -cn --arg name "$name" --arg command "$command" \
+    --arg schedule "$schedule" --argjson sub_id "$sub_id" \
+    '{name: $name, command: $command, schedule: $schedule, sub_id: $sub_id}') || return $?
   local api=$(ql_api_request \
     "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
-    --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"sub_id\":$sub_id}" \
+    --data-raw "$payload" \
     -X POST)
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
@@ -112,10 +116,14 @@ update_cron_api() {
     local id="$4"
   fi
 
+  local payload
+  payload=$(jq -cn --arg name "$name" --arg command "$command" \
+    --arg schedule "$schedule" --arg id "$id" \
+    '{name: $name, command: $command, schedule: $schedule, id: $id}') || return $?
   local api=$(ql_api_request \
     "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
     -X PUT \
-    --data-raw "{\"name\":\"${name//\"/\\\"}\",\"command\":\"${command//\"/\\\"}\",\"schedule\":\"$schedule\",\"id\":\"$id\"}")
+    --data-raw "$payload")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
@@ -135,10 +143,13 @@ update_cron_command_api() {
     local id="$2"
   fi
 
+  local payload
+  payload=$(jq -cn --arg command "$command" --arg id "$id" \
+    '{command: $command, id: $id}') || return $?
   local api=$(ql_api_request \
     "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
     -X PUT \
-    --data-raw "{\"command\":\"${command//\"/\\\"}\",\"id\":\"$id\"}")
+    --data-raw "$payload")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then

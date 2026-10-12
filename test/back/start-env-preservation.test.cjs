@@ -37,7 +37,7 @@ function startup(root, trace, command, fail = false) {
     [
       '-c',
       `npm(){ [[ "$*" == 'prefix --global' ]] || return 2; printf '%s\\n' "$QL_DIR/global-prefix"; };
-node(){ command '${process.execPath}' "$@"; };
+node(){ command "$QL_TEST_NODE" "$@"; };
 pip3(){ :; }; apk(){ :; }; sudo(){ "$@"; }; python3(){ printf 3.11; };
 ${source}`,
       'startup-test',
@@ -51,6 +51,7 @@ ${source}`,
         QL_DATA_DIR: path.join(root, 'data'),
         QL_OS_TYPE: 'alpine',
         QL_INSTALL_TRACE: trace,
+        QL_TEST_NODE: process.execPath,
         QL_INSTALL_FAILURE: fail ? '1' : '0',
       },
     },

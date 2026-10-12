@@ -99,7 +99,9 @@ add_cron() {
       cron_name=$(grep "new Env" $file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
       [[ -z $cron_name ]] && cron_name=$(grep "name:" $file | awk -F ":" '{print $2}' | head -1 | xargs)
       [[ -z $cron_name ]] && cron_name=$(basename "$file_name")
-      result=$(add_cron_api "${cron_line}:${cmd_task} ${file}:${cron_name}:${SUB_ID}")
+      cron_name=${cron_name//$'\r'/}
+      cron_line=${cron_line//$'\r'/}
+      result=$(add_cron_api "$cron_line" "${cmd_task} ${file}" "$cron_name" "$SUB_ID")
       echo -e "$result"
       if [[ $detail ]]; then
         detail="${detail}${result}\n"
@@ -190,7 +192,9 @@ update_raw() {
       [[ -z $cron_line ]] && cron_line=$(grep "cron:" $raw_file_name | awk -F ":" '{print $2}' | head -1 | xargs)
       [[ -z $cron_line ]] && cron_line=$(grep "cron " $raw_file_name | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | head -1 | xargs)
       [[ -z $cron_line ]] && cron_line="$default_cron"
-      result=$(add_cron_api "${cron_line}:${cmd_task} ${filename}:${cron_name}:${SUB_ID}")
+      cron_name=${cron_name//$'\r'/}
+      cron_line=${cron_line//$'\r'/}
+      result=$(add_cron_api "$cron_line" "${cmd_task} ${filename}" "$cron_name" "$SUB_ID")
       echo -e "$result\n"
       notify_api "新增任务通知" "\n$result"
       # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
