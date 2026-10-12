@@ -7,8 +7,8 @@ const { spawnSync } = require('node:child_process');
 
 // Run the actual startup prefix, stopping before service initialization.
 const source = fs
-  .readFileSync('shell/start.sh', 'utf8')
-  .split('. ${QL_DIR}/shell/share.sh')[0];
+  .readFileSync('shell/start-simplify.sh', 'utf8')
+  .split('. "${QL_DIR}/shell/share.sh"')[0];
 for (const command of ['start', 'reload']) {
   for (const existing of [false, true]) {
     test(`${command} ${
