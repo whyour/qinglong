@@ -10,6 +10,9 @@ interface NotifyLogItem {
   content?: string;
   status?: number;
   notifyType?: string;
+  source?: 'system' | 'script';
+  scriptName?: string;
+  taskId?: string;
 }
 
 const NotifyStatusLabel: Record<number, string> = {
@@ -23,6 +26,18 @@ const NotifyStatusColor: Record<number, string> = {
 };
 
 const columns = [
+  {
+    title: intl.get('通知来源'),
+    key: 'source',
+    width: 220,
+    render: (_: unknown, record: NotifyLogItem) => (
+      <span>
+        {intl.get(record.source === 'script' ? '脚本通知' : '系统通知')}
+        {record.scriptName ? ` · ${record.scriptName}` : ''}
+        {record.taskId ? ` (#${record.taskId})` : ''}
+      </span>
+    ),
+  },
   {
     title: intl.get('序号'),
     width: 50,
@@ -68,10 +83,7 @@ const columns = [
     render: (text: string, record: NotifyLogItem) => {
       const statusKey = record.status ?? 1;
       return (
-        <Tag
-          color={NotifyStatusColor[statusKey]}
-          style={{ marginRight: 0 }}
-        >
+        <Tag color={NotifyStatusColor[statusKey]} style={{ marginRight: 0 }}>
           {intl.get(NotifyStatusLabel[statusKey])}
         </Tag>
       );

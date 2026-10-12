@@ -702,5 +702,8 @@
   "通知日志": "Notification log",
   "发送时间": "Sent at",
   "推送渠道": "Channel",
-  "发送状态": "Delivery status"
+  "发送状态": "Delivery status",
+  "通知来源": "Notification source",
+  "脚本通知": "Script notification",
+  "系统通知": "System notification"
 }

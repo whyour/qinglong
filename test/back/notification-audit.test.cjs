@@ -38,8 +38,22 @@ async function fixture(t) {
   }).default;
   const service = Object.assign(Object.create(S.prototype), {
     logger,
-    notificationService: { notify: async () => true },
+    notificationService: new (load('back/services/notify.ts', {
+      typedi: decorators,
+      '../config/util': {},
+      '../data/system': {
+        SystemModel: rows,
+        AuthDataType: { notifyLog: 'notifyLog' },
+        NotifyStatus: { success: 0, fail: 1 },
+      },
+      '../shared/i18n': { t: (s) => s },
+      './user': {},
+    }).default)(),
   });
+  service.notificationService.userService = {
+    getNotificationMode: async () => ({ type: 'email' }),
+  };
+  service.notificationService.modeMap.set('email', async () => true);
   service.getDb = async () => ({ info: { type: 'email' } });
   return { rows, service };
 }
@@ -72,7 +86,7 @@ test('audit DB failure does not turn a successful notification into failure', as
 });
 test('failed sends are recorded and message size is bounded', async (t) => {
   const { service } = await fixture(t);
-  service.notificationService.notify = async () => false;
+  service.notificationService.modeMap.set('gotify', async () => false);
   assert.equal(
     (
       await service.notify({
@@ -88,4 +102,22 @@ test('failed sends are recorded and message size is bounded', async (t) => {
   assert.equal(row.title.length, 512);
   assert.equal(row.content.length, 8192);
   assert.equal(row.notifyType, 'gotify');
+});
+
+test('script reports share retention and preserve source without sending twice', async (t) => {
+  const { service } = await fixture(t);
+  await service.recordNotifyLog({
+    title: 'task result',
+    content: 'body',
+    status: 1,
+    notifyType: 'smtp',
+    source: 'script',
+    scriptName: 'job.py',
+    taskId: '42',
+  });
+  const [row] = await service.getNotifyLog();
+  assert.equal(row.source, 'script');
+  assert.equal(row.scriptName, 'job.py');
+  assert.equal(row.taskId, '42');
+  assert.equal(row.status, 1);
 });

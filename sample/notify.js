@@ -153,7 +153,7 @@ const push_config = {
   WXPUSHER_APP_TOKEN: '', // wxpusher 的 appToken
   WXPUSHER_TOPIC_IDS: '', // wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
   WXPUSHER_UIDS: '', // wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
-  // 方式二：极简发送（最简单，简单好用，一键配置，更推荐） 
+  // 方式二：极简发送（最简单，简单好用，一键配置，更推荐）
   // wxPusher 的 SPT（极简推送），扫码获取 https://wxpusher.zjiecode.com/docs/#/?id=spt
   // 多个用英文逗号,分隔，最多10个；与上面的 appToken 方式二选一即可
   WXPUSHER_SPT_LIST: '', // wxpusher 的 SPT（极简推送），多个用英文逗号,分隔，最多10个
@@ -218,6 +218,8 @@ async function one() {
 }
 
 function gotifyNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { GOTIFY_URL, GOTIFY_TOKEN, GOTIFY_PRIORITY } = push_config;
     if (GOTIFY_URL && GOTIFY_TOKEN) {
@@ -233,18 +235,22 @@ function gotifyNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('Gotify 发送通知调用API失败😞\n', err);
           } else {
             if (data.id) {
+              auditSucceeded = true;
               console.log('Gotify 发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`Gotify 发送通知调用API失败😞 ${data.message}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve();
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -254,6 +260,8 @@ function gotifyNotify(text, desp) {
 }
 
 function gobotNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { GOBOT_URL, GOBOT_TOKEN, GOBOT_QQ } = push_config;
     if (GOBOT_URL) {
@@ -268,20 +276,25 @@ function gobotNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('Go-cqhttp 通知调用API失败😞\n', err);
           } else {
             if (data.retcode === 0) {
+              auditSucceeded = true;
               console.log('Go-cqhttp 发送通知消息成功🎉\n');
             } else if (data.retcode === 100) {
+              auditFailed = true;
               console.log(`Go-cqhttp 发送通知消息异常 ${data.errmsg}\n`);
             } else {
+              auditFailed = true;
               console.log(`Go-cqhttp 发送通知消息异常 ${JSON.stringify(data)}`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -291,6 +304,8 @@ function gobotNotify(text, desp) {
 }
 
 function serverNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { PUSH_KEY } = push_config;
     if (PUSH_KEY) {
@@ -314,22 +329,27 @@ function serverNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('Server 酱发送通知调用API失败😞\n', err);
           } else {
             // server酱和Server酱·Turbo版的返回json格式不太一样
             if (data.errno === 0 || data.code === 0) {
+              auditSucceeded = true;
               console.log('Server 酱发送通知消息成功🎉\n');
             } else if (data.errno === 1024) {
               // 一分钟内发送相同的内容会触发
+              auditFailed = true;
               console.log(`Server 酱发送通知消息异常 ${data.errmsg}\n`);
             } else {
+              auditFailed = true;
               console.log(`Server 酱发送通知消息异常 ${JSON.stringify(data)}`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -339,6 +359,8 @@ function serverNotify(text, desp) {
 }
 
 function pushDeerNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { DEER_KEY, DEER_URL } = push_config;
     if (DEER_KEY) {
@@ -355,6 +377,7 @@ function pushDeerNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('PushDeer 通知调用API失败😞\n', err);
           } else {
             // 通过返回的result的长度来判断是否成功
@@ -362,17 +385,20 @@ function pushDeerNotify(text, desp) {
               data.content.result.length !== undefined &&
               data.content.result.length > 0
             ) {
+              auditSucceeded = true;
               console.log('PushDeer 发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(
                 `PushDeer 发送通知消息异常😞 ${JSON.stringify(data)}`,
               );
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -382,6 +408,8 @@ function pushDeerNotify(text, desp) {
 }
 
 function chatNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { CHAT_URL, CHAT_TOKEN } = push_config;
     if (CHAT_URL && CHAT_TOKEN) {
@@ -397,18 +425,22 @@ function chatNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('Chat 发送通知调用API失败😞\n', err);
           } else {
             if (data.success) {
+              auditSucceeded = true;
               console.log('Chat 发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`Chat 发送通知消息异常 ${JSON.stringify(data)}`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -418,6 +450,8 @@ function chatNotify(text, desp) {
 }
 
 function barkNotify(text, desp, params = {}) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     let {
       BARK_PUSH,
@@ -454,18 +488,22 @@ function barkNotify(text, desp, params = {}) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('Bark APP 发送通知调用API失败😞\n', err);
           } else {
             if (data.code === 200) {
+              auditSucceeded = true;
               console.log('Bark APP 发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`Bark APP 发送通知消息异常 ${data.message}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve();
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -475,6 +513,8 @@ function barkNotify(text, desp, params = {}) {
 }
 
 function tgBotNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const {
       TG_BOT_TOKEN,
@@ -511,9 +551,11 @@ function tgBotNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('Telegram 发送通知消息失败😞\n', err);
           } else {
             if (data.ok) {
+              auditSucceeded = true;
               console.log('Telegram 发送通知消息成功🎉。\n');
             } else if (data.error_code === 400) {
               console.log(
@@ -524,9 +566,10 @@ function tgBotNotify(text, desp) {
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -535,6 +578,8 @@ function tgBotNotify(text, desp) {
   });
 }
 function ddBotNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { DD_BOT_TOKEN, DD_BOT_SECRET } = push_config;
     const options = {
@@ -560,36 +605,44 @@ function ddBotNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('钉钉发送通知消息失败😞\n', err);
           } else {
             if (data.errcode === 0) {
+              auditSucceeded = true;
               console.log('钉钉发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`钉钉发送通知消息异常 ${data.errmsg}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else if (DD_BOT_TOKEN) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('钉钉发送通知消息失败😞\n', err);
           } else {
             if (data.errcode === 0) {
+              auditSucceeded = true;
               console.log('钉钉发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`钉钉发送通知消息异常 ${data.errmsg}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -599,6 +652,8 @@ function ddBotNotify(text, desp) {
 }
 
 function qywxBotNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { QYWX_ORIGIN, QYWX_KEY } = push_config;
     const options = {
@@ -618,18 +673,22 @@ function qywxBotNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('企业微信发送通知消息失败😞\n', err);
           } else {
             if (data.errcode === 0) {
+              auditSucceeded = true;
               console.log('企业微信发送通知消息成功🎉。\n');
             } else {
+              auditFailed = true;
               console.log(`企业微信发送通知消息异常 ${data.errmsg}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -659,17 +718,22 @@ function ChangeUserId(desp) {
 }
 
 async function qywxamNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   const MAX_LENGTH = 900;
   if (desp.length > MAX_LENGTH) {
     let d = desp.substr(0, MAX_LENGTH) + '\n==More==';
-    await do_qywxamNotify(text, d);
-    await qywxamNotify(text, desp.substr(MAX_LENGTH));
+    const first = await do_qywxamNotify(text, d);
+    const rest = await qywxamNotify(text, desp.substr(MAX_LENGTH));
+    return first === undefined ? undefined : first && rest;
   } else {
     return await do_qywxamNotify(text, desp);
   }
 }
 
 function do_qywxamNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { QYWX_AM, QYWX_ORIGIN } = push_config;
     if (QYWX_AM) {
@@ -754,6 +818,7 @@ function do_qywxamNotify(text, desp) {
         $.post(options, (err, resp, data) => {
           try {
             if (err) {
+              auditFailed = true;
               console.log(
                 '成员ID:' +
                   ChangeUserId(desp) +
@@ -762,21 +827,24 @@ function do_qywxamNotify(text, desp) {
               );
             } else {
               if (data.errcode === 0) {
+                auditSucceeded = true;
                 console.log(
                   '成员ID:' +
                     ChangeUserId(desp) +
                     '企业微信应用消息发送通知消息成功🎉。\n',
                 );
               } else {
+                auditFailed = true;
                 console.log(
                   `企业微信应用消息发送通知消息异常 ${data.errmsg}\n`,
                 );
               }
             }
           } catch (e) {
+            auditFailed = true;
             $.logErr(e, resp);
           } finally {
-            resolve(data);
+            resolve(auditSucceeded && !auditFailed);
           }
         });
       });
@@ -787,6 +855,8 @@ function do_qywxamNotify(text, desp) {
 }
 
 function iGotNotify(text, desp, params = {}) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { IGOT_PUSH_KEY } = push_config;
     if (IGOT_PUSH_KEY) {
@@ -808,18 +878,22 @@ function iGotNotify(text, desp, params = {}) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('IGot 发送通知调用API失败😞\n', err);
           } else {
             if (data.ret === 0) {
+              auditSucceeded = true;
               console.log('IGot 发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`IGot 发送通知消息异常 ${data.errMsg}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -829,6 +903,8 @@ function iGotNotify(text, desp, params = {}) {
 }
 
 function pushPlusNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const {
       PUSH_PLUS_TOKEN,
@@ -863,6 +939,7 @@ function pushPlusNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log(
               `pushplus 发送${
                 PUSH_PLUS_USER ? '一对多' : '一对一'
@@ -871,6 +948,7 @@ function pushPlusNotify(text, desp) {
             );
           } else {
             if (data.code === 200) {
+              auditSucceeded = true;
               console.log(
                 `pushplus 发送${
                   PUSH_PLUS_USER ? '一对多' : '一对一'
@@ -879,6 +957,7 @@ function pushPlusNotify(text, desp) {
                 }\n注意：请求成功并不代表推送成功，如未收到消息，请到pushplus官网使用流水号查询推送最终结果`,
               );
             } else {
+              auditFailed = true;
               console.log(
                 `pushplus 发送${
                   PUSH_PLUS_USER ? '一对多' : '一对一'
@@ -887,9 +966,10 @@ function pushPlusNotify(text, desp) {
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -899,6 +979,8 @@ function pushPlusNotify(text, desp) {
 }
 
 function wePlusBotNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { WE_PLUS_BOT_TOKEN, WE_PLUS_BOT_RECEIVER, WE_PLUS_BOT_VERSION } =
       push_config;
@@ -927,18 +1009,22 @@ function wePlusBotNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log(`微加机器人发送通知消息失败😞\n`, err);
           } else {
             if (data.code === 200) {
+              auditSucceeded = true;
               console.log(`微加机器人发送通知消息完成🎉\n`);
             } else {
+              auditFailed = true;
               console.log(`微加机器人发送通知消息异常 ${data.msg}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -948,6 +1034,8 @@ function wePlusBotNotify(text, desp) {
 }
 
 function aibotkNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { AIBOTK_KEY, AIBOTK_TYPE, AIBOTK_NAME } = push_config;
     if (AIBOTK_KEY && AIBOTK_TYPE && AIBOTK_NAME) {
@@ -988,18 +1076,22 @@ function aibotkNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('智能微秘书发送通知消息失败😞\n', err);
           } else {
             if (data.code === 0) {
+              auditSucceeded = true;
               console.log('智能微秘书发送通知消息成功🎉。\n');
             } else {
+              auditFailed = true;
               console.log(`智能微秘书发送通知消息异常 ${data.error}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -1009,6 +1101,8 @@ function aibotkNotify(text, desp) {
 }
 
 function fsBotNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { FSKEY, FSSECRET } = push_config;
     if (FSKEY) {
@@ -1041,18 +1135,22 @@ function fsBotNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('飞书发送通知调用API失败😞\n', err);
           } else {
             if (data.StatusCode === 0 || data.code === 0) {
+              auditSucceeded = true;
               console.log('飞书发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`飞书发送通知消息异常 ${data.msg}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -1113,9 +1211,12 @@ async function smtpNotify(text, desp) {
   } catch (e) {
     console.log('SMTP 发送通知消息出现异常😞\n', e);
   }
+  return false;
 }
 
 function pushMeNotify(text, desp, params = {}) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { PUSHME_KEY, PUSHME_URL } = push_config;
     if (PUSHME_KEY) {
@@ -1130,18 +1231,22 @@ function pushMeNotify(text, desp, params = {}) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('PushMe 发送通知调用API失败😞\n', err);
           } else {
             if (data === 'success') {
+              auditSucceeded = true;
               console.log('PushMe 发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`PushMe 发送通知消息异常 ${data}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -1150,78 +1255,55 @@ function pushMeNotify(text, desp, params = {}) {
   });
 }
 
-function chronocatNotify(title, desp) {
-  return new Promise((resolve) => {
-    const { CHRONOCAT_TOKEN, CHRONOCAT_QQ, CHRONOCAT_URL } = push_config;
-    if (!CHRONOCAT_TOKEN || !CHRONOCAT_QQ || !CHRONOCAT_URL) {
-      resolve();
-      return;
+async function chronocatNotify(text, desp) {
+  const { CHRONOCAT_TOKEN, CHRONOCAT_QQ, CHRONOCAT_URL } = push_config;
+  if (!CHRONOCAT_TOKEN || !CHRONOCAT_QQ || !CHRONOCAT_URL) return;
+  const targets = [];
+  for (const [chatType, prefix] of [
+    [1, 'user_id'],
+    [2, 'group_id'],
+  ]) {
+    for (const match of CHRONOCAT_QQ.matchAll(
+      new RegExp(prefix + '=(\\d+)', 'g'),
+    )) {
+      targets.push({ chatType, peerUin: match[1] });
     }
-
-    const user_ids = CHRONOCAT_QQ.match(/user_id=(\d+)/g)?.map(
-      (match) => match.split('=')[1],
-    );
-    const group_ids = CHRONOCAT_QQ.match(/group_id=(\d+)/g)?.map(
-      (match) => match.split('=')[1],
-    );
-
-    const url = `${CHRONOCAT_URL}/api/message/send`;
-    const headers = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${CHRONOCAT_TOKEN}`,
-    };
-
-    for (const [chat_type, ids] of [
-      [1, user_ids],
-      [2, group_ids],
-    ]) {
-      if (!ids) {
-        continue;
-      }
-      for (const chat_id of ids) {
-        const data = {
-          peer: {
-            chatType: chat_type,
-            peerUin: chat_id,
-          },
-          elements: [
-            {
-              elementType: 1,
-              textElement: {
-                content: `${title}\n\n${desp}`,
-              },
+  }
+  const results = await Promise.all(
+    targets.map(async (peer) => {
+      try {
+        const response = await httpClient.post(
+          `${CHRONOCAT_URL}/api/message/send`,
+          {
+            json: {
+              peer,
+              elements: [
+                {
+                  elementType: 1,
+                  textElement: { content: `${text}\n\n${desp}` },
+                },
+              ],
             },
-          ],
-        };
-        const options = {
-          url: url,
-          json: data,
-          headers,
-          timeout,
-        };
-        $.post(options, (err, resp, data) => {
-          try {
-            if (err) {
-              console.log('Chronocat 发送QQ通知消息失败😞\n', err);
-            } else {
-              if (chat_type === 1) {
-                console.log(`Chronocat 个人消息 ${ids}推送成功🎉`);
-              } else {
-                console.log(`Chronocat 群消息 ${ids}推送成功🎉`);
-              }
-            }
-          } catch (e) {
-            $.logErr(e, resp);
-          } finally {
-            resolve(data);
-          }
-        });
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${CHRONOCAT_TOKEN}`,
+            },
+            timeout,
+          },
+        );
+        await response.body.text();
+        return response.statusCode >= 200 && response.statusCode < 300;
+      } catch (_) {
+        return false;
       }
-    }
-  });
+    }),
+  );
+  return results.length > 0 && results.every(Boolean);
 }
 
 function qmsgNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { QMSG_KEY, QMSG_TYPE } = push_config;
     if (QMSG_KEY && QMSG_TYPE) {
@@ -1236,18 +1318,22 @@ function qmsgNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('Qmsg 发送通知调用API失败😞\n', err);
           } else {
             if (data.code === 0) {
+              auditSucceeded = true;
               console.log('Qmsg 发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`Qmsg 发送通知消息异常 ${data}\n`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -1257,6 +1343,8 @@ function qmsgNotify(text, desp) {
 }
 
 function webhookNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const {
       WEBHOOK_URL,
@@ -1294,24 +1382,35 @@ function webhookNotify(text, desp) {
       '$title',
       encodeURIComponent(text),
     ).replaceAll('$content', encodeURIComponent(desp));
-    httpClient.request(formatUrl, options).then(async (resp) => {
-      const body = await resp.body.text();
-      try {
-        if (resp.statusCode !== 200) {
-          console.log(`自定义发送通知消息失败😞 ${body}\n`);
-        } else {
-          console.log(`自定义发送通知消息成功🎉 ${body}\n`);
+    httpClient
+      .request(formatUrl, options)
+      .then(async (resp) => {
+        const body = await resp.body.text();
+        try {
+          if (resp.statusCode !== 200) {
+            auditFailed = true;
+            console.log(`自定义发送通知消息失败😞 ${body}\n`);
+          } else {
+            auditSucceeded = true;
+            console.log(`自定义发送通知消息成功🎉 ${body}\n`);
+          }
+        } catch (e) {
+          auditFailed = true;
+          $.logErr(e, resp);
+        } finally {
+          resolve(auditSucceeded && !auditFailed);
         }
-      } catch (e) {
-        $.logErr(e, resp);
-      } finally {
-        resolve(body);
-      }
-    });
+      })
+      .catch(() => {
+        console.log('自定义发送通知消息失败');
+        resolve(false);
+      });
   });
 }
 
 function ntfyNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   function encodeRFC2047(text) {
     const encodedBase64 = Buffer.from(text).toString('base64');
     return `=?utf-8?B?${encodedBase64}?=`;
@@ -1341,8 +1440,9 @@ function ntfyNotify(text, desp) {
       if (NTFY_TOKEN) {
         options.headers['Authorization'] = `Bearer ${NTFY_TOKEN}`;
       } else if (NTFY_USERNAME && NTFY_PASSWORD) {
-        options.headers['Authorization'] =
-          `Basic ${Buffer.from(`${NTFY_USERNAME}:${NTFY_PASSWORD}`).toString('base64')}`;
+        options.headers['Authorization'] = `Basic ${Buffer.from(
+          `${NTFY_USERNAME}:${NTFY_PASSWORD}`,
+        ).toString('base64')}`;
       }
       if (NTFY_ACTIONS) {
         options.headers['Actions'] = encodeRFC2047(NTFY_ACTIONS);
@@ -1351,18 +1451,22 @@ function ntfyNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('Ntfy 通知调用API失败😞\n', err);
           } else {
             if (data.id) {
+              auditSucceeded = true;
               console.log('Ntfy 发送通知消息成功🎉\n');
             } else {
+              auditFailed = true;
               console.log(`Ntfy 发送通知消息异常 ${JSON.stringify(data)}`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -1372,6 +1476,8 @@ function ntfyNotify(text, desp) {
 }
 
 function wxPusherNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { WXPUSHER_APP_TOKEN, WXPUSHER_TOPIC_IDS, WXPUSHER_UIDS } =
       push_config;
@@ -1421,18 +1527,22 @@ function wxPusherNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('wxpusher发送通知消息失败！\n', err);
           } else {
             if (data.code === 1000) {
+              auditSucceeded = true;
               console.log('wxpusher发送通知消息完成！');
             } else {
+              auditFailed = true;
               console.log(`wxpusher发送通知消息异常：${data.msg}`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -1442,6 +1552,8 @@ function wxPusherNotify(text, desp) {
 }
 
 function wxPusherSptNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { WXPUSHER_SPT_LIST } = push_config;
     if (WXPUSHER_SPT_LIST) {
@@ -1479,18 +1591,22 @@ function wxPusherSptNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('wxpusher SPT 发送通知消息失败！\n', err);
           } else {
             if (data.code === 1000) {
+              auditSucceeded = true;
               console.log('wxpusher SPT 发送通知消息完成！');
             } else {
+              auditFailed = true;
               console.log(`wxpusher SPT 发送通知消息异常：${data.msg}`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -1499,9 +1615,9 @@ function wxPusherSptNotify(text, desp) {
   });
 }
 
-
-
 function wpushNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { WPUSH_APIKEY, WPUSH_CHANNEL, WPUSH_TOPIC_CODE } = push_config;
     if (WPUSH_APIKEY) {
@@ -1525,20 +1641,26 @@ function wpushNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('WPUSH 发送通知消息失败！\n', err);
           } else {
             if (data.code === 0) {
+              auditSucceeded = true;
               console.log('WPUSH 发送通知消息成功！');
             } else {
+              auditFailed = true;
               console.log(
-                `WPUSH 发送通知消息异常：${data.message || JSON.stringify(data)}`,
+                `WPUSH 发送通知消息异常：${
+                  data.message || JSON.stringify(data)
+                }`,
               );
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -1548,6 +1670,8 @@ function wpushNotify(text, desp) {
 }
 
 function openiLinkNotify(text, desp) {
+  let auditSucceeded = false;
+  let auditFailed = false;
   return new Promise((resolve) => {
     const { OPENILINK_APP_TOKEN, OPENILINK_HUB_URL, OPENILINK_CONTEXT_TOKEN } =
       push_config;
@@ -1575,18 +1699,22 @@ function openiLinkNotify(text, desp) {
       $.post(options, (err, resp, data) => {
         try {
           if (err) {
+            auditFailed = true;
             console.log('OpeniLink 发送通知消息失败！\n', err);
           } else {
             if (data.ok) {
+              auditSucceeded = true;
               console.log('OpeniLink 发送通知消息成功！');
             } else {
+              auditFailed = true;
               console.log(`OpeniLink 发送通知消息异常：${data.error}`);
             }
           }
         } catch (e) {
+          auditFailed = true;
           $.logErr(e, resp);
         } finally {
-          resolve(data);
+          resolve(auditSucceeded && !auditFailed);
         }
       });
     } else {
@@ -1681,6 +1809,41 @@ function formatBodyFun(contentType, body) {
   return {};
 }
 
+async function auditNotification(channel, title, content, send) {
+  let result;
+  try {
+    result = await send();
+  } catch (error) {
+    await reportNotification(channel, title, content, false);
+    throw error;
+  }
+  // Unconfigured channels do not create audit entries.
+  if (typeof result === 'boolean')
+    await reportNotification(channel, title, content, result);
+  return result;
+}
+
+async function reportNotification(channel, title, content, success) {
+  if (!process.env.QL_DIR) return;
+  try {
+    const path = require('node:path');
+    const report = require(path.join(
+      process.env.QL_DIR,
+      'shell/preload/notificationAudit.js',
+    ));
+    await report({
+      title: String(title || '').slice(0, 512),
+      content: String(content || '').slice(0, 8192),
+      success,
+      notifyType: channel,
+      scriptName: path.basename(process.argv[1] || ''),
+      taskId: process.env.ID || '',
+    });
+  } catch (_) {
+    // Older/offline panels must not prevent script notification delivery.
+  }
+}
+
 /**
  * sendNotify 推送通知功能
  * @param text 通知头
@@ -1703,31 +1866,41 @@ async function sendNotify(text, desp, params = {}) {
   }
 
   await Promise.all([
-    serverNotify(text, desp), // 微信server酱
-    pushPlusNotify(text, desp), // pushplus
-    wePlusBotNotify(text, desp), // 微加机器人
-    barkNotify(text, desp, params), // iOS Bark APP
-    tgBotNotify(text, desp), // telegram 机器人
-    ddBotNotify(text, desp), // 钉钉机器人
-    qywxBotNotify(text, desp), // 企业微信机器人
-    qywxamNotify(text, desp), // 企业微信应用消息推送
-    iGotNotify(text, desp, params), // iGot
-    gobotNotify(text, desp), // go-cqhttp
-    gotifyNotify(text, desp), // gotify
-    chatNotify(text, desp), // synology chat
-    pushDeerNotify(text, desp), // PushDeer
-    aibotkNotify(text, desp), // 智能微秘书
-    fsBotNotify(text, desp), // 飞书机器人
-    smtpNotify(text, desp), // SMTP 邮件
-    pushMeNotify(text, desp, params), // PushMe
-    chronocatNotify(text, desp), // Chronocat
-    webhookNotify(text, desp), // 自定义通知
-    qmsgNotify(text, desp), // 自定义通知
-    ntfyNotify(text, desp), // Ntfy
-    wxPusherNotify(text, desp), // wxpusher
-    wxPusherSptNotify(text, desp), // wxpusher SPT
-    openiLinkNotify(text, desp), // OpeniLink
-    wpushNotify(text, desp), // WPUSH
+    auditNotification('server', text, desp, () => serverNotify(text, desp)), // 微信server酱
+    auditNotification('pushPlus', text, desp, () => pushPlusNotify(text, desp)), // pushplus
+    auditNotification('wePlusBot', text, desp, () =>
+      wePlusBotNotify(text, desp),
+    ), // 微加机器人
+    auditNotification('bark', text, desp, () => barkNotify(text, desp, params)), // iOS Bark APP
+    auditNotification('tgBot', text, desp, () => tgBotNotify(text, desp)), // telegram 机器人
+    auditNotification('ddBot', text, desp, () => ddBotNotify(text, desp)), // 钉钉机器人
+    auditNotification('qywxBot', text, desp, () => qywxBotNotify(text, desp)), // 企业微信机器人
+    auditNotification('qywxam', text, desp, () => qywxamNotify(text, desp)), // 企业微信应用消息推送
+    auditNotification('iGot', text, desp, () => iGotNotify(text, desp, params)), // iGot
+    auditNotification('gobot', text, desp, () => gobotNotify(text, desp)), // go-cqhttp
+    auditNotification('gotify', text, desp, () => gotifyNotify(text, desp)), // gotify
+    auditNotification('chat', text, desp, () => chatNotify(text, desp)), // synology chat
+    auditNotification('pushDeer', text, desp, () => pushDeerNotify(text, desp)), // PushDeer
+    auditNotification('aibotk', text, desp, () => aibotkNotify(text, desp)), // 智能微秘书
+    auditNotification('fsBot', text, desp, () => fsBotNotify(text, desp)), // 飞书机器人
+    auditNotification('smtp', text, desp, () => smtpNotify(text, desp)), // SMTP 邮件
+    auditNotification('pushMe', text, desp, () =>
+      pushMeNotify(text, desp, params),
+    ), // PushMe
+    auditNotification('chronocat', text, desp, () =>
+      chronocatNotify(text, desp),
+    ), // Chronocat
+    auditNotification('webhook', text, desp, () => webhookNotify(text, desp)), // 自定义通知
+    auditNotification('qmsg', text, desp, () => qmsgNotify(text, desp)), // 自定义通知
+    auditNotification('ntfy', text, desp, () => ntfyNotify(text, desp)), // Ntfy
+    auditNotification('wxPusher', text, desp, () => wxPusherNotify(text, desp)), // wxpusher
+    auditNotification('wxPusherSpt', text, desp, () =>
+      wxPusherSptNotify(text, desp),
+    ), // wxpusher SPT
+    auditNotification('openiLink', text, desp, () =>
+      openiLinkNotify(text, desp),
+    ), // OpeniLink
+    auditNotification('wpush', text, desp, () => wpushNotify(text, desp)), // WPUSH
   ]);
 }
 

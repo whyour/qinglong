@@ -409,7 +409,7 @@ test('cron metadata precedence agrees with unchanged legacy add_cron', (t) => {
         '--noprofile',
         '--norc',
         '-c',
-        `${definition}\nt() { :; }\nnotify_api() { :; }\nadd_cron_api() { printf '%s' "$1"; }\nadd_cron "$dir_scripts/list" repo`,
+        `${definition}\nt() { :; }\nnotify_api() { :; }\nadd_cron_api() { printf '%s:%s:%s:%s' "$1" "$2" "$3" "$4"; }\nadd_cron "$dir_scripts/list" repo`,
       ],
       {
         encoding: 'utf8',

@@ -1,3 +1,4 @@
+import { persistNotificationAudit } from '../shared/notificationAudit';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { Inject, Service } from 'typedi';
@@ -55,27 +56,33 @@ export default class NotificationService {
     content: string,
     notificationInfo?: NotificationInfo,
   ): Promise<boolean | undefined> {
-    let { type, ...rest } = await this.userService.getNotificationMode();
-    if (notificationInfo?.type) {
-      type = notificationInfo?.type;
-    }
-    if (type) {
-      this.title = title;
-      this.content = content;
-      let params = rest;
-      if (notificationInfo) {
-        const { type: _, ...others } = notificationInfo;
-        params = { ...rest, ...others };
+    let type: string | undefined;
+    let success = false;
+    try {
+      const saved = await this.userService.getNotificationMode();
+      type = notificationInfo?.type || saved.type;
+      if (type) {
+        this.title = title;
+        this.content = content;
+        const { type: _, ...overrides } = notificationInfo || {};
+        const { type: _saved, ...rest } = saved;
+        this.params = { ...rest, ...overrides };
+        try {
+          success = !!(await this.modeMap.get(type)?.call(this));
+        } catch (error) {
+          console.error(error);
+        }
       }
-      this.params = params;
-      const notificationModeAction = this.modeMap.get(type);
-      try {
-        return await notificationModeAction?.call(this);
-      } catch (error: any) {
-        console.error(error);
-      }
+      return success;
+    } finally {
+      await persistNotificationAudit({
+        title,
+        content,
+        notifyType: type,
+        source: 'system',
+        status: success ? 0 : 1,
+      });
     }
-    return false;
   }
 
   public async testNotify(
@@ -84,14 +91,23 @@ export default class NotificationService {
     content: string,
   ) {
     const { type, ...rest } = info;
-    if (type) {
+    if (!type) return true;
+    let success = false;
+    try {
       this.title = title;
       this.content = content;
       this.params = rest;
-      const notificationModeAction = this.modeMap.get(type);
-      return await notificationModeAction?.call(this);
+      success = !!(await this.modeMap.get(type)?.call(this));
+      return success;
+    } finally {
+      await persistNotificationAudit({
+        title,
+        content,
+        notifyType: type,
+        source: 'system',
+        status: success ? 0 : 1,
+      });
     }
-    return true;
   }
 
   private parseMailRecipients(value?: string) {

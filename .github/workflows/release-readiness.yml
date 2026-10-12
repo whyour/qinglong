@@ -120,7 +120,7 @@ jobs:
         run: |
           docker run --rm --network none --entrypoint node \
             qinglong-readiness:${{ matrix.image }} \
-            -e 'const assert=require("node:assert/strict"); const {createRequire}=require("node:module"); for(const [name,want] of Object.entries({"@grpc/grpc-js":"1.14.5",compression:"1.8.2",multer:"2.3.0",sequelize:"6.37.8"}))assert.equal(require(name+"/package.json").version,want); const expressRequire=createRequire(require.resolve("express")); assert.equal(expressRequire("proxy-addr/package.json").version,"2.0.8"); const sockRequire=createRequire(require.resolve("sockjs")); assert.equal(sockRequire("websocket-driver/package.json").version,"0.7.5"); require("sqlite3"); require("nodemailer"); require("undici"); console.log("Minimal production patches and runtime imports verified")'
+            -e 'const assert=require("node:assert/strict"); const {createRequire}=require("node:module"); for(const [name,want] of Object.entries({"@grpc/grpc-js":"1.14.5",compression:"1.8.2",multer:"2.4.0",sequelize:"6.37.8"}))assert.equal(require(name+"/package.json").version,want); const expressRequire=createRequire(require.resolve("express")); assert.equal(expressRequire("proxy-addr/package.json").version,"2.0.8"); const sockRequire=createRequire(require.resolve("sockjs")); assert.equal(sockRequire("websocket-driver/package.json").version,"0.7.5"); require("sqlite3"); require("nodemailer"); require("undici"); console.log("Minimal production patches and runtime imports verified")'
       - name: Export native Debian image for isolated dev validation
         if: matrix.image == 'debian'
         run: |

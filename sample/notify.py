@@ -10,6 +10,8 @@ import threading
 import time
 import urllib.parse
 import smtplib
+import subprocess
+from typing import Optional
 from email.mime.text import MIMEText
 from email.header import Header
 from email.utils import formataddr
@@ -161,10 +163,11 @@ for k in push_config:
         push_config[k] = v
 
 
-def bark(title: str, content: str) -> None:
+def bark(title: str, content: str) -> Optional[bool]:
     """
     使用 bark 推送消息。
     """
+    audit_results = []
     if not push_config.get("BARK_PUSH"):
         return
     print("bark 服务启动")
@@ -200,22 +203,28 @@ def bark(title: str, content: str) -> None:
     ).json()
 
     if response["code"] == 200:
+        audit_results.append(True)
         print("bark 推送成功！")
     else:
+        audit_results.append(False)
         print("bark 推送失败！")
+    return all(audit_results) if audit_results else None
 
 
-def console(title: str, content: str) -> None:
+def console(title: str, content: str) -> Optional[bool]:
     """
     使用 控制台 推送消息。
     """
+    audit_results = []
     print(f"{title}\n\n{content}")
+    return True
 
 
-def dingding_bot(title: str, content: str) -> None:
+def dingding_bot(title: str, content: str) -> Optional[bool]:
     """
     使用 钉钉机器人 推送消息。
     """
+    audit_results = []
     if not push_config.get("DD_BOT_SECRET") or not push_config.get("DD_BOT_TOKEN"):
         return
     print("钉钉机器人 服务启动")
@@ -236,15 +245,19 @@ def dingding_bot(title: str, content: str) -> None:
     ).json()
 
     if not response["errcode"]:
+        audit_results.append(True)
         print("钉钉机器人 推送成功！")
     else:
+        audit_results.append(False)
         print("钉钉机器人 推送失败！")
+    return all(audit_results) if audit_results else None
 
 
-def feishu_bot(title: str, content: str) -> None:
+def feishu_bot(title: str, content: str) -> Optional[bool]:
     """
     使用 飞书机器人 推送消息。
     """
+    audit_results = []
     if not push_config.get("FSKEY"):
         return
     print("飞书 服务启动")
@@ -268,15 +281,19 @@ def feishu_bot(title: str, content: str) -> None:
     response = requests.post(url, data=json.dumps(data)).json()
 
     if response.get("StatusCode") == 0 or response.get("code") == 0:
+        audit_results.append(True)
         print("飞书 推送成功！")
     else:
+        audit_results.append(False)
         print("飞书 推送失败！错误信息如下：\n", response)
+    return all(audit_results) if audit_results else None
 
 
-def go_cqhttp(title: str, content: str) -> None:
+def go_cqhttp(title: str, content: str) -> Optional[bool]:
     """
     使用 go_cqhttp 推送消息。
     """
+    audit_results = []
     if not push_config.get("GOBOT_URL") or not push_config.get("GOBOT_QQ"):
         return
     print("go-cqhttp 服务启动")
@@ -285,15 +302,19 @@ def go_cqhttp(title: str, content: str) -> None:
     response = requests.get(url).json()
 
     if response["status"] == "ok":
+        audit_results.append(True)
         print("go-cqhttp 推送成功！")
     else:
+        audit_results.append(False)
         print("go-cqhttp 推送失败！")
+    return all(audit_results) if audit_results else None
 
 
-def gotify(title: str, content: str) -> None:
+def gotify(title: str, content: str) -> Optional[bool]:
     """
     使用 gotify 推送消息。
     """
+    audit_results = []
     if not push_config.get("GOTIFY_URL") or not push_config.get("GOTIFY_TOKEN"):
         return
     print("gotify 服务启动")
@@ -307,15 +328,19 @@ def gotify(title: str, content: str) -> None:
     response = requests.post(url, data=data).json()
 
     if response.get("id"):
+        audit_results.append(True)
         print("gotify 推送成功！")
     else:
+        audit_results.append(False)
         print("gotify 推送失败！")
+    return all(audit_results) if audit_results else None
 
 
-def iGot(title: str, content: str) -> None:
+def iGot(title: str, content: str) -> Optional[bool]:
     """
     使用 iGot 推送消息。
     """
+    audit_results = []
     if not push_config.get("IGOT_PUSH_KEY"):
         return
     print("iGot 服务启动")
@@ -326,15 +351,19 @@ def iGot(title: str, content: str) -> None:
     response = requests.post(url, data=data, headers=headers).json()
 
     if response["ret"] == 0:
+        audit_results.append(True)
         print("iGot 推送成功！")
     else:
+        audit_results.append(False)
         print(f'iGot 推送失败！{response["errMsg"]}')
+    return all(audit_results) if audit_results else None
 
 
-def serverJ(title: str, content: str) -> None:
+def serverJ(title: str, content: str) -> Optional[bool]:
     """
     通过 serverJ 推送消息。
     """
+    audit_results = []
     if not push_config.get("PUSH_KEY"):
         return
     print("serverJ 服务启动")
@@ -351,15 +380,19 @@ def serverJ(title: str, content: str) -> None:
     response = requests.post(url, data=data).json()
 
     if response.get("errno") == 0 or response.get("code") == 0:
+        audit_results.append(True)
         print("serverJ 推送成功！")
     else:
+        audit_results.append(False)
         print(f'serverJ 推送失败！错误码：{response["message"]}')
+    return all(audit_results) if audit_results else None
 
 
-def pushdeer(title: str, content: str) -> None:
+def pushdeer(title: str, content: str) -> Optional[bool]:
     """
     通过PushDeer 推送消息
     """
+    audit_results = []
     if not push_config.get("DEER_KEY"):
         return
     print("PushDeer 服务启动")
@@ -376,15 +409,19 @@ def pushdeer(title: str, content: str) -> None:
     response = requests.post(url, data=data).json()
 
     if len(response.get("content").get("result")) > 0:
+        audit_results.append(True)
         print("PushDeer 推送成功！")
     else:
+        audit_results.append(False)
         print("PushDeer 推送失败！错误信息：", response)
+    return all(audit_results) if audit_results else None
 
 
-def chat(title: str, content: str) -> None:
+def chat(title: str, content: str) -> Optional[bool]:
     """
     通过Chat 推送消息
     """
+    audit_results = []
     if not push_config.get("CHAT_URL") or not push_config.get("CHAT_TOKEN"):
         return
     print("chat 服务启动")
@@ -393,15 +430,19 @@ def chat(title: str, content: str) -> None:
     response = requests.post(url, data=data)
 
     if response.status_code == 200:
+        audit_results.append(True)
         print("Chat 推送成功！")
     else:
+        audit_results.append(False)
         print("Chat 推送失败！错误信息：", response)
+    return all(audit_results) if audit_results else None
 
 
-def pushplus_bot(title: str, content: str) -> None:
+def pushplus_bot(title: str, content: str) -> Optional[bool]:
     """
     通过 pushplus 推送消息。
     """
+    audit_results = []
     if not push_config.get("PUSH_PLUS_TOKEN"):
         return
     print("PUSHPLUS 服务启动")
@@ -424,7 +465,9 @@ def pushplus_bot(title: str, content: str) -> None:
 
     code = response["code"]
     if code == 200:
+        audit_results.append(True)
         print("PUSHPLUS 推送请求成功，可根据流水号查询推送结果:" + response["data"])
+        audit_results.append(True)
         print(
             "注意：请求成功并不代表推送成功，如未收到消息，请到pushplus官网使用流水号查询推送最终结果"
         )
@@ -437,16 +480,20 @@ def pushplus_bot(title: str, content: str) -> None:
         response = requests.post(url=url_old, data=body, headers=headers).json()
 
         if response["code"] == 200:
+            audit_results.append(True)
             print("PUSHPLUS(hxtrip) 推送成功！")
 
         else:
+            audit_results.append(False)
             print("PUSHPLUS 推送失败！")
+    return all(audit_results) if audit_results else None
 
 
-def weplus_bot(title: str, content: str) -> None:
+def weplus_bot(title: str, content: str) -> Optional[bool]:
     """
     通过 微加机器人 推送消息。
     """
+    audit_results = []
     if not push_config.get("WE_PLUS_BOT_TOKEN"):
         return
     print("微加机器人 服务启动")
@@ -469,15 +516,19 @@ def weplus_bot(title: str, content: str) -> None:
     response = requests.post(url=url, data=body, headers=headers).json()
 
     if response["code"] == 200:
+        audit_results.append(True)
         print("微加机器人 推送成功！")
     else:
+        audit_results.append(False)
         print("微加机器人 推送失败！")
+    return all(audit_results) if audit_results else None
 
 
-def qmsg_bot(title: str, content: str) -> None:
+def qmsg_bot(title: str, content: str) -> Optional[bool]:
     """
     使用 qmsg 推送消息。
     """
+    audit_results = []
     if not push_config.get("QMSG_KEY") or not push_config.get("QMSG_TYPE"):
         return
     print("qmsg 服务启动")
@@ -487,15 +538,19 @@ def qmsg_bot(title: str, content: str) -> None:
     response = requests.post(url=url, params=payload).json()
 
     if response["code"] == 0:
+        audit_results.append(True)
         print("qmsg 推送成功！")
     else:
+        audit_results.append(False)
         print(f'qmsg 推送失败！{response["reason"]}')
+    return all(audit_results) if audit_results else None
 
 
-def wecom_app(title: str, content: str) -> None:
+def wecom_app(title: str, content: str) -> Optional[bool]:
     """
     通过 企业微信 APP 推送消息。
     """
+    audit_results = []
     if not push_config.get("QYWX_AM"):
         return
     QYWX_AM_AY = re.split(",", push_config.get("QYWX_AM"))
@@ -521,9 +576,12 @@ def wecom_app(title: str, content: str) -> None:
         response = wx.send_mpnews(title, content, media_id, touser)
 
     if response == "ok":
+        audit_results.append(True)
         print("企业微信推送成功！")
     else:
+        audit_results.append(False)
         print("企业微信推送失败！错误信息如下：\n", response)
+    return all(audit_results) if audit_results else None
 
 
 class WeCom:
@@ -588,10 +646,11 @@ class WeCom:
         return respone["errmsg"]
 
 
-def wecom_bot(title: str, content: str) -> None:
+def wecom_bot(title: str, content: str) -> Optional[bool]:
     """
     通过 企业微信机器人 推送消息。
     """
+    audit_results = []
     if not push_config.get("QYWX_KEY"):
         return
     print("企业微信机器人服务启动")
@@ -608,15 +667,19 @@ def wecom_bot(title: str, content: str) -> None:
     ).json()
 
     if response["errcode"] == 0:
+        audit_results.append(True)
         print("企业微信机器人推送成功！")
     else:
+        audit_results.append(False)
         print("企业微信机器人推送失败！")
+    return all(audit_results) if audit_results else None
 
 
-def telegram_bot(title: str, content: str) -> None:
+def telegram_bot(title: str, content: str) -> Optional[bool]:
     """
     使用 telegram 机器人 推送消息。
     """
+    audit_results = []
     if not push_config.get("TG_BOT_TOKEN") or not push_config.get("TG_USER_ID"):
         return
     print("tg 服务启动")
@@ -652,15 +715,19 @@ def telegram_bot(title: str, content: str) -> None:
     ).json()
 
     if response["ok"]:
+        audit_results.append(True)
         print("tg 推送成功！")
     else:
+        audit_results.append(False)
         print("tg 推送失败！")
+    return all(audit_results) if audit_results else None
 
 
-def aibotk(title: str, content: str) -> None:
+def aibotk(title: str, content: str) -> Optional[bool]:
     """
     使用 智能微秘书 推送消息。
     """
+    audit_results = []
     if (
         not push_config.get("AIBOTK_KEY")
         or not push_config.get("AIBOTK_TYPE")
@@ -688,15 +755,19 @@ def aibotk(title: str, content: str) -> None:
     response = requests.post(url=url, data=body, headers=headers).json()
     print(response)
     if response["code"] == 0:
+        audit_results.append(True)
         print("智能微秘书 推送成功！")
     else:
+        audit_results.append(False)
         print(f'智能微秘书 推送失败！{response["error"]}')
+    return all(audit_results) if audit_results else None
 
 
-def smtp(title: str, content: str) -> None:
+def smtp(title: str, content: str) -> Optional[bool]:
     """
     使用 SMTP 邮件 推送消息。
     """
+    audit_results = []
     if (
         not push_config.get("SMTP_SERVER")
         or not push_config.get("SMTP_SSL")
@@ -736,15 +807,19 @@ def smtp(title: str, content: str) -> None:
             message.as_bytes(),
         )
         smtp_server.close()
+        audit_results.append(True)
         print("SMTP 邮件 推送成功！")
     except Exception as e:
+        audit_results.append(False)
         print(f"SMTP 邮件 推送失败！{e}")
+    return all(audit_results) if audit_results else None
 
 
-def pushme(title: str, content: str) -> None:
+def pushme(title: str, content: str) -> Optional[bool]:
     """
     使用 PushMe 推送消息。
     """
+    audit_results = []
     if not push_config.get("PUSHME_KEY"):
         return
     print("PushMe 服务启动")
@@ -764,15 +839,19 @@ def pushme(title: str, content: str) -> None:
     response = requests.post(url, data=data)
 
     if response.status_code == 200 and response.text == "success":
+        audit_results.append(True)
         print("PushMe 推送成功！")
     else:
+        audit_results.append(False)
         print(f"PushMe 推送失败！{response.status_code} {response.text}")
+    return all(audit_results) if audit_results else None
 
 
-def chronocat(title: str, content: str) -> None:
+def chronocat(title: str, content: str) -> Optional[bool]:
     """
     使用 CHRONOCAT 推送消息。
     """
+    audit_results = []
     if (
         not push_config.get("CHRONOCAT_URL")
         or not push_config.get("CHRONOCAT_QQ")
@@ -807,21 +886,27 @@ def chronocat(title: str, content: str) -> None:
             response = requests.post(url, headers=headers, data=json.dumps(data))
             if response.status_code == 200:
                 if chat_type == 1:
+                    audit_results.append(True)
                     print(f"QQ个人消息:{ids}推送成功！")
                 else:
+                    audit_results.append(True)
                     print(f"QQ群消息:{ids}推送成功！")
             else:
                 if chat_type == 1:
+                    audit_results.append(False)
                     print(f"QQ个人消息:{ids}推送失败！")
                 else:
+                    audit_results.append(False)
                     print(f"QQ群消息:{ids}推送失败！")
+    return all(audit_results) if audit_results else None
 
 
-def ntfy(title: str, content: str) -> None:
+def ntfy(title: str, content: str) -> Optional[bool]:
     """
     通过 Ntfy 推送消息
     """
 
+    audit_results = []
     def encode_rfc2047(text: str) -> str:
         """将文本编码为符合 RFC 2047 标准的格式"""
         encoded_bytes = base64.b64encode(text.encode("utf-8"))
@@ -853,12 +938,15 @@ def ntfy(title: str, content: str) -> None:
     url = push_config.get("NTFY_URL") + "/" + push_config.get("NTFY_TOPIC")
     response = requests.post(url, data=data, headers=headers)
     if response.status_code == 200:  # 使用 response.status_code 进行检查
+        audit_results.append(True)
         print("Ntfy 推送成功！")
     else:
+        audit_results.append(False)
         print("Ntfy 推送失败！错误信息：", response.text)
+    return all(audit_results) if audit_results else None
 
 
-def wxpusher_bot(title: str, content: str) -> None:
+def wxpusher_bot(title: str, content: str) -> Optional[bool]:
     """
     通过 wxpusher 推送消息。
     支持的环境变量:
@@ -866,6 +954,7 @@ def wxpusher_bot(title: str, content: str) -> None:
     - WXPUSHER_TOPIC_IDS: 主题ID, 多个用英文分号;分隔
     - WXPUSHER_UIDS: 用户ID, 多个用英文分号;分隔
     """
+    audit_results = []
     if not push_config.get("WXPUSHER_APP_TOKEN"):
         return
 
@@ -909,17 +998,21 @@ def wxpusher_bot(title: str, content: str) -> None:
     response = requests.post(url=url, json=data, headers=headers).json()
 
     if response.get("code") == 1000:
+        audit_results.append(True)
         print("wxpusher 推送成功！")
     else:
+        audit_results.append(False)
         print(f"wxpusher 推送失败！错误信息：{response.get('msg')}")
+    return all(audit_results) if audit_results else None
 
 
-def wxpusher_spt(title: str, content: str) -> None:
+def wxpusher_spt(title: str, content: str) -> Optional[bool]:
     """
     通过 wxpusher 极简推送（SPT）推送消息。
     支持的环境变量:
     - WXPUSHER_SPT_LIST: SPT, 多个用英文逗号,分隔, 最多10个
     """
+    audit_results = []
     if not push_config.get("WXPUSHER_SPT_LIST"):
         return
 
@@ -956,17 +1049,21 @@ def wxpusher_spt(title: str, content: str) -> None:
     response = requests.post(url=url, json=data, headers=headers).json()
 
     if response.get("code") == 1000:
+        audit_results.append(True)
         print("wxpusher SPT 推送成功！")
     else:
+        audit_results.append(False)
         print(f"wxpusher SPT 推送失败！错误信息：{response.get('msg')}")
+    return all(audit_results) if audit_results else None
 
 
 
-def wpush(title: str, content: str) -> None:
+def wpush(title: str, content: str) -> Optional[bool]:
     """
     通过 WPUSH 推送消息。
     官方文档: https://wpush.cn/docs
     """
+    audit_results = []
     if not push_config.get("WPUSH_APIKEY"):
         return
 
@@ -986,12 +1083,15 @@ def wpush(title: str, content: str) -> None:
     response = requests.post(url=url, json=data, headers=headers, timeout=15).json()
 
     if response.get("code") == 0:
+        audit_results.append(True)
         print("WPUSH 推送成功！")
     else:
+        audit_results.append(False)
         print(f'WPUSH 推送失败！错误信息：{response.get("message") or response}')
+    return all(audit_results) if audit_results else None
 
 
-def openilink(title: str, content: str) -> None:
+def openilink(title: str, content: str) -> Optional[bool]:
     """
     通过 OpeniLink 推送消息。
     支持的环境变量:
@@ -999,6 +1099,7 @@ def openilink(title: str, content: str) -> None:
     - OPENILINK_HUB_URL: OpeniLink Hub 地址，默认为 https://hub.openilink.com
     - OPENILINK_CONTEXT_TOKEN: 消息会话上下文 token，可从消息事件中获取
     """
+    audit_results = []
     if not push_config.get("OPENILINK_APP_TOKEN"):
         return
 
@@ -1023,9 +1124,12 @@ def openilink(title: str, content: str) -> None:
     response = requests.post(url=url, json=data, headers=headers).json()
 
     if response.get("ok"):
+        audit_results.append(True)
         print("OpeniLink 推送成功！")
     else:
+        audit_results.append(False)
         print(f'OpeniLink 推送失败！错误信息：{response.get("error")}')
+    return all(audit_results) if audit_results else None
 
 
 def parse_headers(headers):
@@ -1079,10 +1183,11 @@ def parse_body(body, content_type, value_format_fn=None):
     return parsed
 
 
-def custom_notify(title: str, content: str) -> None:
+def custom_notify(title: str, content: str) -> Optional[bool]:
     """
     通过 自定义通知 推送消息。
     """
+    audit_results = []
     if not push_config.get("WEBHOOK_URL") or not push_config.get("WEBHOOK_METHOD"):
         return
 
@@ -1114,9 +1219,12 @@ def custom_notify(title: str, content: str) -> None:
     )
 
     if response.status_code == 200:
+        audit_results.append(True)
         print("自定义通知推送成功！")
     else:
+        audit_results.append(False)
         print(f"自定义通知推送失败！{response.status_code} {response.text}")
+    return all(audit_results) if audit_results else None
 
 
 def one() -> str:
@@ -1204,6 +1312,33 @@ def add_notify_function():
     return notify_function
 
 
+def report_notification(channel, title, content, success):
+    ql_dir = os.getenv("QL_DIR")
+    if not ql_dir:
+        return
+    payload = {"title": str(title or "")[:512], "content": str(content or "")[:8192],
+               "success": success, "notifyType": channel,
+               "scriptName": os.path.basename(__import__("sys").argv[0]), "taskId": os.getenv("ID", "")}
+    code = """const fs=require('node:fs'),path=require('node:path');
+const report=require(path.join(process.env.QL_DIR,'shell/preload/notificationAudit.js'));
+report(JSON.parse(fs.readFileSync(0,'utf8'))).catch(()=>{});"""
+    try:
+        subprocess.run(["node", "-e", code], input=json.dumps(payload), text=True,
+                       capture_output=True, timeout=3)
+    except Exception:
+        pass  # Audit availability never changes notification delivery.
+
+
+def audited_notification(mode, title, content):
+    result = None
+    try:
+        result = mode(title, content)
+    except Exception:
+        result = False
+        print(f"{mode.__name__} 推送失败")
+    report_notification(mode.__name__, title, content, result is True)
+
+
 def send(title: str, content: str, ignore_default_config: bool = False, **kwargs):
     if kwargs:
         global push_config
@@ -1228,7 +1363,7 @@ def send(title: str, content: str, ignore_default_config: bool = False, **kwargs
 
     notify_function = add_notify_function()
     ts = [
-        threading.Thread(target=mode, args=(title, content), name=mode.__name__)
+        threading.Thread(target=audited_notification, args=(mode, title, content), name=mode.__name__)
         for mode in notify_function
     ]
     [t.start() for t in ts]

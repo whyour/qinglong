@@ -1,4 +1,4 @@
-import { Op } from 'sequelize';
+import { persistNotificationAudit } from '../shared/notificationAudit';
 import { spawn } from 'cross-spawn';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -413,59 +413,21 @@ export default class SystemService {
       notificationInfo.type = typeString;
     }
 
-    let notifyType: string | undefined;
-    if (notificationInfo?.type) {
-      notifyType = typeString || (notificationInfo.type as string);
-    } else {
-      try {
-        const notifConfig = await this.getDb({
-          type: AuthDataType.notification,
-        });
-        notifyType = notifConfig.info?.type as string | undefined;
-      } catch (e) {}
-    }
-
     const isSuccess = await this.notificationService.notify(
       title,
       content,
       notificationInfo,
     );
 
-    try {
-      await SystemModel.create({
-        type: AuthDataType.notifyLog,
-        info: {
-          timestamp: Date.now(),
-          title: title.slice(0, 512),
-          content: content.slice(0, 8192),
-          status: isSuccess ? NotifyStatus.success : NotifyStatus.fail,
-          notifyType,
-        },
-      });
-      const oldest = await SystemModel.findAll({
-        where: { type: AuthDataType.notifyLog },
-        attributes: ['id'],
-        order: [['id', 'DESC']],
-        offset: 200,
-        limit: 1,
-      });
-      if (oldest[0]?.id) {
-        await SystemModel.destroy({
-          where: {
-            type: AuthDataType.notifyLog,
-            id: { [Op.lte]: oldest[0].id },
-          },
-        });
-      }
-    } catch (error) {
-      this.logger.error('Failed to persist notification audit log: %o', error);
-    }
-
     if (isSuccess) {
       return { code: 200, message: t('通知发送成功') };
     } else {
       return { code: 400, message: t('通知发送失败，请检查系统设置/通知配置') };
     }
+  }
+
+  public async recordNotifyLog(info: NotifyLogInfo): Promise<void> {
+    await persistNotificationAudit(info);
   }
 
   public async getNotifyLog(): Promise<Array<NotifyLogInfo>> {

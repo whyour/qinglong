@@ -260,6 +260,15 @@ message SystemNotifyRequest {
   optional NotificationInfo notificationInfo = 3;
 }
 
+message RecordNotifyLogRequest {
+  string title = 1;
+  string content = 2;
+  bool success = 3;
+  string notifyType = 4;
+  string scriptName = 5;
+  string taskId = 6;
+}
+
 service Api {
   rpc GetEnvs(GetEnvsRequest) returns (EnvsResponse) {}
   rpc CreateEnv(CreateEnvRequest) returns (EnvsResponse) {}
@@ -271,6 +280,7 @@ service Api {
   rpc UpdateEnvNames(UpdateEnvNamesRequest) returns (Response) {}
   rpc GetEnvById(GetEnvByIdRequest) returns (EnvResponse) {}
   rpc SystemNotify(SystemNotifyRequest) returns (Response) {}
+  rpc RecordNotifyLog(RecordNotifyLogRequest) returns (Response) {}
   rpc GetCronDetail(CronDetailRequest) returns (CronDetailResponse) {}
   rpc CreateCron(CreateCronRequest) returns (CronResponse) {}
   rpc UpdateCron(UpdateCronRequest) returns (CronResponse) {}

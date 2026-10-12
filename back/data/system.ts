@@ -63,6 +63,9 @@ export interface NotifyLogInfo {
   content?: string;
   status?: NotifyStatus;
   notifyType?: string;
+  source?: 'system' | 'script';
+  scriptName?: string;
+  taskId?: string;
 }
 
 export interface TokenInfo {
