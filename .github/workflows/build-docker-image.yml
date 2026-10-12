@@ -38,6 +38,10 @@ jobs:
     if: ${{ !inputs.static_sync_only }}
     uses: ./.github/workflows/validate.yml
 
+  runtime-tools:
+    if: ${{ !inputs.static_sync_only }}
+    uses: ./.github/workflows/runtime-tools.yml
+
   code_gitlab:
     if: ${{ !inputs.static_sync_only }}
     runs-on: ubuntu-latest
@@ -58,17 +62,17 @@ jobs:
 
   build-static:
     if: ${{ !inputs.static_sync_only }}
-    needs: validate
+    needs: [validate, runtime-tools]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
         with:
-          version: "8.3.1"
+          version: "10.34.6"
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -77,7 +81,12 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build:front
           pnpm build:back
-          pnpm build:info
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-runtime-tools-${{ github.sha }}
+          path: static/
+      - run: pnpm build:info
 
       - uses: actions/upload-artifact@v6
         with:
@@ -93,6 +102,13 @@ jobs:
           GITHUB_REF_TYPE: ${{ github.ref_type }}
         run: |
           bash scripts/publish-static.sh "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" "$GITHUB_BRANCH" "$GITHUB_REF_TYPE"
+
+  npm-package:
+    if: ${{ !inputs.static_sync_only }}
+    needs: build-static
+    uses: ./.github/workflows/npm-package.yml
+    with:
+      static-artifact: qinglong-static-${{ github.sha }}
 
   static_gitlab:
     needs: build-static
@@ -209,10 +225,10 @@ jobs:
           path: static/
       - uses: pnpm/action-setup@v6
         with:
-          version: "8.3.1"
+          version: "10.34.6"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -295,10 +311,10 @@ jobs:
           path: static/
       - uses: pnpm/action-setup@v6
         with:
-          version: "8.3.1"
+          version: "10.34.6"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -381,10 +397,10 @@ jobs:
           path: static/
       - uses: pnpm/action-setup@v6
         with:
-          version: "8.3.1"
+          version: "10.34.6"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -453,10 +469,10 @@ jobs:
           path: static/
       - uses: pnpm/action-setup@v6
         with:
-          version: "8.3.1"
+          version: "10.34.6"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -513,46 +529,115 @@ jobs:
 
   publish:
     if: ${{ github.repository == 'whyour/qinglong' && github.ref == 'refs/heads/master' }}
-    needs: [build-alpine, build-debian, build-alpine310, build-debian310]
+    needs: [build-alpine, build-debian, build-alpine310, build-debian310, npm-package]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       id-token: write
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+      VERIFIED_TARBALL_SHA256: ${{ needs.npm-package.outputs.tarball-sha256 }}
+      VERIFIED_PACKAGE_VERSION: ${{ needs.npm-package.outputs.package-version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
+      - uses: actions/checkout@v6
         with:
-          version: "8.3.1"
-
-      - uses: actions/setup-node@v3
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
-          cache: "pnpm"
-
-      - name: build front and back
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build:front
-          pnpm build:back
-
-      - name: Set up Node for trusted publishing
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          registry-url: https://registry.npmjs.org
+          node-version: '22.23.3'
           package-manager-cache: false
-
-      - name: Publish npm package with OIDC
+      - uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.npm-package.outputs.artifact-name }}
+          path: ${{ runner.temp }}/main-npm-publish/
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-runtime-tools-${{ github.sha }}
+          path: ${{ runner.temp }}/npm-publisher-runtime-tools/
+      - name: Verify the gate-approved archive and its source receipts
         shell: bash
         run: |
           set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), assert = require('node:assert/strict');
+          const { spawnSync } = require('node:child_process');
+          const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+          const fileHash = (file) => hash(fs.readFileSync(file));
+          const directory = path.join(process.env.RUNNER_TEMP, 'main-npm-publish');
+          const summary = JSON.parse(fs.readFileSync(path.join(directory, 'package-build-summary.json')));
+          const pkg = JSON.parse(fs.readFileSync('package.json'));
+          assert.match(process.env.VERIFIED_TARBALL_SHA256 || '', /^[a-f0-9]{64}$/);
+          assert.equal(summary.sourceCommit, process.env.SOURCE_SHA); assert.equal(summary.previewMetadata, false);
+          assert.deepEqual(summary.sourceMetadataChanges, []); assert(summary.helperProvenance.length > 0);
+          assert(summary.helperProvenance.every((item) => item.matchesGitSource));
+          assert.equal(summary.package, pkg.name); assert.equal(summary.packageVersion, pkg.version);
+          assert.equal(summary.packageVersion, process.env.VERIFIED_PACKAGE_VERSION);
+          assert.equal(summary.productionManifestSHA256, fileHash('package.json')); assert.equal(summary.productionLockSHA256, fileHash('pnpm-lock.yaml'));
+          const source = spawnSync('git', ['archive', process.env.SOURCE_SHA], { maxBuffer: 128 * 1024 * 1024 });
+          assert.equal(source.status, 0); assert.equal(hash(source.stdout), summary.sourceArchiveSHA256);
+          assert.equal(summary.runtimeToolsIncluded, true); assert.equal(summary.runtimeTools.sourceCommit, process.env.SOURCE_SHA);
+          assert.equal(summary.runtimeTools.builder.platform, 'linux'); assert.equal(summary.runtimeTools.builder.releaseBuild, true);
+          assert.equal(path.basename(summary.tarball.filename), summary.tarball.filename); assert(summary.tarball.filename.endsWith('.tgz'));
+          assert.deepEqual(fs.readdirSync(directory).filter((name) => name.endsWith('.tgz')), [summary.tarball.filename]);
+          const tarball = path.join(directory, summary.tarball.filename);
+          assert.equal(summary.tarball.sha256, process.env.VERIFIED_TARBALL_SHA256);
+          assert.equal(fileHash(tarball), process.env.VERIFIED_TARBALL_SHA256); assert.equal(fs.statSync(tarball).size, summary.tarball.bytes);
+          const tar = (args) => {
+            const result = spawnSync('tar', args, { maxBuffer: 128 * 1024 * 1024 });
+            assert.equal(result.status, 0, 'Cannot read the approved archive'); return result.stdout;
+          };
+          const entries = tar(['-tzf', tarball]).toString().split('\n').filter(Boolean);
+          assert.equal(entries.length, new Set(entries).size);
+          for (const name of entries) assert(name.startsWith('package/') && !name.split('/').includes('..') && !name.endsWith('.node') && !name.split('/').some((part) => ['.npmrc', '.git', '.pnpm', '_cacache'].includes(part)), 'Forbidden archive item ' + name);
+          const read = (relative) => tar(['-xOf', tarball, 'package/' + relative]);
+          const receipt = JSON.parse(read('qinglong-npm-dependency-proof.json'));
+          const { tarball: ignoredTarball, ...producerReceipt } = summary; assert.deepEqual(receipt, producerReceipt);
+          assert.deepEqual(entries.map((name) => name.slice('package/'.length)).sort(), receipt.publishedFilePaths);
+          const published = JSON.parse(read('package.json')); assert.equal(published.name, pkg.name); assert.equal(published.version, pkg.version);
+          assert.equal(hash(read('package.json')), receipt.publishedRootManifestSHA256);
+          const buildInfo = read('static/build-info.json'), build = JSON.parse(buildInfo);
+          assert.equal(hash(buildInfo), summary.ciBuildInfoSHA256); assert.equal(build.sourceCommit, process.env.SOURCE_SHA); assert.equal(build.dirty, false);
+          assert.equal(build.lockfileSha256, summary.productionLockSHA256);
+          assert.deepEqual(entries.filter((name) => name.startsWith('package/static/')).map((name) => name.slice('package/static/'.length)).sort(), [...Object.keys(build.files), 'build-info.json'].sort());
+          const toolsRoot = path.join(process.env.RUNNER_TEMP, 'npm-publisher-runtime-tools');
+          for (const [name, expected] of [['runtime-tools.tgz', summary.runtimeTools.archiveSHA256], ['runtime-tools-proof.json', summary.runtimeTools.proofSHA256]]) {
+            assert.equal(fileHash(path.join(toolsRoot, name)), expected); assert.equal(hash(read('static/' + name)), expected); assert.equal(build.files[name], expected);
+          }
+          const tools = JSON.parse(fs.readFileSync(path.join(toolsRoot, 'runtime-tools-proof.json')));
+          assert.equal(tools.sourceCommit, process.env.SOURCE_SHA); assert.equal(tools.archive.sha256, summary.runtimeTools.archiveSHA256);
+          assert.equal(tools.builder.platform, 'linux'); assert.equal(tools.builder.releaseBuild, true);
+          assert.equal(tools.sourceAttestation.verified, true); assert.equal(tools.sourceAttestation.head, process.env.SOURCE_SHA); assert(tools.inputs.length > 0);
+          for (const input of tools.inputs) {
+            assert(input.path && !path.isAbsolute(input.path) && !input.path.split(/[\\/]/).includes('..'));
+            assert.equal(fileHash(input.path), input.sha256, 'Tool source input changed: ' + input.path);
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, 'QINGLONG_PUBLISH_TARBALL=' + tarball + '\n');
+          console.log(JSON.stringify({ sourceCommit: summary.sourceCommit, packageVersion: summary.packageVersion, tarballSHA256: summary.tarball.sha256, cleanSource: true, runtimeToolsIncluded: true }));
+          NODE
+      - name: Install the same fixed npm CLI for trusted publishing
+        run: |
+          node scripts/install-runtime-tools.cjs \
+            --archive "$RUNNER_TEMP/npm-publisher-runtime-tools/runtime-tools.tgz" \
+            --proof "$RUNNER_TEMP/npm-publisher-runtime-tools/runtime-tools-proof.json" \
+            --prefix "$RUNNER_TEMP/npm-publisher-tools"
+      - name: Publish the verified npm archive with OIDC
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm_cli="$RUNNER_TEMP/npm-publisher-tools/lib/node_modules/npm/bin/npm-cli.js"
+          export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/npm-publish-public.npmrc"
+          export NPM_CONFIG_GLOBALCONFIG=/dev/null
+          export NPM_CONFIG_CACHE="$RUNNER_TEMP/npm-publish-cache"
+          printf 'registry=https://registry.npmjs.org/\n' > "$NPM_CONFIG_USERCONFIG"
+          test "$(node "$npm_cli" --version)" = '12.2.0'
           name=$(node -p 'require("./package.json").name')
           version=$(node -p 'require("./package.json").version')
-          if npm view "$name@$version" version --json --registry=https://registry.npmjs.org > "$RUNNER_TEMP/npm-version.json" 2> "$RUNNER_TEMP/npm-version-error.log"; then
+          if node "$npm_cli" view "$name@$version" version --json --registry=https://registry.npmjs.org > "$RUNNER_TEMP/npm-version.json" 2> "$RUNNER_TEMP/npm-version-error.log"; then
             jq -e --arg version "$version" '. == $version' "$RUNNER_TEMP/npm-version.json" > /dev/null
             echo "::notice::$name@$version is already published; skipping npm publication for this image rebuild."
           elif jq -e '.error.code == "E404"' "$RUNNER_TEMP/npm-version.json" > /dev/null; then
-            npm publish --access public --registry=https://registry.npmjs.org
+            node "$npm_cli" publish "$QINGLONG_PUBLISH_TARBALL" --ignore-scripts --access public --registry=https://registry.npmjs.org
           else
             echo '::error::Could not check the published npm version; refusing to publish.'
             exit 1

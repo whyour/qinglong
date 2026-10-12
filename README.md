@@ -64,10 +64,14 @@ docker run -d \
 
 ### npm
 
-npm 版本支持 `debian/ubuntu/alpine` 系统，需要自行安装 `node/npm/python3/pip3/pnpm`
+npm 版本支持 `debian/ubuntu/alpine` 系统，需要自行安装 Node.js 22.x >=22.22.2 或 24.x >=24.15.0，以及 npm、Python 3 和 pip。2.23.0 归档携带冻结生产依赖和受控工具，不需要单独安装 pnpm。该版本发布后使用以下命令；npm 12 的项目安装需要在当前项目 `package.json` 中精确批准安装脚本：
+
+```json
+{"allowScripts":{"@whyour/qinglong@2.23.0":true}}
+```
 
 ```bash
-npm i @whyour/qinglong
+npm i @whyour/qinglong@2.23.0
 ```
 
 ## 部署
@@ -107,13 +111,15 @@ npm CLI 用于远程管理。面板内置 `ql` 同样使用这个命令名，已
 
 ## 开发
 
+使用 Node.js 22.22.2 及以上的 22.x，或 Node.js 24.x >=24.15.0。
+
 ```bash
 git clone https://github.com/whyour/qinglong.git
 cd qinglong
 cp .env.example .env
 # 推荐使用 pnpm https://pnpm.io/zh/installation
-npm install -g pnpm@8.3.1
-pnpm install
+npm install -g pnpm@10.34.6
+pnpm install --frozen-lockfile
 pnpm start
 ```
 

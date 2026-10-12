@@ -45,8 +45,27 @@ test('release images receive the same-run artifact and verify it before use', ()
   const workflow = yaml.load(
     fs.readFileSync('.github/workflows/build-docker-image.yml', 'utf8'),
   );
-  assert.equal(workflow.jobs['build-static'].needs, 'validate');
-  const upload = workflow.jobs['build-static'].steps.find(step => step.uses?.startsWith('actions/upload-artifact@'));
+  assert.deepEqual(workflow.jobs['build-static'].needs, [
+    'validate',
+    'runtime-tools',
+  ]);
+  const staticSteps = workflow.jobs['build-static'].steps;
+  const toolsDownload = staticSteps.findIndex((step) =>
+    step.uses?.startsWith('actions/download-artifact@'),
+  );
+  assert.notEqual(toolsDownload, -1);
+  assert.equal(
+    staticSteps[toolsDownload].with.name,
+    'qinglong-runtime-tools-${{ github.sha }}',
+  );
+  assert.equal(staticSteps[toolsDownload].with.path, 'static/');
+  const buildInfo = staticSteps.findIndex(
+    (step) => step.run === 'pnpm build:info',
+  );
+  assert.ok(buildInfo > toolsDownload);
+  const upload = workflow.jobs['build-static'].steps.find((step) =>
+    step.uses?.startsWith('actions/upload-artifact@'),
+  );
   assert.equal(upload.with['include-hidden-files'], true);
   for (const name of [
     'build-alpine',
@@ -78,6 +97,65 @@ test('release images receive the same-run artifact and verify it before use', ()
   }
 });
 
+test('npm publication uses the archive approved by every consumer without rebuilding it', () => {
+  const yaml = require('js-yaml');
+  const workflow = yaml.load(
+    fs.readFileSync('.github/workflows/build-docker-image.yml', 'utf8'),
+  );
+  const gate = yaml.load(
+    fs.readFileSync('.github/workflows/npm-package.yml', 'utf8'),
+  );
+  assert.deepEqual(gate.jobs.verified.needs, [
+    'archive',
+    'consumer',
+    'source-fallback',
+  ]);
+  assert.equal(gate.jobs.consumer.needs, 'archive');
+  assert.deepEqual(gate.jobs.consumer.strategy.matrix.client, [
+    { npm: '10', mode: 'local' },
+    { npm: '12', mode: 'local' },
+    { npm: '12', mode: 'global' },
+  ]);
+  assert.deepEqual(gate.jobs.consumer.strategy.matrix.sqlite, [
+    'prebuilt',
+    'source',
+  ]);
+  const publish = workflow.jobs.publish;
+  assert.ok(publish.needs.includes('npm-package'));
+  assert.equal(
+    publish.env.VERIFIED_TARBALL_SHA256,
+    '${{ needs.npm-package.outputs.tarball-sha256 }}',
+  );
+  const approvedDownload = publish.steps.find((step) =>
+    step.uses?.startsWith('actions/download-artifact@'),
+  );
+  assert.equal(
+    approvedDownload.with.name,
+    '${{ needs.npm-package.outputs.artifact-name }}',
+  );
+  const checks = publish.steps.findIndex((step) =>
+    step.run?.includes(
+      'assert.equal(fileHash(tarball), process.env.VERIFIED_TARBALL_SHA256)',
+    ),
+  );
+  const installer = publish.steps.findIndex((step) =>
+    step.run?.includes('node scripts/install-runtime-tools.cjs'),
+  );
+  const publication = publish.steps.findIndex((step) =>
+    step.run?.includes('publish "$QINGLONG_PUBLISH_TARBALL" --ignore-scripts'),
+  );
+  assert.ok(checks !== -1 && installer > checks && publication > installer);
+  const operations = publish.steps.map((step) => step.run || '').join('\n');
+  assert.doesNotMatch(
+    operations,
+    /build-npm-package|build:front|build:back|build:info/,
+  );
+  assert.doesNotMatch(
+    operations,
+    /\b(?:npm|pnpm)\s+(?:install|ci|rebuild|pack)\b/,
+  );
+});
+
 test('complete artifact manifests reject changed, missing, extra files and untracked build inputs', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-build-manifest-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -97,6 +175,8 @@ test('complete artifact manifests reject changed, missing, extra files and untra
     'dist/chunks/main.js',
     'dist/assets/main.css',
     'dist/.well-known/config',
+    'runtime-tools.tgz',
+    'runtime-tools-proof.json',
   ];
   for (const file of artifacts) {
     fs.mkdirSync(path.dirname(path.join(dir, 'static', file)), {
@@ -123,6 +203,8 @@ test('complete artifact manifests reject changed, missing, extra files and untra
     'dist/chunks/main.js',
     'dist/assets/main.css',
     'dist/.well-known/config',
+    'runtime-tools.tgz',
+    'runtime-tools-proof.json',
   ]) {
     const file = path.join(dir, 'static', name);
     fs.writeFileSync(file, 'stale');

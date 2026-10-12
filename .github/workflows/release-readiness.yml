@@ -19,7 +19,11 @@ jobs:
   regression:
     uses: ./.github/workflows/validate.yml
 
+  runtime-tools:
+    uses: ./.github/workflows/runtime-tools.yml
+
   static:
+    needs: runtime-tools
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -28,13 +32,19 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: pnpm/action-setup@v6
         with:
-          version: '8.3.1'
+          version: '10.34.6'
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build:front && pnpm build:back && pnpm build:info
+      - run: pnpm audit --prod --audit-level high
+      - run: pnpm build:front && pnpm build:back
+      - uses: actions/download-artifact@v7
+        with:
+          name: qinglong-runtime-tools-${{ github.event.pull_request.head.sha || github.sha }}
+          path: static/
+      - run: pnpm build:info
       - uses: actions/upload-artifact@v6
         with:
           name: release-readiness-static
@@ -42,8 +52,41 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
 
+  sqlite-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '10.34.6'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --prod --frozen-lockfile
+      - name: Verify precompiled SQLite and production protocols
+        run: node scripts/verify-production-dependencies.cjs
+      - name: Rebuild SQLite from source
+        env:
+          npm_config_build_from_source: 'true'
+          PYTHON: /usr/bin/python3
+        run: |
+          export npm_config_node_gyp="$(node -p 'require("node:module").createRequire(require.resolve("sqlite3/package.json")).resolve("node-gyp/bin/node-gyp.js")')"
+          pnpm rebuild @whyour/sqlite3
+      - name: Verify source-built SQLite and production protocols
+        run: node scripts/verify-production-dependencies.cjs
+
+  npm-package:
+    needs: static
+    uses: ./.github/workflows/npm-package.yml
+    with:
+      static-artifact: release-readiness-static
+
   images:
-    needs: [regression, static]
+    needs: [regression, static, sqlite-install]
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     strategy:
@@ -120,17 +163,32 @@ jobs:
         run: |
           docker run --rm --network none --entrypoint node \
             qinglong-readiness:${{ matrix.image }} \
-            -e 'const assert=require("node:assert/strict"); const {createRequire}=require("node:module"); for(const [name,want] of Object.entries({"@grpc/grpc-js":"1.14.5",compression:"1.8.2",multer:"2.4.0",sequelize:"6.37.8"}))assert.equal(require(name+"/package.json").version,want); const expressRequire=createRequire(require.resolve("express")); assert.equal(expressRequire("proxy-addr/package.json").version,"2.0.8"); const sockRequire=createRequire(require.resolve("sockjs")); assert.equal(sockRequire("websocket-driver/package.json").version,"0.7.5"); require("sqlite3"); require("nodemailer"); require("undici"); console.log("Minimal production patches and runtime imports verified")'
-      - name: Export native Debian image for isolated dev validation
+            --eval 'console.log(JSON.stringify({node: process.version, arch: process.arch, platform: process.platform}))'
+          docker run --rm --network none --entrypoint python3 \
+            qinglong-readiness:${{ matrix.image }} --version
+          docker run --rm --network none --entrypoint node \
+            qinglong-readiness:${{ matrix.image }} \
+            scripts/verify-system-runtime.cjs
+          docker run --rm --network none --entrypoint node \
+            qinglong-readiness:${{ matrix.image }} \
+            scripts/verify-production-dependencies.cjs
+      - name: Archive verified native Debian image for isolated dev validation
         if: matrix.image == 'debian'
+        shell: bash
         run: |
-          docker save qinglong-readiness:debian | gzip -1 > release-readiness-debian-image.tar.gz
+          docker image inspect qinglong-readiness:debian \
+            --format '{"id":{{json .Id}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}},"architecture":{{json .Architecture}},"os":{{json .Os}}}' \
+            > release-readiness-debian-image.json
+          docker save qinglong-readiness:debian | gzip > release-readiness-debian-image.tar.gz
           sha256sum release-readiness-debian-image.tar.gz > release-readiness-debian-image.sha256
-          docker image inspect qinglong-readiness:debian > release-readiness-debian-image.json
       - uses: actions/upload-artifact@v6
         if: matrix.image == 'debian'
         with:
           name: release-readiness-debian-image
-          path: release-readiness-debian-image.*
+          path: |
+            release-readiness-debian-image.tar.gz
+            release-readiness-debian-image.sha256
+            release-readiness-debian-image.json
           compression-level: 0
+          retention-days: 3
           if-no-files-found: error

@@ -2,7 +2,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { createContext } = require('../../dist/internal/runtime/context');
-const { installPanelDependencies } = require('../../dist/internal/maintenance/operator');
+const {
+  installPanelDependencies,
+} = require('../../dist/internal/maintenance/operator');
 const { reloadPanel } = require('../../dist/internal/maintenance/upgrade');
 assert.equal(process.env.QL_PANEL_INTEGRATION, '1');
 (async () => {
@@ -65,7 +67,16 @@ assert.equal(process.env.QL_PANEL_INTEGRATION, '1');
   const config = await fs.readFile('/ql/data/config/config.sh');
   const dotenv = await fs.readFile('/ql/.env');
   const context = createContext({ root: '/ql' }, process.env);
-  await installPanelDependencies(context, '/stage/source');
+  const stagedManifest = JSON.parse(
+    await fs.readFile('/stage/static/build-info.json', 'utf8'),
+  );
+  assert.match(stagedManifest.sourceCommit, /^[0-9a-f]{40}$/);
+  await installPanelDependencies(
+    context,
+    '/stage/source',
+    '/stage/static',
+    stagedManifest.sourceCommit,
+  );
   const replacement = await reloadPanel(context, 'system', {
     source: '/stage/source',
     static: '/stage/static',

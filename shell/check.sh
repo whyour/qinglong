@@ -6,7 +6,7 @@ reset_env() {
   t '---> 配置文件检测完成\n'
 
   t '---> 2. 开始安装青龙依赖\n'
-  npm_install_2 $dir_root
+  npm_install_2 "$dir_root" || return $?
   t '---> 青龙依赖安装完成\n'
 
   t '---> 脚本依赖安装完成\n'
@@ -97,9 +97,16 @@ check_pm2() {
 
 main() {
   t '=====> 开始检测'
-  npm i -g pnpm@8.3.1 pm2 ts-node typescript@5
+  local ql_tools_prefix
+  ql_tools_prefix=$(npm prefix --global) || return $?
+  node "$dir_root/scripts/install-runtime-tools.cjs" \
+    --archive "$dir_root/static/runtime-tools.tgz" \
+    --proof "$dir_root/static/runtime-tools-proof.json" \
+    --prefix "$ql_tools_prefix" || return $?
+  export PATH="$ql_tools_prefix/bin:$PATH"
+  export NODE_PATH="$ql_tools_prefix/lib/node_modules${NODE_PATH:+:$NODE_PATH}"
 
-  reset_env
+  reset_env || return $?
   copy_dep
   reload_pm2
   local checkStatus=0

@@ -1,0 +1,24 @@
+{
+  "name": "qinglong-runtime-tools",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
+  "dependencies": {
+    "pm2": "7.0.4",
+    "pnpm": "file:pnpm-10.34.6-qinglong-security-linux.tgz",
+    "node-gyp": "12.4.0",
+    "ts-node": "10.9.2",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "pm2": {
+      "js-yaml": "4.3.2",
+      "basic-ftp": "6.2.1"
+    },
+    "http-cache-semantics": "4.3.0",
+    "brace-expansion@1": "1.1.21",
+    "brace-expansion@2": "2.1.7"
+  }
+}

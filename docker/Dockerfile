@@ -1,15 +1,17 @@
 # Run Node package installation natively on the builder. Node/npm can spin at
 # 100% CPU when Alpine s390x is emulated through QEMU.
-FROM --platform=$BUILDPLATFORM node:18-alpine3.18 AS builder
+FROM --platform=$BUILDPLATFORM node:22.23.3-alpine3.24 AS builder
 
 ARG TARGETARCH
 ENV NPM_CONFIG_PREFIX=/opt/node-global
 ENV PATH=/opt/node-global/bin:${PATH}
 
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
+COPY static/runtime-tools.tgz static/runtime-tools-proof.json /tmp/runtime-tools/
+COPY scripts/install-runtime-tools.cjs /tmp/install-runtime-tools.cjs
 RUN set -x \
   && apk add --no-cache git \
-  && npm i -g pnpm@8.3.1 pm2 ts-node typescript@5 \
+  && node /tmp/install-runtime-tools.cjs --archive /tmp/runtime-tools/runtime-tools.tgz --proof /tmp/runtime-tools/runtime-tools-proof.json --prefix /opt/node-global \
   && cd /tmp/build \
   && case "${TARGETARCH}" in \
     amd64) NODE_ARCH=x64 ;; \
@@ -22,7 +24,7 @@ RUN set -x \
     npm_config_target_libc=musl \
     pnpm install --prod --frozen-lockfile
 
-FROM python:3.11-alpine
+FROM python:3.11.17-alpine3.24@sha256:d9368b3a5ac59afea7b5d4f2e2aea0941dbf9fdee9c369c5bec00b98244bc929
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -41,7 +43,7 @@ VOLUME /ql/data
 
 EXPOSE 5700
 
-COPY --from=builder /opt/node-global/lib/node_modules/. /usr/local/lib/node_modules/
+COPY --from=builder /opt/node-global/lib/. /usr/local/lib/
 COPY --from=builder /opt/node-global/bin/. /usr/local/bin/
 
 RUN set -x \
@@ -61,7 +63,6 @@ RUN set -x \
   procps \
   netcat-openbsd \
   unzip \
-  npm \
   && rm -rf /var/cache/apk/* \
   && apk update \
   && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \

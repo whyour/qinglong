@@ -25,7 +25,7 @@ const artifacts = require('./upgradeArtifacts.cjs') as {
     mirror: 'github' | 'gitee';
     signal?: AbortSignal;
     run(program: string, args: string[], capture?: boolean): Promise<unknown>;
-    install(source: string): Promise<void>;
+    install(source: string, staticRoot: string, sourceCommit: string): Promise<void>;
   }): Promise<{ source: string; static: string }>;
   selectedUpgrade(
     tmp: string,
@@ -78,7 +78,8 @@ export async function stageUpgrade(
       signal: operationSignal(),
       run: (program, args, capture) =>
         checkedProcess(program, args, { env: context.env, capture }),
-      install: (source) => installPanelDependencies(context, source),
+      install: (source, staticRoot, sourceCommit) =>
+        installPanelDependencies(context, source, staticRoot, sourceCommit),
     }),
   );
 }

@@ -220,7 +220,7 @@ async function stageUpgrade({ root, tmp, env, mirror, run, install, signal }) {
     )
       dependenciesChanged = true;
     if (dependenciesChanged) {
-      await install(source);
+      await install(source, staticRoot, manifest.sourceCommit);
       await fs.access(path.join(source, 'node_modules'));
       await verifyUpgrade(source, staticRoot);
     }
@@ -553,7 +553,13 @@ async function withLifecycleHooks(root, tmp, env, operation) {
 case "$1" in
   stop) delete_pm2 ;;
   start) reload_pm2 ;;
-  install) npm_install_2 "$2"; exit "$exit_status" ;;
+  install)
+    exit_status=0
+    npm_install_2 "$2" "$3" "$4"
+    hook_install_status=$?
+    [[ "$hook_install_status" -eq 0 ]] || exit "$hook_install_status"
+    exit "$exit_status"
+    ;;
   *) printf '%s\\n' 'Unknown lifecycle operation' >&2; exit 2 ;;
 esac
 `,
@@ -617,7 +623,8 @@ async function main() {
           mirror: process.argv[3],
           run,
           signal: controller.signal,
-          install: (source) => hook('install', [source], controller.signal),
+          install: (source, staticRoot, sourceCommit) =>
+            hook('install', [source, staticRoot, sourceCommit], controller.signal),
         });
         console.log('更新包下载及校验成功...');
         if (process.argv[4] !== 'true') return;
