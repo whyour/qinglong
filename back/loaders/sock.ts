@@ -6,6 +6,7 @@ import { getPlatform } from '../config/util';
 import { shareStore } from '../shared/store';
 import { isValidToken } from '../shared/auth';
 import config from '../config';
+import jwt from 'jsonwebtoken';
 
 export default async ({ server }: { server: Server }) => {
   const echo = sockJs.createServer({
@@ -16,6 +17,30 @@ export default async ({ server }: { server: Server }) => {
   const sessions = new Map<Connection, { token: string; platform: string }>();
   let sessionTimer: ReturnType<typeof setInterval> | undefined;
   let checking = false;
+
+  const validateSession = async (
+    authInfo: any,
+    token: string,
+    platform: string,
+  ) => {
+    if (isValidToken(authInfo, token, platform, config.jwt.secret)) return true;
+    const claims = jwt.decode(token);
+    if (
+      !claims ||
+      typeof claims === 'string' ||
+      !Number.isSafeInteger(claims.userId) ||
+      claims.userId <= 0
+    )
+      return false;
+    const { default: UserManagementService } = await import(
+      '../services/userManagement'
+    );
+    const account = await Container.get(UserManagementService).validateToken(
+      token,
+      platform,
+    );
+    return account?.role === 0;
+  };
 
   const checkSessions = async () => {
     if (checking || sessions.size === 0) return;
@@ -35,7 +60,7 @@ export default async ({ server }: { server: Server }) => {
         }
         let valid = platforms.get(platform);
         if (valid === undefined) {
-          valid = isValidToken(current, token, platform, config.jwt.secret);
+          valid = await validateSession(current, token, platform);
           platforms.set(platform, valid);
         }
         if (!valid) conn.close('401');
@@ -77,7 +102,8 @@ export default async ({ server }: { server: Server }) => {
     const platform = getPlatform(conn.headers['user-agent'] || '') || 'desktop';
     const headerToken = conn.url.replace(`${conn.pathname}?token=`, '');
 
-    if (isValidToken(authInfo, headerToken, platform, config.jwt.secret)) {
+    if (await validateSession(authInfo, headerToken, platform)) {
+      if (closed) return;
       sockService.addClient(conn);
       sessions.set(conn, { token: headerToken, platform });
       if (!sessionTimer) {

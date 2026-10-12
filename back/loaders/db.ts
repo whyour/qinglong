@@ -9,6 +9,8 @@ import { CrontabViewModel } from '../data/cronView';
 import { CrontabStatModel } from '../data/cronStats';
 import { RunningInstanceModel } from '../data/runningInstance';
 import { sequelize } from '../data';
+import { UserModel } from '../data/user';
+import { migrateUserSchema } from '../shared/userSchemaMigrations';
 import { migrateSchema } from '../shared/schemaMigrations';
 
 export default async () => {
@@ -23,7 +25,9 @@ export default async () => {
     await CrontabStatModel.sync();
     await RunningInstanceModel.sync();
 
+    await UserModel.sync();
     await migrateSchema(sequelize);
+    await migrateUserSchema(sequelize);
 
     Logger.info('[boot] DB loaded');
   } catch (error) {

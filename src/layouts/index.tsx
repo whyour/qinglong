@@ -10,7 +10,15 @@ import {
 import ProLayout, { PageLoading } from '@ant-design/pro-layout';
 import { history, Link, Outlet, useLocation } from '@umijs/max';
 import * as DarkReader from '@umijs/ssr-darkreader';
-import { Avatar, Badge, Dropdown, Image, MenuProps, Tooltip } from 'antd';
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Dropdown,
+  Image,
+  MenuProps,
+  Tooltip,
+} from 'antd';
 import React, { useEffect, useState } from 'react';
 import intl from 'react-intl-universal';
 import vhCheck from 'vh-check';
@@ -48,7 +56,8 @@ export default function () {
   const [loading, setLoading] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<TSystemInfo>();
   const [siteTitle, setSiteTitle] = useState(
-    () => localStorage.getItem('qinglong_panel_title')?.trim() || intl.get('青龙'),
+    () =>
+      localStorage.getItem('qinglong_panel_title')?.trim() || intl.get('青龙'),
   );
   const [collapsed, setCollapsed] = useState(false);
   const [initLoading, setInitLoading] = useState<boolean>(true);
@@ -94,7 +103,7 @@ export default function () {
         if (code === 200 && data.username) {
           setUser(data);
           if (location.pathname === '/') {
-            history.push('/dashboard');
+            history.push(data.role === 1 ? '/env' : '/dashboard');
           }
         }
         needLoading && setLoading(false);
@@ -206,7 +215,7 @@ export default function () {
   }, []);
 
   useEffect(() => {
-    if (!user || !user.username) return;
+    if (!user || !user.username || user.role === 1) return;
     const ws = WebSocketManager.getInstance(
       `${window.location.origin}${
         config.apiPrefix
@@ -390,7 +399,27 @@ export default function () {
         </span>
       )}
       {...defaultProps}
+      {...(user.role === 1
+        ? {
+            route: {
+              routes: defaultProps.route!.routes!.filter((route) =>
+                ['/crontab', '/env', '/subscription'].includes(
+                  route.path || '',
+                ),
+              ),
+            },
+          }
+        : {})}
     >
+      {user.role === 1 && (
+        <Alert
+          type="info"
+          showIcon
+          message={intl.get(
+            '普通用户只读自己的数据，执行和系统修改由管理员负责',
+          )}
+        />
+      )}
       <Outlet
         context={{
           ...ctx,

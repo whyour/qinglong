@@ -34,10 +34,13 @@ import {
 } from '../shared/password';
 import { serializeAuthMutation } from '../shared/authMutation';
 import { LoginThrottle } from '../shared/loginThrottle';
+import UserManagementService from './userManagement';
 
 @Service()
 export default class UserService {
   private loginThrottle = new LoginThrottle();
+  @Inject((type) => UserManagementService)
+  private userManagementService!: UserManagementService;
   @Inject((type) => NotificationService)
   private notificationService!: NotificationService;
 
@@ -115,6 +118,24 @@ export default class UserService {
         message: tf('失败次数过多，请%s秒后重试', waitTime),
         data: waitTime,
       };
+    }
+
+    if (username !== cUsername) {
+      const account = await this.userManagementService.authenticate(
+        username,
+        password,
+      );
+      if (account) {
+        this.loginThrottle.reset(ip);
+        const token = await this.userManagementService.issueToken(
+          account,
+          req.platform,
+        );
+        return {
+          code: 200,
+          data: { token, username: account.username, role: account.role },
+        };
+      }
     }
 
     const passwordMatches =

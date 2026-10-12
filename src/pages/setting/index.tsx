@@ -36,6 +36,7 @@ import useResizeObserver from '@react-hook/resize-observer';
 import SystemLog from './systemLog';
 import Dependence from './dependence';
 import ClientIp from './clientIp';
+import UserManagement from './userManagement';
 
 const { Text } = Typography;
 const isDemoEnv = window.__ENV__DeployEnv === 'demo';
@@ -344,6 +345,11 @@ const Setting = () => {
               key: 'login',
               label: intl.get('登录日志'),
               children: <LoginLog height={height} data={loginLogData} />,
+            },
+            {
+              key: 'user-management',
+              label: intl.get('用户管理'),
+              children: <UserManagement height={height} />,
             },
             {
               key: 'client-ip',

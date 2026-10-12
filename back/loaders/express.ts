@@ -13,6 +13,8 @@ import { isValidToken, isDefaultAuthInfo } from '../shared/auth';
 import { AuthInfo } from '../data/system';
 import path from 'path';
 import { t } from '../shared/i18n';
+import { Container } from 'typedi';
+import jwt from 'jsonwebtoken';
 import { AppScope } from '../data/open';
 import uniqueConstraintError from '../middlewares/uniqueConstraintError';
 import protectedPathCase from '../middlewares/protectedPathCase';
@@ -144,6 +146,26 @@ export default ({ app }: { app: Application }) => {
 
     const authInfo = await shareStore.getAuthInfo();
     if (isValidToken(authInfo, headerToken, req.platform, config.jwt.secret)) {
+      req.user = { role: 0 };
+      return next();
+    }
+    const claims = jwt.decode(headerToken);
+    let account = null;
+    if (
+      typeof claims === 'object' &&
+      Number.isSafeInteger(claims?.userId) &&
+      claims!.userId > 0
+    ) {
+      const { default: UserManagementService } = await import(
+        '../services/userManagement'
+      );
+      account = await Container.get(UserManagementService).validateToken(
+        headerToken,
+        req.platform,
+      );
+    }
+    if (account) {
+      req.user = { userId: account.id, role: account.role };
       return next();
     }
 
@@ -177,7 +199,15 @@ export default ({ app }: { app: Application }) => {
   });
 
   app.use(rewrite('/open/*', '/api/$1'));
-  app.use(config.api.prefix, routes());
+  app.use(
+    config.api.prefix,
+    async (req, res, next) => {
+      if (!req.user || req.user.role === 0) return next();
+      const { userAccess } = await import('../middlewares/userAccess');
+      return userAccess(req, res, next);
+    },
+    routes(),
+  );
 
   app.get('*', (_, res, next) => {
     const indexPath = path.join(frontendPath, 'index.html');

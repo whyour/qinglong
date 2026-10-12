@@ -36,6 +36,7 @@ function fixture(initial) {
         require('node:crypto').randomBytes(32).toString('hex'),
     },
     './notify': class {},
+    './userManagement': class {},
     './schedule': class {},
     './sock': class {},
     '../shared/store': {
@@ -67,6 +68,7 @@ function fixture(initial) {
     { getClients: () => [{ close: () => closed++ }] },
   );
   user.notificationService = { notify() {} };
+  user.userManagementService = { authenticate: async () => null };
   return {
     user,
     get auth() {

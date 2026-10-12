@@ -106,6 +106,7 @@ test('database loader rejects initialization failure rather than allowing worker
   const mocks = { './logger': { error() {}, info() {} } };
   for (const [file, model] of [
     ['env', 'EnvModel'],
+    ['user', 'UserModel'],
     ['cron', 'CrontabModel'],
     ['dependence', 'DependenceModel'],
     ['open', 'AppModel'],

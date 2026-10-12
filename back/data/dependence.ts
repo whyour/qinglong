@@ -9,6 +9,7 @@ export class Dependence {
   name: string;
   log?: string[];
   remark?: string;
+  userId?: number;
 
   constructor(options: Dependence) {
     this.id = options.id;
@@ -21,6 +22,7 @@ export class Dependence {
     this.name = options.name.trim();
     this.log = options.log || [];
     this.remark = options.remark || '';
+    this.userId = options.userId;
   }
 }
 
@@ -59,5 +61,6 @@ export const DependenceModel = sequelize.define<DependenceInstance>(
     status: DataTypes.NUMBER,
     log: DataTypes.JSON,
     remark: DataTypes.STRING,
+    userId: { type: DataTypes.NUMBER, allowNull: true },
   },
 );

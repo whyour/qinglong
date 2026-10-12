@@ -76,7 +76,17 @@ export default (app: Router) => {
       try {
         const userService = Container.get(UserService);
         const token = getToken(req);
-        await userService.logout(req.platform, token);
+        if (req.user?.userId) {
+          const { default: UserManagementService } = await import(
+            '../services/userManagement'
+          );
+          await Container.get(UserManagementService).revokeToken(
+            req.user.userId,
+            token,
+          );
+        } else {
+          await userService.logout(req.platform, token);
+        }
         res.send({ code: 200 });
       } catch (e) {
         return next(e);
@@ -98,6 +108,16 @@ export default (app: Router) => {
           return res.send({ code: 450, message: t('未知错误') });
         }
         const userService = Container.get(UserService);
+        if (req.user?.userId) {
+          const { default: UserManagementService } = await import(
+            '../services/userManagement'
+          );
+          await Container.get(UserManagementService).update({
+            id: req.user.userId,
+            ...req.body,
+          });
+          return res.send({ code: 200 });
+        }
         const result = await userService.updateUsernameAndPassword(req.body);
         res.send(result);
       } catch (e) {
@@ -110,10 +130,28 @@ export default (app: Router) => {
     const logger: Logger = Container.get('logger');
     try {
       const userService = Container.get(UserService);
+      if (req.user?.userId) {
+        const { default: UserManagementService } = await import(
+          '../services/userManagement'
+        );
+        const account = await Container.get(UserManagementService).get(
+          req.user.userId,
+        );
+        return res.send({
+          code: 200,
+          data: {
+            username: account.username,
+            role: account.role,
+            id: account.id,
+            readOnly: account.role === 1,
+          },
+        });
+      }
       const authInfo = await userService.getAuthInfo();
       res.send({
         code: 200,
         data: {
+          role: 0,
           username: authInfo.username,
           avatar: authInfo.avatar,
           twoFactorActivated: authInfo.twoFactorActivated,

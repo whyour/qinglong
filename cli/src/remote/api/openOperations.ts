@@ -12,6 +12,39 @@ export interface OpenOperation {
   anonymous?: boolean;
 }
 export const openOperations: readonly OpenOperation[] = [
+  { name: 'account list', method: 'GET', path: 'user-management' },
+  {
+    name: 'account get',
+    method: 'GET',
+    path: 'user-management/:id',
+    params: ['id'],
+  },
+  {
+    name: 'account create',
+    method: 'POST',
+    path: 'user-management',
+    body: 'json',
+  },
+  {
+    name: 'account update',
+    method: 'PUT',
+    path: 'user-management',
+    body: 'json',
+  },
+  {
+    name: 'account delete',
+    method: 'DELETE',
+    path: 'user-management',
+    body: 'ids',
+  },
+  {
+    name: 'account assign',
+    method: 'PUT',
+    path: 'user-management/:id/resources',
+    params: ['id'],
+    body: 'json',
+  },
+
   { name: 'task view-list', method: 'GET', path: 'crons/views' },
   {
     name: 'task view-create',
@@ -478,7 +511,12 @@ export const openOperations: readonly OpenOperation[] = [
     path: 'system/config/dependence-clean',
     body: 'json',
   },
-  { name: 'dashboard record', method: 'POST', path: 'dashboard/record', body: 'json' },
+  {
+    name: 'dashboard record',
+    method: 'POST',
+    path: 'dashboard/record',
+    body: 'json',
+  },
   { name: 'dashboard overview', method: 'GET', path: 'dashboard/overview' },
   { name: 'dashboard trend', method: 'GET', path: 'dashboard/trend' },
   { name: 'dashboard top-time', method: 'GET', path: 'dashboard/top-time' },
