@@ -76,7 +76,9 @@
       "@codemirror/state": "6.5.4",
       "@codemirror/view": "6.39.16",
       "proxy-addr": "2.0.8",
-      "websocket-driver": "0.7.5"
+      "websocket-driver": "0.7.5",
+      "brace-expansion@1": "1.1.21",
+      "brace-expansion@2": "2.1.7"
     }
   },
   "dependencies": {
@@ -86,7 +88,7 @@
     "@grpc/proto-loader": "^0.8.0",
     "@keyv/sqlite": "^4.0.1",
     "@otplib/preset-default": "^12.0.1",
-    "body-parser": "^2.3.0",
+    "body-parser": "^1.20.3",
     "celebrate": "^15.0.3",
     "chokidar": "^4.0.1",
     "compression": "1.8.2",
@@ -101,10 +103,10 @@
     "express-urlrewrite": "^2.0.3",
     "helmet": "^8.1.0",
     "hpagent": "^1.2.0",
-    "http-proxy-middleware": "^4.2.0",
+    "http-proxy-middleware": "^3.0.3",
     "iconv-lite": "^0.6.3",
     "ip2region": "2.3.0",
-    "js-yaml": "^5.4.3",
+    "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.2",
     "keyv": "^5.2.3",
     "lodash": "^4.17.21",
@@ -121,7 +123,7 @@
     "sqlite3": "npm:@whyour/sqlite3@1.1.2",
     "toad-scheduler": "^3.0.1",
     "typedi": "^0.10.0",
-    "undici": "^8.11.2",
+    "undici": "^7.9.0",
     "uuid": "^11.0.3",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0"
