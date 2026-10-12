@@ -129,7 +129,7 @@ Acquire::http::Timeout "1";
           'fs/promises': {
             readFile: async (file) =>
               file === '/etc/os-release'
-                ? distribution
+                ? `${distribution}\nVERSION_CODENAME=bookworm\n`
                 : existingMirror
                 ? 'URIs: http://old.example/debian\n'
                 : '',

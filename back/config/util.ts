@@ -13,6 +13,7 @@ import { FormData } from 'undici';
 import os from 'os';
 import { maybeSudo, isInContainer } from './container';
 import { resolveFileAccess } from '../shared/fileAccess';
+import { mirrorWriteCommand, normalizeMirror, rewriteMirrorSources } from '../shared/linuxMirror';
 
 export * from './share';
 
@@ -806,77 +807,73 @@ export async function detectOS(): Promise<
   return osType;
 }
 
-async function getCurrentMirrorDomain(
-  filePath: string,
-): Promise<string | null> {
-  const fileContent = await fs.readFile(filePath, 'utf8');
-  const lines = fileContent.split('\n');
-  for (const line of lines) {
-    if (line.trim().startsWith('#')) {
-      continue;
-    }
-    const match = line.match(/https?:\/\/[^\/]+/);
-    if (match) {
-      return match[0];
-    }
-  }
-  return null;
-}
-
-async function replaceDomainInFile(
-  filePath: string,
-  oldDomainWithScheme: string,
-  newDomainWithScheme: string,
-): Promise<void> {
-  let fileContent = await fs.readFile(filePath, 'utf8');
-  let updatedContent = fileContent.replace(
-    new RegExp(oldDomainWithScheme, 'g'),
-    newDomainWithScheme,
-  );
-
-  if (!newDomainWithScheme.endsWith('/')) {
-    newDomainWithScheme += '/';
-  }
-
-  await writeFileWithLock(filePath, updatedContent);
-}
-
 async function _updateLinuxMirror(
   osType: string,
-  mirrorDomainWithScheme: string,
+  mirror: string,
 ): Promise<string> {
+  const defaults: Record<string, string> = {
+    Debian: 'http://deb.debian.org/debian',
+    Ubuntu: 'http://archive.ubuntu.com/ubuntu',
+    Alpine: 'http://dl-cdn.alpinelinux.org/alpine',
+  };
+  if (!defaults[osType])
+    throw new Error('Unsupported OS type for updating mirrors.');
+  const target = mirror || defaults[osType];
+  normalizeMirror(target);
   const S = isInContainer() ? 'sudo ' : '';
-  // APT otherwise returns zero when index downloads fail with transient errors.
-  const aptUpdate = `${S}apt-get update --error-on=any`;
-  let filePath: string, currentDomainWithScheme: string | null;
-  switch (osType) {
-    case 'Debian':
-      filePath = '/etc/apt/sources.list.d/debian.sources';
-      currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
-      if (currentDomainWithScheme) {
-        return `${S}sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://deb.debian.org'}|g' ${filePath} || (${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | ${S}tee ${filePath}) && ${aptUpdate}`;
-      } else {
-        return `${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://deb.debian.org'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates\\nComponents: main\\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg" | ${S}tee ${filePath} && ${aptUpdate}`;
+  const update =
+    osType === 'Alpine' ? 'apk update' : `${S}apt-get update --error-on=any`;
+  let file =
+    osType === 'Alpine'
+      ? '/etc/apk/repositories'
+      : `/etc/apt/sources.list.d/${osType.toLowerCase()}.sources`;
+  let content = '';
+  try {
+    content = await fs.readFile(file, 'utf8');
+  } catch (error: any) {
+    if (error.code !== 'ENOENT') throw error;
+    if (osType !== 'Alpine') {
+      try {
+        file = '/etc/apt/sources.list';
+        content = await fs.readFile(file, 'utf8');
+      } catch (legacyError: any) {
+        if (legacyError.code !== 'ENOENT') throw legacyError;
+        file = `/etc/apt/sources.list.d/${osType.toLowerCase()}.sources`;
       }
-    case 'Ubuntu':
-      filePath = '/etc/apt/sources.list.d/ubuntu.sources';
-      currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
-      if (currentDomainWithScheme) {
-        return `${S}sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}|g' ${filePath} || (${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | ${S}tee ${filePath}) && ${aptUpdate}`;
-      } else {
-        return `${S}mkdir -p /etc/apt/sources.list.d && echo -e "Types: deb\\nURIs: ${mirrorDomainWithScheme || 'http://archive.ubuntu.com'}\\nSuites: \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2) \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-updates \\$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)-backports\\nComponents: main restricted universe multiverse\\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" | ${S}tee ${filePath} && ${aptUpdate}`;
-      }
-    case 'Alpine':
-      filePath = '/etc/apk/repositories';
-      currentDomainWithScheme = await getCurrentMirrorDomain(filePath);
-      if (currentDomainWithScheme) {
-        return `sed -i 's|${currentDomainWithScheme}|${mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org'}|g' ${filePath} || (mkdir -p /etc/apk && echo -e "\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/main\\n\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/community" | sed "s|^|${mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org'}/alpine/v|" | tee ${filePath}) && apk update`;
-      } else {
-        return `mkdir -p /etc/apk && echo -e "\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/main\\n\\$(grep VERSION_ID /etc/os-release | cut -d= -f2 | cut -d. -f1,2)/community" | sed "s|^|${mirrorDomainWithScheme || 'http://dl-cdn.alpinelinux.org'}/alpine/v|" | tee ${filePath} && apk update`;
-      }
-    default:
-      throw Error('Unsupported OS type for updating mirrors.');
+    }
   }
+  if (!content.trim()) {
+    const release = await fs.readFile('/etc/os-release', 'utf8');
+    if (osType === 'Alpine') {
+      const version = release.match(/^VERSION_ID=["']?(\d+\.\d+)/m)?.[1];
+      if (!version)
+        throw new Error('Cannot determine Alpine repository version');
+      content = `${defaults.Alpine}/v${version}/main\n${defaults.Alpine}/v${version}/community\n`;
+    } else {
+      // The fallback may have read an empty legacy .list. Deb822 stanzas must
+      // be written to a .sources file, leaving the legacy file untouched.
+      file = `/etc/apt/sources.list.d/${osType.toLowerCase()}.sources`;
+      const codename = release.match(/^VERSION_CODENAME=["']?([\w-]+)/m)?.[1];
+      if (!codename)
+        throw new Error('Cannot determine APT repository codename');
+      const ubuntu = osType === 'Ubuntu';
+      content = `Types: deb\nURIs: ${
+        defaults[osType]
+      }\nSuites: ${codename} ${codename}-updates${
+        ubuntu ? ` ${codename}-backports` : ''
+      }\nComponents: ${
+        ubuntu ? 'main restricted universe multiverse' : 'main'
+      }\nSigned-By: /usr/share/keyrings/${osType.toLowerCase()}-archive-keyring.gpg\n`;
+      if (!ubuntu)
+        content += `\nTypes: deb\nURIs: http://security.debian.org/debian-security\nSuites: ${codename}-security\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n`;
+    }
+  }
+  return mirrorWriteCommand(
+    file,
+    rewriteMirrorSources(content, target),
+    S,
+    update,
+  );
 }
 
 export async function updateLinuxMirrorFile(mirror: string): Promise<string> {
