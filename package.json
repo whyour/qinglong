@@ -28,7 +28,8 @@
     "panel": "npm run build:back && node static/build/app.js",
     "gen:proto": "protoc --experimental_allow_proto3_optional --plugin=./node_modules/.bin/protoc-gen-ts_proto ./back/protos/*.proto --ts_proto_out=./ --ts_proto_opt=outputServices=grpc-js,env=node,esModuleInterop=true,snakeToCamel=false",
     "prettier": "prettier --write '**/*.{js,jsx,tsx,ts,less,md,json}'",
-    "postinstall": "max setup 2>/dev/null || true"
+    "postinstall": "max setup 2>/dev/null || true",
+    "start:simple": "bash shell/start-simplify.sh"
   },
   "gitHooks": {
     "pre-commit": "lint-staged"
@@ -76,7 +77,9 @@
       "@codemirror/state": "6.5.4",
       "@codemirror/view": "6.39.16",
       "proxy-addr": "2.0.8",
-      "websocket-driver": "0.7.5"
+      "websocket-driver": "0.7.5",
+      "brace-expansion@1": "1.1.21",
+      "brace-expansion@2": "2.1.7"
     }
   },
   "dependencies": {
@@ -171,7 +174,7 @@
     "concurrently": "^7.0.0",
     "file-saver": "2.0.2",
     "lint-staged": "^13.0.3",
-    "moment": "2.30.1",
+    "moment": "2.31.0",
     "monaco-editor": "0.33.0",
     "nodemon": "^3.0.1",
     "prettier": "^2.5.1",

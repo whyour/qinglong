@@ -705,5 +705,7 @@
   "发送状态": "发送状态",
   "通知来源": "通知来源",
   "脚本通知": "脚本通知",
-  "系统通知": "系统通知"
+  "系统通知": "系统通知",
+  "Python支持多种安装方式：\n1. 包名（如：requests）\n2. GitHub链接（如：git+https://github.com/user/repo.git）\n3. requirements文件路径（如：path/to/requirements.txt）\n4. pyproject.toml文件路径": "Python支持多种安装方式：\n1. 包名（如：requests）\n2. GitHub链接（如：git+https://github.com/user/repo.git）\n3. requirements文件路径（如：path/to/requirements.txt）\n4. pyproject.toml文件路径",
+  "支持包名、GitHub链接、requirements.txt或pyproject.toml路径": "支持包名、GitHub链接、requirements.txt或pyproject.toml路径"
 }

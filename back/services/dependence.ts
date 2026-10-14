@@ -32,10 +32,11 @@ export default class DependenceService {
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
+      getInstallCommand(x.type, x.name);
       const tab = new Dependence({ ...x, status: DependenceStatus.queued });
       return tab;
     });
@@ -59,6 +60,7 @@ export default class DependenceService {
       ...other,
       status: DependenceStatus.queued,
     });
+    getInstallCommand(tab.type, tab.name);
     const newDoc = await this.updateDb(tab);
     this.installDependenceOneByOne([newDoc]);
     return newDoc;
@@ -296,6 +298,23 @@ export default class DependenceService {
     force: boolean = false,
   ) {
     return taskLimit.runDependeny(dependency, () => {
+      let validatedCommand: string;
+      try {
+        validatedCommand = isInstall
+          ? getInstallCommand(dependency.type, dependency.name.trim())
+          : getUninstallCommand(dependency.type, dependency.name.trim());
+      } catch (error) {
+        taskLimit.removeQueuedDependency(dependency);
+        return DependenceModel.update(
+          {
+            status: isInstall
+              ? DependenceStatus.installFailed
+              : DependenceStatus.removeFailed,
+            log: [String(error)],
+          },
+          { where: { id: dependency.id } },
+        ).then(() => null);
+      }
       return new Promise(async (resolve) => {
         if (taskLimit.firstDependencyId !== dependency.id) {
           return resolve(null);
@@ -345,9 +364,7 @@ export default class DependenceService {
           : DependenceStatus.removing;
         await DependenceModel.update({ status }, { where: { id: depIds } });
 
-        let command = isInstall
-          ? getInstallCommand(dependency.type, depName)
-          : getUninstallCommand(dependency.type, depName);
+        let command = validatedCommand;
         if (isLinuxDependence) {
           command = isInstall
             ? `${linuxCommand.install} ${depName.trim()}`
@@ -470,15 +487,20 @@ export default class DependenceService {
 
           const message =
             '\n' +
-            tf('依赖%s%s，结束时间 %s，耗时 %s 秒',
-            actionText,
-            resultText,
-            endTime.format('YYYY-MM-DD HH:mm:ss'),
-            String(endTime.diff(startTime, 'second')),
-          );
+            tf(
+              '依赖%s%s，结束时间 %s，耗时 %s 秒',
+              actionText,
+              resultText,
+              endTime.format('YYYY-MM-DD HH:mm:ss'),
+              String(endTime.diff(startTime, 'second')),
+            );
           const exitStatus = isSucceed
-            ? (isInstall ? DependenceStatus.installed : DependenceStatus.removed)
-            : (isInstall ? DependenceStatus.installFailed : DependenceStatus.removeFailed);
+            ? isInstall
+              ? DependenceStatus.installed
+              : DependenceStatus.removed
+            : isInstall
+            ? DependenceStatus.installFailed
+            : DependenceStatus.removeFailed;
           this.sockService.sendMessage({
             type: socketMessageType,
             message,
