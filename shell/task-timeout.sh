@@ -36,11 +36,15 @@ run_task_command() {
     ) &
     timeout_watcher=$!
     set +m
-    trap 'kill -KILL -- "-$timeout_watcher" 2>/dev/null || :
+    trap '{
+        # Bash can report a killed job between any two cleanup commands.
+        # Keep redirection active until the watchdog is fully reaped.
+        kill -KILL -- "-$timeout_watcher" || :
+        wait "$timeout_watcher" || :
+      } 2>/dev/null
       if kill -TERM -- "-$timeout_worker" 2>/dev/null; then sleep 0.1; fi
       kill -KILL -- "-$timeout_worker" 2>/dev/null || :
       wait "$timeout_worker" 2>/dev/null || :
-      wait "$timeout_watcher" 2>/dev/null || :
       rm -rf -- "$timeout_dir"' EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM

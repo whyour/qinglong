@@ -4,6 +4,7 @@ import { SharedContext } from '@/layouts';
 import { depthFirstSearch, findNode, getEditorMode } from '@/utils';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
+import { getCodeMirrorExtensions } from '@/utils/codemirror/language';
 import { canPreviewInMonaco } from '@/utils/monaco';
 import {
   CloudDownloadOutlined,
@@ -15,7 +16,6 @@ import {
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
 import Editor from '@monaco-editor/react';
-import { langs } from '@uiw/codemirror-extensions-langs';
 import CodeMirror from '@uiw/react-codemirror';
 import { history, useOutletContext } from '@umijs/max';
 import {
@@ -747,9 +747,7 @@ const Script = () => {
         {isPhone && (
           <CodeMirror
             value={value}
-            extensions={
-              mode ? [langs[mode as keyof typeof langs]()] : undefined
-            }
+            extensions={getCodeMirrorExtensions(mode)}
             theme={theme.includes('dark') ? 'dark' : 'light'}
             readOnly={!isEditing || saving}
             onChange={(value) => {
