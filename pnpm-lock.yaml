@@ -6,6 +6,8 @@ overrides:
   '@codemirror/view': 6.39.16
   proxy-addr: 2.0.8
   websocket-driver: 0.7.5
+  brace-expansion@1: 1.1.21
+  brace-expansion@2: 2.1.7
 
 dependencies:
   '@ant-design/plots':
@@ -278,8 +280,8 @@ devDependencies:
     specifier: ^13.0.3
     version: 13.3.0
   moment:
-    specifier: 2.30.1
-    version: 2.30.1
+    specifier: 2.31.0
+    version: 2.31.0
   monaco-editor:
     specifier: 0.33.0
     version: 0.33.0
@@ -876,7 +878,7 @@ packages:
       '@babel/runtime': 7.26.0
       antd: 4.24.16(react-dom@18.3.1)(react@18.3.1)
       classnames: 2.5.1
-      moment: 2.30.1
+      moment: 2.31.0
       rc-util: 5.43.0(react-dom@18.3.1)(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
@@ -5369,7 +5371,7 @@ packages:
       fast-deep-equal: 3.1.3
       intl: 1.2.5
       lodash: 4.17.21
-      moment: 2.30.1
+      moment: 2.31.0
       qiankun: 2.10.16
       react-intl: 3.12.1(react@18.3.1)
       react-redux: 8.1.3(@types/react-dom@18.3.1)(@types/react@18.3.12)(react-dom@18.3.1)(react@18.3.1)(redux@4.2.1)
@@ -5866,7 +5868,7 @@ packages:
       classnames: 2.5.1
       copy-to-clipboard: 3.3.3
       lodash: 4.17.21
-      moment: 2.30.1
+      moment: 2.31.0
       rc-cascader: 3.7.3(react-dom@18.3.1)(react@18.3.1)
       rc-checkbox: 3.0.1(react-dom@18.3.1)(react@18.3.1)
       rc-collapse: 3.4.2(react-dom@18.3.1)(react@18.3.1)
@@ -6355,18 +6357,6 @@ packages:
     engines: {node: '>= 5.10.0'}
     dependencies:
       big-integer: 1.6.52
-    dev: true
-
-  /brace-expansion@1.1.12:
-    resolution: {integrity: sha512-9T9UjW3r0UW5c1Q7GTwllptXwhvYmEzFhzMfZ9H7FQWt+uZePjZPjBP/W1ZEyZ1twGWom5/56TF4lPcqjnDHcg==}
-    dependencies:
-      balanced-match: 1.0.2
-      concat-map: 0.0.1
-
-  /brace-expansion@2.0.2:
-    resolution: {integrity: sha512-Jt0vHyM+jmUBqojB7E1NIYadt0vI0Qxjxd2TErW94wDz+E2LAm5vKMXXwg6ZZBTHPuUlDgQHKXvjGBdfcF1ZDQ==}
-    dependencies:
-      balanced-match: 1.0.2
     dev: true
 
   /braces@3.0.3:
@@ -8662,7 +8652,7 @@ packages:
   /file-stream-rotator@0.6.1:
     resolution: {integrity: sha512-u+dBid4PvZw17PmDeRcNOtCP9CCK/9lRN2w+r1xIS7yOL9JFrIBKTvrYsxT4P0pGtThYTn++QS5ChHaUov3+zQ==}
     dependencies:
-      moment: 2.30.1
+      moment: 2.31.0
     dev: false
 
   /fill-range@7.1.1:
@@ -10733,11 +10723,12 @@ packages:
   /moment-timezone@0.5.46:
     resolution: {integrity: sha512-ZXm9b36esbe7OmdABqIWJuBBiLLwAjrN7CE+7sYdCCx82Nabt1wHDj8TVseS59QIlfFPbOoiBPm6ca9BioG4hw==}
     dependencies:
-      moment: 2.30.1
+      moment: 2.31.0
     dev: false
 
-  /moment@2.30.1:
-    resolution: {integrity: sha512-uEmtNhbDOrWPFS+hdjFCBfy9f2YoyzRpwcl+DqpC6taX21FzsTLQVbMV/W7PzNSX6x/bhC1zA3c2UQ5NzH6how==}
+  /moment@2.31.0:
+    resolution:
+      integrity: sha512-0acOTfMiWOheYS4eoWb80yYMb/JLvVv9SHbs2PehaDzfUG0Bw855SKyk0IKTnPGa5+U2bmi3W68l1+sGLX/pvw==
 
   /monaco-editor@0.33.0:
     resolution: {integrity: sha512-VcRWPSLIUEgQJQIE0pVT8FcGBIgFoxz7jtqctE+IiCxWugD0DwgyQBcZBhdSrdMC84eumoqMZsGl2GTreOzwqw==}
@@ -12724,7 +12715,7 @@ packages:
       classnames: 2.5.1
       date-fns: 2.30.0
       dayjs: 1.11.13
-      moment: 2.30.1
+      moment: 2.31.0
       rc-trigger: 5.3.4(react-dom@18.3.1)(react@18.3.1)
       rc-util: 5.43.0(react-dom@18.3.1)(react@18.3.1)
       react: 18.3.1
@@ -13951,7 +13942,7 @@ packages:
       dottie: 2.0.6
       inflection: 1.13.4
       lodash: 4.17.21
-      moment: 2.30.1
+      moment: 2.31.0
       moment-timezone: 0.5.46
       pg-connection-string: 2.7.0
       retry-as-promised: 7.0.4

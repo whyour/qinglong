@@ -76,7 +76,9 @@
       "@codemirror/state": "6.5.4",
       "@codemirror/view": "6.39.16",
       "proxy-addr": "2.0.8",
-      "websocket-driver": "0.7.5"
+      "websocket-driver": "0.7.5",
+      "brace-expansion@1": "1.1.21",
+      "brace-expansion@2": "2.1.7"
     }
   },
   "dependencies": {
@@ -171,7 +173,7 @@
     "concurrently": "^7.0.0",
     "file-saver": "2.0.2",
     "lint-staged": "^13.0.3",
-    "moment": "2.30.1",
+    "moment": "2.31.0",
     "monaco-editor": "0.33.0",
     "nodemon": "^3.0.1",
     "prettier": "^2.5.1",
