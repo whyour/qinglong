@@ -5,15 +5,20 @@ import psTreeFun from 'ps-tree';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
 import config from './index';
-import { PYTHON_INSTALL_DIR, TASK_COMMAND } from './const';
+import { PYTHON_INSTALL_DIR, PYTHON_VENV_DIR, TASK_COMMAND } from './const';
 import Logger from '../loaders/logger';
 import { writeFileWithLock } from '../shared/utils';
 import { DependenceTypes } from '../data/dependence';
 import { FormData } from 'undici';
 import os from 'os';
 import { maybeSudo, isInContainer } from './container';
+import { shellQuote } from '../shared/shellQuote';
 import { resolveFileAccess } from '../shared/fileAccess';
-import { mirrorWriteCommand, normalizeMirror, rewriteMirrorSources } from '../shared/linuxMirror';
+import {
+  mirrorWriteCommand,
+  normalizeMirror,
+  rewriteMirrorSources,
+} from '../shared/linuxMirror';
 
 export * from './share';
 
@@ -671,7 +676,9 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
       throw new Error('Invalid timezone');
     }
 
-    await promiseExec(maybeSudo(`ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`));
+    await promiseExec(
+      maybeSudo(`ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`),
+    );
     await promiseExec(`echo "${timezone}" | ${maybeSudo('tee /etc/timezone')}`);
 
     return true;
@@ -685,7 +692,13 @@ export function getGetCommand(type: DependenceTypes, name: string): string {
   const baseCommands = {
     [DependenceTypes.nodejs]: `pnpm ls -g  | grep "${name}" | head -1`,
     [DependenceTypes.python3]: `
-    python3 -c "exec('''
+    ${
+      PYTHON_VENV_DIR
+        ? shellQuote(
+            path.resolve(config.rootPath, PYTHON_VENV_DIR, 'bin/python3'),
+          )
+        : 'python3'
+    } -c "exec('''
 name='${name}'
 try:
     from importlib.metadata import version
@@ -696,9 +709,10 @@ except:
     spec=u.find_spec(name)
     print(name if spec else '')
 ''')"`,
-    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
-      ? `apk info -es ${name}`
-      : maybeSudo(`dpkg-query -s ${name}`),
+    [DependenceTypes.linux]:
+      getOsTypeSync() === 'Alpine'
+        ? `apk info -es ${name}`
+        : maybeSudo(`dpkg-query -s ${name}`),
   };
 
   return baseCommands[type];
@@ -707,16 +721,28 @@ except:
 export function getInstallCommand(type: DependenceTypes, name: string): string {
   const baseCommands = {
     [DependenceTypes.nodejs]: 'pnpm add -g',
-    [DependenceTypes.python3]:
-      'pip3 install --disable-pip-version-check --root-user-action=ignore',
-    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
-      ? 'apk add --no-check-certificate'
-      : maybeSudo('apt-get install -y'),
+    [DependenceTypes.python3]: `${
+      PYTHON_VENV_DIR
+        ? shellQuote(
+            path.resolve(config.rootPath, PYTHON_VENV_DIR, 'bin/python3'),
+          ) + ' -m pip'
+        : 'pip3'
+    } install --disable-pip-version-check${
+      PYTHON_VENV_DIR ? '' : ' --root-user-action=ignore'
+    }`,
+    [DependenceTypes.linux]:
+      getOsTypeSync() === 'Alpine'
+        ? 'apk add --no-check-certificate'
+        : maybeSudo('apt-get install -y'),
   };
 
   let command = baseCommands[type];
 
-  if (type === DependenceTypes.python3 && PYTHON_INSTALL_DIR) {
+  if (
+    type === DependenceTypes.python3 &&
+    PYTHON_INSTALL_DIR &&
+    !PYTHON_VENV_DIR
+  ) {
     command = `${command} --prefix=${PYTHON_INSTALL_DIR}`;
   }
 
@@ -729,11 +755,17 @@ export function getUninstallCommand(
 ): string {
   const baseCommands = {
     [DependenceTypes.nodejs]: 'pnpm remove -g',
-    [DependenceTypes.python3]:
-      'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
-    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
-      ? 'apk del'
-      : maybeSudo('apt-get remove -y'),
+    [DependenceTypes.python3]: `${
+      PYTHON_VENV_DIR
+        ? shellQuote(
+            path.resolve(config.rootPath, PYTHON_VENV_DIR, 'bin/python3'),
+          ) + ' -m pip'
+        : 'pip3'
+    } uninstall --disable-pip-version-check${
+      PYTHON_VENV_DIR ? '' : ' --root-user-action=ignore'
+    } -y`,
+    [DependenceTypes.linux]:
+      getOsTypeSync() === 'Alpine' ? 'apk del' : maybeSudo('apt-get remove -y'),
   };
 
   return `${baseCommands[type]} ${name.trim()}`;
