@@ -395,7 +395,7 @@
   "父目录": "Parent Directory",
   "版本": "Version",
   "状态": "Status",
-  "环境变量": "Environment Variables",
+  "环境变量": "Environment variable",
   "生成数据中...": "Generating data...",
   "用于访问所有私有仓库的全局SSH私钥": "Global SSH private key for accessing all private repositories",
   "用户令牌，扫描登录后 我的—>设置->令牌 中获取，参考 https://www.weplusbot.com/": "Token, which can be obtained after scanning and logging in, is available under 'My Account' -> 'Settings' -> 'Tokens'. Please refer to the instructions for detailed steps: https://www.weplusbot.com/",
@@ -634,7 +634,6 @@
   "保存配置": "Save",
   "当前生效值": "Effective value",
   "默认配置": "Default",
-  "环境变量": "Environment variable",
   "客户端 IP 诊断": "Client IP diagnostics",
   "重新诊断": "Run again",
   "Socket 地址": "Socket address",
@@ -699,5 +698,7 @@
   "仍然保存": "Save anyway",
   "已保存，本次未记录历史版本": "Saved without a history snapshot",
   "已保存，但旧历史清理失败，请检查存储权限和空间": "Saved, but old history could not be removed. Check storage permissions and free space.",
-  "保存失败": "Unable to save"
+  "保存失败": "Unable to save",
+  "Python支持多种安装方式：\n1. 包名（如：requests）\n2. GitHub链接（如：git+https://github.com/user/repo.git）\n3. requirements文件路径（如：path/to/requirements.txt）\n4. pyproject.toml文件路径": "Python supports package names, Git URLs, and existing requirements.txt or pyproject.toml files under the scripts or repository directory.",
+  "支持包名、GitHub链接、requirements.txt或pyproject.toml路径": "Package name, Git URL, requirements.txt or pyproject.toml path"
 }
