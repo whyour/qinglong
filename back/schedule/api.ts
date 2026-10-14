@@ -16,6 +16,7 @@ import {
   MoveEnvRequest,
   Response,
   SystemNotifyRequest,
+  RecordNotifyLogRequest,
   UpdateEnvNamesRequest,
   UpdateEnvRequest,
 } from '../protos/api';
@@ -238,7 +239,8 @@ export const systemNotify = async (
     const data = await systemService.notify({
       title: call.request.title,
       content: call.request.content,
-      notificationInfo: call.request.notificationInfo as unknown as NotificationInfo,
+      notificationInfo: call.request
+        .notificationInfo as unknown as NotificationInfo,
     });
     callback(null, data);
   } catch (e: any) {
@@ -246,10 +248,31 @@ export const systemNotify = async (
   }
 };
 
+export const recordNotifyLog = async (
+  call: ServerUnaryCall<RecordNotifyLogRequest, Response>,
+  callback: sendUnaryData<Response>,
+) => {
+  try {
+    await Container.get(SystemService).recordNotifyLog({
+      title: call.request.title,
+      content: call.request.content,
+      status: call.request.success ? 0 : 1,
+      notifyType: call.request.notifyType,
+      source: 'script',
+      scriptName: call.request.scriptName,
+      taskId: call.request.taskId,
+    });
+    callback(null, { code: 200 });
+  } catch (error: any) {
+    callback(error);
+  }
+};
+
 const normalizeCronData = (data: CronItem | null): CronItem | undefined => {
   if (!data) return undefined;
   // create() returns a Sequelize instance; spreading it omits attribute getters.
-  const cron = data instanceof Model ? (data.get({ plain: true }) as CronItem) : data;
+  const cron =
+    data instanceof Model ? (data.get({ plain: true }) as CronItem) : data;
   return {
     ...cron,
     labels: cron.labels ?? [],

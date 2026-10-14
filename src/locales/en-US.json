@@ -699,6 +699,13 @@
   "已保存，本次未记录历史版本": "Saved without a history snapshot",
   "已保存，但旧历史清理失败，请检查存储权限和空间": "Saved, but old history could not be removed. Check storage permissions and free space.",
   "保存失败": "Unable to save",
+  "通知日志": "Notification log",
+  "发送时间": "Sent at",
+  "推送渠道": "Channel",
+  "发送状态": "Delivery status",
+  "通知来源": "Notification source",
+  "脚本通知": "Script notification",
+  "系统通知": "System notification",
   "Python支持多种安装方式：\n1. 包名（如：requests）\n2. GitHub链接（如：git+https://github.com/user/repo.git）\n3. requirements文件路径（如：path/to/requirements.txt）\n4. pyproject.toml文件路径": "Python supports package names, Git URLs, and existing requirements.txt or pyproject.toml files under the scripts or repository directory.",
   "支持包名、GitHub链接、requirements.txt或pyproject.toml路径": "Package name, Git URL, requirements.txt or pyproject.toml path"
 }

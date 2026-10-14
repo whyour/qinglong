@@ -1,3 +1,4 @@
+import { persistNotificationAudit } from '../shared/notificationAudit';
 import { spawn } from 'cross-spawn';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -32,6 +33,8 @@ import {
   SystemInstance,
   SystemModel,
   SystemModelInfo,
+  NotifyStatus,
+  NotifyLogInfo,
 } from '../data/system';
 import taskLimit from '../shared/pLimit';
 import cronClient from '../schedule/client';
@@ -53,7 +56,7 @@ export default class SystemService {
     @Inject('logger') private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
-  ) { }
+  ) {}
 
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
@@ -158,7 +161,9 @@ export default class SystemService {
     if (info.dependenceProxy) {
       await fs.promises.writeFile(
         config.dependenceProxyFile,
-        `export http_proxy=${shellQuote(info.dependenceProxy)}\nexport https_proxy=${shellQuote(info.dependenceProxy)}`,
+        `export http_proxy=${shellQuote(
+          info.dependenceProxy,
+        )}\nexport https_proxy=${shellQuote(info.dependenceProxy)}`,
       );
     } else {
       await fs.promises.rm(config.dependenceProxyFile);
@@ -293,7 +298,7 @@ export default class SystemService {
         );
         const text = await body.text();
         lastVersionContent = parseContentVersion(text);
-      } catch (error) { }
+      } catch (error) {}
 
       if (!lastVersionContent) {
         lastVersionContent = currentVersionContent;
@@ -407,11 +412,13 @@ export default class SystemService {
     if (notificationInfo && typeString) {
       notificationInfo.type = typeString;
     }
+
     const isSuccess = await this.notificationService.notify(
       title,
       content,
       notificationInfo,
     );
+
     if (isSuccess) {
       return { code: 200, message: t('通知发送成功') };
     } else {
@@ -419,16 +426,36 @@ export default class SystemService {
     }
   }
 
-  public async run({ command, logPath }: { command: string; logPath?: string }, callback: TaskCallbacks) {
+  public async recordNotifyLog(info: NotifyLogInfo): Promise<void> {
+    await persistNotificationAudit(info);
+  }
+
+  public async getNotifyLog(): Promise<Array<NotifyLogInfo>> {
+    const docs = await SystemModel.findAll({
+      where: { type: AuthDataType.notifyLog },
+      order: [['id', 'DESC']],
+      limit: 200,
+    });
+    return docs.map((x) => ({ ...x.info, id: x.id }));
+  }
+
+  public async run(
+    { command, logPath }: { command: string; logPath?: string },
+    callback: TaskCallbacks,
+  ) {
     if (!command.startsWith(TASK_COMMAND)) {
       command = `${TASK_COMMAND} ${command}`;
     }
-    const logPathPrefix = logPath ? `real_log_path=${logPath}` : ''
-    this.scheduleService.runTask(`${logPathPrefix} real_time=true ${command}`, callback, {
-      command,
-      id: command.replace(/ /g, '-'),
-      runOrigin: 'system',
-    });
+    const logPathPrefix = logPath ? `real_log_path=${logPath}` : '';
+    this.scheduleService.runTask(
+      `${logPathPrefix} real_time=true ${command}`,
+      callback,
+      {
+        command,
+        id: command.replace(/ /g, '-'),
+        runOrigin: 'system',
+      },
+    );
   }
 
   public async stop({ command, pid }: { command: string; pid: number }) {
@@ -459,8 +486,20 @@ export default class SystemService {
       if (type && type.length) {
         dataDirs = dataDirs.concat(type.filter((x) => x !== 'base'));
       }
-      const allowed = new Set(['db', 'upload', 'config', 'scripts', 'log', 'deps',
-        'syslog', 'dep_cache', 'raw', 'repo', 'ssh.d', 'script-history']);
+      const allowed = new Set([
+        'db',
+        'upload',
+        'config',
+        'scripts',
+        'log',
+        'deps',
+        'syslog',
+        'dep_cache',
+        'raw',
+        'repo',
+        'ssh.d',
+        'script-history',
+      ]);
       if (dataDirs.some((dir) => !allowed.has(dir))) {
         return res.status(400).send({ code: 400, message: t('参数错误') });
       }
@@ -470,9 +509,13 @@ export default class SystemService {
         dataDirs = dataDirs.filter((dir) => dir !== 'script-history');
       }
       const dataPaths = [...new Set(dataDirs)].map((dir) => `data/${dir}`);
-      await promisify(execFile)('tar', ['-zcf', config.dataTgzFile, '--', ...dataPaths], {
-        cwd: path.dirname(config.dataPath),
-      });
+      await promisify(execFile)(
+        'tar',
+        ['-zcf', config.dataTgzFile, '--', ...dataPaths],
+        {
+          cwd: path.dirname(config.dataPath),
+        },
+      );
       res.download(config.dataTgzFile);
     } catch (error: any) {
       return res.send({ code: 400, message: error.message });

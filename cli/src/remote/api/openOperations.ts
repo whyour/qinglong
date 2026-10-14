@@ -12,6 +12,12 @@ export interface OpenOperation {
   anonymous?: boolean;
 }
 export const openOperations: readonly OpenOperation[] = [
+  {
+    name: 'system notification-logs',
+    method: 'GET',
+    path: 'system/notify-log',
+  },
+
   { name: 'task view-list', method: 'GET', path: 'crons/views' },
   {
     name: 'task view-create',
@@ -478,7 +484,12 @@ export const openOperations: readonly OpenOperation[] = [
     path: 'system/config/dependence-clean',
     body: 'json',
   },
-  { name: 'dashboard record', method: 'POST', path: 'dashboard/record', body: 'json' },
+  {
+    name: 'dashboard record',
+    method: 'POST',
+    path: 'dashboard/record',
+    body: 'json',
+  },
   { name: 'dashboard overview', method: 'GET', path: 'dashboard/overview' },
   { name: 'dashboard trend', method: 'GET', path: 'dashboard/trend' },
   { name: 'dashboard top-time', method: 'GET', path: 'dashboard/top-time' },

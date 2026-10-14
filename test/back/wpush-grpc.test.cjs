@@ -64,7 +64,7 @@ test('decoded SystemNotify requests reach WPUSH with explicit or saved configura
     '../config/const': constants,
     '../config/util': {},
     '../data/dependence': {},
-    '../data/system': {},
+    '../data/system': { AuthDataType: { notifyLog: 'notifyLog' }, NotifyStatus: { success: 0, fail: 1 }, SystemModel: { create: async () => {}, findAll: async () => [] } },
     '../shared/pLimit': {},
     '../schedule/client': {},
     '../shared/i18n': { t: (x) => x },
@@ -79,7 +79,7 @@ test('decoded SystemNotify requests reach WPUSH with explicit or saved configura
       wpushApiKey: 'saved-key',
     }),
   };
-  const system = new SystemService();
+  const system = new SystemService({ error() {} });
   system.notificationService = notification;
 
   for (const info of [

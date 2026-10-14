@@ -47,6 +47,7 @@ class GrpcClient {
     'updateEnvNames',
     'getEnvById',
     'systemNotify',
+    'recordNotifyLog',
     'getCronDetail',
     'createCron',
     'updateCron',
