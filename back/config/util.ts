@@ -1,19 +1,25 @@
 import * as fs from 'fs/promises';
+import { statSync } from 'fs';
 import * as path from 'path';
 import { exec, execSync } from 'child_process';
 import psTreeFun from 'ps-tree';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
 import config from './index';
-import { PYTHON_INSTALL_DIR, TASK_COMMAND } from './const';
+import { PYTHON_INSTALL_DIR, PYTHON_VENV_DIR, TASK_COMMAND } from './const';
 import Logger from '../loaders/logger';
 import { writeFileWithLock } from '../shared/utils';
 import { DependenceTypes } from '../data/dependence';
 import { FormData } from 'undici';
 import os from 'os';
 import { maybeSudo, isInContainer } from './container';
+import { shellQuote } from '../shared/shellQuote';
 import { resolveFileAccess } from '../shared/fileAccess';
-import { mirrorWriteCommand, normalizeMirror, rewriteMirrorSources } from '../shared/linuxMirror';
+import {
+  mirrorWriteCommand,
+  normalizeMirror,
+  rewriteMirrorSources,
+} from '../shared/linuxMirror';
 
 export * from './share';
 
@@ -671,7 +677,9 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
       throw new Error('Invalid timezone');
     }
 
-    await promiseExec(maybeSudo(`ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`));
+    await promiseExec(
+      maybeSudo(`ln -sf /usr/share/zoneinfo/${timezone} /etc/localtime`),
+    );
     await promiseExec(`echo "${timezone}" | ${maybeSudo('tee /etc/timezone')}`);
 
     return true;
@@ -681,61 +689,150 @@ export async function setSystemTimezone(timezone: string): Promise<boolean> {
   }
 }
 
+// Helper function to check if a name is a GitHub URL
+function getPythonExecutable(): string {
+  return PYTHON_VENV_DIR
+    ? shellQuote(path.resolve(config.rootPath, PYTHON_VENV_DIR, 'bin/python3'))
+    : 'python3';
+}
+
+function getPythonPip(): string {
+  return PYTHON_VENV_DIR ? `${getPythonExecutable()} -m pip` : 'pip3';
+}
+
+function isGitHubUrl(name: string): boolean {
+  // Support git+https://, git+http://, https://, and http:// URLs
+  // This covers GitHub URLs and other git-compatible repositories
+  return !!name.match(/^(git\+https?:\/\/|https?:\/\/)/i);
+}
+
+// Helper function to check if a name is a requirements file
+function isRequirementsFile(name: string): boolean {
+  return !!name.match(/requirements.*\.(txt|in)$/i);
+}
+
+// Helper function to check if a name is a pyproject.toml file
+function isPyprojectToml(name: string): boolean {
+  return name.endsWith('pyproject.toml');
+}
+
 export function getGetCommand(type: DependenceTypes, name: string): string {
+  const trimmedName = name.trim();
+
+  // For Python dependencies installed from GitHub or requirements files,
+  // we can't reliably check if they're installed, so skip the check
+  if (type === DependenceTypes.python3) {
+    if (
+      isGitHubUrl(trimmedName) ||
+      isRequirementsFile(trimmedName) ||
+      isPyprojectToml(trimmedName)
+    ) {
+      // Return a command that will always indicate not installed
+      // This ensures GitHub URLs and requirements files are always installed
+      return 'echo ""';
+    }
+  }
+
   const baseCommands = {
-    [DependenceTypes.nodejs]: `pnpm ls -g  | grep "${name}" | head -1`,
-    [DependenceTypes.python3]: `
-    python3 -c "exec('''
-name='${name}'
-try:
-    from importlib.metadata import version
-    print(version(name))
-except:
-    import importlib.util as u
-    import importlib.metadata as m
-    spec=u.find_spec(name)
-    print(name if spec else '')
-''')"`,
-    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
-      ? `apk info -es ${name}`
-      : maybeSudo(`dpkg-query -s ${name}`),
+    [DependenceTypes.nodejs]: `pnpm ls -g  | grep "${trimmedName}" | head -1`,
+    [DependenceTypes.python3]: `${getPythonExecutable()} -c ${shellQuote(
+      `from importlib.metadata import version\nimport importlib.util as u\nname=${JSON.stringify(
+        trimmedName,
+      )}\ntry:\n print(version(name))\nexcept Exception:\n print(name if u.find_spec(name) else '')`,
+    )}`,
+    [DependenceTypes.linux]:
+      getOsTypeSync() === 'Alpine'
+        ? `apk info -es ${trimmedName}`
+        : maybeSudo(`dpkg-query -s ${trimmedName}`),
   };
 
   return baseCommands[type];
 }
 
 export function getInstallCommand(type: DependenceTypes, name: string): string {
+  if (type === DependenceTypes.python3) {
+    const prefix =
+      PYTHON_INSTALL_DIR && !PYTHON_VENV_DIR
+        ? ` --prefix=${shellQuote(PYTHON_INSTALL_DIR)}`
+        : '';
+    const pip = `${getPythonPip()} install --disable-pip-version-check${
+      PYTHON_VENV_DIR ? '' : ' --root-user-action=ignore'
+    }${prefix}`;
+    name = name.trim();
+    if (isRequirementsFile(name) || isPyprojectToml(name)) {
+      const file = [config.scriptPath, config.repoPath]
+        .filter(Boolean)
+        .map((root) => resolveFileAccess(root, [name]))
+        .find((file) => {
+          if (!file) return false;
+          try {
+            return statSync(file).isFile();
+          } catch {
+            return false;
+          }
+        });
+      if (!file)
+        throw new Error(
+          'Python dependency file must be inside scripts or repo',
+        );
+      return isRequirementsFile(name)
+        ? `${pip} -r ${shellQuote(file)}`
+        : `${pip} ${shellQuote(path.dirname(file))}`;
+    }
+    return `${pip} -- ${shellQuote(name)}`;
+  }
   const baseCommands = {
     [DependenceTypes.nodejs]: 'pnpm add -g',
-    [DependenceTypes.python3]:
-      'pip3 install --disable-pip-version-check --root-user-action=ignore',
-    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
-      ? 'apk add --no-check-certificate'
-      : maybeSudo('apt-get install -y'),
+    [DependenceTypes.linux]:
+      getOsTypeSync() === 'Alpine'
+        ? 'apk add --no-check-certificate'
+        : maybeSudo('apt-get install -y'),
   };
-
-  let command = baseCommands[type];
-
-  if (type === DependenceTypes.python3 && PYTHON_INSTALL_DIR) {
-    command = `${command} --prefix=${PYTHON_INSTALL_DIR}`;
-  }
-
-  return `${command} ${name.trim()}`;
+  return `${baseCommands[type]} ${name.trim()}`;
 }
 
 export function getUninstallCommand(
   type: DependenceTypes,
   name: string,
 ): string {
+  if (type === DependenceTypes.python3) {
+    name = name.trim();
+    if (isRequirementsFile(name)) {
+      const file = [config.scriptPath, config.repoPath]
+        .filter(Boolean)
+        .map((root) => resolveFileAccess(root, [name]))
+        .find((file) => {
+          if (!file) return false;
+          try {
+            return statSync(file).isFile();
+          } catch {
+            return false;
+          }
+        });
+      if (!file)
+        throw new Error(
+          'Python dependency file must be inside scripts or repo',
+        );
+      return `${getPythonPip()} uninstall --disable-pip-version-check${
+        PYTHON_VENV_DIR ? '' : ' --root-user-action=ignore'
+      } -y -r ${shellQuote(file)}`;
+    }
+    if (isPyprojectToml(name) || isGitHubUrl(name)) {
+      // A source URL/project can install several distributions and has no safe
+      // inverse. Removing its panel entry leaves installed packages intact.
+      return `printf '%s\\n' ${shellQuote(
+        'Remove installed Python distributions separately by package name.',
+      )}`;
+    }
+    return `${getPythonPip()} uninstall --disable-pip-version-check${
+      PYTHON_VENV_DIR ? '' : ' --root-user-action=ignore'
+    } -y -- ${shellQuote(name)}`;
+  }
   const baseCommands = {
     [DependenceTypes.nodejs]: 'pnpm remove -g',
-    [DependenceTypes.python3]:
-      'pip3 uninstall --disable-pip-version-check --root-user-action=ignore -y',
-    [DependenceTypes.linux]: getOsTypeSync() === 'Alpine'
-      ? 'apk del'
-      : maybeSudo('apt-get remove -y'),
+    [DependenceTypes.linux]:
+      getOsTypeSync() === 'Alpine' ? 'apk del' : maybeSudo('apt-get remove -y'),
   };
-
   return `${baseCommands[type]} ${name.trim()}`;
 }
 

@@ -705,5 +705,7 @@
   "发送状态": "Delivery status",
   "通知来源": "Notification source",
   "脚本通知": "Script notification",
-  "系统通知": "System notification"
+  "系统通知": "System notification",
+  "Python支持多种安装方式：\n1. 包名（如：requests）\n2. GitHub链接（如：git+https://github.com/user/repo.git）\n3. requirements文件路径（如：path/to/requirements.txt）\n4. pyproject.toml文件路径": "Python supports package names, Git URLs, and existing requirements.txt or pyproject.toml files under the scripts or repository directory.",
+  "支持包名、GitHub链接、requirements.txt或pyproject.toml路径": "Package name, Git URL, requirements.txt or pyproject.toml path"
 }
