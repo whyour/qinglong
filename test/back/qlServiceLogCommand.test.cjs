@@ -101,7 +101,7 @@ test('ql log follows the current Winston system log without PM2', () => {
   );
 
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, `tail <-n> <0> <--retry> <-F> <${currentLog}>\n`);
+  assert.equal(result.stdout, `tail <-n> <0> <-F> <${currentLog}>\n`);
   assert.equal(fs.existsSync(path.join(testRoot, 'data/log/log')), false);
 });
 

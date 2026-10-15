@@ -36,7 +36,10 @@ run_task_command() {
     ) &
     timeout_watcher=$!
     set +m
-    trap '{
+    finish_task_timeout() {
+      local code="$1"
+      trap - EXIT
+      {
         # Bash can report a killed job between any two cleanup commands.
         # Keep redirection active until the watchdog is fully reaped.
         kill -KILL -- "-$timeout_watcher" || :
@@ -45,14 +48,19 @@ run_task_command() {
       if kill -TERM -- "-$timeout_worker" 2>/dev/null; then sleep 0.1; fi
       kill -KILL -- "-$timeout_worker" 2>/dev/null || :
       wait "$timeout_worker" 2>/dev/null || :
-      rm -rf -- "$timeout_dir"' EXIT
-    trap 'exit 130' INT
-    trap 'exit 143' TERM
-    trap 'exit 129' HUP
-    trap 'exit 131' QUIT
+      rm -rf -- "$timeout_dir"
+      exit "$code"
+    }
+    # Older Bash can omit a subshell's EXIT trap in sourced pipelines. Call
+    # cleanup explicitly on completion/signals, retaining EXIT as a fallback.
+    trap 'finish_task_timeout "$?"' EXIT
+    trap 'finish_task_timeout 130' INT
+    trap 'finish_task_timeout 143' TERM
+    trap 'finish_task_timeout 129' HUP
+    trap 'finish_task_timeout 131' QUIT
     # Do not clean up a timer whose process group has not initialized yet.
     while [[ ! -f "$timeout_dir/ready" ]]; do
-      kill -0 "$timeout_watcher" 2>/dev/null || exit 125
+      kill -0 "$timeout_watcher" 2>/dev/null || finish_task_timeout 125
       sleep 0.001
     done
     wait "$timeout_worker"
@@ -60,8 +68,8 @@ run_task_command() {
     if [[ -f "$timeout_dir/expired" ]]; then
       # Let the timer finish escalation even if the task leader exited first.
       wait "$timeout_watcher" 2>/dev/null || :
-      exit 124
+      finish_task_timeout 124
     fi
-    exit "$timeout_code"
+    finish_task_timeout "$timeout_code"
   )
 }

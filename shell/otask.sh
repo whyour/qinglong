@@ -39,16 +39,16 @@ random_delay() {
 gen_array_scripts() {
   local dir_current=$(pwd)
   local i="-1"
-  cd $dir_scripts
-  for file in $(ls); do
+  cd "$dir_scripts" || return $?
+  for file in *; do
     if [[ -f $file ]] && [[ $file == *.js && $file != sendNotify.js ]]; then
       let i++
-      array_scripts[i]=$(echo "$file" | perl -pe "s|$dir_scripts/||g")
-      array_scripts_name[i]=$(grep "new Env" $file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
+      array_scripts[i]=$file
+      array_scripts_name[i]=$(grep -- "new Env" "$file" | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
       [[ -z ${array_scripts_name[i]} ]] && array_scripts_name[i]="<未识别出活动名称>"
     fi
   done
-  cd $dir_current
+  cd "$dir_current" || return $?
 }
 
 ## 使用说明
@@ -72,11 +72,11 @@ usage() {
 ## run nohup，$1：文件名，不含路径，带后缀
 run_nohup() {
   local file_name=$1
-  nohup node $file_name &>$log_path &
+  nohup node "$file_name" &>"$log_path" &
 }
 
 env_str_to_array() {
-  . $file_env
+  . "$file_env"
   local IFS="&"
   read -ra array <<<"${!env_param}"
   array_length=${#array[@]}
@@ -122,7 +122,7 @@ enter_script_workdir() {
       _target_dir="${dir_scripts}/${work_dir}"
     fi
     if [[ -d "${_target_dir}" ]]; then
-      cd "${_target_dir}"
+      cd "${_target_dir}" || return $?
       if [[ ${file_param} =~ "/" ]]; then
         local script_name="${file_param##*/}"
         if [[ "${use_dot_prefix}" == "true" ]]; then
@@ -136,13 +136,13 @@ enter_script_workdir() {
     t '警告：工作目录不存在 %s' "${_target_dir}"
   fi
 
-  cd $dir_scripts
+  cd "$dir_scripts" || return $?
   if [[ ${file_param} =~ "/" ]]; then
     local script_dir="${file_param%/*}"
     local script_name="${file_param##*/}"
 
     if [[ -d ${script_dir} ]]; then
-      cd ${script_dir}
+      cd "$script_dir" || return $?
       if [[ "${use_dot_prefix}" == "true" ]]; then
         file_param="./${script_name}"
       else
@@ -159,12 +159,12 @@ run_normal() {
     random_delay "$file_param"
   fi
 
-  enter_script_workdir
+  enter_script_workdir || return $?
 
   if [[ $isJsOrPythonFile == 'false' ]]; then
     clear_non_sh_env
   fi
-  run_task_command $which_program $file_param "${script_params[@]}"
+  run_task_command ${which_program:+"$which_program"} "$file_param" "${script_params[@]}"
 }
 
 handle_env_split() {
@@ -175,7 +175,7 @@ handle_env_split() {
   env_str_to_array
   local tempArr=$(echo $num_param | sed "s/-max/-${array_length}/g" | sed "s/max-/${array_length}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
   local runArr=($(eval echo $tempArr))
-  array_run=($(awk -v RS=' ' '!a[$1]++' <<<${runArr[@]}))
+  array_run=($(awk -v RS=' ' '!a[$1]++' <<<"${runArr[*]}"))
 }
 
 ## 并发执行时，设定的 RandomDelay 不会生效，即所有任务立即执行
@@ -192,10 +192,10 @@ run_concurrent() {
   time=$(date "+$mtime_format")
   single_log_time=$(format_log_time "$mtime_format" "$time")
 
-  enter_script_workdir
+  enter_script_workdir || return $?
 
   local j=0
-  for i in ${array_run[@]}; do
+  for i in "${array_run[@]}"; do
     single_log_path="$dir_log/$log_dir/${single_log_time}_$((j + 1)).log"
     let j++
 
@@ -203,16 +203,16 @@ run_concurrent() {
       export "${env_param}=${array[$i - 1]}"
       clear_non_sh_env
     fi
-    eval envParam="${env_param}" numParam="${i}" run_task_command $which_program $file_param "${script_params[@]}" &>$single_log_path &
+    envParam="${env_param}" numParam="${i}" run_task_command ${which_program:+"$which_program"} "$file_param" "${script_params[@]}" &>"$single_log_path" &
   done
 
   wait
   local k=0
-  for i in ${array_run[@]}; do
+  for i in "${array_run[@]}"; do
     single_log_path="$dir_log/$log_dir/${single_log_time}_$((k + 1)).log"
     let k++
-    cat $single_log_path
-    [[ -f $single_log_path ]] && rm -f $single_log_path
+    cat "$single_log_path"
+    [[ -f $single_log_path ]] && rm -f "$single_log_path"
   done
 }
 
@@ -229,7 +229,7 @@ run_designated() {
 
   if [[ $isJsOrPythonFile == 'false' ]]; then
     local n=0
-    for i in ${array_run[@]}; do
+    for i in "${array_run[@]}"; do
       array_str[n]=${array[$i - 1]}
       let n++
     done
@@ -241,9 +241,9 @@ run_designated() {
     clear_non_sh_env
   fi
 
-  enter_script_workdir
+  enter_script_workdir || return $?
 
-  envParam="${env_param}" numParam="${num_param}" run_task_command $which_program $file_param "${script_params[@]}"
+  envParam="${env_param}" numParam="${num_param}" run_task_command ${which_program:+"$which_program"} "$file_param" "${script_params[@]}"
 }
 
 ## 运行其他命令
@@ -273,7 +273,7 @@ run_else() {
     if [[ -n "$script_for_dir" ]]; then
       local saved_file_param="$file_param"
       file_param="$script_for_dir"
-      enter_script_workdir true
+      enter_script_workdir true || return $?
       local adjusted_script="$file_param"
       file_param="$saved_file_param"
 
@@ -289,17 +289,17 @@ run_else() {
       set -- "${new_args[@]}"
     else
       # 没有找到脚本参数，只 cd 到 scripts 目录
-      enter_script_workdir true
+      enter_script_workdir true || return $?
       shift
     fi
   else
     # file_param 本身就是脚本，直接用 enter_script_workdir 处理
-    enter_script_workdir true
+    enter_script_workdir true || return $?
     shift
   fi
 
   clear_non_sh_env
-  run_task_command $which_program $file_param "$@"
+  run_task_command ${which_program:+"$which_program"} "$file_param" "$@"
 }
 
 check_file() {
@@ -313,12 +313,14 @@ check_file() {
       export PREV_NODE_OPTIONS="${NODE_OPTIONS:=}"
       export PREV_PYTHONPATH="${PYTHONPATH:=}"
       if [[ $1 == *.js ]] || [[ $1 == *.ts ]] || [[ $1 == *.mjs ]]; then
-        export NODE_OPTIONS="-r ${file_preload_js} ${NODE_OPTIONS}"
+        local preload_path=${file_preload_js//\\/\\\\}
+        preload_path=${preload_path//\"/\\\"}
+        export NODE_OPTIONS="-r \"${preload_path}\" ${NODE_OPTIONS}"
       else
         export PYTHONPATH="${dir_preload}:${dir_config}:${PYTHONPATH}"
       fi
     else
-      . $file_env
+      . "$file_env"
     fi
   fi
 }

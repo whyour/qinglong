@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 dir_shell=$QL_DIR/shell
-. $dir_shell/share.sh
-. $dir_shell/api.sh
-. $dir_shell/task-timeout.sh
+. "$dir_shell/share.sh"
+. "$dir_shell/api.sh"
+. "$dir_shell/task-timeout.sh"
 
 trap 'single_hanle SIGINT'  INT
 trap 'single_hanle SIGTERM' TERM
@@ -48,7 +48,7 @@ handle_log_path() {
   fi
 
   if [[ -z ${ID:=} ]]; then
-    ID=$(cat $list_crontab_user | grep -E "$cmd_task.* $file_param" | perl -pe "s|.*ID=(.*) $cmd_task.* $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
+    ID=$(cat "$list_crontab_user" | grep -E "$cmd_task.* $file_param" | perl -pe "s|.*ID=(.*) $cmd_task.* $file_param\.*|\1|" | head -1 | awk -F " " '{print $1}')
   fi
   local suffix=""
   if [[ ! -z $ID ]]; then
@@ -89,10 +89,10 @@ handle_log_path() {
     log_path="$real_log_path"
   fi
 
-  cmd="2>&1 | tee -a $dir_log/$log_path"
+  printf -v cmd '2>&1 | tee -a %q' "$dir_log/$log_path"
   make_dir "$dir_log/$log_dir"
   if [[ "${no_tee:=}" == "true" ]]; then
-    cmd=">> $dir_log/$log_path 2>&1"
+    printf -v cmd '>> %q 2>&1' "$dir_log/$log_path"
   fi
 
   if [[ "${real_time:=}" == "true" ]]; then
@@ -162,5 +162,5 @@ define_program "${task_shell_params[@]}"
 handle_log_path "${task_shell_params[@]}"
 init_begin_time
 
-eval . $dir_shell/otask.sh "$cmd"
+eval '. "$dir_shell/otask.sh"' "$cmd"
 exit 0

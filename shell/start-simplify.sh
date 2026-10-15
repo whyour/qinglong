@@ -63,12 +63,12 @@ reload_pm2
 if [[ $command != "reload" ]]; then
   if [[ $AutoStartBot == true ]]; then
     log_with_style "INFO" "🤖 4. 启动 bot..."
-    nohup ql bot >$dir_log/bot.log 2>&1 &
+    nohup ql bot >"$dir_log/bot.log" 2>&1 &
   fi
 
   if [[ $EnableExtraShell == true ]]; then
     log_with_style "INFO" "🛠️ 5. 执行自定义脚本..."
-    nohup ql extra >$dir_log/extra.log 2>&1 &
+    nohup ql extra >"$dir_log/extra.log" 2>&1 &
   fi
 
   pm2 startup

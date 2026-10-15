@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 dir_shell=$QL_DIR/shell
-. $dir_shell/share.sh
-. $dir_shell/api.sh
+. "$dir_shell/share.sh"
+. "$dir_shell/api.sh"
 load_ql_envs
-. $dir_shell/env.sh
+. "$dir_shell/env.sh"
 
 send_mark=$dir_shell/send_mark
 
@@ -165,17 +165,20 @@ update_raw() {
   t '开始下载：%s 保存路径：%s\n' "${raw_url}" "$dir_raw/${raw_file_name}"
 
   set_proxy "$proxy"
-  wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" ${raw_url}
-  exit_status=$?
+  if wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" "$raw_url"; then
+    exit_status=0
+  else
+    exit_status=$?
+  fi
   unset_proxy
 
-  if [[ $? -eq 0 ]]; then
-    mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}"
+  if [[ $exit_status -eq 0 ]]; then
+    mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}" || return $?
     t '下载 %s 成功...\n' "${raw_file_name}"
-    cd $dir_raw
+    cd "$dir_raw" || return $?
     local filename="raw_${raw_file_name}"
-    local cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | awk -F " " '{print $1}')
-    cp -f $raw_file_name $dir_scripts/${filename}
+    local cron_id=$(cat "$list_crontab_user" | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | awk -F " " '{print $1}')
+    cp -f "$raw_file_name" "$dir_scripts/${filename}" || return $?
     if [[ -z $cron_id ]] && [[ ${autoAddCron} == true ]]; then
       cron_line=$(
         perl -ne "{
@@ -202,6 +205,7 @@ update_raw() {
   else
     t '下载 %s 失败，保留之前正常下载的版本...\n' "${raw_file_name}"
     [[ -f "$dir_raw/${raw_file_name}.new" ]] && rm -f "$dir_raw/${raw_file_name}.new"
+    return "$exit_status"
   fi
 
 }
@@ -209,7 +213,7 @@ update_raw() {
 ## 调用用户自定义的extra.sh
 run_extra_shell() {
   if [[ -f $file_extra_shell ]]; then
-    . $file_extra_shell
+    . "$file_extra_shell"
   else
     t '%s文件不存在，跳过执行...\n' "$file_extra_shell"
   fi
@@ -266,7 +270,8 @@ show_service_logs() {
   # Winston writes the active runtime log by date. Follow the filename so
   # size-based rotations are handled without involving the PM2 log files.
   local current_system_log="$system_log_dir/$(date +%F).log"
-  tail -n 0 --retry -F "$current_system_log"
+  # GNU and BSD tail both support -F; --retry is GNU-only and implied by -F.
+  tail -n 0 -F "$current_system_log"
 }
 
 ## 脚本用法
@@ -484,9 +489,9 @@ main() {
   local log_path="${log_dir}/${log_time}.log"
   local file_path="$dir_log/$log_path"
 
-  cmd="2>&1 | tee -a $file_path"
+  printf -v cmd '2>&1 | tee -a %q' "$file_path"
   if [[ "$no_tee" == "true" ]]; then
-    cmd=">> $file_path 2>&1"
+    printf -v cmd '>> %q 2>&1' "$file_path"
   fi
   if [[ "$real_time" == "true" ]]; then
     cmd=""
@@ -532,19 +537,20 @@ main() {
     get_uniq_path "$p2"
     if [[ -n $p2 ]]; then
       update_raw "$p2" "$p3" "$p4" "$p5"
+      command_status=$?
     else
       t '命令输入错误...\n'
       eval usage $cmd
     fi
     ;;
   rmlog)
-    eval . $dir_shell/rmlog.sh "$p2" $cmd
+    eval '. "$dir_shell/rmlog.sh" "$p2"' "$cmd"
     ;;
   bot)
-    eval . $dir_shell/bot.sh $cmd
+    eval '. "$dir_shell/bot.sh"' "$cmd"
     ;;
   check)
-    eval . $dir_shell/check.sh $cmd
+    eval '. "$dir_shell/check.sh"' "$cmd"
     ;;
   resetlet)
     eval update_auth_config "\\\"retries\\\":0" "重置登录错误次数" $cmd

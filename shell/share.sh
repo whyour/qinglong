@@ -77,16 +77,19 @@ load_ql_envs() {
 }
 
 import_config() {
-  [[ -f $file_config_user ]] && . $file_config_user
-  [[ -f $dir_preload/lang_env.sh ]] && . $dir_preload/lang_env.sh
+  [[ -f $file_config_user ]] && . "$file_config_user"
+  [[ -f $dir_preload/lang_env.sh ]] && . "$dir_preload/lang_env.sh"
 
-  # 加载语言包（bash 4+ 支持 declare -A，不兼容时回退输出中文 key）
+  # Language packs need global associative arrays (Bash 4.2+). Probe the
+  # capability so Bash 3.2 and 4.0/4.1 retain the Chinese-key fallback.
   local lang=${QL_LANG:-zh}
   local lang_file="$dir_shell/lang/${lang}.sh"
-  if [[ ${BASH_VERSINFO[0]} -ge 4 ]] && [[ -f $lang_file ]]; then
-    . $lang_file
-  elif [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
-    . "$dir_shell/lang/zh.sh"
+  if (declare -gA __ql_lang_probe) 2>/dev/null; then
+    if [[ -f $lang_file ]]; then
+      . "$lang_file"
+    elif [[ -f "$dir_shell/lang/zh.sh" ]]; then
+      . "$dir_shell/lang/zh.sh"
+    fi
   fi
 
   load_ql_envs
@@ -132,7 +135,7 @@ unset_proxy() {
 make_dir() {
   local dir=$1
   if [[ ! -d $dir ]]; then
-    mkdir -p $dir
+    mkdir -p -- "$dir"
   fi
 }
 
@@ -176,57 +179,57 @@ define_cmd() {
 }
 
 fix_config() {
-  make_dir $dir_tmp
-  make_dir $dir_static
-  make_dir $dir_data
-  make_dir $dir_config
-  make_dir $dir_log
-  make_dir $dir_db
-  make_dir $dir_scripts
-  make_dir $dir_list_tmp
-  make_dir $dir_repo
-  make_dir $dir_raw
-  make_dir $dir_update_log
-  make_dir $dir_dep
+  make_dir "$dir_tmp"
+  make_dir "$dir_static"
+  make_dir "$dir_data"
+  make_dir "$dir_config"
+  make_dir "$dir_log"
+  make_dir "$dir_db"
+  make_dir "$dir_scripts"
+  make_dir "$dir_list_tmp"
+  make_dir "$dir_repo"
+  make_dir "$dir_raw"
+  make_dir "$dir_update_log"
+  make_dir "$dir_dep"
 
   if [[ ! -s $file_config_user ]]; then
-    cp -f $file_config_sample $file_config_user
+    cp -f "$file_config_sample" "$file_config_user"
   fi
 
   if [[ ! -f $file_task_before ]]; then
-    cp -f $file_task_sample $file_task_before
+    cp -f "$file_task_sample" "$file_task_before"
   fi
 
   if [[ ! -f $file_task_after ]]; then
-    cp -f $file_task_sample $file_task_after
+    cp -f "$file_task_sample" "$file_task_after"
   fi
 
   if [[ ! -f $file_extra_shell ]]; then
-    cp -f $file_extra_sample $file_extra_shell
+    cp -f "$file_extra_sample" "$file_extra_shell"
   fi
 
   if [[ ! -s $file_notify_py ]]; then
-    cp -f $file_notify_py_sample $file_notify_py
+    cp -f "$file_notify_py_sample" "$file_notify_py"
   fi
 
   if [[ ! -s $file_notify_js ]]; then
-    cp -f $file_notify_js_sample $file_notify_js
+    cp -f "$file_notify_js_sample" "$file_notify_js"
   fi
 
   if [[ ! -s $file_test_js ]]; then
-    cp -f $file_test_js_sample $file_test_js
+    cp -f "$file_test_js_sample" "$file_test_js"
   fi
 
   if [[ ! -s $file_test_py ]]; then
-    cp -f $file_test_py_sample $file_test_py
+    cp -f "$file_test_py_sample" "$file_test_py"
   fi
 
   if [[ ! -s $dep_notify_js ]]; then
-    cp -f $file_notify_js_sample $dep_notify_js
+    cp -f "$file_notify_js_sample" "$dep_notify_js"
   fi
 
   if [[ ! -s $dep_notify_py ]]; then
-    cp -f $file_notify_py_sample $dep_notify_py
+    cp -f "$file_notify_py_sample" "$dep_notify_py"
   fi
 
 }
@@ -246,17 +249,17 @@ npm_install_2() {
   local dir_current=$(pwd)
   local dir_work=$1
 
-  cd $dir_work
+  cd "$dir_work" || return $?
   t '安装 %s 依赖包...\n' "$dir_work"
   npm_install_sub
-  cd $dir_current
+  cd "$dir_current" || return $?
 }
 
 diff_and_copy() {
   local copy_source=$1
   local copy_to=$2
-  if [[ ! -s $copy_to ]] || [[ $(diff $copy_source $copy_to) ]]; then
-    cp -f $copy_source $copy_to
+  if [[ ! -s $copy_to ]] || [[ $(diff "$copy_source" "$copy_to") ]]; then
+    cp -f "$copy_source" "$copy_to"
   fi
 }
 
@@ -265,12 +268,13 @@ git_clone_scripts() {
   local dir="$2"
   local branch="$3"
   local proxy="$4"
-  [[ $branch ]] && local part_cmd="-b $branch "
+  local branch_args=()
+  [[ $branch ]] && branch_args=(-b "$branch")
   t '开始拉取仓库 %s 到 %s\n' "${uniq_path}" "$dir"
 
   set_proxy "$proxy"
 
-  git clone -q --depth=1 $part_cmd $url $dir
+  git clone -q --depth=1 "${branch_args[@]}" "$url" "$dir"
   exit_status=$?
 
   unset_proxy
@@ -283,7 +287,7 @@ random_range() {
 }
 
 delete_pm2() {
-  cd $dir_root
+  cd "$dir_root" || return $?
   # Try to delete PM2 processes, but don't fail if PM2 is not available
   pm2 delete ecosystem.config.js 2>/dev/null || true
   # Also try to kill any directly spawned node processes
@@ -291,7 +295,7 @@ delete_pm2() {
 }
 
 reload_pm2() {
-  cd $dir_root
+  cd "$dir_root" || return $?
   restore_env_vars
   
   # Try to start PM2, but handle failures gracefully
@@ -310,7 +314,7 @@ reload_pm2() {
     if [[ "$QL_CONTAINER" == "true" ]]; then
       nohup node static/build/app.js >/proc/1/fd/1 2>/proc/1/fd/2 &
     else
-      nohup node static/build/app.js >$dir_log/qinglong.log 2>&1 &
+      nohup node static/build/app.js >"$dir_log/qinglong.log" 2>&1 &
     fi
     local node_pid=$!
 
@@ -398,7 +402,7 @@ handle_task_start() {
 }
 
 run_task_before() {
-  . $file_task_before "$@"
+  . "$file_task_before" "$@"
 
   if [[ ${task_before:=} ]]; then
     t '执行前置命令\n'
@@ -408,7 +412,7 @@ run_task_before() {
 }
 
 run_task_after() {
-  . $file_task_after "$@"
+  . "$file_task_after" "$@"
 
   if [[ ${task_after:=} ]]; then
     t '\n执行后置命令\n'

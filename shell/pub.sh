@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+
+# BSD grep accepts \d as a digit; GNU grep treats it as a literal d.
+string=$(awk '$1 == "version:" { print $2; exit }' version.yaml) || exit 1
+if [[ ! $string =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[[:alnum:].-]+)?(\+[[:alnum:].-]+)?$ ]]; then
+  printf 'Invalid release version: %s\n' "$string" >&2
+  exit 1
+fi
+version="v$string"
 echo -e "开始发布"
 
 echo -e "切换master分支"
@@ -9,8 +17,6 @@ git push --set-upstream origin master -f
 echo -e "更新cdn文件"
 ts-node-transpile-only sample/tool.ts
 
-string=$(cat version.yaml | grep "version" | egrep "[^ ]*" -o | egrep "\d\.*")
-version="v$string"
 echo -e "当前版本$version"
 
 echo -e "删除已经存在的本地tag"

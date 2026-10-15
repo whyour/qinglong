@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
 create_token() {
-  local token_command="ts-node-transpile-only ${dir_root}/back/token.ts"
   local token_file="${dir_root}/static/build/token.js"
   if [[ -f $token_file ]]; then
-    token_command="node ${token_file}"
+    __ql_token__=$(node "$token_file")
+  else
+    __ql_token__=$(ts-node-transpile-only "${dir_root}/back/token.ts")
   fi
-  __ql_token__=$(eval "$token_command")
 }
 
 get_token() {
