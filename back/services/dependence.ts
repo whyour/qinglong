@@ -20,6 +20,7 @@ import {
   getInstallCommand,
   getUninstallCommand,
   getGetCommand,
+  isPythonSourceDependency,
 } from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
@@ -76,21 +77,25 @@ export default class DependenceService {
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
     }
-    const unInstalledDeps = docs.filter(
-      (x) => x.status !== DependenceStatus.installed,
-    );
     const installedDeps = docs.filter(
-      (x) => x.status === DependenceStatus.installed,
+      (x) =>
+        x.status === DependenceStatus.installed ||
+        // Older list refreshes marked unprobeable sources as failed. They may
+        // still have installed distributions (including partial pip installs).
+        (x.status === DependenceStatus.installFailed &&
+          x.type === DependenceTypes.python3 &&
+          isPythonSourceDependency(x.name)),
     );
+    const unInstalledDeps = docs.filter((x) => !installedDeps.includes(x));
     await this.removeDb(unInstalledDeps.map((x) => x.id!));
 
     if (installedDeps.length) {
       await DependenceModel.update(
         { status: DependenceStatus.queued, log: [] },
-        { where: { id: ids } },
+        { where: { id: installedDeps.map((x) => x.id!) } },
       );
 
-      this.installDependenceOneByOne(docs, false, force);
+      this.installDependenceOneByOne(installedDeps, false, force);
     }
     return docs;
   }
@@ -156,9 +161,15 @@ export default class DependenceService {
       },
     });
     const checks = await concurrentRun(
-      docs.map((doc) => async () => {
-        return (await this.isDependenceInstalled(doc)) ? undefined : doc.id;
-      }),
+      docs
+        .filter(
+          (doc) =>
+            doc.type !== DependenceTypes.python3 ||
+            !isPythonSourceDependency(doc.name),
+        )
+        .map((doc) => async () => {
+          return (await this.isDependenceInstalled(doc)) ? undefined : doc.id;
+        }),
       5,
     );
     const missingIds = (checks || []).filter(
