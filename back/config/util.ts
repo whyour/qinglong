@@ -716,17 +716,20 @@ function isPyprojectToml(name: string): boolean {
   return name.endsWith('pyproject.toml');
 }
 
+export function isPythonSourceDependency(name: string): boolean {
+  const source = name.trim();
+  return (
+    isGitHubUrl(source) || isRequirementsFile(source) || isPyprojectToml(source)
+  );
+}
+
 export function getGetCommand(type: DependenceTypes, name: string): string {
   const trimmedName = name.trim();
 
   // For Python dependencies installed from GitHub or requirements files,
   // we can't reliably check if they're installed, so skip the check
   if (type === DependenceTypes.python3) {
-    if (
-      isGitHubUrl(trimmedName) ||
-      isRequirementsFile(trimmedName) ||
-      isPyprojectToml(trimmedName)
-    ) {
+    if (isPythonSourceDependency(trimmedName)) {
       // Return a command that will always indicate not installed
       // This ensures GitHub URLs and requirements files are always installed
       return 'echo ""';
@@ -917,7 +920,7 @@ async function _updateLinuxMirror(
     throw new Error('Unsupported OS type for updating mirrors.');
   const target = mirror || defaults[osType];
   normalizeMirror(target);
-  const S = isInContainer() ? 'sudo ' : '';
+  const S = osType !== 'Alpine' && isInContainer() ? 'sudo ' : '';
   const update =
     osType === 'Alpine' ? 'apk update' : `${S}apt-get update --error-on=any`;
   let file =

@@ -700,6 +700,8 @@
   "已保存，但旧历史清理失败，请检查存储权限和空间": "Saved, but old history could not be removed. Check storage permissions and free space.",
   "保存失败": "Unable to save",
   "通知日志": "Notification log",
+  "标题": "Title",
+  "内容": "Content",
   "发送时间": "Sent at",
   "推送渠道": "Channel",
   "发送状态": "Delivery status",
