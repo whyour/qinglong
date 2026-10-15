@@ -716,17 +716,20 @@ function isPyprojectToml(name: string): boolean {
   return name.endsWith('pyproject.toml');
 }
 
+export function isPythonSourceDependency(name: string): boolean {
+  const source = name.trim();
+  return (
+    isGitHubUrl(source) || isRequirementsFile(source) || isPyprojectToml(source)
+  );
+}
+
 export function getGetCommand(type: DependenceTypes, name: string): string {
   const trimmedName = name.trim();
 
   // For Python dependencies installed from GitHub or requirements files,
   // we can't reliably check if they're installed, so skip the check
   if (type === DependenceTypes.python3) {
-    if (
-      isGitHubUrl(trimmedName) ||
-      isRequirementsFile(trimmedName) ||
-      isPyprojectToml(trimmedName)
-    ) {
+    if (isPythonSourceDependency(trimmedName)) {
       // Return a command that will always indicate not installed
       // This ensures GitHub URLs and requirements files are always installed
       return 'echo ""';
@@ -736,10 +739,30 @@ export function getGetCommand(type: DependenceTypes, name: string): string {
   const baseCommands = {
     [DependenceTypes.nodejs]: `pnpm ls -g  | grep "${trimmedName}" | head -1`,
     [DependenceTypes.python3]: `${getPythonExecutable()} -c ${shellQuote(
-      `from importlib.metadata import version\nimport importlib.util as u\nname=${JSON.stringify(
-        trimmedName,
-      )}\ntry:\n print(version(name))\nexcept Exception:\n print(name if u.find_spec(name) else '')`,
-    )}`,
+      `from importlib.metadata import version, PackageNotFoundError
+import importlib.util
+import sys
+try:
+ try:
+  from packaging.requirements import Requirement
+ except ImportError:
+  from pip._vendor.packaging.requirements import Requirement
+ requirement = Requirement(sys.argv[1])
+ if requirement.marker and not requirement.marker.evaluate():
+  print('not applicable')
+ else:
+  try:
+   installed = version(requirement.name)
+  except PackageNotFoundError:
+   if not requirement.specifier and not requirement.extras and not requirement.url:
+    if importlib.util.find_spec(requirement.name):
+     print(requirement.name)
+  else:
+   if requirement.specifier.contains(installed, prereleases=True):
+    print(installed)
+except Exception:
+ pass`,
+    )} ${shellQuote(trimmedName)}`,
     [DependenceTypes.linux]:
       getOsTypeSync() === 'Alpine'
         ? `apk info -es ${trimmedName}`
@@ -824,9 +847,13 @@ export function getUninstallCommand(
         'Remove installed Python distributions separately by package name.',
       )}`;
     }
+    const packageName =
+      name.match(
+        /^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]+\])?(?=\s*(?:[<>=!~;@]|$))/,
+      )?.[1] || name;
     return `${getPythonPip()} uninstall --disable-pip-version-check${
       PYTHON_VENV_DIR ? '' : ' --root-user-action=ignore'
-    } -y -- ${shellQuote(name)}`;
+    } -y -- ${shellQuote(packageName)}`;
   }
   const baseCommands = {
     [DependenceTypes.nodejs]: 'pnpm remove -g',
@@ -917,7 +944,7 @@ async function _updateLinuxMirror(
     throw new Error('Unsupported OS type for updating mirrors.');
   const target = mirror || defaults[osType];
   normalizeMirror(target);
-  const S = isInContainer() ? 'sudo ' : '';
+  const S = osType !== 'Alpine' && isInContainer() ? 'sudo ' : '';
   const update =
     osType === 'Alpine' ? 'apk update' : `${S}apt-get update --error-on=any`;
   let file =

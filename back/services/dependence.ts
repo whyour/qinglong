@@ -20,6 +20,7 @@ import {
   getInstallCommand,
   getUninstallCommand,
   getGetCommand,
+  isPythonSourceDependency,
 } from '../config/util';
 import dayjs from 'dayjs';
 import taskLimit from '../shared/pLimit';
@@ -76,21 +77,25 @@ export default class DependenceService {
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
     }
-    const unInstalledDeps = docs.filter(
-      (x) => x.status !== DependenceStatus.installed,
-    );
     const installedDeps = docs.filter(
-      (x) => x.status === DependenceStatus.installed,
+      (x) =>
+        x.status === DependenceStatus.installed ||
+        // Older list refreshes marked unprobeable sources as failed. They may
+        // still have installed distributions (including partial pip installs).
+        (x.status === DependenceStatus.installFailed &&
+          x.type === DependenceTypes.python3 &&
+          isPythonSourceDependency(x.name)),
     );
+    const unInstalledDeps = docs.filter((x) => !installedDeps.includes(x));
     await this.removeDb(unInstalledDeps.map((x) => x.id!));
 
     if (installedDeps.length) {
       await DependenceModel.update(
         { status: DependenceStatus.queued, log: [] },
-        { where: { id: ids } },
+        { where: { id: installedDeps.map((x) => x.id!) } },
       );
 
-      this.installDependenceOneByOne(docs, false, force);
+      this.installDependenceOneByOne(installedDeps, false, force);
     }
     return docs;
   }
@@ -156,9 +161,15 @@ export default class DependenceService {
       },
     });
     const checks = await concurrentRun(
-      docs.map((doc) => async () => {
-        return (await this.isDependenceInstalled(doc)) ? undefined : doc.id;
-      }),
+      docs
+        .filter(
+          (doc) =>
+            doc.type !== DependenceTypes.python3 ||
+            !isPythonSourceDependency(doc.name),
+        )
+        .map((doc) => async () => {
+          return (await this.isDependenceInstalled(doc)) ? undefined : doc.id;
+        }),
       5,
     );
     const missingIds = (checks || []).filter(
@@ -177,7 +188,10 @@ export default class DependenceService {
     let depName = dependency.name.trim();
     const depVersionStr = versionDependenceCommandTypes[dependency.type];
     let depVersion = '';
-    if (depName.includes(depVersionStr)) {
+    if (
+      dependency.type !== DependenceTypes.python3 &&
+      depName.includes(depVersionStr)
+    ) {
       const symbolRegx = new RegExp(
         `(.*)${depVersionStr}([0-9\\.\\-\\+a-zA-Z]*)`,
       );
@@ -305,6 +319,9 @@ export default class DependenceService {
           : getUninstallCommand(dependency.type, dependency.name.trim());
       } catch (error) {
         taskLimit.removeQueuedDependency(dependency);
+        if (!isInstall && force) {
+          return this.removeDb([dependency.id!]).then(() => null);
+        }
         return DependenceModel.update(
           {
             status: isInstall
@@ -387,7 +404,13 @@ export default class DependenceService {
         this.updateLog(depIds, message);
 
         // 判断是否已经安装过依赖
-        if (isInstall && !force) {
+        // pip must resolve optional dependencies even if the base distribution
+        // is already present; its version alone cannot prove extras are ready.
+        if (
+          isInstall &&
+          !force &&
+          !(isPythonDependence && depName.includes('['))
+        ) {
           let getCommand = getGetCommand(dependency.type, depName);
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
           if (isLinuxDependence) {
@@ -395,7 +418,7 @@ export default class DependenceService {
           }
 
           let depVersion = '';
-          if (depName.includes(depVersionStr)) {
+          if (!isPythonDependence && depName.includes(depVersionStr)) {
             const symbolRegx = new RegExp(
               `(.*)${depVersionStr}([0-9\\.\\-\\+a-zA-Z]*)`,
             );

@@ -61,6 +61,7 @@ test('dependency listing marks cache entries missing from disk for reinstall', a
     fileExist: async () => false,
     getGetCommand: (_type, name) => `check:${name}`,
     getInstallCommand: () => '',
+    isPythonSourceDependency: () => false,
     getPid: async () => 0,
     getUninstallCommand: () => '',
     killTask: async () => {},
