@@ -162,7 +162,7 @@ test('script discovery keeps filenames with spaces, glob characters and leading 
     f.write(`scripts/${name}`, "new Env('fixture');\n");
   const result = f.run(
     extract('shell/otask.sh', 'gen_array_scripts') +
-      '\ngen_array_scripts; printf "%s\\n" "${array_scripts[@]}"',
+      '\ngen_array_scripts; printf "%s\\n" "${array_scripts[@]}"; printf "NAME=%s\\n" "${array_scripts_name[@]}"',
     {
       dir_scripts: path.join(f.root, 'scripts'),
     },
@@ -171,6 +171,8 @@ test('script discovery keeps filenames with spaces, glob characters and leading 
   assert.equal(result.stderr, '');
   assert.deepEqual(result.stdout.trim().split('\n').sort(), [
     '-dash name.js',
+    'NAME=fixture',
+    'NAME=fixture',
     'probe [1].js',
   ]);
 });

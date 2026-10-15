@@ -188,7 +188,10 @@ export default class DependenceService {
     let depName = dependency.name.trim();
     const depVersionStr = versionDependenceCommandTypes[dependency.type];
     let depVersion = '';
-    if (depName.includes(depVersionStr)) {
+    if (
+      dependency.type !== DependenceTypes.python3 &&
+      depName.includes(depVersionStr)
+    ) {
       const symbolRegx = new RegExp(
         `(.*)${depVersionStr}([0-9\\.\\-\\+a-zA-Z]*)`,
       );
@@ -316,6 +319,9 @@ export default class DependenceService {
           : getUninstallCommand(dependency.type, dependency.name.trim());
       } catch (error) {
         taskLimit.removeQueuedDependency(dependency);
+        if (!isInstall && force) {
+          return this.removeDb([dependency.id!]).then(() => null);
+        }
         return DependenceModel.update(
           {
             status: isInstall
@@ -398,7 +404,13 @@ export default class DependenceService {
         this.updateLog(depIds, message);
 
         // 判断是否已经安装过依赖
-        if (isInstall && !force) {
+        // pip must resolve optional dependencies even if the base distribution
+        // is already present; its version alone cannot prove extras are ready.
+        if (
+          isInstall &&
+          !force &&
+          !(isPythonDependence && depName.includes('['))
+        ) {
           let getCommand = getGetCommand(dependency.type, depName);
           const depVersionStr = versionDependenceCommandTypes[dependency.type];
           if (isLinuxDependence) {
@@ -406,7 +418,7 @@ export default class DependenceService {
           }
 
           let depVersion = '';
-          if (depName.includes(depVersionStr)) {
+          if (!isPythonDependence && depName.includes(depVersionStr)) {
             const symbolRegx = new RegExp(
               `(.*)${depVersionStr}([0-9\\.\\-\\+a-zA-Z]*)`,
             );

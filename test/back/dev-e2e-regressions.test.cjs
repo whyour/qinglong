@@ -151,3 +151,88 @@ test('Alpine container mirror command runs without sudo and writes valid reposit
     ),
   );
 });
+
+test('force deletion removes a source record even when its requirements file is gone', async () => {
+  const removed = [],
+    updates = [];
+  const Service = load('back/services/dependence.ts', {
+    '../config': {},
+    '../config/util': {
+      getUninstallCommand() {
+        throw Error('Python dependency file must be inside scripts or repo');
+      },
+    },
+    '../data/dependence': {
+      Dependence: class {},
+      DependenceTypes: types,
+      DependenceStatus: { ...statuses, removeFailed: 5 },
+      DependenceModel: {
+        destroy: async ({ where }) => removed.push(...where.id),
+        update: async (values) => updates.push(values),
+      },
+    },
+    '../shared/pLimit': {
+      runDependeny: (_dep, fn) => fn(),
+      removeQueuedDependency() {},
+    },
+    './sock': class {},
+    '../shared/i18n': {},
+  }).default;
+  const service = new Service({}, {});
+  const dep = { id: 1, name: 'gone/requirements.txt', type: 1, status: 2 };
+  await service.installOrUninstallDependency(dep, false, false);
+  assert.deepEqual(removed, []);
+  assert.equal(updates[0].status, 5);
+  await service.installOrUninstallDependency(dep, false, true);
+  assert.deepEqual(removed, [1]);
+});
+
+test('Python extras run pip even when the base package version is already installed', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-extra-install-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const marker = path.join(root, 'pip-ran');
+  const dep = {
+    id: 1,
+    name: 'fixture[optional]>=1',
+    type: 1,
+    status: 6,
+    log: [],
+  };
+  let probes = 0;
+  const Service = load('back/services/dependence.ts', {
+    '../config': {},
+    '../config/util': {
+      getInstallCommand: () => `printf installed > '${marker}'`,
+      getGetCommand: () => {
+        probes++;
+        return 'probe';
+      },
+      promiseExecSuccess: async () => '1.0',
+      detectOS: async () => 'Alpine',
+      fileExist: async () => false,
+    },
+    '../data/dependence': {
+      Dependence: class {},
+      DependenceTypes: types,
+      DependenceStatus: { ...statuses, installing: 0, cancelled: 7 },
+      versionDependenceCommandTypes: { 0: '@', 1: '==', 2: '=' },
+      DependenceModel: {
+        findAll: async () => [dep],
+        update: async (values) => Object.assign(dep, values),
+      },
+    },
+    '../shared/pLimit': {
+      firstDependencyId: 1,
+      runDependeny: (_dep, fn) => fn(),
+      removeQueuedDependency() {},
+      updateDepLog: (fn) => fn(),
+    },
+    './sock': class {},
+    '../shared/i18n': { t: (text) => text, tf: (text) => text },
+  }).default;
+  const service = new Service({}, { sendMessage() {} });
+  await service.installOrUninstallDependency(dep, true, false);
+  assert.equal(probes, 0);
+  assert.equal(fs.readFileSync(marker, 'utf8'), 'installed');
+  assert.equal(dep.status, 1);
+});
