@@ -214,8 +214,13 @@ async function reconcile(
   if (added || removed) {
     try {
       await api.call('system/notify', 'PUT', {
-        title: `${namespace} 订阅同步`,
-        content: `新增 ${added} 个任务，删除 ${removed} 个任务`,
+        title: translate(context.env, '%s 订阅同步', namespace),
+        content: translate(
+          context.env,
+          '新增 %s 个任务，删除 %s 个任务',
+          added,
+          removed,
+        ),
       });
     } catch {
       operationOutput(

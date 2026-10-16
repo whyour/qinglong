@@ -364,13 +364,10 @@ const CronDetailModal = ({
 
   const enabledOrDisabledCron = () => {
     Modal.confirm({
-      title: `确认${currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
-        }`,
+      title: intl.get('确认操作', { operation: currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用') }),
       content: (
         <>
-          {intl.get('确认')}
-          {currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')}
-          {intl.get('定时任务')}{' '}
+          {intl.get('确认操作对象', { operation: currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用'), object: intl.get('定时任务') })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {currentCron.name}
           </Text>{' '}
@@ -398,13 +395,10 @@ const CronDetailModal = ({
 
   const pinOrUnPinCron = () => {
     Modal.confirm({
-      title: `确认${currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
-        }`,
+      title: intl.get('确认操作', { operation: currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶') }),
       content: (
         <>
-          {intl.get('确认')}
-          {currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')}
-          {intl.get('定时任务')}{' '}
+          {intl.get('确认操作对象', { operation: currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'), object: intl.get('定时任务') })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {currentCron.name}
           </Text>{' '}

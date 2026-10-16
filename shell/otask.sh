@@ -45,7 +45,7 @@ gen_array_scripts() {
       let i++
       array_scripts[i]=$file
       array_scripts_name[i]=$(grep -- "new Env" "$file" | awk -F '[(]' '{print $2}' | awk -F '[)]' '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
-      [[ -z ${array_scripts_name[i]} ]] && array_scripts_name[i]="<未识别出活动名称>"
+      [[ -z ${array_scripts_name[i]} ]] && array_scripts_name[i]="$(t '<未识别出活动名称>')"
     fi
   done
   cd "$dir_current" || return $?
@@ -54,18 +54,18 @@ gen_array_scripts() {
 ## 使用说明
 usage() {
   gen_array_scripts
-  echo -e "task命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或去掉 “$dir_scripts/” 目录后的相对路径（定时任务中请写作相对路径），用法为："
-  echo -e "1.$cmd_task <file_name>                                             # 依次执行，如果设置了随机延迟，将随机延迟一定秒数"
-  echo -e "2.$cmd_task <file_name> now                                         # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中"
-  echo -e "3.$cmd_task <file_name> conc <环境变量名称> <账号编号，空格分隔>(可选的)  # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中，且可指定账号执行"
-  echo -e "4.$cmd_task <file_name> desi <环境变量名称> <账号编号，空格分隔>         # 指定账号执行，无论是否设置了随机延迟，均立即运行"
+  t 'task命令运行本程序自动添加进crontab的脚本，需要输入脚本的绝对路径或去掉 “%s/” 目录后的相对路径（定时任务中请写作相对路径），用法为：' "$dir_scripts"
+  t '1.%s <file_name>                                             # 依次执行，如果设置了随机延迟，将随机延迟一定秒数' "$cmd_task"
+  t '2.%s <file_name> now                                         # 依次执行，无论是否设置了随机延迟，均立即运行，前台会输出日志，同时记录在日志文件中' "$cmd_task"
+  t '3.%s <file_name> conc <环境变量名称> <账号编号，空格分隔>(可选的)  # 并发执行，无论是否设置了随机延迟，均立即运行，前台不产生日志，直接记录在日志文件中，且可指定账号执行' "$cmd_task"
+  t '4.%s <file_name> desi <环境变量名称> <账号编号，空格分隔>         # 指定账号执行，无论是否设置了随机延迟，均立即运行' "$cmd_task"
   if [[ ${#array_scripts[*]} -gt 0 ]]; then
-    echo -e "\n当前有以下脚本可以运行:"
+    t '\n当前有以下脚本可以运行:'
     for ((i = 0; i < ${#array_scripts[*]}; i++)); do
       echo -e "$(($i + 1)). ${array_scripts_name[i]}：${array_scripts[i]}"
     done
   else
-    echo -e "\n暂无脚本可以执行"
+    t '\n暂无脚本可以执行'
   fi
 }
 

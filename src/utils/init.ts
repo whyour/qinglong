@@ -1,5 +1,6 @@
 import { loader } from '@monaco-editor/react';
 import config from './config';
+import intl from 'react-intl-universal';
 
 export function init(version: string) {
   // monaco 编辑器配置cdn和locale
@@ -9,7 +10,7 @@ export function init(version: string) {
     },
     'vs/nls': {
       availableLanguages: {
-        '*': 'zh-cn',
+        '*': intl.getInitOptions().currentLocale === 'en' ? 'i-default' : 'zh-cn',
       },
     },
   });

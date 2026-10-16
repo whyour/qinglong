@@ -2,6 +2,7 @@ import intl from 'react-intl-universal';
 import React from 'react';
 import { Table, Tag } from 'antd';
 import dayjs from 'dayjs';
+import './index.less';
 
 interface NotifyLogItem {
   id?: number;
@@ -40,7 +41,7 @@ const columns = [
   },
   {
     title: intl.get('序号'),
-    width: 50,
+    width: 90,
     render: (text: string, record: any, index: number) => {
       return index + 1;
     },
@@ -79,7 +80,7 @@ const columns = [
     title: intl.get('发送状态'),
     dataIndex: 'status',
     key: 'status',
-    width: 90,
+    width: 140,
     render: (text: string, record: NotifyLogItem) => {
       const statusKey = record.status ?? 1;
       return (
@@ -101,12 +102,13 @@ const NotifyLog = ({
   return (
     <>
       <Table
+        className="notify-log-table"
         columns={columns}
         pagination={false}
         dataSource={data}
         rowKey="id"
         size="middle"
-        scroll={{ x: 1000, y: height }}
+        scroll={{ x: 1240, y: height }}
       />
     </>
   );

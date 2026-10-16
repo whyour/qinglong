@@ -1,8 +1,13 @@
 // Migrated from shell/lang/en.sh; the original remains for differential evaluation.
 export const english: Record<string, string> = {
-  '需要双因素验证，请调用 user two-factor-login。': 'Two-factor authentication required; use user two-factor-login.',
-  'QL_URL 和 QL_ACCESS_TOKEN 必须同时提供。': 'Provide QL_URL and QL_ACCESS_TOKEN together.',
-  '接口返回 JSON，未保存下载文件。': 'The endpoint returned JSON; no download was saved.',
+  '%s 订阅同步': '%s subscription sync',
+  '新增 %s 个任务，删除 %s 个任务': 'Added %s tasks, removed %s tasks',
+  '需要双因素验证，请调用 user two-factor-login。':
+    'Two-factor authentication required; use user two-factor-login.',
+  'QL_URL 和 QL_ACCESS_TOKEN 必须同时提供。':
+    'Provide QL_URL and QL_ACCESS_TOKEN together.',
+  '接口返回 JSON，未保存下载文件。':
+    'The endpoint returned JSON; no download was saved.',
   '已选择的 CLI 安装路径必须为绝对路径。':
     'The selected CLI installation path must be absolute.',
   '保留 CLI 入口仅支持已确认的 2.x 升级载荷。':
@@ -152,9 +157,12 @@ export const english: Record<string, string> = {
   '应用凭据和 %s 权限': 'application credentials and %s permission',
   未知: 'unknown',
   '请检查%s。': 'Check %s.',
-  '资源冲突，请检查重复的名称或值。': 'Resource conflict; check for duplicate names or values.',
-  '服务端错误，请检查服务状态和日志。': 'Server error; check service status and logs.',
-  '请求未成功，请检查请求参数和服务日志。': 'Request unsuccessful; check request parameters and service logs.',
+  '资源冲突，请检查重复的名称或值。':
+    'Resource conflict; check for duplicate names or values.',
+  '服务端错误，请检查服务状态和日志。':
+    'Server error; check service status and logs.',
+  '请求未成功，请检查请求参数和服务日志。':
+    'Request unsuccessful; check request parameters and service logs.',
   'API 请求失败（%s %s）。%s%s': 'API request failed (%s %s). %s%s',
 
   ' 执行结果可能未知，请先检查%s状态再考虑重试。':
@@ -169,8 +177,7 @@ export const english: Record<string, string> = {
     'API request rejected (code %s). Check %s.',
   'CLI 配置必须是当前用户拥有的私有普通文件（0600）。':
     'CLI config must be an owned private regular file (0600).',
-  'CLI 配置无效，请运行 ql login。':
-    'Invalid CLI config. Run ql login.',
+  'CLI 配置无效，请运行 ql login。': 'Invalid CLI config. Run ql login.',
   '尚未登录，请运行 ql login。': 'Not logged in. Run ql login.',
   '无法读取 CLI 配置，请检查文件权限并运行 ql login。':
     'Cannot read CLI config. Check file permissions and run ql login.',

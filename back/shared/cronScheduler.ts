@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { createTask, ScheduledTask } from 'node-cron';
 import { parseCronSchedule } from './cronSchedule';
 
@@ -36,7 +37,7 @@ export function createCronJob(
     if (cancelled || !started || !accepts(index, date)) return;
     if (missed) {
       options.logger.warn(
-        '[schedule][补执行迟到任务] 任务: %s, 计划时间: %s',
+        t('[schedule][补执行迟到任务] 任务: %s, 计划时间: %s'),
         options.name,
         date.toISOString(),
       );
@@ -45,7 +46,7 @@ export function createCronJob(
       await callback(date);
     } catch (error) {
       options.logger.error(
-        '[schedule][定时回调失败] 任务: %s, 错误: %s',
+        t('[schedule][定时回调失败] 任务: %s, 错误: %s'),
         options.name,
         error instanceof Error ? error.message : String(error),
       );

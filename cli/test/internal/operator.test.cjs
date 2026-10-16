@@ -287,7 +287,7 @@ test('upgrade staging extracts both archives before publishing readiness and rej
     ['-qry', path.join(archives, 'qinglong.zip'), `qinglong-${sourceCommit}`],
     { cwd: payloads },
   );
-  await assert.rejects(stageUpgrade(ctx, 'github'), /symlinks/);
+  await assert.rejects(stageUpgrade(ctx, 'github'), /symlinks|符号链接/);
   assert.deepEqual(
     (await fs.readdir(ctx.paths.dir_tmp)).sort(),
     [

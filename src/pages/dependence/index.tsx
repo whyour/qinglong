@@ -536,9 +536,7 @@ const Dependence = () => {
             {intl.get('批量强制删除')}
           </Button>
           <span style={{ marginLeft: 8 }}>
-            {intl.get('已选择')}
-            <a>{selectedRowIds?.length}</a>
-            {intl.get('项')}
+            {intl.get('选中条数', { count: selectedRowIds.length })}
           </span>
         </div>
       )}

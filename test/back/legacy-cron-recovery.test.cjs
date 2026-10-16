@@ -38,7 +38,7 @@ test('legacy main and extra schedules restore real jobs and healthy readiness', 
     './data': { scheduleStacks: stacks },
     '../shared/runCron': { runCron() {} },
     '../loaders/logger': { info() {}, warn() {} },
-    '../shared/i18n': { tf: format },
+    '../shared/i18n': { t: (s) => s, tf: format },
   });
   const crons = legacySchedules.map((schedule, index) => ({
     id: `legacy-${index}`, name: 'legacy', schedule, command: 'true',

@@ -103,7 +103,7 @@ const Subscription = () => {
       key: 'type',
       width: 130,
       render: (text: string, record: any) => {
-        return (SubscriptionType as any)[record.type];
+        return intl.get((SubscriptionType as any)[record.type]);
       },
     },
     {
@@ -121,7 +121,7 @@ const Subscription = () => {
       render: (text: string, record: any) => {
         if (record.schedule_type === 'interval') {
           const { type, value } = record.interval_schedule;
-          return `每${value}${(IntervalSchedule as any)[type]}`;
+          return intl.get('间隔定时规则', { value, unit: intl.get((IntervalSchedule as any)[type]) });
         }
         return record.schedule;
       },
@@ -369,14 +369,13 @@ const Subscription = () => {
 
   const enabledOrDisabledSubscription = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${
-        record.is_disabled === 1 ? intl.get('启用') : intl.get('禁用')
-      }`,
+      title: intl.get('确认操作', {
+        operation:
+          record.is_disabled === 1 ? intl.get('启用') : intl.get('禁用'),
+      }),
       content: (
         <>
-          {intl.get('确认')}
-          {record.is_disabled === 1 ? intl.get('启用') : intl.get('禁用')}
-          {intl.get('定时订阅')}{' '}
+          {intl.get('确认操作对象', { operation: record.is_disabled === 1 ? intl.get('启用') : intl.get('禁用'), object: intl.get('定时订阅') })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
@@ -569,7 +568,7 @@ const Subscription = () => {
           simple: isPhone,
           defaultPageSize: 20,
           showTotal: (total: number, range: number[]) =>
-            `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+            intl.get('分页总数', { start: range[0], end: range[1], total }),
           pageSizeOptions: [20, 100, 500, 1000] as any,
         }}
         dataSource={value}

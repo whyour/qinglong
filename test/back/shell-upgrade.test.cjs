@@ -225,6 +225,7 @@ for (const branch of ['master', 'develop', 'debian', 'debian-dev'])
     const f = await fixture(t, { branch, lockChange: true, tee: true });
     let result = await f.execute('update', 'false');
     assert.equal(result.code, 0, result.stdout + result.stderr);
+    assert.ok(result.stdout.includes('　　　　　'), 'update logs retain the completion marker');
     assert.equal(f.read('version.yaml'), 'version: 2.21.0');
     assert.equal(fs.existsSync(path.join(f.root, 'stops')), false);
     assert.match(
@@ -295,7 +296,7 @@ test('failed health checks and concurrent upgrades are rejected', async (t) => {
   await withUpgradeLock(tmp, async () => {
     await assert.rejects(
       withUpgradeLock(tmp, async () => {}),
-      /Another upgrade/,
+      /Another upgrade|已有更新或重载/,
     );
   });
   assert.deepEqual(fs.readdirSync(tmp), []);
@@ -307,6 +308,6 @@ test('failed health checks and concurrent upgrades are rejected', async (t) => {
   t.after(() => new Promise((resolve) => server.close(resolve)));
   await assert.rejects(
     waitForHealth({ QlPort: String(server.address().port) }, 20),
-    /health check/,
+    /health check|后端启动检查失败/,
   );
 });

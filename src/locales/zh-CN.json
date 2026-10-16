@@ -1,4 +1,19 @@
 {
+  "选中条数": "已选择 {count} 项",
+  "登录失败次数": "失败{count}次",
+  "间隔定时规则": "每{value}{unit}",
+  "SOCK5代理，例如 IP:PORT": "SOCK5代理，例如 IP:PORT",
+  "HTTP/SOCK5代理，例如 http://127.0.0.1:1080": "HTTP/SOCK5代理，例如 http://127.0.0.1:1080",
+  "确认操作对象": "确认{operation}{object}",
+  "确认批量操作": "确认{operation}选中的{object}吗",
+  "检查更新失败，请检查网络后重试": "检查更新失败，请检查网络后重试",
+  "确认操作": "确认{operation}",
+  "分页总数": "第 {start}-{end} 条/总共 {total} 条",
+  "总条数": "共 {total} 个",
+  "内网IP": "内网IP",
+  "容器更新修复命令": "1. 宿主机执行 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower -cR <容器名>",
+  "WxPusher(极简推送SPT-推荐)": "WxPusher(极简推送SPT-推荐)",
+  "新版本可用，当前版本": "新版本 {version} 可用，你使用的版本为 {current}。",
   "1. 宿主机执行 docker run --rm -v\n                  /var/run/docker.sock:/var/run/docker.sock\n                  containrrr/watchtower -cR <容器名>": "1. 宿主机执行 docker run --rm -v\n                  /var/run/docker.sock:/var/run/docker.sock\n                  containrrr/watchtower -cR <容器名>",
   "2. 容器内执行 ql check、ql update": "2. 容器内执行 ql check、ql update",
   "24小时未运行": "24小时未运行",
@@ -709,5 +724,12 @@
   "脚本通知": "脚本通知",
   "系统通知": "系统通知",
   "Python支持多种安装方式：\n1. 包名（如：requests）\n2. GitHub链接（如：git+https://github.com/user/repo.git）\n3. requirements文件路径（如：path/to/requirements.txt）\n4. pyproject.toml文件路径": "Python支持多种安装方式：\n1. 包名（如：requests）\n2. GitHub链接（如：git+https://github.com/user/repo.git）\n3. requirements文件路径（如：path/to/requirements.txt）\n4. pyproject.toml文件路径",
-  "支持包名、GitHub链接、requirements.txt或pyproject.toml路径": "支持包名、GitHub链接、requirements.txt或pyproject.toml路径"
+  "支持包名、GitHub链接、requirements.txt或pyproject.toml路径": "支持包名、GitHub链接、requirements.txt或pyproject.toml路径",
+  "控制台诗句": "忘形雨笠烟蓑，知心牧唱樵歌。明月清风共我，闲人三个，从他今古消磨。",
+  "运行环境信息": "青龙运行环境:\n\n系统：{system}\n浏览器：{browser}\n内核：{engine}",
+  "WebSocket错误": "WebSocket错误:",
+  "白屏时间": "白屏时间: {duration} ms",
+  "请求完毕至DOM加载": "请求完毕至DOM加载: {duration} ms",
+  "解释DOM树耗时": "解释 DOM 树耗时: {duration} ms",
+  "从开始至load总耗时": "从开始至 load 总耗时: {duration} ms"
 }

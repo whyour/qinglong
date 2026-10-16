@@ -31,7 +31,7 @@ diff_cron() {
 ## 输出是否有新的或失效的定时任务，$1：新的或失效的任务清单文件路径，$2：新/失效
 output_list_add_drop() {
   local list=$1
-  local type=$2
+  local type=$(t "$2")
   if [[ -s $list ]]; then
     t '检测到有%s的定时任务:' "$type"
     cat $list
@@ -67,7 +67,7 @@ del_cron() {
   done
   if [[ $ids ]]; then
     result=$(del_cron_api "$ids")
-    notify_api "$path 删除任务${result}" "$detail"
+    notify_api "$(t '%s 删除任务%s' "$path" "$result")" "$detail"
   fi
 }
 
@@ -110,7 +110,7 @@ add_cron() {
       fi
     fi
   done
-  notify_api "$path 新增任务" "$detail"
+  notify_api "$(t '%s 新增任务' "$path")" "$detail"
 }
 
 ## 更新仓库
@@ -199,7 +199,7 @@ update_raw() {
       cron_line=${cron_line//$'\r'/}
       result=$(add_cron_api "$cron_line" "${cmd_task} ${filename}" "$cron_name" "$SUB_ID")
       echo -e "$result\n"
-      notify_api "新增任务通知" "\n$result"
+      notify_api "$(t '新增任务通知')" "\n$result"
       # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
     fi
   else
@@ -276,19 +276,19 @@ show_service_logs() {
 
 ## 脚本用法
 usage() {
-  t "$cmd_update 命令使用方法："
-  echo -e "1.  $cmd_update update                                                                  # 更新并重启青龙"
-  echo -e "2.  $cmd_update extra                                                                   # 运行自定义脚本"
-  echo -e "3.  $cmd_update raw <fileurl>                                                           # 更新单个脚本文件"
-  echo -e "4.  $cmd_update repo <repourl> <path> <blacklist> <dependence> <branch> <extensions>    # 更新单个仓库的脚本"
-  echo -e "5.  $cmd_update rmlog <days>                                                            # 删除旧日志"
-  echo -e "6.  $cmd_update bot                                                                     # 启动tg-bot"
-  echo -e "7.  $cmd_update check                                                                   # 检测青龙环境并修复"
-  echo -e "8.  $cmd_update log [--lines <n>] [--nostream]                                         # 查看青龙运行日志"
-  echo -e "9.  $cmd_update resetlet                                                                # 重置登录错误次数"
-  echo -e "10. $cmd_update resettfa                                                                # 禁用两步登录"
-  echo -e "11. $cmd_update resetpwd                                                                # 修改登录密码"
-  echo -e "12. $cmd_update resetname                                                               # 修改登录用户名"
+  t '%s 命令使用方法：' "$cmd_update"
+  echo -e "1.  $cmd_update update                                                                  # $(t '更新并重启青龙')"
+  echo -e "2.  $cmd_update extra                                                                   # $(t '运行自定义脚本')"
+  echo -e "3.  $cmd_update raw <fileurl>                                                           # $(t '更新单个脚本文件')"
+  echo -e "4.  $cmd_update repo <repourl> <path> <blacklist> <dependence> <branch> <extensions>    # $(t '更新单个仓库的脚本')"
+  echo -e "5.  $cmd_update rmlog <days>                                                            # $(t '删除旧日志')"
+  echo -e "6.  $cmd_update bot                                                                     # $(t '启动tg-bot')"
+  echo -e "7.  $cmd_update check                                                                   # $(t '检测青龙环境并修复')"
+  echo -e "8.  $cmd_update log [--lines <n>] [--nostream]                                         # $(t '查看青龙运行日志')"
+  echo -e "9.  $cmd_update resetlet                                                                # $(t '重置登录错误次数')"
+  echo -e "10. $cmd_update resettfa                                                                # $(t '禁用两步登录')"
+  echo -e "11. $cmd_update resetpwd                                                                # $(t '修改登录密码')"
+  echo -e "12. $cmd_update resetname                                                               # $(t '修改登录用户名')"
 }
 
 reload_qinglong() {
@@ -504,7 +504,9 @@ main() {
   local begin_time=$(format_time "$time_format" "$time")
 
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
-    eval echo -e "\#\# 开始执行... $begin_time\\\n" $cmd
+    local start_message
+    printf -v start_message '%q' "$(t '## 开始执行... %s\n' "$begin_time")"
+    eval "printf '%s\n' $start_message $cmd"
   fi
 
   [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
@@ -577,7 +579,9 @@ main() {
   [[ $ID ]] && update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time"
 
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
-    eval echo -e "\\\n\#\# 执行结束... $end_time  耗时 $diff_time 秒　　　　　" $cmd
+    local end_message
+    printf -v end_message '%q' "$(t '\n## 执行结束... %s  耗时 %s 秒' "$end_time" "$diff_time")　　　　　"
+    eval "printf '%s\n' $end_message $cmd"
   fi
   return "$command_status"
 }

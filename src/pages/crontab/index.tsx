@@ -544,13 +544,13 @@ const Crontab = () => {
 
   const enabledOrDisabledCron = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')
-        }`,
+      title: intl.get('确认操作', {
+        operation:
+          record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用'),
+      }),
       content: (
         <>
-          {intl.get('确认')}
-          {record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用')}
-          {intl.get('定时任务')}{' '}
+          {intl.get('确认操作对象', { operation: record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用'), object: intl.get('定时任务') })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
@@ -584,13 +584,13 @@ const Crontab = () => {
 
   const pinOrUnPinCron = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
-        }`,
+      title: intl.get('确认操作', {
+        operation:
+          record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'),
+      }),
       content: (
         <>
-          {intl.get('确认')}
-          {record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')}
-          {intl.get('定时任务')}{' '}
+          {intl.get('确认操作对象', { operation: record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'), object: intl.get('定时任务') })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
@@ -745,12 +745,12 @@ const Crontab = () => {
 
   const operateCrons = (operationStatus: number) => {
     Modal.confirm({
-      title: `确认${OperationName[operationStatus]}`,
+      title: intl.get('确认操作', {
+        operation: intl.get(OperationName[operationStatus]),
+      }),
       content: (
         <>
-          {intl.get('确认')}
-          {OperationName[operationStatus]}
-          {intl.get('选中的定时任务吗')}
+          {intl.get('确认批量操作', { operation: intl.get(OperationName[operationStatus]), object: intl.get('定时任务') })}
         </>
       ),
       onOk() {
@@ -1035,9 +1035,7 @@ const Crontab = () => {
               {intl.get('批量修改标签')}
             </Button>
             <span style={{ marginLeft: 8 }}>
-              {intl.get('已选择')}
-              <a>{selectedRowIds?.length}</a>
-              {intl.get('项')}
+              {intl.get('选中条数', { count: selectedRowIds.length })}
             </span>
           </div>
         )}
@@ -1051,7 +1049,7 @@ const Crontab = () => {
             simple: isPhone,
             total,
             showTotal: (total: number, range: number[]) =>
-              `第 ${range[0]}-${range[1]} 条/总共 ${total} 条`,
+              intl.get('分页总数', { start: range[0], end: range[1], total }),
             pageSizeOptions: [10, 20, 50, 100, 200, 500, total || 10000].sort(
               (a, b) => a - b,
             ),

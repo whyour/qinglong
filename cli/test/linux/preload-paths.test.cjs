@@ -23,7 +23,7 @@ test(
       [
         '--test',
         '--test-reporter=tap',
-        path.resolve(__dirname, '../preload.test.cjs'),
+        path.resolve(__dirname, '../internal/preload.test.cjs'),
       ],
       {
         env,

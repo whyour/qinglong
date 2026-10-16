@@ -46,28 +46,28 @@ log_with_style() {
   printf "\n[%s] [%7s]  %s\n" "${timestamp}" "${level}" "${message}"
 }
 
-log_with_style "INFO" "🚀  1. 检测配置文件..."
 import_config "$@"
+log_with_style "INFO" "$(t '🚀  1. 检测配置文件...')"
 make_dir /etc/nginx/conf.d
 make_dir /run/nginx
 fix_config
 
 pm2 l &>/dev/null
 
-log_with_style "INFO" "🔄  2. 启动 nginx..."
+log_with_style "INFO" "$(t '🔄  2. 启动 nginx...')"
 nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf
 
-log_with_style "INFO" "⚙️  3. 启动 pm2 服务..."
+log_with_style "INFO" "$(t '⚙️  3. 启动 pm2 服务...')"
 reload_pm2
 
 if [[ $command != "reload" ]]; then
   if [[ $AutoStartBot == true ]]; then
-    log_with_style "INFO" "🤖 4. 启动 bot..."
+    log_with_style "INFO" "$(t '🤖 4. 启动 bot...')"
     nohup ql bot >"$dir_log/bot.log" 2>&1 &
   fi
 
   if [[ $EnableExtraShell == true ]]; then
-    log_with_style "INFO" "🛠️ 5. 执行自定义脚本..."
+    log_with_style "INFO" "$(t '🛠️ 5. 执行自定义脚本...')"
     nohup ql extra >"$dir_log/extra.log" 2>&1 &
   fi
 
@@ -75,4 +75,4 @@ if [[ $command != "reload" ]]; then
   pm2 save
 fi
 
-log_with_style "SUCCESS" "🎉 启动成功!"
+log_with_style "SUCCESS" "$(t '🎉 启动成功!')"

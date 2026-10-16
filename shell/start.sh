@@ -8,6 +8,16 @@ set -x
 startup_message() {
   local format="$1"
   shift
+  if [[ ${QL_LANG:-zh} == en ]]; then
+    case "$format" in
+    '未找到 qinglong 模块，请先执行 npm i -g @whyour/qinglong 安装') format='Module not found. Run: npm i -g @whyour/qinglong' ;;
+    '请先手动设置 export QL_DIR=%s，环境变量，并手动添加到系统环境变量，然后再次执行命令 qinglong 启动服务') format='Set export QL_DIR=%s in your system environment, then run qinglong to start the service' ;;
+    'QL_DIR 必须为绝对路径，例如 /ql') format='QL_DIR must be an absolute path, e.g. /ql' ;;
+    '请先手动设置数据存储目录 export QL_DATA_DIR 环境变量，目录必须以斜杠开头的绝对路径，并且以 /data 结尾，例如 /ql/data 并手动添加到系统环境变量') format='Set QL_DATA_DIR to an absolute path ending in /data, e.g. /ql/data, in your system environment' ;;
+    'QL_DATA_DIR 必须为以 /data 结尾的绝对路径，例如 /ql/data，如果有历史数据，请新建 data 目录，把历史数据放到 data 目录中') format='QL_DATA_DIR must be an absolute path ending in /data, e.g. /ql/data. Move existing data into that directory' ;;
+    '暂不支持此系统部署 %s') format='Unsupported system for deployment: %s' ;;
+    esac
+  fi
   printf -- "$format\n" "$@" >&2
 }
 

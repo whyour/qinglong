@@ -1,4 +1,19 @@
 {
+  "选中条数": "Selected {count} items",
+  "登录失败次数": "Failed {count} time(s)",
+  "间隔定时规则": "Every {value} {unit}",
+  "SOCK5代理，例如 IP:PORT": "SOCKS5 proxy, e.g. IP:PORT",
+  "HTTP/SOCK5代理，例如 http://127.0.0.1:1080": "HTTP/SOCKS5 proxy, e.g. http://127.0.0.1:1080",
+  "确认操作对象": "Confirm {operation} {object}",
+  "确认批量操作": "Confirm {operation} selected {object}?",
+  "检查更新失败，请检查网络后重试": "Failed to check for updates. Check your network and try again.",
+  "确认操作": "Confirm {operation}",
+  "分页总数": "{start}-{end} of {total} items",
+  "总条数": "{total} items",
+  "内网IP": "Private IP",
+  "容器更新修复命令": "1. Run on the host: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower -cR <container_name>",
+  "WxPusher(极简推送SPT-推荐)": "WxPusher (Simple Push SPT, recommended)",
+  "新版本可用，当前版本": "Version {version} is available. You are using {current}.",
   "1. 宿主机执行 docker run --rm -v\n                  /var/run/docker.sock:/var/run/docker.sock\n                  containrrr/watchtower -cR <容器名>": "1. Execute 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower -cR <container_name>' on the host machine",
   "2. 容器内执行 ql check、ql update": "2. Execute 'ql check' and 'ql update' inside the container",
   "24小时未运行": "Idle 24h+",
@@ -709,5 +724,12 @@
   "脚本通知": "Script notification",
   "系统通知": "System notification",
   "Python支持多种安装方式：\n1. 包名（如：requests）\n2. GitHub链接（如：git+https://github.com/user/repo.git）\n3. requirements文件路径（如：path/to/requirements.txt）\n4. pyproject.toml文件路径": "Python supports package names, Git URLs, and existing requirements.txt or pyproject.toml files under the scripts or repository directory.",
-  "支持包名、GitHub链接、requirements.txt或pyproject.toml路径": "Package name, Git URL, requirements.txt or pyproject.toml path"
+  "支持包名、GitHub链接、requirements.txt或pyproject.toml路径": "Package name, Git URL, requirements.txt or pyproject.toml path",
+  "控制台诗句": "A rain hat and cloak, a song among the hills. The moon, the breeze and I spend our idle days together.",
+  "运行环境信息": "QingLong runtime:\n\nSystem: {system}\nBrowser: {browser}\nEngine: {engine}",
+  "WebSocket错误": "WebSocket error:",
+  "白屏时间": "Time to first response: {duration} ms",
+  "请求完毕至DOM加载": "Response end to DOM interactive: {duration} ms",
+  "解释DOM树耗时": "DOM completion time: {duration} ms",
+  "从开始至load总耗时": "Total load time: {duration} ms"
 }

@@ -79,16 +79,10 @@ const Error = () => {
             description={
               <Typography.Text type="danger">
                 <div>{intl.get('请先按如下方式修复：')}</div>
-                <div>
-                  1. 宿主机执行 docker run --rm -v
-                  /var/run/docker.sock:/var/run/docker.sock
-                  containrrr/watchtower -cR &lt;容器名&gt;
-                </div>
+                <div>{intl.get('容器更新修复命令')}</div>
                 <div>{intl.get('2. 容器内执行 ql check、ql update')}</div>
                 <div>
-                  {intl.get(
-                    '3. 如果无法解决，容器内执行 ql log，拷贝执行结果',
-                  )}
+                  {intl.get('3. 如果无法解决，容器内执行 ql log，拷贝执行结果')}
                   <Typography.Link href="https://github.com/whyour/qinglong/issues/new?assignees=&labels=&template=bug_report.yml">
                     {intl.get('提交 issue')}
                   </Typography.Link>

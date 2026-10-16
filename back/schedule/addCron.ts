@@ -5,7 +5,7 @@ import { isValidCronSchedule } from '../shared/cronSchedule';
 import { scheduleStacks } from './data';
 import { runCron } from '../shared/runCron';
 import Logger from '../loaders/logger';
-import { tf } from '../shared/i18n';
+import { t, tf } from '../shared/i18n';
 
 // Validate the entire batch before replacing any existing jobs.
 const isValidCronField = (cron: string): boolean => {
@@ -67,7 +67,7 @@ const addCron = (
           createCronJob(
             schedule,
             async () => {
-              Logger.info('[schedule][准备运行任务] 命令: %s', item.command);
+              Logger.info(t('[schedule][准备运行任务] 命令: %s'), item.command);
               await runCron(
                 item.command,
                 item,
@@ -104,7 +104,7 @@ const addCron = (
     scheduleStacks.set(id, jobs);
     jobs.forEach((job) => job.start());
     Logger.info(
-      '[schedule][创建定时任务] 任务ID: %s, 规则数: %s',
+      t('[schedule][创建定时任务] 任务ID: %s, 规则数: %s'),
       id,
       jobs.length,
     );

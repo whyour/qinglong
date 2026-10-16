@@ -155,9 +155,9 @@ export default function browserType() {
     shell === 'none'
       ? {}
       : {
-        shell, // wechat qq uc 360 2345 sougou liebao maxthon
-        shellVs,
-      },
+          shell, // wechat qq uc 360 2345 sougou liebao maxthon
+          shellVs,
+        },
   );
 
   console.log(
@@ -165,11 +165,15 @@ export default function browserType() {
     'color: blue;font-size: 14px;',
   );
   console.log(
-    '%c忘形雨笠烟蓑，知心牧唱樵歌。明月清风共我，闲人三个，从他今古消磨。\n',
+    `%c${intl.get('控制台诗句')}\n`,
     'color: yellow;font-size: 18px;',
   );
   console.log(
-    `%c青龙运行环境:\n\n系统：${result.system}/${result.systemVs}\n浏览器：${result.supporter}/${result.supporterVs}\n内核：${result.engine}/${result.engineVs}`,
+    `%c${intl.get('运行环境信息', {
+      system: `${result.system}/${result.systemVs}`,
+      browser: `${result.supporter}/${result.supporterVs}`,
+      engine: `${result.engine}/${result.engineVs}`,
+    })}`,
     'color: green;font-size: 14px;font-weight: bold;',
   );
 
@@ -337,7 +341,7 @@ export function parseCrontab(schedule: string): Date | null {
     if (time) {
       return time.next().toDate();
     }
-  } catch (error) { }
+  } catch (error) {}
 
   return null;
 }

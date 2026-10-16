@@ -641,7 +641,7 @@ export default class CronService {
         stopped.add(pid);
       } catch (error) {
         this.logger.error(
-          '[panel][停止任务失败] PID: %s, 错误: %s',
+          t('[panel][停止任务失败] PID: %s, 错误: %s'),
           pid,
           asError(error).message
         );
@@ -695,7 +695,7 @@ export default class CronService {
         await killTask(instance.pid);
       } catch (error) {
         this.logger.error(
-          `[panel][停止实例失败] 实例ID: ${instanceId}, PID: ${instance.pid}, 错误: ${error}`,
+          t("[panel][停止实例失败] 实例ID: %s, PID: %s, 错误: %s"), instanceId, instance.pid, error,
         );
       }
     }
@@ -791,20 +791,20 @@ export default class CronService {
         const result = await completed;
         if (result.error) {
           this.logger.error(
-            '[panel][执行任务失败] 任务ID: %s, 错误: %s',
+            t('[panel][执行任务失败] 任务ID: %s, 错误: %s'),
             id,
             result.error.message
           );
         }
         this.logger.info(
-          '[panel][执行任务结束] 任务ID: %s, 退出码: %j',
+          t('[panel][执行任务结束] 任务ID: %s, 退出码: %j'),
           id,
           result.code
         );
         return { ...cron, pid: cp.pid, ...result } as any;
       } catch (error) {
         this.logger.error(
-          '[panel][创建任务失败] 任务ID: %s, 错误: %s',
+          t('[panel][创建任务失败] 任务ID: %s, 错误: %s'),
           cronId,
           asError(error).message
         );
@@ -813,7 +813,7 @@ export default class CronService {
           if (absolutePath) await logStreamManager.closeStream(absolutePath);
         } catch (error) {
           this.logger.error(
-            '[panel][关闭任务日志失败] %s',
+            t('[panel][关闭任务日志失败] %s'),
             asError(error).message
           );
         }
@@ -845,7 +845,7 @@ export default class CronService {
           );
         } catch (error) {
           this.logger.error(
-            '[panel][清理任务状态失败] %s',
+            t('[panel][清理任务状态失败] %s'),
             asError(error).message
           );
         }

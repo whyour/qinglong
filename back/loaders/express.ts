@@ -6,7 +6,7 @@ import config from '../config';
 import { UnauthorizedError, expressjwt } from 'express-jwt';
 import { getPlatform, getToken } from '../config/util';
 import rewrite from 'express-urlrewrite';
-import { errors } from 'celebrate';
+import validationErrors from '../middlewares/validationErrors';
 import { serveEnv } from '../config/serverEnv';
 import { shareStore } from '../shared/store';
 import { isValidToken, isDefaultAuthInfo } from '../shared/auth';
@@ -197,7 +197,7 @@ export default ({ app }: { app: Application }) => {
     });
   });
 
-  app.use(errors());
+  app.use(validationErrors);
   app.use(uniqueConstraintError);
 
   app.use(

@@ -48,7 +48,8 @@ export default function () {
   const [loading, setLoading] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<TSystemInfo>();
   const [siteTitle, setSiteTitle] = useState(
-    () => localStorage.getItem('qinglong_panel_title')?.trim() || intl.get('青龙'),
+    () =>
+      localStorage.getItem('qinglong_panel_title')?.trim() || intl.get('青龙'),
   );
   const [collapsed, setCollapsed] = useState(false);
   const [initLoading, setInitLoading] = useState<boolean>(true);
@@ -221,15 +222,25 @@ export default function () {
   useEffect(() => {
     window.onload = () => {
       const timing = performance.timing;
-      console.log(`白屏时间: ${timing.responseStart - timing.navigationStart}`);
       console.log(
-        `请求完毕至DOM加载: ${timing.domInteractive - timing.responseEnd}`,
+        intl.get('白屏时间', {
+          duration: timing.responseStart - timing.navigationStart,
+        }),
       );
       console.log(
-        `解释dom树耗时: ${timing.domComplete - timing.domInteractive}`,
+        intl.get('请求完毕至DOM加载', {
+          duration: timing.domInteractive - timing.responseEnd,
+        }),
       );
       console.log(
-        `从开始至load总耗时: ${timing.loadEventEnd - timing.navigationStart}`,
+        intl.get('解释DOM树耗时', {
+          duration: timing.domComplete - timing.domInteractive,
+        }),
+      );
+      console.log(
+        intl.get('从开始至load总耗时', {
+          duration: timing.loadEventEnd - timing.navigationStart,
+        }),
       );
     };
   }, []);

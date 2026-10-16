@@ -5,7 +5,7 @@ import { promisify } from 'util';
 import { shellQuote } from '../shared/shellQuote';
 import { Response } from 'express';
 import fs from 'fs';
-import { Agent, request } from 'undici';
+import { request } from 'undici';
 import path from 'path';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
@@ -282,26 +282,24 @@ export default class SystemService {
   }
 
   public async checkUpdate() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const currentVersionContent = await parseVersion(config.versionFile);
 
-      let lastVersionContent;
-      try {
-        const { body } = await request(
-          `${config.lastVersionFile}?t=${Date.now()}`,
-          {
-            dispatcher: new Agent({
-              keepAliveTimeout: 30000,
-              keepAliveMaxTimeout: 30000,
-            }),
-          },
-        );
-        const text = await body.text();
-        lastVersionContent = parseContentVersion(text);
-      } catch (error) {}
-
-      if (!lastVersionContent) {
-        lastVersionContent = currentVersionContent;
+      const { body, statusCode } = await request(
+        `${config.lastVersionFile}?t=${Date.now()}`,
+        { signal: controller.signal },
+      );
+      const text = await body.text();
+      if (statusCode !== 200) throw new Error('Version request failed');
+      const lastVersionContent = parseContentVersion(text);
+      if (
+        !lastVersionContent ||
+        typeof lastVersionContent.version !== 'string' ||
+        !/^\d+\.\d+\.\d+$/.test(lastVersionContent.version)
+      ) {
+        throw new Error('Invalid version response');
       }
 
       return {
@@ -319,8 +317,10 @@ export default class SystemService {
     } catch (error: any) {
       return {
         code: 400,
-        message: error.message,
+        message: t('检查更新失败，请检查网络后重试'),
       };
+    } finally {
+      clearTimeout(timeout);
     }
   }
 

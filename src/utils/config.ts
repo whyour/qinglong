@@ -80,7 +80,7 @@ export default {
     { value: 'pushPlus', label: 'PushPlus' },
     { value: 'wePlusBot', label: intl.get('微加机器人') },
     { value: 'wxPusherBot', label: 'wxPusher' },
-    { value: 'wxPusherSpt', label: 'WxPusher(极简推送SPT-推荐)' },
+    { value: 'wxPusherSpt', label: intl.get('WxPusher(极简推送SPT-推荐)') },
     { value: 'openiLink', label: 'OpeniLink' },
     { value: 'wpush', label: 'WPUSH' },
     { value: 'chat', label: intl.get('群晖chat') },
@@ -431,9 +431,7 @@ export default {
       },
       {
         label: 'larkSecret',
-        tip: intl.get(
-          '飞书群组机器人加签密钥，安全设置中开启签名校验后获得',
-        ),
+        tip: intl.get('飞书群组机器人加签密钥，安全设置中开启签名校验后获得'),
       },
     ],
     email: [

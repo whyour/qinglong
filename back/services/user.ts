@@ -173,7 +173,7 @@ export default class UserService {
         t('你于') +
           dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss') +
           t('在') +
-          address +
+          t(address) +
           ' ' +
           req.platform +
           t('端') +
@@ -219,7 +219,7 @@ export default class UserService {
         t('你于') +
           dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss') +
           t('在') +
-          address +
+          t(address) +
           ' ' +
           req.platform +
           t('端') +

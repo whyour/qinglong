@@ -129,7 +129,7 @@ const Initialization = () => {
             >
               <Input.TextArea
                 autoSize={{ minRows: 1, maxRows: 5 }}
-                placeholder={`请输入${x.label}`}
+                placeholder={`${intl.get('请输入')} ${x.label}`}
               />
             </Form.Item>
           ))}

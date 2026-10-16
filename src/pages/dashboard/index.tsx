@@ -167,7 +167,7 @@ const Dashboard = () => {
   const runtimePagination = {
     pageSize: 5,
     showSizeChanger: false,
-    showTotal: (total: number) => `共 ${total} 个`,
+    showTotal: (total: number) => intl.get('总条数', { total }),
   };
 
   if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
@@ -348,7 +348,7 @@ const Dashboard = () => {
                     data={{
                       target: Number(system.memUsagePercent),
                       total: 100,
-                      name: '内存使用率',
+                      name: intl.get('内存使用'),
                     }}
                     style={{
                       textY: '70%',

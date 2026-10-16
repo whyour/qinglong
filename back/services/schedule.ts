@@ -1,3 +1,4 @@
+import { t } from '../shared/i18n';
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import { createCronJob, CronJob } from '../shared/cronScheduler';
@@ -83,7 +84,7 @@ export default class ScheduleService {
         let cp: ChildProcessWithoutNullStreams | undefined;
         let result: ProcessResult = { code: null, signal: null };
         try {
-          this.logger.info('[panel][开始执行任务] 任务ID: %s', others.id);
+          this.logger.info(t('[panel][开始执行任务] 任务ID: %s'), others.id);
           await callbacks.onBefore?.(startTime);
           cp = spawn(command, { shell: '/bin/bash' });
           const child = cp;
@@ -103,7 +104,7 @@ export default class ScheduleService {
 
         if (result.error) {
           this.logger.error(
-            '[panel][执行任务失败] 任务ID: %s, 错误: %s',
+            t('[panel][执行任务失败] 任务ID: %s, 错误: %s'),
             others.id,
             result.error.message,
           );
@@ -111,7 +112,7 @@ export default class ScheduleService {
             await callbacks.onError?.(result.error.message);
           } catch (error) {
             this.logger.error(
-              '[panel][任务错误回调失败] %s',
+              t('[panel][任务错误回调失败] %s'),
               asError(error).message,
             );
           }
@@ -127,12 +128,12 @@ export default class ScheduleService {
         } catch (error) {
           result.error ??= asError(error);
           this.logger.error(
-            '[panel][任务结束回调失败] %s',
+            t('[panel][任务结束回调失败] %s'),
             asError(error).message,
           );
         }
         this.logger.info(
-          '[panel][执行任务结束] 任务ID: %s, 退出码: %j',
+          t('[panel][执行任务结束] 任务ID: %s, 退出码: %j'),
           others.id,
           result.code,
         );
@@ -141,7 +142,7 @@ export default class ScheduleService {
     ).catch((error) => {
       // Queue/setup failures must not become unhandled rejections in detached callers.
       rejectStart(asError(error));
-      this.logger.error('[panel][任务队列失败] %s', asError(error).message);
+      this.logger.error(t('[panel][任务队列失败] %s'), asError(error).message);
       return { ...others, code: null, signal: null, error: asError(error) };
     });
 
@@ -156,7 +157,7 @@ export default class ScheduleService {
   ) {
     const _id = this.formatId(id);
     this.logger.info(
-      '[panel][创建cron任务] 任务ID: %s, cron: %s, 任务名: %s, 执行命令: %s',
+      t('[panel][创建cron任务] 任务ID: %s, cron: %s, 任务名: %s, 执行命令: %s'),
       _id,
       schedule,
       name,
@@ -183,7 +184,7 @@ export default class ScheduleService {
       } catch (error) {
         // A persisted invalid subscription must not become an unhandled startup rejection.
         this.logger.warn(
-          '[panel][跳过无效定时任务] 任务ID: %s, cron: %s, 错误: %s',
+          t('[panel][跳过无效定时任务] 任务ID: %s, cron: %s, 错误: %s'),
           _id,
           schedule,
           asError(error).message,
@@ -204,7 +205,7 @@ export default class ScheduleService {
 
   async cancelCronTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
-    this.logger.info('[panel][取消定时任务] 任务名: %s', name);
+    this.logger.info(t('[panel][取消定时任务] 任务名: %s'), name);
     if (this.scheduleStacks.has(_id)) {
       this.scheduleStacks.get(_id)?.cancel();
       this.scheduleStacks.delete(_id);
@@ -219,7 +220,7 @@ export default class ScheduleService {
   ) {
     const _id = this.formatId(id);
     this.logger.info(
-      '[panel][创建interval任务] 任务ID: %s, 任务名: %s, 执行命令: %s',
+      t('[panel][创建interval任务] 任务ID: %s, 任务名: %s, 执行命令: %s'),
       _id,
       name,
       command,
@@ -236,7 +237,7 @@ export default class ScheduleService {
       },
       (err) => {
         this.logger.error(
-          '[panel][执行任务失败] 命令: %s, 错误信息: %j',
+          t('[panel][执行任务失败] 命令: %s, 错误信息: %j'),
           command,
           err,
         );
@@ -264,7 +265,7 @@ export default class ScheduleService {
   async cancelIntervalTask({ id = 0, name }: ScheduleTaskType) {
     const _id = this.formatId(id);
     this.logger.info(
-      '[panel][取消interval任务] 任务ID: %s, 任务名: %s',
+      t('[panel][取消interval任务] 任务ID: %s, 任务名: %s'),
       _id,
       name,
     );

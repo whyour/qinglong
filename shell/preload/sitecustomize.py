@@ -56,7 +56,7 @@ def run():
         if task_before:
             escaped_task_before = task_before.replace('"', '\\"').replace("$", "\\$")
             commands.append(f"eval '{escaped_task_before}'")
-            print("执行前置命令\n")
+            print("Executing before command\n" if os.environ.get("QL_LANG") == "en" else "执行前置命令\n")
             
         commands.append(f"echo -e '{split_str}'")
         
@@ -88,12 +88,12 @@ def run():
         if len(output) > 0:
             print(output)
         if task_before:
-            print("执行前置命令结束\n")
+            print("Before command finished\n" if os.environ.get("QL_LANG") == "en" else "执行前置命令结束\n")
 
     except subprocess.CalledProcessError as error:
         print(f"\ue926 run task before error: {error}")
         if task_before:
-            print("执行前置命令结束\n")
+            print("Before command finished\n" if os.environ.get("QL_LANG") == "en" else "执行前置命令结束\n")
     except OSError as error:
         error_message = str(error)
         if "Argument list too long" not in error_message:
@@ -101,11 +101,11 @@ def run():
         # else:
             # environment variable is too large
         if task_before:
-            print("执行前置命令结束\n")
+            print("Before command finished\n" if os.environ.get("QL_LANG") == "en" else "执行前置命令结束\n")
     except Exception as error:
         print(f"\ue926 run task before error: {error}")
         if task_before:
-            print("执行前置命令结束\n")
+            print("Before command finished\n" if os.environ.get("QL_LANG") == "en" else "执行前置命令结束\n")
 
     import task_before
 

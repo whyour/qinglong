@@ -1,3 +1,4 @@
+import { t } from '../shared/i18n';
 import { performance } from 'perf_hooks';
 import Logger from '../loaders/logger';
 
@@ -126,7 +127,7 @@ export class MetricsService {
       timestamp: Date.now(),
       metrics: this.getMetrics(),
     };
-    Logger.info('性能指标报告:', report);
+    Logger.info(t('性能指标报告:'), report);
     return report;
   }
 }

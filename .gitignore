@@ -38,3 +38,12 @@ __pycache__
 
 # Local security audit artifacts
 /audit/
+
+# Local browser tests, screenshots, reports, and temporary test output
+/.playwright-cli/
+/output/
+/playwright-report/
+/test-results/
+/blob-report/
+/coverage/
+/.nyc_output/

@@ -1,3 +1,4 @@
+import { t } from '../shared/i18n';
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import fs from 'fs/promises';
@@ -61,10 +62,10 @@ export default class SshKeyService {
       const filePath = resolveSubscriptionPath(this.sshPath, alias);
       try {
         await rmPath(filePath);
-      } catch { }
+      } catch {}
       await writeFileWithLock(filePath, `${key}${os.EOL}`, { mode: '400' });
     } catch (error) {
-      this.logger.error('生成私钥文件失败', error);
+      this.logger.error(t('生成私钥文件失败'), error);
     }
   }
 
@@ -73,7 +74,7 @@ export default class SshKeyService {
       const filePath = resolveSubscriptionPath(this.sshPath, alias);
       await rmPath(filePath);
     } catch (error) {
-      this.logger.error('删除私钥文件失败', error);
+      this.logger.error(t('删除私钥文件失败'), error);
     }
   }
 
@@ -82,9 +83,13 @@ export default class SshKeyService {
     host: string,
     proxy?: string,
   ) {
-    if (!/^[a-zA-Z0-9.-]+$/.test(host) ||
-        (proxy && !/^[a-zA-Z0-9.:[\]-]+$/.test(proxy))) {
-      throw Object.assign(new Error('Invalid SSH host or proxy'), { status: 400 });
+    if (
+      !/^[a-zA-Z0-9.-]+$/.test(host) ||
+      (proxy && !/^[a-zA-Z0-9.:[\]-]+$/.test(proxy))
+    ) {
+      throw Object.assign(new Error('Invalid SSH host or proxy'), {
+        status: 400,
+      });
     }
     if (host === 'github.com') {
       host = `ssh.github.com\n    Port 443\n    HostkeyAlgorithms +ssh-rsa`;
@@ -92,7 +97,10 @@ export default class SshKeyService {
     const proxyStr = proxy
       ? `    ProxyCommand nc -v -x ${proxy} %h %p 2>/dev/null\n`
       : '';
-    const config = `Host ${alias}\n    Hostname ${host}\n    IdentityFile ${resolveSubscriptionPath(this.sshPath, alias)}\n    StrictHostKeyChecking no\n${proxyStr}`;
+    const config = `Host ${alias}\n    Hostname ${host}\n    IdentityFile ${resolveSubscriptionPath(
+      this.sshPath,
+      alias,
+    )}\n    StrictHostKeyChecking no\n${proxyStr}`;
     await writeFileWithLock(
       `${resolveSubscriptionPath(this.sshPath, alias, '.config')}`,
       config,
@@ -108,7 +116,7 @@ export default class SshKeyService {
       const filePath = resolveSubscriptionPath(this.sshPath, alias, '.config');
       await rmPath(filePath);
     } catch (error) {
-      this.logger.error(`删除ssh配置文件${alias}失败`, error);
+      this.logger.error(t('删除ssh配置文件%s失败'), alias, error);
     }
   }
 
@@ -147,7 +155,7 @@ export default class SshKeyService {
           );
           await this.generateSingleSshConfig(alias, host, doc.proxy);
         } catch (error) {
-          this.logger.warn('跳过订阅 %s 的无效 SSH 配置: %s', doc.id, error);
+          this.logger.warn(t('跳过订阅 %s 的无效 SSH 配置: %s'), doc.id, error);
         }
       }
     }
@@ -167,7 +175,10 @@ export default class SshKeyService {
 
   private async generateGlobalSshConfig(alias: string) {
     // Create a config that matches all hosts, making this key globally available
-    const config = `Host *\n    IdentityFile ${resolveSubscriptionPath(this.sshPath, alias)}\n    StrictHostKeyChecking no\n`;
+    const config = `Host *\n    IdentityFile ${resolveSubscriptionPath(
+      this.sshPath,
+      alias,
+    )}\n    StrictHostKeyChecking no\n`;
     await writeFileWithLock(
       `${resolveSubscriptionPath(this.sshPath, alias, '.config')}`,
       config,

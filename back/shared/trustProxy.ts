@@ -1,6 +1,7 @@
 import express, { Application, Request } from 'express';
 import { AuthDataType, SystemModel } from '../data/system';
 import { normalizeClientIp } from './clientIp';
+import { t } from './i18n';
 
 const DEFAULT_TRUST_PROXY = 'loopback';
 
@@ -30,10 +31,10 @@ export function resolveTrustProxy(value?: string): TrustProxyValue {
 function validateTrustProxy(value: string): string {
   const setting = normalizeSetting(value);
   if (setting.length > 500 || /[\r\n]/.test(setting)) {
-    throw new Error('trust proxy 配置格式无效');
+    throw new Error(t('trust proxy 配置格式无效'));
   }
   if (/^\d+$/.test(setting) && Number(setting) > 20) {
-    throw new Error('代理层数不能超过 20');
+    throw new Error(t('代理层数不能超过 20'));
   }
 
   const probe = express();
@@ -73,7 +74,7 @@ export async function initializeTrustProxy(app: Application) {
 
 export async function updateTrustProxy(value: string) {
   if (getEnvironmentSetting()) {
-    throw new Error('环境变量 QL_TRUST_PROXY 已生效，系统设置不可覆盖');
+    throw new Error(t('环境变量 QL_TRUST_PROXY 已生效，系统设置不可覆盖'));
   }
 
   const trustProxy = validateTrustProxy(value);
@@ -81,7 +82,7 @@ export async function updateTrustProxy(value: string) {
     where: { type: AuthDataType.systemConfig },
   });
   if (!doc) {
-    throw new Error('系统配置不存在');
+    throw new Error(t('系统配置不存在'));
   }
 
   const plain = doc.get({ plain: true });

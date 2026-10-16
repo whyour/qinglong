@@ -23,7 +23,7 @@ test(
     assert.notEqual(before.dev, (await fs.stat(root)).dev);
     const context = createContext(
       { root, 'data-dir': data },
-      { PATH: '/nonexistent' },
+      { PATH: '/nonexistent', QL_LANG: 'en' },
     );
     t.after(async () => {
       await stopPanel(context);

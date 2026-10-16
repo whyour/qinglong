@@ -11,13 +11,21 @@ import { installPanelDependencies, startPanel, stopPanel } from './operator';
 // The Bash image updater and local CLI must enforce the same build provenance.
 const artifacts = require('./upgradeArtifacts.cjs') as {
   releaseBranch(env: NodeJS.ProcessEnv): string;
-  verifyUpgrade(source: string, staticRoot: string): Promise<unknown>;
+  verifyUpgrade(
+    source: string,
+    staticRoot: string,
+    env?: NodeJS.ProcessEnv,
+  ): Promise<unknown>;
   waitForHealth(
     env: NodeJS.ProcessEnv,
     timeout?: number,
     signal?: AbortSignal,
   ): Promise<void>;
-  withUpgradeLock<T>(tmp: string, operation: () => Promise<T>): Promise<T>;
+  withUpgradeLock<T>(
+    tmp: string,
+    operation: () => Promise<T>,
+    env?: NodeJS.ProcessEnv,
+  ): Promise<T>;
   stageUpgrade(options: {
     root: string;
     tmp: string;
@@ -30,6 +38,7 @@ const artifacts = require('./upgradeArtifacts.cjs') as {
   selectedUpgrade(
     tmp: string,
     branch: string,
+    env?: NodeJS.ProcessEnv,
   ): Promise<{ source: string; static: string }>;
 };
 
@@ -69,17 +78,20 @@ export async function stageUpgrade(
   context: LocalContext,
   mirror: 'github' | 'gitee',
 ): Promise<{ source: string; static: string }> {
-  return artifacts.withUpgradeLock(context.paths.dir_tmp!, () =>
-    artifacts.stageUpgrade({
-      root: context.root,
-      tmp: context.paths.dir_tmp!,
-      env: context.env,
-      mirror,
-      signal: operationSignal(),
-      run: (program, args, capture) =>
-        checkedProcess(program, args, { env: context.env, capture }),
-      install: (source) => installPanelDependencies(context, source),
-    }),
+  return artifacts.withUpgradeLock(
+    context.paths.dir_tmp!,
+    () =>
+      artifacts.stageUpgrade({
+        root: context.root,
+        tmp: context.paths.dir_tmp!,
+        env: context.env,
+        mirror,
+        signal: operationSignal(),
+        run: (program, args, capture) =>
+          checkedProcess(program, args, { env: context.env, capture }),
+        install: (source) => installPanelDependencies(context, source),
+      }),
+    context.env,
   );
 }
 
@@ -89,6 +101,7 @@ async function selectedUpgrade(
   return artifacts.selectedUpgrade(
     context.paths.dir_tmp!,
     releaseBranch(context),
+    context.env,
   );
 }
 
@@ -259,7 +272,7 @@ export async function reloadPanel(
   const staticRoot = selected.static;
   await validateTree(source, context.env);
   await validateTree(staticRoot, context.env);
-  await artifacts.verifyUpgrade(source, staticRoot);
+  await artifacts.verifyUpgrade(source, staticRoot, context.env);
   const entries = await fs.readdir(source);
   const reserved = new Set(['data', '.tmp', 'static', '.git', '.env']);
   const relativeData = path.relative(context.root, context.data);
@@ -284,15 +297,18 @@ export async function reloadPanel(
   if (selection)
     replacements.push({ source: selection.source, target: selection.target });
   try {
-    return await artifacts.withUpgradeLock(context.paths.dir_tmp!, () =>
-      replaceAndReload(context, replacements, {
-        stop: stopPanel,
-        start: async (ctx) => {
-          const service = await startPanel(ctx);
-          await artifacts.waitForHealth(ctx.env, 60000, operationSignal());
-          return service;
-        },
-      }),
+    return await artifacts.withUpgradeLock(
+      context.paths.dir_tmp!,
+      () =>
+        replaceAndReload(context, replacements, {
+          stop: stopPanel,
+          start: async (ctx) => {
+            const service = await startPanel(ctx);
+            await artifacts.waitForHealth(ctx.env, 60000, operationSignal());
+            return service;
+          },
+        }),
+      context.env,
     );
   } finally {
     if (selection)

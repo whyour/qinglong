@@ -31,7 +31,7 @@ async function fixture() {
     '../shared/cronScheduler': { createCronJob: (schedule, callback) => ({ start() {}, cancel() {}, fire: callback }) },
     '../shared/cronSchedule': { isValidCronSchedule: x => x !== 'invalid' },
     './data': { scheduleStacks: jobs }, '../shared/runCron': { runCron }, '../loaders/logger': logger,
-    '../shared/i18n': { tf: s => s },
+    '../shared/i18n': { t: (s) => s, tf: s => s },
   });
   const { delCron } = load('back/schedule/delCron.ts', { './data': { scheduleStacks: jobs }, '../loaders/logger': logger });
   function add(id = '1', command = 'old', replace = false) {

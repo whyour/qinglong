@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { spawn } from 'cross-spawn';
 import taskLimit from './pLimit';
 import Logger from '../loaders/logger';
@@ -37,7 +38,9 @@ export function runCron(
             existingCron.status === CrontabStatus.queued)
         ) {
           Logger.info(
-            `[schedule][停止已运行任务] 任务ID: ${cron.id}, PID: ${existingCron.pid}`,
+            t('[schedule][停止已运行任务] 任务ID: %s, PID: %s'),
+            cron.id,
+            existingCron.pid,
           );
           await killTask(existingCron.pid, true);
           // Mark old running instances as stopped
@@ -59,7 +62,9 @@ export function runCron(
         }
       } catch (error) {
         Logger.error(
-          `[schedule][检查已运行任务失败] 任务ID: ${cron.id}, 错误: ${error}`,
+          t('[schedule][检查已运行任务失败] 任务ID: %s, 错误: %s'),
+          cron.id,
+          error,
         );
         throw error;
       }
@@ -67,17 +72,18 @@ export function runCron(
       // In particular, invalidation can happen while stopping a previous run.
       if (!isCurrent()) return;
       Logger.info(
-        `[schedule][开始执行任务] 参数 ${JSON.stringify({
+        t('[schedule][开始执行任务] 参数 %s'),
+        JSON.stringify({
           ...cron,
           command: cmd,
-        })}`,
+        }),
       );
       const cp = spawn(cmd, { shell: '/bin/bash' });
 
       const { completed } = observeChildProcess(cp, {
         onStderr: async (message) => {
           Logger.info(
-            '[schedule][任务标准错误] 命令: %s, 信息: %s',
+            t('[schedule][任务标准错误] 命令: %s, 信息: %s'),
             cmd,
             message,
           );
@@ -86,20 +92,20 @@ export function runCron(
       const result = await completed;
       if (result.error) {
         Logger.error(
-          '[schedule][执行任务失败] 命令: %s, 错误: %s',
+          t('[schedule][执行任务失败] 命令: %s, 错误: %s'),
           cmd,
           result.error.message,
         );
       }
       Logger.info(
-        '[schedule][执行任务结束] 任务ID: %s, 退出码: %j',
+        t('[schedule][执行任务结束] 任务ID: %s, 退出码: %j'),
         cron.id,
         result.code,
       );
       return { ...cron, command: cmd, pid: cp.pid, ...result } as any;
     } catch (error) {
       Logger.error(
-        '[schedule][创建任务失败] 命令: %s, 错误: %s',
+        t('[schedule][创建任务失败] 命令: %s, 错误: %s'),
         cmd,
         asError(error).message,
       );

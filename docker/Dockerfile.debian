@@ -11,6 +11,7 @@ RUN set -x && \
   apt-get update && \
   apt-get install --no-install-recommends -y libatomic1 && \
   npm i -g pnpm@8.3.1 && \
+  test "$(pnpm --version)" = "8.3.1" && \
   cd /tmp/build && \
   pnpm install --prod --frozen-lockfile
 
@@ -70,6 +71,7 @@ RUN set -x && \
   git config --global user.name "qinglong" && \
   git config --global http.postBuffer 524288000 && \
   npm install -g pnpm@8.3.1 pm2 ts-node typescript@5 && \
+  test "$(pnpm --version)" = "8.3.1" && \
   npm cache clean --force && \
   rm -rf /root/.cache && \
   rm -rf /root/.npm && \
@@ -114,7 +116,8 @@ USER root
 
 RUN ln -sf ${QL_DIR}/shell/task.sh /usr/local/bin/task \
   && ln -sf ${QL_DIR}/shell/update.sh /usr/local/bin/ql \
-  && chmod +x /usr/local/bin/task /usr/local/bin/ql
+  && chmod +x /usr/local/bin/task /usr/local/bin/ql \
+  && test "$(pnpm --version)" = "8.3.1"
 
 WORKDIR ${QL_DIR}
 

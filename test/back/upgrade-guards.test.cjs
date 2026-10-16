@@ -88,7 +88,7 @@ for (const legacy of [true, false])
       try {
         await entered;
         const contender = await Promise.race(attempts);
-        assert.match(contender.error?.message || '', /Another upgrade/);
+        assert.match(contender.error?.message || '', /Another upgrade|已有更新或重载/);
         assert.equal(maximum, 1);
         assert.equal((await original.readdir(lock)).length, 1);
       } finally {
@@ -106,7 +106,7 @@ test('an empty abandoned lock is acquired atomically and a failed operation rele
     withUpgradeLock(tmp, async () => {
       await assert.rejects(
         withUpgradeLock(tmp, async () => assert.fail('concurrent operation')),
-        /Another upgrade/,
+        /Another upgrade|已有更新或重载/,
       );
       throw new Error('operation failed');
     }),
@@ -169,7 +169,7 @@ withUpgradeLock(process.argv[2], async () => {
     await withUpgradeLock(tmp, async () => {
       await assert.rejects(
         withUpgradeLock(tmp, async () => {}),
-        /Another upgrade/,
+        /Another upgrade|已有更新或重载/,
       );
     });
     assert.deepEqual(await fs.readdir(tmp), ['worker.cjs']);
@@ -235,7 +235,7 @@ test(
       res.once('close', () => clearInterval(timer));
     });
     const began = Date.now();
-    await assert.rejects(waitForHealth({ QlPort: port }, 80), /health check/);
+    await assert.rejects(waitForHealth({ QlPort: port }, 80), /health check|后端启动检查失败/);
     assert.ok(
       Date.now() - began < 1000,
       'deadline must not depend on socket inactivity',
@@ -280,6 +280,6 @@ for (const streaming of [false, true])
 test('unhealthy, malformed and oversized health responses fail within the deadline', async (t) => {
   for (const body of ['{}', '{', ' '.repeat(65537)]) {
     const port = await healthServer(t, (req, res) => res.end(body));
-    await assert.rejects(waitForHealth({ QlPort: port }, 20), /health check/);
+    await assert.rejects(waitForHealth({ QlPort: port }, 20), /health check|后端启动检查失败/);
   }
 });

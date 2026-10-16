@@ -279,16 +279,13 @@ const Env = () => {
 
   const enabledOrDisabledEnv = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${
-        record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用')
-      }`,
+      title: intl.get('确认操作', {
+        operation:
+          record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用'),
+      }),
       content: (
         <>
-          {intl.get('确认')}
-          {record.status === Status.已禁用
-            ? intl.get('启用')
-            : intl.get('禁用')}
-          Env{' '}
+          {intl.get('确认操作对象', { operation: record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用'), object: 'Env' })}{' '}
           <Paragraph
             style={{ wordBreak: 'break-all', display: 'inline' }}
             ellipsis={{ rows: 6, expandable: true }}
@@ -343,14 +340,13 @@ const Env = () => {
 
   const pinOrUnpinEnv = (record: any, index: number) => {
     Modal.confirm({
-      title: `确认${
-        record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')
-      }`,
+      title: intl.get('确认操作', {
+        operation:
+          record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'),
+      }),
       content: (
         <>
-          {intl.get('确认')}
-          {record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶')}
-          Env{' '}
+          {intl.get('确认操作对象', { operation: record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'), object: 'Env' })}{' '}
           <Paragraph
             style={{ wordBreak: 'break-all', display: 'inline' }}
             ellipsis={{ rows: 6, expandable: true }}
@@ -543,12 +539,12 @@ const Env = () => {
 
   const operateEnvs = (operationStatus: number) => {
     Modal.confirm({
-      title: `确认${OperationName[operationStatus]}`,
+      title: intl.get('确认操作', {
+        operation: intl.get(OperationName[operationStatus]),
+      }),
       content: (
         <>
-          {intl.get('确认')}
-          {OperationName[operationStatus]}
-          {intl.get('选中的变量吗')}
+          {intl.get('确认批量操作', { operation: intl.get(OperationName[operationStatus]), object: intl.get('环境变量') })}
         </>
       ),
       onOk() {
@@ -603,7 +599,9 @@ const Env = () => {
         );
 
         if (code === 200) {
-          message.success(`${intl.get('成功上传')}${data.length}${intl.get('个环境变量')}`);
+          message.success(
+            `${intl.get('成功上传')}${data.length}${intl.get('个环境变量')}`,
+          );
           getEnvs();
         }
         setImportLoading(false);
@@ -708,9 +706,7 @@ const Env = () => {
               {intl.get('批量取消置顶')}
             </Button>
             <span style={{ marginLeft: 8 }}>
-              {intl.get('已选择')}
-              <a>{selectedRowIds?.length}</a>
-              {intl.get('项')}
+              {intl.get('选中条数', { count: selectedRowIds.length })}
             </span>
           </div>
         )}

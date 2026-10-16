@@ -91,7 +91,7 @@ const Login = () => {
             </div>
             <div>
               {intl.get('上次登录地点：')}
-              {lastaddr || '-'}
+              {lastaddr === '内网IP' ? intl.get('内网IP') : lastaddr || '-'}
             </div>
             <div>
               {intl.get('上次登录IP：')}
@@ -103,7 +103,7 @@ const Login = () => {
             </div>
             <div>
               {intl.get('上次登录状态：')}
-              {retries > 0 ? `失败${retries}次` : intl.get('成功')}
+              {retries > 0 ? intl.get('登录失败次数', { count: retries }) : intl.get('成功')}
             </div>
           </>
         ),

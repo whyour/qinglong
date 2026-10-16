@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import { celebrate, Joi } from 'celebrate';
+import { t } from '../shared/i18n';
 import {
   diagnoseClientIp,
   getTrustProxyConfig,
@@ -36,7 +37,7 @@ export default (app: Router) => {
       } catch (error) {
         res.send({
           code: 400,
-          message: error instanceof Error ? error.message : '配置更新失败',
+          message: error instanceof Error ? error.message : t('配置更新失败'),
         });
       }
     },

@@ -236,7 +236,7 @@ find_cron_api() {
 
 update_auth_config() {
   local body="$1"
-  local tip="$2"
+  local tip=$(t "$2")
   local currentTimeStamp=$(date +%s)
   local api=$(ql_api_request \
     "http://localhost:${ql_port}/open/system/auth/reset?t=$currentTimeStamp" \

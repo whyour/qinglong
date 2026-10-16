@@ -5,6 +5,7 @@ import { Container } from 'typedi';
 import config from './config';
 import Logger from './loaders/logger';
 import { errStack } from './shared/errors';
+import { initializeLanguageSync } from './shared/languageSync';
 import { type GrpcServerService } from './services/grpc';
 import { type HttpServerService } from './services/http';
 
@@ -27,6 +28,7 @@ class Application {
       if (cluster.isPrimary) {
         await this.initializeDatabase();
       }
+      await initializeLanguageSync();
       if (cluster.isPrimary) {
         this.startMasterProcess();
       } else {

@@ -48,7 +48,7 @@ test('recovery reconciles a surviving scheduler after missed deletes and disable
     },
     '../shared/runCron': {},
     '../loaders/logger': { info() {}, warn() {} },
-    '../shared/i18n': { tf: (s) => s },
+    '../shared/i18n': { t: (s) => s, tf: (s) => s },
   });
   const client = {
     addCron: async (crons, replace) => {
@@ -97,7 +97,7 @@ test('invalid replacement leaves the previous schedule intact', async () => {
     './data': { scheduleStacks: stacks },
     '../shared/runCron': {},
     '../loaders/logger': {},
-    '../shared/i18n': { tf: (s) => s },
+    '../shared/i18n': { t: (s) => s, tf: (s) => s },
   });
   await assert.rejects(
     new Promise((resolve, reject) =>
@@ -122,7 +122,7 @@ test('invalid persisted schedules cannot block recovery, valid jobs or HTTP heal
     './data': { scheduleStacks: stacks },
     '../shared/runCron': {},
     '../loaders/logger': { info() {}, warn() {} },
-    '../shared/i18n': { tf: require('node:util').format },
+    '../shared/i18n': { t: (s) => s, tf: require('node:util').format },
   });
   const client = { addCron: (crons, replace) => new Promise((resolve, reject) => {
     addCron({ request: { crons, replace } }, (error) => error ? reject(error) : resolve());

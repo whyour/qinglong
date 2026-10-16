@@ -43,6 +43,7 @@ test(
           context.paths.dir_tmp,
         );
         installations.push(directory);
+        await fs.mkdir(path.join(directory, 'node_modules'), { recursive: true });
       },
     );
     const controller = new AbortController();
@@ -70,9 +71,16 @@ test(
       ),
     );
     assert.equal(pointer.directory, path.basename(workspace));
+    const manifest = JSON.parse(
+      await fs.readFile(path.join(staged.static, 'build-info.json'), 'utf8'),
+    );
     assert.deepEqual(
       JSON.parse(await fs.readFile(path.join(workspace, 'ready.json'), 'utf8')),
-      staged,
+      {
+        ...staged,
+        sourceCommit: manifest.sourceCommit,
+        dependenciesChanged: true,
+      },
     );
     assert.equal(
       await fs.readFile(path.join(root, 'package.json'), 'utf8'),

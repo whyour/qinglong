@@ -150,10 +150,10 @@ const SubscriptionModal = ({
           precision={0}
           min={1}
           value={intervalNumber}
-          style={{ width: 'calc(100% - 58px)' }}
+          style={{ width: 'calc(100% - 100px)' }}
           onChange={numberChange}
         />
-        <Select value={intervalType} onChange={intervalTypeChange}>
+        <Select value={intervalType} onChange={intervalTypeChange} style={{ width: 100 }}>
           <Option value="days">{intl.get('天')}</Option>
           <Option value="hours">{intl.get('时')}</Option>
           <Option value="minutes">{intl.get('分')}</Option>
@@ -527,8 +527,8 @@ const SubscriptionModal = ({
             onPaste={onNamePaste}
             placeholder={
               type === 'private-repo'
-                ? 'SOCK5代理，例如 IP:PORT'
-                : 'HTTP/SOCK5代理，例如 http://127.0.0.1:1080'
+                ? intl.get('SOCK5代理，例如 IP:PORT')
+                : intl.get('HTTP/SOCK5代理，例如 http://127.0.0.1:1080')
             }
           />
         </Form.Item>

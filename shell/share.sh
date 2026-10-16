@@ -395,7 +395,7 @@ handle_task_start() {
   if [[ $ID ]]; then
     local error=$(update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp")
     if [[ $error ]]; then
-      error_message=", 任务状态更新失败(${error})"
+      error_message=$(t ', 任务状态更新失败(%s)' "$error")
     fi
   fi
   t '## 开始执行... %s\n' "${begin_time}${error_message}"
@@ -437,7 +437,7 @@ handle_task_end() {
   if [[ $ID ]]; then
     local error=$(update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time" "$exit_code")
     if [[ $error ]]; then
-      error_message=", 状态更新失败(${error})"
+      error_message=$(t ', 状态更新失败(%s)' "$error")
     fi
   fi
 

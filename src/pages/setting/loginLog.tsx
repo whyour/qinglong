@@ -47,7 +47,7 @@ const LoginLog = ({ data, height }: { data: Array<any>; height: number }) => {
   const columns = [
     {
       title: intl.get('序号'),
-      width: 50,
+      width: 90,
       render: (text: string, record: any, index: number) => index + 1,
     },
     {
@@ -63,6 +63,7 @@ const LoginLog = ({ data, height }: { data: Array<any>; height: number }) => {
       dataIndex: 'address',
       width: 120,
       key: 'address',
+      render: (text: string) => (text === '内网IP' ? intl.get('内网IP') : text),
     },
     {
       title: intl.get('登录IP'),
@@ -74,13 +75,13 @@ const LoginLog = ({ data, height }: { data: Array<any>; height: number }) => {
       title: intl.get('登录设备'),
       dataIndex: 'platform',
       key: 'platform',
-      width: 80,
+      width: 140,
     },
     {
       title: intl.get('登录状态'),
       dataIndex: 'status',
       key: 'status',
-      width: 80,
+      width: 140,
       render: (text: string, record: any) => (
         <Tag color={LoginStatusColor[record.status]} style={{ marginRight: 0 }}>
           {intl.get(LoginStatus[record.status])}
@@ -116,12 +117,13 @@ const LoginLog = ({ data, height }: { data: Array<any>; height: number }) => {
   return (
     <>
       <Table
+        className="login-log-table"
         columns={columns}
         pagination={false}
         dataSource={data}
         rowKey={(record) => `${record.ip}-${record.timestamp}`}
         size="middle"
-        scroll={{ x: 1000, y: height }}
+        scroll={{ x: 1120, y: height }}
       />
     </>
   );

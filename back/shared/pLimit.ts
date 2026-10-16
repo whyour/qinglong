@@ -79,29 +79,36 @@ class TaskLimit {
   private handleEvents() {
     this.cronLimit.on('add', () => {
       Logger.info(
-        `[schedule][任务加入队列] 运行中任务数: ${this.cronLimitActiveCount}, 等待中任务数: ${this.cronLimitPendingCount}`,
+        t('[schedule][任务加入队列] 运行中任务数: %s, 等待中任务数: %s'),
+        this.cronLimitActiveCount,
+        this.cronLimitPendingCount,
       );
     });
     this.cronLimit.on('active', () => {
       Logger.info(
-        `[schedule][开始处理任务] 运行中任务数: ${
-          this.cronLimitActiveCount + 1
-        }, 等待中任务数: ${this.cronLimitPendingCount}`,
+        t('[schedule][开始处理任务] 运行中任务数: %s, 等待中任务数: %s'),
+        this.cronLimitActiveCount + 1,
+        this.cronLimitPendingCount,
       );
     });
     this.cronLimit.on('completed', (param) => {
-      Logger.info(`[schedule][任务处理成功] 参数 ${JSON.stringify(param)}`);
+      Logger.info(t('[schedule][任务处理成功] 参数 %s'), JSON.stringify(param));
     });
     this.cronLimit.on('error', (error) => {
-      Logger.error(`[schedule][任务处理错误] 参数 ${JSON.stringify(error)}`);
+      Logger.error(
+        t('[schedule][任务处理错误] 参数 %s'),
+        JSON.stringify(error),
+      );
     });
     this.cronLimit.on('next', () => {
       Logger.info(
-        `[schedule][任务处理结束] 运行中任务数: ${this.cronLimitActiveCount}, 等待中任务数: ${this.cronLimitPendingCount}`,
+        t('[schedule][任务处理结束] 运行中任务数: %s, 等待中任务数: %s'),
+        this.cronLimitActiveCount,
+        this.cronLimitPendingCount,
       );
     });
     this.cronLimit.on('idle', () => {
-      Logger.info(`[schedule][任务队列] 空闲中...`);
+      Logger.info(t(`[schedule][任务队列] 空闲中...`));
     });
   }
 
@@ -172,13 +179,14 @@ class TaskLimit {
           (err, res) => {
             if (err) {
               Logger.error(
-                `[schedule][任务重复运行] 通知失败 ${JSON.stringify(err)}`,
+                t('[schedule][任务重复运行] 通知失败 %s'),
+                JSON.stringify(err),
               );
             }
           },
         );
       }
-      Logger.warn(`[schedule][任务重复运行] 参数 ${JSON.stringify(cron)}`);
+      Logger.warn(t('[schedule][任务重复运行] 参数 %s'), JSON.stringify(cron));
       return;
     }
     this.queuedCrons.set(cron.id, result);
