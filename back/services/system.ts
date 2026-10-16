@@ -606,7 +606,17 @@ export default class SystemService {
     const result = await readDirs(config.systemLogPath, config.systemLogPath);
     const logs = result.reverse().filter((x) => x.title.endsWith('.log'));
     for (const log of logs) {
-      await rmPath(path.join(config.systemLogPath, log.title));
+      // All workers keep append handles open; unlinking strands future writes
+      // in a deleted inode until rotation. Preserve the file while clearing it.
+      const file = await fs.promises.open(
+        path.join(config.systemLogPath, log.title),
+        fs.constants.O_WRONLY | fs.constants.O_NOFOLLOW,
+      );
+      try {
+        await file.truncate(0);
+      } finally {
+        await file.close();
+      }
     }
   }
 
