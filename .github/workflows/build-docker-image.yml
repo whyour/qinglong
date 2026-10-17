@@ -619,7 +619,7 @@ jobs:
             # This amd64 helper executes a genuine Raspbian ARMv6 userspace under
             # ARM1176 QEMU. It is a CI validator, not a user runtime or bundle.
             echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-            validator="ghcr.io/${GITHUB_REPOSITORY}-armv6-glibc-validator:${GITHUB_SHA}"
+            validator="ghcr.io/${GITHUB_REPOSITORY}:upgrade-armv6-glibc-validator-${GITHUB_SHA}"
             mkdir -p output/validator
             docker buildx build --platform linux/amd64 --build-arg "SOURCE_IMAGE=$image" --file docker/Dockerfile.armv6-glibc --target runtime --tag "$validator" --push --metadata-file output/validator/image.json .
             validator_digest="$(jq -er '."containerimage.digest"' output/validator/image.json)"
