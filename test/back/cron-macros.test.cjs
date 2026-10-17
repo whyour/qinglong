@@ -7,10 +7,13 @@ const { isValidCronSchedule } = require('../../back/shared/cronSchedule');
 if (!process.env.QL_MACRO_TEST_TZ) {
   for (const tz of ['UTC', 'Asia/Shanghai']) {
     test(`macro execution in ${tz}`, () => {
+      const env = { ...process.env, TZ: tz, QL_MACRO_TEST_TZ: tz };
+      delete env.NODE_TEST_CONTEXT;
       const result = require('node:child_process').spawnSync(process.execPath,
         ['-r', 'ts-node/register/transpile-only', '--test', __filename],
-        { env: { ...process.env, TZ: tz, QL_MACRO_TEST_TZ: tz }, encoding: 'utf8' });
+        { env, encoding: 'utf8' });
       assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /@annually fires at the expected local times/);
     });
   }
 }
