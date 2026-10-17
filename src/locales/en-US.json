@@ -744,6 +744,7 @@
   "更新已就绪，重启后应用新版本": "Update ready. Restart to apply the new version.",
   "更新在后台进行，可以继续使用面板": "The update runs in the background. You can keep using the panel.",
   "下载构建产物": "Downloading application files",
+  "下载更新包": "Downloading update package",
   "下载源码": "Downloading source files",
   "正在获取下载大小": "Total size unavailable",
   "查看更新日志": "View update log",
