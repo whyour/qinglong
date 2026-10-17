@@ -28,12 +28,14 @@ RUN chmod 755 /usr/local/bin/armv6-run && \
     printf '%s\n' 'deb [signed-by=/usr/share/keyrings/raspbian.gpg] https://archive.raspbian.org/raspbian bullseye main' > /armv6/etc/apt/sources.list && \
     mkdir -p /armv6/etc/ssl/certs && \
     cp /etc/ssl/certs/ca-certificates.crt /armv6/etc/ssl/certs/ca-certificates.crt && \
+    printf '#!/bin/sh\nexit 101\n' > /armv6/usr/sbin/policy-rc.d && \
+    chmod 755 /armv6/usr/sbin/policy-rc.d && \
     armv6-run /bin/sh -ec 'apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential binutils python3 ca-certificates curl git nginx procps jq sudo; rm -rf /var/lib/apt/lists/*'
 # This Node is a pinned CI/test prerequisite, never part of the upgrade archive.
 # Build against the minimum supported Node, including its bundled C++ headers.
-RUN curl -fsSL https://unofficial-builds.nodejs.org/download/release/v20.18.1/node-v20.18.1-linux-armv6l.tar.xz -o /tmp/node.tar.xz && \
-    echo '02f4c973a1e432d91f8509b5268d26f3a10f4af33312907d9f43ba2483f14d34  /tmp/node.tar.xz' | sha256sum -c - && \
-    tar -xJf /tmp/node.tar.xz -C /armv6/usr/local --strip-components=1 && rm /tmp/node.tar.xz
+RUN curl -fsSL https://unofficial-builds.nodejs.org/download/release/v20.18.1/node-v20.18.1-linux-armv6l.tar.gz -o /tmp/node.tar.gz && \
+    echo 'd4343a3d0fe23ddbd785537271bb0b60435edd50f5fba5bc580134592d51f011  /tmp/node.tar.gz' | sha256sum -c - && \
+    tar -xzf /tmp/node.tar.gz -C /armv6/usr/local --strip-components=1 && rm /tmp/node.tar.gz
 COPY --from=source /ql/ /armv6/ql/
 # PM2 is JavaScript. Keep the ARMv6 Node/npm and the Raspbian system libraries.
 COPY --from=source /usr/local/lib/node_modules/pm2/ /armv6/usr/local/lib/node_modules/pm2/
