@@ -1,0 +1,38 @@
+# ARMv7 is a source of application files only. None of its system libraries or
+# Node binaries are executed or copied into the ARMv6 runtime.
+ARG SOURCE_IMAGE
+FROM --platform=linux/arm/v7 ${SOURCE_IMAGE} AS source
+
+# PRoot keeps ARM1176 execution isolated, without installing host binfmt handlers.
+FROM --platform=linux/amd64 debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 AS runtime
+COPY --from=source /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
+      debootstrap gpg gpgv ca-certificates curl qemu-user-static proot && \
+    rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://archive.raspbian.org/raspbian.public.key -o /tmp/raspbian.key && \
+    echo 'ca59cd4f2bcbc3a1d41ba6815a02a8dc5c175467a59bd87edeac458f4a5345de  /tmp/raspbian.key' | sha256sum -c - && \
+    gpg --dearmor -o /usr/share/keyrings/raspbian.gpg /tmp/raspbian.key && \
+    debootstrap --foreign --arch=armhf --variant=minbase \
+      --keyring=/usr/share/keyrings/raspbian.gpg \
+      bullseye /armv6 https://archive.raspbian.org/raspbian
+COPY docker/armv6-run /usr/local/bin/armv6-run
+RUN chmod 755 /usr/local/bin/armv6-run && \
+    armv6-run /debootstrap/debootstrap --second-stage && \
+    cp /usr/share/keyrings/raspbian.gpg /armv6/usr/share/keyrings/raspbian.gpg && \
+    printf '%s\n' 'deb [signed-by=/usr/share/keyrings/raspbian.gpg] https://archive.raspbian.org/raspbian bullseye main' > /armv6/etc/apt/sources.list && \
+    mkdir -p /armv6/etc/ssl/certs && \
+    cp /etc/ssl/certs/ca-certificates.crt /armv6/etc/ssl/certs/ca-certificates.crt && \
+    armv6-run /bin/sh -ec 'apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential binutils python3 ca-certificates curl git nginx procps jq sudo; rm -rf /var/lib/apt/lists/*'
+# This Node is a pinned CI/test prerequisite, never part of the upgrade archive.
+# Build against the minimum supported Node, including its bundled C++ headers.
+RUN curl -fsSL https://unofficial-builds.nodejs.org/download/release/v20.18.1/node-v20.18.1-linux-armv6l.tar.xz -o /tmp/node.tar.xz && \
+    echo '02f4c973a1e432d91f8509b5268d26f3a10f4af33312907d9f43ba2483f14d34  /tmp/node.tar.xz' | sha256sum -c - && \
+    tar -xJf /tmp/node.tar.xz -C /armv6/usr/local --strip-components=1 && rm /tmp/node.tar.xz
+COPY --from=source /ql/ /armv6/ql/
+# PM2 is JavaScript. Keep the ARMv6 Node/npm and the Raspbian system libraries.
+COPY --from=source /usr/local/lib/node_modules/pm2/ /armv6/usr/local/lib/node_modules/pm2/
+RUN ln -s ../lib/node_modules/pm2/bin/pm2 /armv6/usr/local/bin/pm2 && \
+    armv6-run /bin/bash -ec 'ulimit -c 0; cd "$(readlink -f /ql/node_modules/sqlite3)"; CFLAGS="-march=armv6 -mfpu=vfp -mfloat-abi=hard" CXXFLAGS="-march=armv6 -mfpu=vfp -mfloat-abi=hard" npm_config_nodedir=/usr/local npm_config_build_from_source=true node --jitless -e '\''require("node:child_process").execFileSync(process.execPath,[require.resolve("@mapbox/node-pre-gyp/bin/node-pre-gyp"),"rebuild","--napi_build_version=6"],{stdio:"inherit"})'\''; readelf -A lib/binding/napi-v6-linux-arm/node_sqlite3.node | grep -E "Tag_CPU_arch: v6($|K)"; readelf -A lib/binding/napi-v6-linux-arm/node_sqlite3.node | grep "Tag_ABI_VFP_args: VFP registers"; rm -rf build; node --jitless -e '\''const p=process; if(p.config.variables.arm_version!=="6" && p.config.variables.arm_version!==6) process.exit(1); console.log(JSON.stringify({node:p.version,arm:p.config.variables.arm_version,float:p.config.variables.arm_float_abi,glibc:p.report.getReport().header.glibcVersionRuntime}));'\'''
+LABEL qinglong.qa.runtime="armv6-glibc-arm1176"
+ENTRYPOINT ["/usr/local/bin/armv6-run"]

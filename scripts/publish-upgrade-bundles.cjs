@@ -13,6 +13,7 @@ const platforms = [
   'linux-s390x-musl',
   'linux-ia32-musl',
   'linux-x64-glibc',
+  'linux-armv6-glibc',
   'linux-armv7-glibc',
   'linux-arm64-glibc',
   'linux-ppc64-glibc',

@@ -202,6 +202,35 @@ test('native target compatibility distinguishes ARMv6/ARMv7 and libc and retains
     target: { ...target, libcMinimum: '1.2.4' },
   };
   bundle.assertCompatible(manifest, target, '20.20.2');
+  const glibcTarget = {
+    ...target,
+    libc: 'glibc',
+    libcVersion: '2.31',
+    endianness: 'LE',
+    armFloatAbi: 'hard',
+  };
+  const glibcManifest = {
+    ...manifest,
+    target: { ...glibcTarget, libcMinimum: '2.31' },
+  };
+  bundle.assertCompatible(glibcManifest, glibcTarget, '20.18.1');
+  assert.equal(bundle.targetKey(glibcTarget), 'linux-armv6-glibc');
+  assert.throws(
+    () =>
+      bundle.assertCompatible(glibcManifest, {
+        ...glibcTarget,
+        libcVersion: '2.30',
+      }),
+    /requires glibc/,
+  );
+  assert.throws(
+    () =>
+      bundle.assertCompatible(glibcManifest, {
+        ...glibcTarget,
+        armFloatAbi: 'soft',
+      }),
+    /floating-point ABI mismatch/,
+  );
   assert.throws(
     () => bundle.assertCompatible(manifest, { ...target, arch: 'armv7' }),
     /platform mismatch/,
@@ -309,7 +338,18 @@ test('publishing requires every platform and validates all immutable archive has
     );
   }
   const index = releaseIndex(f.directory, sourceCommit, repository);
-  assert.equal(Object.keys(index.packages).length, 12);
+  assert.equal(Object.keys(index.packages).length, 13);
+  const armv6 = path.join(
+    f.directory,
+    `qinglong-${sourceCommit}-linux-armv6-glibc.tar.gz`,
+  );
+  const armv6Bytes = await fs.readFile(armv6);
+  await fs.rm(armv6);
+  assert.throws(
+    () => releaseIndex(f.directory, sourceCommit, repository),
+    /ENOENT/,
+  );
+  await fs.writeFile(armv6, armv6Bytes);
   await fs.appendFile(
     path.join(f.directory, `qinglong-${sourceCommit}-${platforms[0]}.tar.gz`),
     'corrupt',
