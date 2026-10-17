@@ -221,12 +221,14 @@ async function startJob({ root, tmp, env = process.env }, action) {
           let selected;
           let metadata;
           if (action === 'apply') {
-            // Fail before launching a process or stopping the working panel.
+            // Keep requests short on slow devices. The detached worker performs
+            // complete file/dependency verification before it can stop the panel.
             try {
               selected = await artifacts.selectedUpgrade(
                 tmp,
                 artifacts.releaseBranch(env),
                 env,
+                { metadataOnly: true },
               );
               metadata = await stagedMetadata(selected);
               if (previous.status === 'ready')

@@ -495,7 +495,12 @@ async function stageUpgrade({
   }
 }
 
-async function selectedUpgrade(tmp, branch, env = process.env) {
+async function selectedUpgrade(
+  tmp,
+  branch,
+  env = process.env,
+  { metadataOnly = false } = {},
+) {
   const pointer = JSON.parse(
     await fs.readFile(path.join(tmp, `upgrade-ready-${branch}.json`), 'utf8'),
   );
@@ -519,10 +524,12 @@ async function selectedUpgrade(tmp, branch, env = process.env) {
   );
   if (ready.source !== selected.source || ready.static !== selected.static)
     throw new Error(upgradeMessage('暂存升级就绪记录不匹配。', env));
-  const manifest = await verifyUpgrade(selected.source, selected.static, env);
+  const manifest = metadataOnly
+    ? await manifestAt(selected.static, env)
+    : await verifyUpgrade(selected.source, selected.static, env);
   if (ready.sourceCommit !== manifest.sourceCommit)
     throw new Error(upgradeMessage('暂存升级就绪记录不匹配。', env));
-  if (ready.bundle)
+  if (ready.bundle && !metadataOnly)
     await require('./platformBundle.cjs').verifyStagedBundle(selected);
   if (ready.dependenciesChanged)
     await fs.access(path.join(selected.source, 'node_modules'));

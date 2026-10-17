@@ -6,7 +6,7 @@ CI 从同次构建的不可变镜像摘要导出完整 tar.gz，包含源码中�
 
 `package.json` 中 `qinglongUpgradeFormat: 2` 表示使用完整包。旧版升级器仍可通过原归档路径完成首次迁移；完整包版本不会在平台包缺失、损坏或不兼容时退回设备端 npm 安装。
 
-面板下载任务与本地离线入口共用 `platformBundle.cjs`：平台匹配 → 归档安全检查 → 全文件/链接/权限和锁文件校验 → SQLite/Sequelize/cron-parser/gRPC/undici 加载及 SQLite 内存库读写 → 发布就绪指针。重启前重新验证完整载荷。离线升级同步面板任务状态，并与在线任务互斥；中断准备时保留之前的可用就绪包。原有服务停止、文件备份、启动健康检查及失败恢复仍由共享升级引擎处理。
+面板下载任务与本地离线入口共用 `platformBundle.cjs`：平台匹配 → 归档安全检查 → 全文件/链接/权限和锁文件校验 → SQLite/Sequelize/cron-parser/gRPC/undici 加载及 SQLite 内存库读写 → 发布就绪指针。点击重启时，接口只检查就绪记录并提交后台任务；完整文件与依赖复验由独立工作进程执行，复验通过后才停止旧服务，避免小设备的预检耗时超过 HTTP 请求期限。离线升级同步面板任务状态，并与在线任务互斥；中断准备时保留之前的可用就绪包。原有服务停止、文件备份、启动健康检查及失败恢复仍由共享升级引擎处理。
 
 渠道索引为 GitHub prerelease `upgrade-develop` 或 `upgrade-master` 下的 `latest.json`。索引记录准确字节数、SHA256 和不可变 `upgrade-<commit>` release 资产 URL。13 个平台均完成归档、解包后复验及依赖试运行才发布渠道；过期工作流不能覆盖更新提交的渠道。
 
