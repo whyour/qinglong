@@ -344,45 +344,51 @@ export default class SystemService {
   }
 
   public async updateSystem() {
-    const cp = spawn('real_time=true ql update false', { shell: '/bin/bash' });
+    return this.startUpgradeJob('download');
+  }
 
-    cp.stdout.on('data', (data) => {
-      this.sockService.sendMessage({
-        type: 'updateSystemVersion',
-        message: data.toString(),
-      });
-    });
+  private upgradeJobs() {
+    return require(path.join(
+      config.rootPath,
+      'cli/src/internal/maintenance/panelUpgrade.cjs',
+    ));
+  }
 
-    cp.stderr.on('data', (data) => {
-      this.sockService.sendMessage({
-        type: 'updateSystemVersion',
-        message: data.toString(),
-      });
-    });
+  public async getUpgradeStatus() {
+    return {
+      code: 200,
+      data: await this.upgradeJobs().getStatus(config.tmpPath),
+    };
+  }
 
-    cp.on('error', (err) => {
-      this.sockService.sendMessage({
-        type: 'updateSystemVersion',
-        message: JSON.stringify(err),
-        status: 'failed',
-      });
-    });
-
-    cp.on('exit', (code) => {
-      this.sockService.sendMessage({
-        type: 'updateSystemVersion',
-        message: '',
-        status: code === 0 ? 'success' : 'failed',
-      });
-    });
-
-    return { code: 200 };
+  private async startUpgradeJob(action: 'download' | 'apply') {
+    try {
+      const data = await this.upgradeJobs().startJob(
+        {
+          root: config.rootPath,
+          tmp: config.tmpPath,
+          env: {
+            ...process.env,
+            dir_data: config.dataPath,
+            dir_config: config.configPath,
+            QlPort: String(config.port),
+            QlBaseUrl: config.baseUrl,
+          },
+        },
+        action,
+      );
+      return { code: 200, data };
+    } catch (error: any) {
+      this.logger.error('[upgrade] %s', error.message);
+      return { code: 400, message: t('升级任务启动失败，请检查日志后重试') };
+    }
   }
 
   public async reloadSystem(target?: 'system' | 'data') {
     if (target && !['system', 'data'].includes(target)) {
       return { code: 400, message: t('参数错误') };
     }
+    if (target === 'system') return this.startUpgradeJob('apply');
     const cmd = `real_time=true ql reload ${shellQuote(target || '')}`;
     const cp = spawn(cmd, {
       shell: '/bin/bash',

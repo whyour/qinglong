@@ -416,6 +416,7 @@ export const openOperations: readonly OpenOperation[] = [
     body: 'json',
   },
   { name: 'system update-check', method: 'PUT', path: 'system/update-check' },
+  { name: 'system update-status', method: 'GET', path: 'system/update-status' },
   { name: 'system update', method: 'PUT', path: 'system/update' },
   { name: 'system reload', method: 'PUT', path: 'system/reload', body: 'json' },
   { name: 'system notify', method: 'PUT', path: 'system/notify', body: 'json' },

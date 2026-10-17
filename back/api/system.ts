@@ -205,6 +205,17 @@ export default (app: Router) => {
     },
   );
 
+  route.get(
+    '/update-status',
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        res.send(await Container.get(SystemService).getUpgradeStatus());
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
   route.put(
     '/reload',
     celebrate({

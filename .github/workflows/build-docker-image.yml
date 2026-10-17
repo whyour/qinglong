@@ -94,6 +94,12 @@ jobs:
         run: |
           bash scripts/publish-static.sh "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" "$GITHUB_BRANCH" "$GITHUB_REF_TYPE"
 
+      - name: publish verified upgrade download sizes
+        env:
+          GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
+          GITHUB_BRANCH: ${{ github.ref_name }}
+        run: node scripts/publish-upgrade-info.cjs "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" "$GITHUB_BRANCH" "$GITHUB_SHA"
+
   static_gitlab:
     needs: build-static
     runs-on: ubuntu-latest

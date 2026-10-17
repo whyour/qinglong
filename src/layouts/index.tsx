@@ -19,6 +19,8 @@ import './index.less';
 import { init } from '../utils/init';
 import WebSocketManager from '../utils/websocket';
 import { observePageLoadTiming } from '../utils/navigationTiming';
+import UpgradeNotice from '@/components/UpgradeNotice';
+import { completionKey, reloadKey, upgradeStore } from '@/hooks/useUpgrade';
 
 export interface SharedContext {
   headerStyle: React.CSSProperties;
@@ -54,6 +56,9 @@ export default function () {
   );
   const [collapsed, setCollapsed] = useState(false);
   const [initLoading, setInitLoading] = useState<boolean>(true);
+  const observeUpgrade =
+    Boolean(user.username) &&
+    !['/login', '/initialization'].includes(location.pathname);
   const {
     enable: enableDarkMode,
     disable: disableDarkMode,
@@ -161,6 +166,18 @@ export default function () {
   useEffect(() => {
     getHealthStatus();
   }, []);
+
+  useEffect(() => {
+    // A reload during restart may initially land on the health error page.
+    // Keep recovering the accepted job even before the sidebar can mount.
+    if (
+      observeUpgrade ||
+      sessionStorage.getItem(reloadKey) ||
+      sessionStorage.getItem(completionKey)
+    ) {
+      return upgradeStore.subscribe(() => {});
+    }
+  }, [observeUpgrade]);
 
   useEffect(() => {
     reloadSystemConfig();
@@ -321,6 +338,12 @@ export default function () {
         </>
       }
       title={false}
+      menuFooterRender={(props) => (
+        <UpgradeNotice
+          collapsed={Boolean(props?.collapsed)}
+          systemInfo={systemInfo}
+        />
+      )}
       menuItemRender={(menuItemProps: any, defaultDom: any) => {
         if (
           menuItemProps.isUrl ||
@@ -351,7 +374,9 @@ export default function () {
                   user.avatar ? `${config.apiPrefix}static/${user.avatar}` : ''
                 }
               />
-              <span style={{ marginLeft: 5 }}>{user.username}</span>
+              <span className="side-menu-username" title={user.username}>
+                {user.username}
+              </span>
             </span>
           </Dropdown>
         )
@@ -377,7 +402,9 @@ export default function () {
                       : ''
                   }
                 />
-                <span style={{ marginLeft: 5 }}>{user.username}</span>
+                <span className="side-menu-username" title={user.username}>
+                  {user.username}
+                </span>
               </span>
             </Dropdown>
           )}

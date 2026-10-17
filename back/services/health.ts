@@ -2,8 +2,10 @@ import { Service } from 'typedi';
 import Logger from '../loaders/logger';
 import cronClient from '../schedule/client';
 import { HttpServerService } from './http';
+import { runtimeBuild } from '../shared/runtimeBuild';
 
 interface HealthStatus {
+  build: typeof runtimeBuild;
   status: 'ok' | 'error';
   services: {
     http: boolean;
@@ -22,12 +24,11 @@ interface HealthStatus {
 export class HealthService {
   private startTime = Date.now();
 
-  constructor(
-    private httpServerService: HttpServerService,
-  ) {}
+  constructor(private httpServerService: HttpServerService) {}
 
   async check(): Promise<HealthStatus> {
     const status: HealthStatus = {
+      build: runtimeBuild,
       status: 'ok',
       services: {
         http: true,

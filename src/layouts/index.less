@@ -354,18 +354,48 @@ select:-webkit-autofill:focus {
 
 .side-menu-container {
   display: flex;
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
   justify-content: space-between;
   align-items: center;
   color: @text-color;
 
-  .side-menu-collapse-button:hover {
-    color: #1890ff;
+  .side-menu-collapse-button {
+    flex-shrink: 0;
+
+    &:hover {
+      color: #1890ff;
+    }
   }
 
   .side-menu-user-wrapper {
-    display: flex;
-    align-items: center;
+    flex: 1;
+    overflow: hidden;
   }
+}
+
+.side-menu-user-wrapper {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 5px;
+
+  .ant-avatar {
+    flex-shrink: 0;
+  }
+
+  .side-menu-username {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+body[data-mode='phone'] .side-menu-user-wrapper {
+  max-width: 50vw;
 }
 
 .side-menu-user-drop-menu {
@@ -475,8 +505,102 @@ body[data-mode='phone'] header {
 }
 
 body[data-dark='true'] {
+  .upgrade-notice {
+    background: #3a3214;
+    border-color: #6b5415;
+    color: #ffd666;
+  }
   .ant-popover-arrow-content {
     --antd-arrow-background-color: rgb(24, 26, 27);
+  }
+}
+
+.upgrade-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 24px);
+  min-height: 36px;
+  padding: 7px 10px;
+  margin: 8px 12px 12px;
+  border: 1px solid #ffe58f;
+  border-radius: 6px;
+  background: #fffbe6;
+  color: #ad6800;
+  font: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+
+  > .anticon {
+    display: inline-flex;
+    flex: 0 0 14px;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  > span:not(.anticon) {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #d48806;
+    outline-offset: 2px;
+  }
+
+  &.upgrade-notice-collapsed {
+    justify-content: center;
+    padding: 7px 0;
+  }
+}
+
+.upgrade-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 600px;
+
+  .upgrade-status-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .upgrade-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .ant-progress {
+      margin: 0;
+    }
+  }
+
+  .upgrade-progress-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .upgrade-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .upgrade-log-link {
+    height: auto;
+    padding: 0;
+    line-height: 22px;
   }
 }
 

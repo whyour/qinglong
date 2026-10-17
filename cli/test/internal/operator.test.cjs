@@ -276,7 +276,7 @@ test('upgrade staging extracts both archives before publishing readiness and rej
         'utf8',
       ),
     ),
-    { ...staged, sourceCommit, dependenciesChanged: false },
+    { ...staged, root: ctx.root, sourceCommit, dependenciesChanged: false },
   );
   await fs.symlink(
     '../../outside',

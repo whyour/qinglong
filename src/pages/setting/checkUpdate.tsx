@@ -1,249 +1,219 @@
-import { disableBody } from '@/utils';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
-import WebSocketManager from '@/utils/websocket';
 import Ansi from 'ansi-to-react';
-import { Button, Modal, Statistic, message } from 'antd';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button, Modal, Progress, Space, Typography, message } from 'antd';
+import { useState } from 'react';
+import useUpgrade, {
+  activeStatuses,
+  phaseLabels,
+  reloadKey,
+  upgradeStore,
+} from '@/hooks/useUpgrade';
 import intl from 'react-intl-universal';
 
-const { Countdown } = Statistic;
+const sizeLabel = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 const CheckUpdate = ({ systemInfo }: any) => {
-  const [updateLoading, setUpdateLoading] = useState(false);
-  const [value, setValue] = useState('');
-  const modalRef = useRef<any>();
-  const lastStatusRef = useRef<string | undefined>();
-  const [updateStatus, setUpdateStatus] = useState<string>();
-
-  const checkUpgrade = () => {
-    if (updateLoading || modalRef.current) return;
-    setUpdateLoading(true);
-    message.loading(intl.get('检查更新中...'), 0);
-    request
-      .put(`${config.apiPrefix}system/update-check`)
-      .then(({ code, data }) => {
-        message.destroy();
-        if (code === 200) {
-          if (data.hasNewVersion) {
-            showConfirmUpdateModal(data);
-          } else {
-            showForceUpdateModal(data);
-          }
-        }
-      })
-      .catch((error: any) => {
-        message.destroy();
-        message.error(intl.get('检查更新失败，请检查网络后重试'));
-      })
-      .finally(() => {
-        setUpdateLoading(false);
-      });
-  };
-
-  const showForceUpdateModal = (data: any) => {
-    Modal.confirm({
-      width: 500,
-      title: intl.get('更新'),
-      content: (
-        <>
-          <div>{intl.get('已经是最新版了！')}</div>
-          <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
-            {intl.get('青龙')} {data.lastVersion}{' '}
-            {intl.get('是目前检测到的最新可用版本了。')}
-          </div>
-        </>
-      ),
-      okText: intl.get('重新下载'),
-      onOk() {
-        startUpdate();
-      },
-    });
-  };
-
-  const showConfirmUpdateModal = (data: any) => {
-    const { lastVersion, lastLog } = data;
-    Modal.confirm({
-      width: 500,
-      title: (
-        <>
-          <div>{intl.get('更新可用')}</div>
-          <div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>
-            {intl.get('新版本可用，当前版本', {
-              version: lastVersion,
-              current: systemInfo.version,
-            })}
-          </div>
-        </>
-      ),
-      content: (
-        <pre>
-          <Ansi>{lastLog}</Ansi>
-        </pre>
-      ),
-      okText: intl.get('下载更新'),
-      cancelText: intl.get('以后再说'),
-      onOk() {
-        startUpdate();
-      },
-    });
-  };
-
-  const showUpdatingModal = () => {
-    setValue('');
-    lastStatusRef.current = 'running';
-    setUpdateStatus('running');
-    modalRef.current = Modal.info({
-      width: 600,
-      maskClosable: false,
-      closable: false,
-      keyboard: false,
-      okButtonProps: { disabled: true },
-      title: intl.get('下载更新中...'),
-      centered: true,
-      afterClose: () => {
-        modalRef.current = undefined;
-      },
-      content: <pre />,
-    });
-  };
+  const { job, busy, connected } = useUpgrade();
+  const [details, setDetails] = useState(false);
+  const active = activeStatuses.includes(job.status);
+  const ready = job.status === 'ready';
+  const completed = job.status === 'completed';
 
   const startUpdate = async () => {
-    showUpdatingModal();
+    if (busy || active) return;
+    if (!upgradeStore.beginMutation()) return;
     try {
-      const response = await request.put(`${config.apiPrefix}system/update`);
-      if (response.code !== 200) throw new Error(response.message);
+      const result = await request.put(`${config.apiPrefix}system/update`);
+      if (result.code !== 200) throw new Error(result.message);
+      upgradeStore.setJob(result.data);
     } catch {
-      lastStatusRef.current = 'failed';
-      setUpdateStatus('failed');
       message.error(intl.get('更新失败，请检查网络及日志或稍后再试'));
+    } finally {
+      upgradeStore.finishMutation();
     }
   };
 
-  const reloadSystem = (type?: string) => {
-    request
-      .put(`${config.apiPrefix}update/${type}`)
-      .then(({ code }: any) => {
-        if (code !== 200) return;
-        message.success({
-          content: (
-            <span>
-              {intl.get('系统将在')}
-              <Countdown
-                className="inline-countdown"
-                format="ss"
-                value={Date.now() + 1000 * 30}
-              />
-              {intl.get('秒后自动刷新')}
-            </span>
-          ),
-          duration: 30,
-        });
-        disableBody();
-        setTimeout(() => {
-          window.location.reload();
-        }, 30000);
-      })
-      .catch((error: any) => {
-        console.log(error);
+  const checkUpgrade = async () => {
+    if (!upgradeStore.beginMutation()) return;
+    try {
+      const { code, data } = await request.put(
+        `${config.apiPrefix}system/update-check`,
+      );
+      if (code !== 200) throw new Error('Update check failed');
+      Modal.confirm({
+        width: 500,
+        title: intl.get(data.hasNewVersion ? '更新可用' : '已经是最新版了！'),
+        content: data.hasNewVersion ? (
+          <>
+            <p>
+              {intl.get('新版本可用，当前版本', {
+                version: data.lastVersion,
+                current: systemInfo.version,
+              })}
+            </p>
+            <pre>
+              <Ansi>{data.lastLog}</Ansi>
+            </pre>
+          </>
+        ) : (
+          `${intl.get('青龙')} ${data.lastVersion}`
+        ),
+        okText: intl.get(data.hasNewVersion ? '下载更新' : '重新下载'),
+        cancelText: intl.get('以后再说'),
+        onOk: startUpdate,
       });
+    } catch {
+      message.error(intl.get('检查更新失败，请检查网络后重试'));
+    } finally {
+      upgradeStore.finishMutation();
+    }
   };
 
-  const showReloadModal = () => {
+  const reloadSystem = async (apply: boolean) => {
+    if (!upgradeStore.beginMutation()) return;
+    try {
+      const result = await request.put(
+        `${config.apiPrefix}update/${apply ? 'system' : 'reload'}`,
+      );
+      if (result.code !== 200) throw new Error(result.message);
+      if (apply) {
+        upgradeStore.setJob(result.data);
+        sessionStorage.setItem(reloadKey, result.data.id);
+      } else {
+        message.success(intl.get('系统将在30秒后自动刷新'));
+        setTimeout(() => window.location.reload(), 30000);
+      }
+    } catch {
+      message.error(intl.get('升级任务启动失败，请检查日志后重试'));
+    } finally {
+      upgradeStore.finishMutation();
+    }
+  };
+
+  const showReloadModal = () =>
     Modal.confirm({
-      width: 600,
-      maskClosable: false,
       title: intl.get('确认重启'),
-      centered: true,
-      content: intl.get('系统安装包下载成功，确认重启'),
-      okText: intl.get('重启'),
-      onOk() {
-        reloadSystem('system');
-      },
-      onCancel() {
-        modalRef.current?.update({
-          maskClosable: true,
-          closable: true,
-          okButtonProps: { disabled: false },
-        });
-      },
+      content: intl.get('更新已就绪，重启后应用新版本'),
+      okText: intl.get('重启并更新'),
+      cancelText: intl.get('以后再说'),
+      onOk: () => reloadSystem(true),
     });
-  };
 
-  useEffect(() => {
-    if (!modalRef.current) return;
-    const updateFailed = updateStatus === 'failed';
-
-    modalRef.current.update({
-      maskClosable: updateFailed,
-      closable: updateFailed,
-      okButtonProps: { disabled: !updateFailed },
-      content: (
-        <>
-          <pre>
-            <Ansi>{value}</Ansi>
-          </pre>
-          <div id="log-identifier" style={{ paddingBottom: 5 }}></div>
-        </>
-      ),
-    });
-  }, [value, updateStatus]);
-
-  const handleMessage = useCallback((payload: any) => {
-    if (!modalRef.current || lastStatusRef.current !== 'running') return;
-    const { message: _message, status } = payload;
-
-    if (status === 'failed') {
-      lastStatusRef.current = 'failed';
-      setUpdateStatus('failed');
-      message.error(intl.get('更新失败，请检查网络及日志或稍后再试'));
-    }
-
-    if (status === 'success') {
-      lastStatusRef.current = 'success';
-      setUpdateStatus('success');
-      setTimeout(() => {
-        if (modalRef.current && lastStatusRef.current === 'success') {
-          showReloadModal();
-        }
-      }, 1000);
-    }
-
-    setTimeout(() => {
-      document
-        .querySelector('#log-identifier')
-        ?.scrollIntoView({ behavior: 'smooth' });
-    }, 600);
-
-    if (_message) {
-      setValue((p) => `${p}${_message}`);
-    }
-  }, []);
-
-  useEffect(() => {
-    const ws = WebSocketManager.getInstance();
-    ws.subscribe('updateSystemVersion', handleMessage);
-
-    return () => {
-      ws.unsubscribe('updateSystemVersion', handleMessage);
-      modalRef.current?.destroy();
-      modalRef.current = undefined;
-    };
-  }, []);
-
-  return (
-    <>
-      <Button type="primary" onClick={checkUpgrade}>
-        {intl.get('检查更新')}
-      </Button>
+  const label =
+    job.status === 'failed'
+      ? intl.get('更新失败')
+      : ready
+      ? intl.get('下载完成，等待重启')
+      : completed
+      ? intl.get('升级成功')
+      : intl.get(phaseLabels[job.phase || ''] || '正在准备更新');
+  const hasJob = job.status !== 'idle' && job.status !== 'loading';
+  const actions = !active && (
+    <Space wrap>
       <Button
         type="primary"
-        onClick={() => reloadSystem('reload')}
-        style={{ marginLeft: 8 }}
+        loading={busy}
+        disabled={!connected || job.status === 'loading'}
+        onClick={ready ? showReloadModal : checkUpgrade}
       >
-        {intl.get('重新启动')}
+        {intl.get(ready ? '重启并更新' : '检查更新')}
       </Button>
-    </>
+      {!ready && !completed && (
+        <Button
+          disabled={busy || !connected || job.status === 'loading'}
+          onClick={() => reloadSystem(false)}
+        >
+          {intl.get('重新启动')}
+        </Button>
+      )}
+    </Space>
+  );
+
+  return (
+    <div className="upgrade-panel">
+      {!connected && (
+        <Typography.Text type="warning" role="status">
+          {intl.get('连接已断开，正在重新连接')}
+        </Typography.Text>
+      )}
+      {!hasJob && actions}
+      {hasJob && (
+        <div
+          className="upgrade-status-content"
+          role="status"
+          aria-live="polite"
+        >
+          <Typography.Text strong>
+            {label}
+            {job.version ? ` · v${job.version}` : ''}
+          </Typography.Text>
+          <Typography.Text
+            type={job.status === 'failed' ? 'danger' : 'secondary'}
+          >
+            {job.status === 'failed'
+              ? intl.get(job.error || '更新失败，请检查网络及日志或稍后再试') ||
+                job.error
+              : intl.get(
+                  completed
+                    ? '已重新启动并运行新版本，无需再次重启。'
+                    : ready
+                    ? '更新已就绪，重启后应用新版本'
+                    : '更新在后台进行，可以继续使用面板',
+                )}
+          </Typography.Text>
+          {job.phase === 'downloading' && active && (
+            <div className="upgrade-progress">
+              <div className="upgrade-progress-meta">
+                <Typography.Text type="secondary">
+                  {intl.get(
+                    job.artifact === 'qinglong-static'
+                      ? '下载构建产物'
+                      : '下载源码',
+                  )}
+                </Typography.Text>
+                <Typography.Text type="secondary">
+                  {sizeLabel(job.downloadedBytes || 0)}
+                  {job.totalBytes ? ` / ${sizeLabel(job.totalBytes)}` : ''}
+                </Typography.Text>
+              </div>
+              <Progress
+                percent={job.percent ?? 0}
+                showInfo={job.percent != null}
+                status="active"
+              />
+            </div>
+          )}
+          <div className="upgrade-actions">
+            {actions}
+            <Button
+              type="link"
+              className="upgrade-log-link"
+              onClick={() => setDetails(true)}
+            >
+              {intl.get('查看更新日志')}
+            </Button>
+          </div>
+        </div>
+      )}
+      <Modal
+        open={details}
+        title={intl.get('更新日志')}
+        footer={null}
+        onCancel={() => setDetails(false)}
+        width={700}
+      >
+        <pre
+          style={{
+            maxHeight: '60vh',
+            overflow: 'auto',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          <Ansi>{job.log || intl.get('暂无日志')}</Ansi>
+        </pre>
+      </Modal>
+    </div>
   );
 };
 

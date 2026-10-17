@@ -24,6 +24,8 @@ const upgradeEnglish = {
   '暂存升级指针无效。': 'Invalid staged upgrade pointer',
   '暂存目录无效。': 'Invalid staging directory',
   '暂存升级就绪记录不匹配。': 'Invalid upgrade readiness',
+  '运行依赖已变化，请重新下载更新。':
+    'Installed dependencies changed; download the update again',
   '保留备份: %s': 'Retained backup: %s',
   '后端启动检查失败。': 'Backend failed health check',
   '保留生命周期快照: %s': 'Retained lifecycle snapshot: %s',
@@ -171,6 +173,82 @@ async function withUpgradeLock(tmp, operation, env = process.env) {
   }
 }
 
+async function downloadWithProgress(
+  run,
+  archive,
+  url,
+  artifact,
+  onProgress,
+  quiet = true,
+  expected,
+) {
+  const headers = `${archive}.headers`;
+  await fs.rm(archive, { force: true });
+  await fs.rm(headers, { force: true });
+  let sampling = Promise.resolve();
+  const sample = async (finished = false) => {
+    const bytes = (await fs.stat(archive).catch(() => undefined))?.size || 0;
+    const response = (await fs.readFile(headers, 'utf8').catch(() => ''))
+      .split(/(?=HTTP\/\S+ \d{3})/)
+      .at(-1);
+    const length = response?.match(/^content-length:\s*(\d+)\s*$/im);
+    const total =
+      expected?.size ||
+      (length && Number(length[1]) > 0 ? Number(length[1]) : null);
+    await onProgress({
+      phase: 'downloading',
+      artifact,
+      downloadedBytes: bytes,
+      totalBytes: total,
+      percent: total
+        ? finished
+          ? 100
+          : Math.min(99, Math.floor((bytes * 100) / total))
+        : null,
+    });
+  };
+  const timer = setInterval(() => {
+    sampling = sampling.then(() => sample());
+    // Observe failures immediately; propagate after the transfer has closed.
+    sampling.catch(() => {});
+  }, 1000);
+  try {
+    await run('curl', [
+      '--fail',
+      '--location',
+      ...(quiet ? ['--silent', '--show-error'] : []),
+      '--proto',
+      '=https',
+      '--proto-redir',
+      '=https',
+      '--connect-timeout',
+      '30',
+      '--max-time',
+      '600',
+      '--speed-limit',
+      '1024',
+      '--speed-time',
+      '30',
+      '--dump-header',
+      headers,
+      '--output',
+      archive,
+      url,
+    ]);
+    clearInterval(timer);
+    await sampling;
+    if (expected) {
+      const bytes = await fs.readFile(archive);
+      if (bytes.length !== expected.size || hash(bytes) !== expected.sha256)
+        throw new Error('Upgrade archive size or checksum mismatch');
+    }
+    await sample(true);
+  } finally {
+    clearInterval(timer);
+    await sampling;
+  }
+}
+
 async function stageUpgrade({
   root,
   tmp,
@@ -180,38 +258,99 @@ async function stageUpgrade({
   run,
   install,
   signal,
+  onProgress,
 }) {
+  const report = onProgress || (async () => {});
   const workspace = await fs.mkdtemp(path.join(tmp, 'upgrade-'));
   const branch = releaseBranch(env);
   try {
+    // Metadata is optional for older releases and unavailable mirrors. Never
+    // invent a percentage when neither metadata nor HTTP supplies a total.
+    let info;
+    if (onProgress && mirror === 'github') {
+      try {
+        const readJson = async (url) => {
+          const filename = path.join(workspace, 'metadata.json');
+          await run('curl', [
+            '--fail',
+            '--silent',
+            '--show-error',
+            '--location',
+            '--proto',
+            '=https',
+            '--proto-redir',
+            '=https',
+            '--connect-timeout',
+            '5',
+            '--max-time',
+            '10',
+            '--max-filesize',
+            '1048576',
+            '--dump-header',
+            `${filename}.headers`,
+            '--output',
+            filename,
+            url,
+          ]);
+          return JSON.parse(await fs.readFile(filename, 'utf8'));
+        };
+        const base = 'https://raw.githubusercontent.com/whyour/qinglong-static';
+        const current = await readJson(
+          `${base}/${branch}/build-info.json?t=${Date.now()}`,
+        );
+        if (!/^[a-f0-9]{40}$/.test(current.sourceCommit))
+          throw new Error('Invalid commit');
+        const candidate = await readJson(
+          `${base}/upgrade-info/${current.sourceCommit}.json`,
+        );
+        if (
+          candidate.version !== 1 ||
+          candidate.sourceCommit !== current.sourceCommit ||
+          !/^[a-f0-9]{40}$/.test(candidate.staticCommit) ||
+          !['qinglong-static', 'qinglong'].every((repo) => {
+            const entry = candidate.archives?.[repo];
+            return (
+              Number.isSafeInteger(entry?.size) &&
+              entry.size > 0 &&
+              /^[a-f0-9]{64}$/.test(entry.sha256)
+            );
+          })
+        )
+          throw new Error('Invalid archive metadata');
+        info = candidate;
+      } catch {
+        signal?.throwIfAborted();
+      }
+    }
     async function extract(repository, ref) {
       const archive = path.join(workspace, `${repository}.zip`);
       const url =
         mirror === 'github'
           ? `https://codeload.github.com/whyour/${repository}/zip/${ref}`
           : `https://gitee.com/whyour/${repository}/repository/archive/${ref}.zip`;
-      const download = (target) =>
-        run('curl', [
-          '--fail',
-          '--location',
-          '--proto',
-          '=https',
-          '--proto-redir',
-          '=https',
-          '--connect-timeout',
-          '30',
-          '--max-time',
-          '600',
-          '--speed-limit',
-          '1024',
-          '--speed-time',
-          '30',
-          '--output',
+      const download = async (target, expected) => {
+        await report({
+          phase: 'downloading',
+          artifact: repository,
+          downloadedBytes: 0,
+          totalBytes: expected?.size || null,
+          percent: expected ? 0 : null,
+        });
+        await downloadWithProgress(
+          run,
           archive,
           target,
-        ]);
+          repository,
+          report,
+          Boolean(onProgress),
+          expected,
+        );
+      };
       try {
-        await download(url);
+        await download(
+          url,
+          mirror === 'github' ? info?.archives[repository] : undefined,
+        );
       } catch (error) {
         signal?.throwIfAborted();
         if (mirror !== 'github' || fallbackMirror !== 'gitee') throw error;
@@ -220,6 +359,11 @@ async function stageUpgrade({
           `https://gitee.com/whyour/${repository}/repository/archive/${ref}.zip`,
         );
       }
+      await report({
+        phase: 'extracting',
+        artifact: repository,
+        percent: null,
+      });
       const listing = await run('unzip', ['-Z1', archive], true);
       const expected = `${repository}-${ref}`;
       const names = listing.stdout.split('\n').filter(Boolean);
@@ -243,11 +387,20 @@ async function stageUpgrade({
     }
     // Static branches are mutable snapshots. Their manifest pins the exact
     // source revision, avoiding a race between two independent branch reads.
-    const staticRoot = await extract('qinglong-static', branch);
+    const downloadedStatic = await extract(
+      'qinglong-static',
+      info?.staticCommit || branch,
+    );
+    const staticRoot = path.join(workspace, `qinglong-static-${branch}`);
+    if (downloadedStatic !== staticRoot)
+      await fs.rename(downloadedStatic, staticRoot);
     const manifest = await manifestAt(staticRoot, env);
+    if (info && manifest.sourceCommit !== info.sourceCommit)
+      throw new Error(upgradeMessage('构建清单无效。', env));
     const downloadedSource = await extract('qinglong', manifest.sourceCommit);
     const source = path.join(workspace, `qinglong-${branch}`);
     await fs.rename(downloadedSource, source);
+    await report({ phase: 'verifying', percent: null });
     await verifyUpgrade(source, staticRoot, env);
     let dependenciesChanged = false;
     for (const name of ['package.json', 'pnpm-lock.yaml']) {
@@ -265,6 +418,7 @@ async function stageUpgrade({
     )
       dependenciesChanged = true;
     if (dependenciesChanged) {
+      await report({ phase: 'dependencies', percent: null });
       await install(source);
       await fs.access(path.join(source, 'node_modules'));
       await verifyUpgrade(source, staticRoot, env);
@@ -275,6 +429,7 @@ async function stageUpgrade({
       path.join(workspace, 'ready.json'),
       JSON.stringify({
         ...selected,
+        root: path.resolve(root),
         sourceCommit: manifest.sourceCommit,
         dependenciesChanged,
       }),
@@ -343,6 +498,28 @@ async function selectedUpgrade(tmp, branch, env = process.env) {
     throw new Error(upgradeMessage('暂存升级就绪记录不匹配。', env));
   if (ready.dependenciesChanged)
     await fs.access(path.join(selected.source, 'node_modules'));
+  else {
+    const root = ready.root || env.QL_DIR;
+    if (
+      !root ||
+      !(
+        await fs.stat(path.join(root, 'node_modules')).catch(() => undefined)
+      )?.isDirectory()
+    )
+      throw new Error(upgradeMessage('运行依赖已变化，请重新下载更新。', env));
+    for (const name of ['package.json', 'pnpm-lock.yaml']) {
+      const current = await fs
+        .readFile(path.join(root, name))
+        .catch(() => undefined);
+      if (
+        !current ||
+        !(await fs.readFile(path.join(selected.source, name))).equals(current)
+      )
+        throw new Error(
+          upgradeMessage('运行依赖已变化，请重新下载更新。', env),
+        );
+    }
+  }
   return selected;
 }
 
@@ -430,6 +607,7 @@ async function reloadSystem({
   config,
   env,
   lifecycle,
+  additionalReplacements = [],
 }) {
   const selected = await selectedUpgrade(tmp, releaseBranch(env), env);
   const reserved = new Set(['data', '.tmp', 'static', '.git', '.env']);
@@ -449,6 +627,7 @@ async function reloadSystem({
       target: path.join(config, 'config.sample.sh'),
     },
   );
+  replacements.push(...additionalReplacements);
   await replaceAndReload(replacements, lifecycle, env);
   // Cleanup after a committed installation must not report a failed update.
   await fs
@@ -687,6 +866,7 @@ async function main() {
 }
 
 module.exports = {
+  downloadWithProgress,
   upgradeMessage,
   releaseBranch,
   verifyUpgrade,
