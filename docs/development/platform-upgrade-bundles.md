@@ -34,7 +34,7 @@ node install-bundle.cjs --root /opt/qinglong --file /absolute/path/package.tar.g
 QL_DIR=/opt/qinglong QL_DATA_DIR=/opt/qinglong/data bash /opt/qinglong/shell/start-simplify.sh
 ```
 
-`--install` 拒绝非空目录，不覆盖既有配置。该包安装青龙及其 Node 生产依赖；首次启动仍需已有 Python、Bash、PM2、nginx 等相应运行环境，不会在线安装或替换它们。服务启动和系统自启按原手动安装流程配置。
+`--install` 拒绝非空目录，不覆盖既有配置。该包安装青龙及其 Node 生产依赖；首次启动仍需已有 Python、Bash、OpenSSL、PM2、nginx 等相应运行环境，不会在线安装或替换它们。手动启动脚本会在启动工作进程前完成首次 gRPC 证书准备，避免慢设备生成密钥耗尽工作进程的就绪期限；已有证书继续复用。服务启动和系统自启按原手动安装流程配置。
 
 ARMv6 glibc 小设备（例如 Raspberry Pi 1/Zero 的 Raspbian/Raspberry Pi OS 32 位系统）选择 `linux-armv6-glibc.tar.gz`，以同一安装器执行上述离线命令。该包要求 glibc >= 2.31、ARMv6 硬浮点 Node >= 20.18.1，不适用于 ARMv5、软浮点 Node 或旧版 glibc。安装和升级均不需要 Docker，也不会下载或替换 Node。
 
