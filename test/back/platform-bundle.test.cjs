@@ -524,3 +524,27 @@ test('portable release archives preserve the permission manifest after normalizi
     /checksums/,
   );
 });
+
+test('full dependency bundles get a bounded slow-link download budget instead of the old ten-minute limit', async (t) => {
+  const f = await fixture(t);
+  let observed;
+  await assert.rejects(
+    artifacts.downloadWithProgress(
+      async (program, args) => {
+        assert.equal(program, 'curl');
+        observed = Number(args[args.indexOf('--max-time') + 1]);
+        assert.ok(observed > 600 && observed <= 7200);
+        assert.equal(args[args.indexOf('--speed-limit') + 1], '1024');
+        throw new Error('stop before transfer');
+      },
+      path.join(f.directory, 'slow.tar.gz'),
+      'https://example.invalid/package.tar.gz',
+      'qinglong-bundle',
+      async () => {},
+      true,
+      { size: 24 * 1024 * 1024, sha256: 'a'.repeat(64) },
+    ),
+    /stop before transfer/,
+  );
+  assert.ok(observed);
+});

@@ -226,7 +226,11 @@ async function downloadWithProgress(
       '--connect-timeout',
       '30',
       '--max-time',
-      '600',
+      String(
+        artifact === 'qinglong-bundle' && expected?.size
+          ? Math.max(600, Math.min(7200, Math.ceil(expected.size / 8192) + 120))
+          : 600,
+      ),
       '--speed-limit',
       '1024',
       '--speed-time',
