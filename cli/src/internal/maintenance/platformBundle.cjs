@@ -204,7 +204,9 @@ async function smokeDependencies(source, signal) {
     db.serialize(()=>{db.run('CREATE TABLE verify_bundle(value INTEGER)');db.run('INSERT INTO verify_bundle VALUES(42)');
       db.get('SELECT value FROM verify_bundle',(err,row)=>{if(err||row.value!==42){console.error(err||'SQLite readback failed');process.exitCode=1;}db.close();});});
   `;
-  await execute(process.execPath, [...nodeRuntimeArgs(), '-e', probe], {
+  // Match the server's normal runtime. Node 20.18's built-in HTTP parser needs
+  // WebAssembly, which --jitless disables; only archive workers need that flag.
+  await execute(process.execPath, ['-e', probe], {
     cwd: source,
     env: { ...process.env, NODE_PATH: '', NODE_OPTIONS: '' },
     timeout: 30000,

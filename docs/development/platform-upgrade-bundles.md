@@ -45,7 +45,7 @@ ARMv6 glibc 小设备（例如 Raspberry Pi 1/Zero 的 Raspbian/Raspberry Pi OS 
 - glibc、musl 分包，并记录构建系统 libc 下限。系统库仍以目标设备加载测试作为最后检查。
 - ARMv6 glibc 使用签名校验的 Raspbian bullseye（glibc 2.31）构建环境，以固定 SHA256 的 ARMv6 Node 20.18.1 头文件编译 SQLite，强制 `-march=armv6 -mfpu=vfp -mfloat-abi=hard`。CI 检查 ELF 的 ARMv6 和硬浮点标记，并在 QEMU ARM1176 下完成归档复验、SQLite 读写和空目录离线安装；验证辅助镜像按不可变摘要记录，不进入用户安装包。Debian ARMv7 镜像仅提供同次构建的应用文件，不复用其 Node、libc 或 SQLite 二进制。
 - ARMv6 与 ARMv7 使用不同包名。ARMv6 在目标镜像中从源码编译 SQLite，禁止复用 generic `arm` 的 ARMv7 预编译件；构建需通过加载和内存库读写，失败则不发布渠道。
-- ARMv6 的归档构建、在线更新工作进程及独立离线安装器使用 `--jitless`，避开 ARM1176 上 V8 的优化编译崩溃；保留现有 Node 二进制，正常面板进程的启动参数不变。依赖加载和 SQLite 读写仍由现有 Node 的独立进程验证。
+- ARMv6 的归档构建、在线更新工作进程及独立离线安装器使用 `--jitless`，避开 ARM1176 上 V8 的优化编译崩溃；保留现有 Node 二进制，正常面板进程的启动参数不变。依赖加载和 SQLite 读写仍由现有 Node 的正常模式独立进程验证，使 Node 20.18.1 的内置 HTTP/WebAssembly 组件保持可用。
 - tar 中允许 pnpm 的包内符号链接；拒绝绝对路径、越界路径、包外链接、硬链接、设备条目和经符号链接写入的条目。重启前再次校验依赖，暂存失败保留上一次可用的就绪包。
 
 自托管镜像可设置 `QL_UPGRADE_INDEX_URL` 指向兼容索引；要求 HTTPS，测试时仅放行 loopback HTTP。索引和所有平台归档应部署到同一可访问源，避免依赖额外的 raw 域名。
