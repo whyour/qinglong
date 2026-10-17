@@ -18,6 +18,7 @@ import defaultProps from './defaultProps';
 import './index.less';
 import { init } from '../utils/init';
 import WebSocketManager from '../utils/websocket';
+import { observePageLoadTiming } from '../utils/navigationTiming';
 
 export interface SharedContext {
   headerStyle: React.CSSProperties;
@@ -220,29 +221,17 @@ export default function () {
   }, [user]);
 
   useEffect(() => {
-    window.onload = () => {
-      const timing = performance.timing;
-      console.log(
-        intl.get('白屏时间', {
-          duration: timing.responseStart - timing.navigationStart,
-        }),
-      );
-      console.log(
-        intl.get('请求完毕至DOM加载', {
-          duration: timing.domInteractive - timing.responseEnd,
-        }),
-      );
-      console.log(
-        intl.get('解释DOM树耗时', {
-          duration: timing.domComplete - timing.domInteractive,
-        }),
-      );
-      console.log(
-        intl.get('从开始至load总耗时', {
-          duration: timing.loadEventEnd - timing.navigationStart,
-        }),
-      );
-    };
+    return observePageLoadTiming((durations) => {
+      const metrics = [
+        ['白屏时间', durations.responseTime],
+        ['请求完毕至DOM加载', durations.domReadyTime],
+        ['解释DOM树耗时', durations.domParseTime],
+        ['从开始至load总耗时', durations.loadTime],
+      ] as const;
+      for (const [label, duration] of metrics) {
+        if (duration !== undefined) console.log(intl.get(label, { duration }));
+      }
+    });
   }, []);
 
   if (initLoading) {
