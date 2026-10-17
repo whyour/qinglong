@@ -7,6 +7,12 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const tar = require('tar');
 const execute = promisify(execFile);
+// Heavy archive parsing can hit unsupported V8 JIT paths on ARM1176. Keep
+// upgrade workers interpreted without changing the installed Node or server.
+const nodeRuntimeArgs = (runtime = process) =>
+  runtime.arch === 'arm' && Number(runtime.config.variables.arm_version) === 6
+    ? ['--jitless']
+    : [];
 const sha256 = (bytes) =>
   crypto.createHash('sha256').update(bytes).digest('hex');
 const inside = (root, filename) => {
@@ -198,7 +204,7 @@ async function smokeDependencies(source, signal) {
     db.serialize(()=>{db.run('CREATE TABLE verify_bundle(value INTEGER)');db.run('INSERT INTO verify_bundle VALUES(42)');
       db.get('SELECT value FROM verify_bundle',(err,row)=>{if(err||row.value!==42){console.error(err||'SQLite readback failed');process.exitCode=1;}db.close();});});
   `;
-  await execute(process.execPath, ['-e', probe], {
+  await execute(process.execPath, [...nodeRuntimeArgs(), '-e', probe], {
     cwd: source,
     env: { ...process.env, NODE_PATH: '', NODE_OPTIONS: '' },
     timeout: 30000,
@@ -457,6 +463,7 @@ async function verifyStagedBundle(selected) {
 }
 
 module.exports = {
+  nodeRuntimeArgs,
   atLeast,
   runtimeTarget,
   targetKey,

@@ -84,6 +84,7 @@ async function buildBundle(root, output) {
       path.join(payload, 'bundle.json'),
       JSON.stringify(manifest),
     );
+    console.log('Bundle inventory verified; writing archive');
     const filename = `qinglong-${build.sourceCommit}-${bundle.targetKey(
       target,
     )}.tar.gz`;
@@ -100,6 +101,7 @@ async function buildBundle(root, output) {
     // Verify the bytes users receive, not just the pre-archive build directory.
     const roundtrip = path.join(workspace, 'roundtrip');
     await fs.mkdir(roundtrip);
+    console.log('Verifying archived paths, permissions and checksums');
     await bundle.extractArchive(path.join(output, filename), roundtrip);
     const extracted = {
       source: path.join(roundtrip, 'qinglong/source'),
@@ -108,6 +110,7 @@ async function buildBundle(root, output) {
     await bundle.verifyPayload(extracted, manifest, target);
     await verifyUpgrade(extracted.source, extracted.static);
     await bundle.smokeDependencies(extracted.source);
+    console.log('Archived production dependencies and SQLite verified');
     const bytes = await fs.readFile(path.join(output, filename));
     const record = {
       format: 2,

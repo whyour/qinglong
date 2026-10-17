@@ -6,6 +6,7 @@ const { spawn } = require('node:child_process');
 const http = require('node:http');
 const { setTimeout: delay } = require('node:timers/promises');
 const artifacts = require('./upgradeArtifacts.cjs');
+const { nodeRuntimeArgs } = require('./platformBundle.cjs');
 
 const active = new Set(['starting', 'running', 'restarting']);
 const stateFile = (tmp) => path.join(tmp, 'panel-upgrade.json');
@@ -443,11 +444,15 @@ async function launchWorker(id) {
   // detached creates a session but keeps the original parent. PM2 kills the
   // backend's entire descendant tree, so an intermediate launcher must exit
   // before the worker is allowed to stop that backend.
-  const child = spawn(process.execPath, [__filename, 'worker', id], {
-    env: { ...process.env, QL_UPGRADE_LAUNCHER_PID: String(process.pid) },
-    detached: true,
-    stdio: 'inherit',
-  });
+  const child = spawn(
+    process.execPath,
+    [...nodeRuntimeArgs(), __filename, 'worker', id],
+    {
+      env: { ...process.env, QL_UPGRADE_LAUNCHER_PID: String(process.pid) },
+      detached: true,
+      stdio: 'inherit',
+    },
+  );
   await new Promise((resolve, reject) => {
     child.once('spawn', resolve);
     child.once('error', reject);

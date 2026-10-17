@@ -6,6 +6,39 @@ const os = require('node:os');
 const tar = require('tar');
 const bundle = require('../../cli/src/internal/maintenance/platformBundle.cjs');
 const artifacts = require('../../shell/upgrade.cjs');
+
+test('ARMv6 offline entry re-executes with an interpreted Node while preserving CLI errors', async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-armv6-entry-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const preload = path.join(directory, 'armv6.cjs');
+  const observed = path.join(directory, 'child.json');
+  await fs.writeFile(
+    preload,
+    `if(process.execArgv.includes('--jitless'))require('node:fs').writeFileSync(${JSON.stringify(
+      observed,
+    )},JSON.stringify({args:process.execArgv,execPath:process.execPath}));else{Object.defineProperty(process,'arch',{value:'arm'});Object.defineProperty(process,'config',{value:{variables:{arm_version:6}}});}`,
+  );
+  const { execFile } = require('node:child_process');
+  const result = await new Promise((resolve) =>
+    execFile(
+      process.execPath,
+      [path.resolve(__dirname, '../../shell/install-bundle.cjs')],
+      {
+        timeout: 10000,
+        env: {
+          ...process.env,
+          NODE_OPTIONS: '--require ' + JSON.stringify(preload),
+        },
+      },
+      (error, stdout, stderr) => resolve({ error, stdout, stderr }),
+    ),
+  );
+  assert.equal(result.error.code, 1);
+  const child = JSON.parse(await fs.readFile(observed));
+  assert.ok(child.args.includes('--jitless'));
+  assert.equal(child.execPath, process.execPath);
+  assert.match(result.stderr, /Usage: node install-bundle.cjs/);
+});
 const {
   writeManifest,
   sourceCommit,

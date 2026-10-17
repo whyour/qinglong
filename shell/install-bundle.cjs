@@ -9,6 +9,36 @@ const execute = promisify(require('node:child_process').execFile);
 const { parseArgs } = require('node:util');
 const artifacts = require('../cli/src/internal/maintenance/upgradeArtifacts.cjs');
 const jobs = require('../cli/src/internal/maintenance/panelUpgrade.cjs');
+const {
+  nodeRuntimeArgs,
+} = require('../cli/src/internal/maintenance/platformBundle.cjs');
+
+async function runInstallerMain(argv = process.argv.slice(2)) {
+  const flags = nodeRuntimeArgs();
+  if (!flags.length || process.execArgv.includes('--jitless'))
+    return installBundle(argv);
+  const child = require('node:child_process').spawn(
+    process.execPath,
+    [...flags, __filename, ...argv],
+    { stdio: 'inherit', env: process.env },
+  );
+  const interrupt = () => child.kill('SIGINT');
+  const terminate = () => child.kill('SIGTERM');
+  process.once('SIGINT', interrupt);
+  process.once('SIGTERM', terminate);
+  try {
+    await new Promise((resolve, reject) => {
+      child.once('error', reject);
+      child.once('exit', (code, signal) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Offline installer exited: ${signal || code}`));
+      });
+    });
+  } finally {
+    process.removeListener('SIGINT', interrupt);
+    process.removeListener('SIGTERM', terminate);
+  }
+}
 
 async function installBundle(argv = process.argv.slice(2), env = process.env) {
   const { values } = parseArgs({
@@ -274,9 +304,9 @@ async function installBundle(argv = process.argv.slice(2), env = process.env) {
   }
 }
 
-module.exports = { installBundle };
+module.exports = { installBundle, runInstallerMain };
 if (require.main === module)
-  installBundle().catch((error) => {
+  runInstallerMain().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
   });
