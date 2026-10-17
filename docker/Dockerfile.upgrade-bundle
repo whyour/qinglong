@@ -15,6 +15,7 @@ RUN if [ "$TARGETARCH/$TARGETVARIANT" = arm/v6 ]; then \
       npm_config_nodedir=/usr npm_config_build_from_source=true QEMU_CPU=arm1176 \
         node -e 'require("node:child_process").execFileSync(process.execPath,[require.resolve("@mapbox/node-pre-gyp/bin/node-pre-gyp"),"rebuild","--napi_build_version=6"],{stdio:"inherit"})' && \
       readelf -A lib/binding/napi-v6-linux-arm/node_sqlite3.node | grep -E 'Tag_CPU_arch: v6($|K)' && \
+      rm -rf build && \
       apk del .ql-bundle-build; \
     fi
 RUN if [ "$TARGETARCH/$TARGETVARIANT" = arm/v6 ]; then export QEMU_CPU=arm1176; fi; \

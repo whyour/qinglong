@@ -6,6 +6,19 @@ const {
   verifyUpgrade,
 } = require('../cli/src/internal/maintenance/upgradeArtifacts.cjs');
 
+async function normalizeModes(directory) {
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    const filename = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await fs.chmod(filename, 0o755);
+      await normalizeModes(filename);
+    } else if (entry.isFile()) {
+      const stat = await fs.stat(filename);
+      await fs.chmod(filename, 0o644 | (stat.mode & 0o111));
+    }
+  }
+}
+
 async function buildBundle(root, output) {
   root = path.resolve(root);
   output = path.resolve(output);
@@ -46,6 +59,8 @@ async function buildBundle(root, output) {
       recursive: true,
       verbatimSymlinks: true,
     });
+    await normalizeModes(source);
+    await normalizeModes(staticRoot);
     const manifest = {
       format: 2,
       sourceCommit: build.sourceCommit,
@@ -82,6 +97,17 @@ async function buildBundle(root, output) {
       },
       ['qinglong'],
     );
+    // Verify the bytes users receive, not just the pre-archive build directory.
+    const roundtrip = path.join(workspace, 'roundtrip');
+    await fs.mkdir(roundtrip);
+    await bundle.extractArchive(path.join(output, filename), roundtrip);
+    const extracted = {
+      source: path.join(roundtrip, 'qinglong/source'),
+      static: path.join(roundtrip, 'qinglong/static'),
+    };
+    await bundle.verifyPayload(extracted, manifest, target);
+    await verifyUpgrade(extracted.source, extracted.static);
+    await bundle.smokeDependencies(extracted.source);
     const bytes = await fs.readFile(path.join(output, filename));
     const record = {
       format: 2,
@@ -102,7 +128,7 @@ async function buildBundle(root, output) {
     await fs.rm(workspace, { recursive: true, force: true });
   }
 }
-module.exports = { buildBundle };
+module.exports = { buildBundle, normalizeModes };
 if (require.main === module)
   buildBundle(process.argv[2] || '/ql', process.argv[3] || '/out').catch(
     (e) => {

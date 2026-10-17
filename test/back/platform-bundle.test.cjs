@@ -351,3 +351,176 @@ test('fresh offline installation needs no package manager, keeps Node and publis
     'keep',
   );
 });
+
+test('offline staging replaces stale panel readiness and refuses an active online job', async (t) => {
+  const f = await fixture(t);
+  await fs.writeFile(path.join(f.source, 'version.yaml'), 'version: 2.24.0\n');
+  await fs.writeFile(
+    path.join(f.source, 'node_modules/sqlite3/index.js'),
+    'exports.Database=class {serialize(fn){fn()}run(){}get(sql,cb){cb(null,{value:42})}close(){}};',
+  );
+  for (const name of ['sequelize', 'cron-parser', '@grpc/grpc-js', 'undici']) {
+    const dir = path.join(f.source, 'node_modules', name);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'index.js'), 'module.exports={};');
+  }
+  f.manifest.files = await bundle.inventory({
+    source: f.source,
+    static: f.staticRoot,
+  });
+  await f.pack();
+  await fs.mkdir(path.join(f.root, 'shell'));
+  await fs.writeFile(
+    path.join(f.root, 'shell/share.sh'),
+    'import_config() { :; }\n',
+  );
+  await fs.writeFile(
+    path.join(f.root, 'shell/env.sh'),
+    'export QL_BRANCH=develop\n',
+  );
+  const stateFile = path.join(f.tmp, 'panel-upgrade.json');
+  await fs.writeFile(
+    stateFile,
+    JSON.stringify({
+      id: 'previous-online-job',
+      status: 'ready',
+      phase: 'ready',
+    }),
+  );
+  const install = require('../../shell/install-bundle.cjs').installBundle;
+  await install(['--root', f.root, '--file', f.archive, '--download-only']);
+  const state = JSON.parse(await fs.readFile(stateFile, 'utf8'));
+  assert.equal(state.status, 'ready');
+  assert.equal(state.sourceCommit, sourceCommit);
+  assert.notEqual(state.id, 'previous-online-job');
+  assert.equal(state.version, '2.24.0');
+  const pointer = await fs.readFile(
+    path.join(f.tmp, 'upgrade-ready-develop.json'),
+    'utf8',
+  );
+  await fs.writeFile(
+    stateFile,
+    JSON.stringify({
+      id: 'live-online-job',
+      status: 'running',
+      pid: process.pid,
+      startedAt: Date.now(),
+    }),
+  );
+  await assert.rejects(
+    install(['--root', f.root, '--file', f.archive, '--download-only']),
+    /已有更新/,
+  );
+  assert.equal(
+    JSON.parse(await fs.readFile(stateFile, 'utf8')).id,
+    'live-online-job',
+  );
+  assert.equal(
+    await fs.readFile(path.join(f.tmp, 'upgrade-ready-develop.json'), 'utf8'),
+    pointer,
+  );
+});
+
+test('interrupting offline staging records failure, preserves prior readiness and releases both locks', async (t) => {
+  const f = await fixture(t);
+  const { spawn } = require('node:child_process');
+  await fs.writeFile(path.join(f.source, 'version.yaml'), 'version: 2.24.0\n');
+  await fs.writeFile(
+    path.join(f.source, 'node_modules/sqlite3/index.js'),
+    'exports.Database=class {serialize(fn){fn()}run(){}get(sql,cb){setTimeout(()=>cb(null,{value:42}),10000)}close(){}};',
+  );
+  for (const name of ['sequelize', 'cron-parser', '@grpc/grpc-js', 'undici']) {
+    const dir = path.join(f.source, 'node_modules', name);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'index.js'), 'module.exports={};');
+  }
+  f.manifest.files = await bundle.inventory({
+    source: f.source,
+    static: f.staticRoot,
+  });
+  await f.pack();
+  await fs.mkdir(path.join(f.root, 'shell'));
+  await fs.writeFile(
+    path.join(f.root, 'shell/share.sh'),
+    'import_config() { :; }\n',
+  );
+  await fs.writeFile(
+    path.join(f.root, 'shell/env.sh'),
+    'export QL_BRANCH=develop\n',
+  );
+  const pointer = path.join(f.tmp, 'upgrade-ready-develop.json');
+  await fs.writeFile(pointer, 'previous-good-readiness');
+  const child = spawn(
+    process.execPath,
+    [
+      path.resolve(__dirname, '../../shell/install-bundle.cjs'),
+      '--root',
+      f.root,
+      '--file',
+      f.archive,
+      '--download-only',
+    ],
+    { stdio: 'ignore' },
+  );
+  t.after(() => {
+    if (child.exitCode === null) child.kill('SIGKILL');
+  });
+  const exited = new Promise((resolve, reject) => {
+    child.once('exit', resolve);
+    child.once('error', reject);
+  });
+  let seen = false;
+  for (let i = 0; i < 200; i++) {
+    const state = await fs
+      .readFile(path.join(f.tmp, 'panel-upgrade.json'), 'utf8')
+      .then(JSON.parse)
+      .catch(() => ({}));
+    if (state.phase === 'dependencies') {
+      seen = true;
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.ok(seen);
+  child.kill('SIGTERM');
+  assert.equal(await exited, 1);
+  assert.equal(await fs.readFile(pointer, 'utf8'), 'previous-good-readiness');
+  assert.equal(
+    JSON.parse(
+      await fs.readFile(path.join(f.tmp, 'panel-upgrade.json'), 'utf8'),
+    ).status,
+    'failed',
+  );
+  await assert.rejects(fs.access(path.join(f.tmp, 'upgrade.lock')));
+  await assert.rejects(
+    fs.access(path.join(f.tmp, 'panel-job-launch/upgrade.lock')),
+  );
+});
+
+test('portable release archives preserve the permission manifest after normalizing image scripts', async (t) => {
+  const f = await fixture(t);
+  const script = path.join(f.source, 'sample/config.sample.sh');
+  await fs.chmod(script, 0o777);
+  const { normalizeModes } = require('../../scripts/build-upgrade-bundle.cjs');
+  await normalizeModes(f.source);
+  await normalizeModes(f.staticRoot);
+  assert.equal((await fs.stat(script)).mode & 0o777, 0o755);
+  f.manifest.files = await bundle.inventory({
+    source: f.source,
+    static: f.staticRoot,
+  });
+  await f.pack();
+  const extracted = path.join(f.directory, 'roundtrip');
+  await fs.mkdir(extracted);
+  await bundle.extractArchive(f.archive, extracted);
+  const selected = {
+    source: path.join(extracted, 'qinglong/source'),
+    static: path.join(extracted, 'qinglong/static'),
+  };
+  await bundle.verifyPayload(selected, f.manifest, f.target);
+  await fs.chmod(path.join(selected.source, 'sample/config.sample.sh'), 0o777);
+  await assert.rejects(
+    bundle.verifyPayload(selected, f.manifest, f.target),
+    /checksums/,
+  );
+});

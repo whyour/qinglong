@@ -431,6 +431,7 @@ async function runJob({ root, tmp, env = process.env }, id) {
 
 module.exports = {
   getStatus,
+  saveState: save,
   startJob,
   runJob,
   withPanelLifecycle,
