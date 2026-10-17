@@ -20,8 +20,10 @@ export const scheduleSchema = Joi.string()
   .required()
   .custom(validateSchedule)
   .messages({
+    'any.required': '定时规则不能为空',
     'any.invalid': '无效的定时规则',
     'string.empty': '定时规则不能为空',
+    'string.base': '定时规则必须是字符串',
   });
 
 export const commonCronSchema = {
@@ -30,7 +32,27 @@ export const commonCronSchema = {
   schedule: scheduleSchema,
   labels: Joi.array().optional().allow(null),
   sub_id: Joi.number().optional().allow(null),
-  extra_schedules: Joi.array().optional().allow(null),
+  extra_schedules: Joi.array()
+    .items(
+      Joi.object({
+        schedule: Joi.string()
+          .required()
+          .custom((value, helpers) =>
+            isValidCronSchedule(value) ? value : helpers.error('any.invalid'),
+          )
+          .messages({
+            'any.required': '定时规则不能为空',
+            'any.invalid': '无效的定时规则',
+            'string.empty': '定时规则不能为空',
+            'string.base': '定时规则必须是字符串',
+          }),
+      })
+        .unknown(true)
+        .messages({ 'object.base': '额外定时规则必须是对象' }),
+    )
+    .optional()
+    .allow(null)
+    .messages({ 'array.base': '额外定时规则必须是数组' }),
   task_before: Joi.string().optional().allow('').allow(null),
   task_after: Joi.string().optional().allow('').allow(null),
   log_name: Joi.string()
