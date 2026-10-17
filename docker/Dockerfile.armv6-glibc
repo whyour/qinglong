@@ -8,8 +8,13 @@ FROM --platform=linux/amd64 debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67
 COPY --from=source /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && apt-get install -y --no-install-recommends \
-      debootstrap gpg gpgv ca-certificates curl qemu-user-static proot && \
+      debootstrap gpg gpgv ca-certificates curl qemu-user-static && \
     rm -rf /var/lib/apt/lists/*
+# Debian's PRoot 5.1 predates faccessat2, which modern QEMU uses for guest
+# access checks. Pin the upstream static tracer instead of misresolving paths.
+RUN curl -fsSL https://github.com/proot-me/proot/releases/download/v5.5.0/proot -o /usr/local/bin/proot && \
+    echo 'db185300a9daabbce86aca7632d8c7fdc4249f6f153171954013b70c5f491ec0  /usr/local/bin/proot' | sha256sum -c - && \
+    chmod 755 /usr/local/bin/proot && proot --version
 RUN curl -fsSL https://archive.raspbian.org/raspbian.public.key -o /tmp/raspbian.key && \
     echo 'ca59cd4f2bcbc3a1d41ba6815a02a8dc5c175467a59bd87edeac458f4a5345de  /tmp/raspbian.key' | sha256sum -c - && \
     gpg --dearmor -o /usr/share/keyrings/raspbian.gpg /tmp/raspbian.key && \
@@ -18,7 +23,7 @@ RUN curl -fsSL https://archive.raspbian.org/raspbian.public.key -o /tmp/raspbian
       bullseye /armv6 https://archive.raspbian.org/raspbian
 COPY docker/armv6-run /usr/local/bin/armv6-run
 RUN chmod 755 /usr/local/bin/armv6-run && \
-    armv6-run /debootstrap/debootstrap --second-stage && \
+    DEBOOTSTRAP_DIR=/debootstrap armv6-run /debootstrap/debootstrap --second-stage && \
     cp /usr/share/keyrings/raspbian.gpg /armv6/usr/share/keyrings/raspbian.gpg && \
     printf '%s\n' 'deb [signed-by=/usr/share/keyrings/raspbian.gpg] https://archive.raspbian.org/raspbian bullseye main' > /armv6/etc/apt/sources.list && \
     mkdir -p /armv6/etc/ssl/certs && \
