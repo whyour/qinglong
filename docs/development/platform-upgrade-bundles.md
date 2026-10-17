@@ -31,7 +31,7 @@ ql reload system
 
 ```sh
 node install-bundle.cjs --root /opt/qinglong --file /absolute/path/package.tar.gz --install
-QL_DIR=/opt/qinglong bash /opt/qinglong/shell/start-simplify.sh
+QL_DIR=/opt/qinglong QL_DATA_DIR=/opt/qinglong/data bash /opt/qinglong/shell/start-simplify.sh
 ```
 
 `--install` 拒绝非空目录，不覆盖既有配置。该包安装青龙及其 Node 生产依赖；首次启动仍需已有 Python、Bash、PM2、nginx 等相应运行环境，不会在线安装或替换它们。服务启动和系统自启按原手动安装流程配置。

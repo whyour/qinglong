@@ -212,6 +212,8 @@ async function installBundle(argv = process.argv.slice(2), env = process.env) {
                   process.version
                 }。启动服务：QL_DIR=${JSON.stringify(
                   root,
+                )} QL_DATA_DIR=${JSON.stringify(
+                  path.join(root, 'data'),
                 )} bash ${JSON.stringify(
                   path.join(root, 'shell/start-simplify.sh'),
                 )}`,
