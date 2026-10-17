@@ -212,6 +212,9 @@ const messages: Record<string, Record<string, string>> = {
     日志设置为忽略: 'Log set to ignore',
     定时规则不能为空: 'Schedule rule cannot be empty',
     无效的定时规则: 'Invalid schedule rule',
+    定时规则必须是字符串: 'Schedule rule must be a string',
+    额外定时规则必须是对象: 'Extra schedule must be an object',
+    额外定时规则必须是数组: 'Extra schedules must be an array',
     '日志名称只能包含中文、字母、数字、下划线、连字符、点和路径分隔符':
       'Log name can only contain Chinese characters, letters, numbers, underscores, hyphens, dots, and path separators',
     日志名称不能超过100个字符: 'Log name cannot exceed 100 characters',
