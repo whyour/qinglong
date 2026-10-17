@@ -8,6 +8,8 @@ on:
       # CLI is verified separately; its shared Bash upgrade engine ships in images.
       - "!cli/**"
       - "cli/src/internal/maintenance/upgradeArtifacts.cjs"
+      - "cli/src/internal/maintenance/platformBundle.cjs"
+      - "cli/src/internal/maintenance/panelUpgrade.cjs"
       - "!.github/workflows/cli-package.yml"
     branches:
       - "master"
@@ -203,6 +205,8 @@ jobs:
   build-alpine:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: build-static
+    outputs:
+      image-digest: ${{ steps.image.outputs.digest }}
     runs-on: ubuntu-22.04
     permissions:
       packages: write
@@ -268,6 +272,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build and push (Alpine)
+        id: image
         uses: docker/build-push-action@v7
         with:
           build-args: |
@@ -289,6 +294,8 @@ jobs:
   build-debian:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: build-static
+    outputs:
+      image-digest: ${{ steps.image.outputs.digest }}
     runs-on: ubuntu-22.04
     permissions:
       packages: write
@@ -353,6 +360,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build and push (Debian)
+        id: image
         uses: docker/build-push-action@v7
         with:
           build-args: |
@@ -563,3 +571,76 @@ jobs:
             echo '::error::Could not check the published npm version; refusing to publish.'
             exit 1
           fi
+
+  build-upgrade-bundles:
+    needs: [build-alpine, build-debian]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux/amd64, libc: musl, name: x64-musl }
+          - { platform: linux/arm/v6, libc: musl, name: armv6-musl }
+          - { platform: linux/arm/v7, libc: musl, name: armv7-musl }
+          - { platform: linux/arm64, libc: musl, name: arm64-musl }
+          - { platform: linux/ppc64le, libc: musl, name: ppc64-musl }
+          - { platform: linux/s390x, libc: musl, name: s390x-musl }
+          - { platform: linux/386, libc: musl, name: ia32-musl }
+          - { platform: linux/amd64, libc: glibc, name: x64-glibc }
+          - { platform: linux/arm/v7, libc: glibc, name: armv7-glibc }
+          - { platform: linux/arm64, libc: glibc, name: arm64-glibc }
+          - { platform: linux/ppc64le, libc: glibc, name: ppc64-glibc }
+          - { platform: linux/s390x, libc: glibc, name: s390x-glibc }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+      - uses: docker/setup-buildx-action@v4
+      - name: Build and probe the immutable platform package
+        env:
+          ALPINE_DIGEST: ${{ needs.build-alpine.outputs.image-digest }}
+          DEBIAN_DIGEST: ${{ needs.build-debian.outputs.image-digest }}
+          BUNDLE_LIBC: ${{ matrix.libc }}
+          BUNDLE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          digest="$ALPINE_DIGEST"
+          if [ "$BUNDLE_LIBC" = glibc ]; then digest="$DEBIAN_DIGEST"; fi
+          test -n "$digest"
+          docker buildx build --platform "$BUNDLE_PLATFORM" --build-arg "BASE_IMAGE=ghcr.io/${GITHUB_REPOSITORY}@${digest}" --file docker/Dockerfile.upgrade-bundle --output type=local,dest=output/upgrade .
+      - uses: actions/upload-artifact@v6
+        with:
+          name: upgrade-${{ matrix.name }}-${{ github.sha }}
+          path: output/upgrade/*
+          if-no-files-found: error
+
+  publish-upgrade-bundles:
+    needs: build-upgrade-bundles
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: upgrade-channel-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - run: pnpm install --prod --frozen-lockfile
+      - run: npm --prefix cli ci
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: upgrade-*-${{ github.sha }}
+          path: output/upgrade
+          merge-multiple: true
+      - run: node scripts/build-bundle-installer.cjs output/upgrade/install-bundle.cjs
+      - name: Publish complete packages before advancing the channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-upgrade-bundles.cjs output/upgrade "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"

@@ -429,7 +429,15 @@ async function runJob({ root, tmp, env = process.env }, id) {
   }
 }
 
-module.exports = { getStatus, startJob, runJob };
+module.exports = {
+  getStatus,
+  startJob,
+  runJob,
+  withPanelLifecycle,
+  readRunningBuild,
+  verifyRunningVersion,
+  stagedMetadata,
+};
 async function launchWorker(id) {
   // detached creates a session but keeps the original parent. PM2 kills the
   // backend's entire descendant tree, so an intermediate launcher must exit

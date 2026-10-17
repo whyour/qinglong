@@ -17,6 +17,10 @@ fs.copyFileSync(
   path.join(root, 'src/internal/maintenance/upgradeArtifacts.cjs'),
   path.join(root, 'dist/internal/maintenance/upgradeArtifacts.cjs'),
 );
+fs.copyFileSync(
+  path.join(root, 'src/internal/maintenance/platformBundle.cjs'),
+  path.join(root, 'dist/internal/maintenance/platformBundle.cjs'),
+);
 require('esbuild').buildSync({
   entryPoints: [path.join(root, 'src/shared/cli/commander.ts')],
   outfile: path.join(root, 'dist/shared/cli/commander.js'),

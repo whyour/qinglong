@@ -218,7 +218,9 @@ async function downloadWithProgress(
       '--location',
       ...(quiet ? ['--silent', '--show-error'] : []),
       '--proto',
-      '=https',
+      /^http:\/\/(?:127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url)
+        ? '=http,https'
+        : '=https',
       '--proto-redir',
       '=https',
       '--connect-timeout',
@@ -260,6 +262,26 @@ async function stageUpgrade({
   signal,
   onProgress,
 }) {
+  const currentPackage = JSON.parse(
+    await fs
+      .readFile(path.join(root, 'package.json'), 'utf8')
+      .catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+        return '{}';
+      }),
+  );
+  if (env.QL_UPGRADE_FILE || currentPackage.qinglongUpgradeFormat === 2) {
+    return require('./platformBundle.cjs').stageBundle({
+      root,
+      tmp,
+      env,
+      run,
+      signal,
+      onProgress,
+      verifyStatic: verifyUpgrade,
+      download: downloadWithProgress,
+    });
+  }
   const report = onProgress || (async () => {});
   const workspace = await fs.mkdtemp(path.join(tmp, 'upgrade-'));
   const branch = releaseBranch(env);
@@ -496,6 +518,8 @@ async function selectedUpgrade(tmp, branch, env = process.env) {
   const manifest = await verifyUpgrade(selected.source, selected.static, env);
   if (ready.sourceCommit !== manifest.sourceCommit)
     throw new Error(upgradeMessage('暂存升级就绪记录不匹配。', env));
+  if (ready.bundle)
+    await require('./platformBundle.cjs').verifyStagedBundle(selected);
   if (ready.dependenciesChanged)
     await fs.access(path.join(selected.source, 'node_modules'));
   else {
