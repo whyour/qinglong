@@ -256,7 +256,7 @@ async function installBundle(argv = process.argv.slice(2), env = process.env) {
                         );
                         await artifacts.waitForHealth(
                           environment,
-                          60000,
+                          undefined,
                           recover ? undefined : controller.signal,
                         );
                         if (!recover)

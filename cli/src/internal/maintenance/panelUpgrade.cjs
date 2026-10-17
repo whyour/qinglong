@@ -391,7 +391,7 @@ async function runJob({ root, tmp, env = process.env }, id) {
                       );
                       await artifacts.waitForHealth(
                         env,
-                        60000,
+                        undefined,
                         recover ? undefined : controller.signal,
                       );
                       if (!recover)

@@ -668,7 +668,16 @@ async function reloadSystem({
     .catch(() => {});
 }
 
-async function waitForHealth(env, timeout = 60000, signal) {
+function startupHealthTimeout(runtime = process) {
+  // ARMv6 starts the database, scheduler and HTTP workers sequentially. Give
+  // slow devices time to become healthy before deciding to restore a backup.
+  return runtime.arch === 'arm' &&
+    Number(runtime.config.variables.arm_version) === 6
+    ? 300000
+    : 60000;
+}
+
+async function waitForHealth(env, timeout = startupHealthTimeout(), signal) {
   const port = Number(env.QlPort || 5700);
   let base = env.QlBaseUrl || '';
   if (base && !base.startsWith('/')) base = `/${base}`;
@@ -856,7 +865,7 @@ async function main() {
             await hook('start', [], recover ? undefined : controller.signal);
             await waitForHealth(
               env,
-              60000,
+              undefined,
               recover ? undefined : controller.signal,
             );
           },
@@ -903,6 +912,7 @@ module.exports = {
   selectedUpgrade,
   replaceAndReload,
   reloadSystem,
+  startupHealthTimeout,
   waitForHealth,
   runProcess,
   withLifecycleHooks,
