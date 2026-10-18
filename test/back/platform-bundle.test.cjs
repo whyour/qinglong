@@ -7,6 +7,136 @@ const tar = require('tar');
 const bundle = require('../../cli/src/internal/maintenance/platformBundle.cjs');
 const artifacts = require('../../shell/upgrade.cjs');
 
+test('ready is published only after prestart; dependency failure repairs once and keeps application hashes', async (t) => {
+  const f = await fixture(t);
+  const pointer = path.join(f.tmp, 'upgrade-ready-develop.json');
+  await fs.writeFile(pointer, 'previous-ready');
+  let probes = 0,
+    repairs = 0,
+    starts = 0;
+  const options = {
+    root: f.root,
+    tmp: f.tmp,
+    env: {
+      QL_BRANCH: 'develop',
+      QL_UPGRADE_FILE: f.archive,
+      QL_UPGRADE_REPAIR_DEPS: '1',
+    },
+    verifyStatic: artifacts.verifyUpgrade,
+    probe: async () => {
+      if (++probes === 1)
+        throw Object.assign(
+          new Error(
+            'dlopen node_modules/sqlite3/node.node: invalid ELF header',
+          ),
+          { code: 'ERR_DLOPEN_FAILED' },
+        );
+    },
+    repair: async (source) => {
+      repairs++;
+      await fs.writeFile(
+        path.join(source, 'node_modules/sqlite3/repaired'),
+        'rebuilt for this device',
+      );
+    },
+    prestart: async () => {
+      starts++;
+      assert.equal(await fs.readFile(pointer, 'utf8'), 'previous-ready');
+    },
+  };
+  const selected = await bundle.stageBundle(options);
+  assert.equal(repairs, 1);
+  assert.equal(probes, 2);
+  assert.equal(starts, 1);
+  const receipt = JSON.parse(
+    await fs.readFile(
+      path.join(path.dirname(selected.source), 'prestart.json'),
+    ),
+  );
+  assert.ok(receipt.completedAt);
+  assert.ok(
+    receipt.dependencyFiles[
+      'source/node_modules/.pnpm/sqlite/node_modules/sqlite3/repaired'
+    ],
+  );
+  await fs.writeFile(
+    path.join(selected.source, 'version.yaml'),
+    'version: 9.9.9',
+  );
+  await assert.rejects(bundle.verifyStagedBundle(selected), /checksums/);
+});
+
+test('offline dependency failure never repairs by default; a failed retry keeps old readiness', async (t) => {
+  const f = await fixture(t),
+    pointer = path.join(f.tmp, 'upgrade-ready-develop.json');
+  await fs.writeFile(pointer, 'previous-ready');
+  let repairs = 0,
+    starts = 0;
+  const options = {
+    root: f.root,
+    tmp: f.tmp,
+    env: { QL_BRANCH: 'develop', QL_UPGRADE_FILE: f.archive },
+    verifyStatic: artifacts.verifyUpgrade,
+    probe: async () => {},
+    prestart: async () => {
+      starts++;
+      throw Object.assign(new Error("Cannot find module 'decimal.js'"), {
+        code: 'MODULE_NOT_FOUND',
+      });
+    },
+    repair: async () => {
+      repairs++;
+    },
+    run: () => assert.fail('offline must not access network'),
+  };
+  await assert.rejects(
+    bundle.stageBundle(options),
+    /no network access attempted/,
+  );
+  assert.equal(repairs, 0);
+  await assert.rejects(
+    bundle.stageBundle({
+      ...options,
+      env: { ...options.env, QL_UPGRADE_REPAIR_DEPS: '1' },
+    }),
+    /Cannot find module/,
+  );
+  assert.equal(repairs, 1);
+  assert.equal(starts, 3);
+  assert.equal(await fs.readFile(pointer, 'utf8'), 'previous-ready');
+  assert.deepEqual(await fs.readdir(f.tmp), ['upgrade-ready-develop.json']);
+});
+
+test('dependency repair cannot change verified source or static files', async (t) => {
+  const f = await fixture(t);
+  let starts = 0;
+  await assert.rejects(
+    bundle.stageBundle({
+      root: f.root,
+      tmp: f.tmp,
+      env: {
+        QL_BRANCH: 'develop',
+        QL_UPGRADE_FILE: f.archive,
+        QL_UPGRADE_REPAIR_DEPS: '1',
+      },
+      verifyStatic: artifacts.verifyUpgrade,
+      probe: async () => {
+        throw Object.assign(new Error("Cannot find module 'decimal.js'"), {
+          code: 'MODULE_NOT_FOUND',
+        });
+      },
+      repair: async (source) =>
+        fs.writeFile(path.join(source, 'version.yaml'), 'version: 9.9.9'),
+      prestart: async () => {
+        starts++;
+      },
+    }),
+    /checksums/,
+  );
+  assert.equal(starts, 0);
+  assert.deepEqual(await fs.readdir(f.tmp), []);
+});
+
 test('ARMv6 offline entry re-executes with an interpreted Node while preserving CLI errors', async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-armv6-entry-'));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
@@ -81,6 +211,19 @@ async function fixture(t) {
   );
   await fs.mkdir(path.join(staticRoot, 'build'), { recursive: true });
   await fs.writeFile(path.join(staticRoot, 'build/app.js'), 'backend');
+  await fs.writeFile(path.join(source, 'version.yaml'), 'version: 2.24.0\n');
+  await fs.mkdir(path.join(staticRoot, 'build/bootstrap'));
+  await fs.writeFile(
+    path.join(staticRoot, 'build/bootstrap/upgradeProbe.js'),
+    `
+    const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+    if(process.env.NODE_OPTIONS || process.env.NODE_PATH || process.env.QL_CLI_ROOT)throw new Error('Leaked host environment');
+    const info=JSON.parse(fs.readFileSync(path.join(__dirname,'../../build-info.json')));
+    process.send({type:'upgrade-probe',ok:true,build:{version:'2.24.0',sourceCommit:info.sourceCommit,
+      backendSha256:crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname,'../app.js'))).digest('hex')}});
+    process.disconnect();
+  `,
+  );
   writeManifest(source, staticRoot);
   const target = await bundle.runtimeTarget();
   const manifest = {

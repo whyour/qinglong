@@ -335,11 +335,15 @@ test('the persistent yellow sidebar entry shows live progress and remains access
   assert.match(p.nodes('button')[0].props['aria-label'], /62%/);
   p.nodes('button')[0].props.onClick();
   p.render({ collapsed: true });
-  assert.match(p.nodes('button')[0].props.className, /collapsed/);
+  assert.equal(p.nodes('button').length, 0);
   assert.equal(p.nodes(p.Modal)[0].props.open, true);
-  f.store.setJob({ status: 'ready', phase: 'ready' });
+  f.store.setJob({ status: 'ready', phase: 'completed' });
   p.render();
-  assert.equal(p.nodes('button')[0].props['aria-label'], '更新已就绪');
+  assert.equal(p.nodes('button').length, 0);
+  p.nodes(p.Modal)[0].props.onCancel();
+  p.render({ collapsed: true });
+  assert.match(p.nodes('button')[0].props.className, /collapsed/);
+  assert.equal(p.nodes('button')[0].props['aria-label'], '下载完成，等待重启');
 });
 
 test('completed update refreshes once and reminds once after reconnecting the refreshed page', async () => {
@@ -431,5 +435,34 @@ test('update modal uses plain aligned content and explains restart state', () =>
       .some(
         (n) => n.props.children === '已重新启动并运行新版本，无需再次重启。',
       ),
+  );
+});
+
+test('sidebar and dialog use the same authoritative status even when old phase fields disagree', () => {
+  const f = fixture(),
+    notice = f.component('src/components/UpgradeNotice.tsx'),
+    panel = f.component('src/pages/setting/checkUpdate.tsx');
+  f.store.setJob({ status: 'ready', phase: 'completed' });
+  notice.render();
+  panel.render();
+  assert.equal(
+    notice.nodes('button')[0].props['aria-label'],
+    f.hooks.upgradeStatusLabel(f.store.getSnapshot().job),
+  );
+  assert.ok(
+    panel
+      .nodes('Text')
+      .some((node) => node.props.children.includes?.('下载完成，等待重启')),
+  );
+  f.store.setJob({ status: 'ready', phase: 'downloading', percent: 62 });
+  notice.render();
+  assert.equal(notice.nodes('button')[0].props['aria-label'], '下载完成，等待重启');
+  f.store.setJob({ status: 'completed', phase: 'ready' });
+  assert.equal(notice.render(), null);
+  panel.render();
+  assert.ok(
+    panel
+      .nodes('Text')
+      .some((node) => node.props.children.includes?.('升级成功')),
   );
 });

@@ -1,27 +1,29 @@
-import { useState, useEffect, useMemo } from 'react';
-import browserType from './index';
+import { useState, useEffect } from 'react';
 
 export const useCtx = () => {
-  const [width, setWidth] = useState('100%');
-  const [marginLeft, setMarginLeft] = useState(0);
-  const [marginTop, setMarginTop] = useState(-48);
-  const [isPhone, setIsPhone] = useState(false);
-  const { platform } = useMemo(() => browserType(), []);
+  // Match ProLayout's xs/sm breakpoint, including narrow desktop windows.
+  const [isPhone, setIsPhone] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia('(max-width: 767.99px)').matches,
+  );
 
   useEffect(() => {
-    if (platform === 'mobile' && document.body.offsetWidth < 768) {
-      setWidth('auto');
-      setMarginLeft(0);
-      setMarginTop(0);
-      setIsPhone(true);
-      document.body.setAttribute('data-mode', 'phone');
-    } else {
-      setWidth('100%');
-      setMarginLeft(0);
-      setMarginTop(-48);
-      setIsPhone(false);
-      document.body.setAttribute('data-mode', 'desktop');
+    const media = window.matchMedia('(max-width: 767.99px)');
+    const update = () => {
+      setIsPhone(media.matches);
+      document.body.setAttribute(
+        'data-mode',
+        media.matches ? 'phone' : 'desktop',
+      );
+    };
+    update();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', update);
+      return () => media.removeEventListener('change', update);
     }
+    media.addListener(update);
+    return () => media.removeListener(update);
   }, []);
 
   return {
@@ -31,9 +33,9 @@ export const useCtx = () => {
       top: 0,
       left: 0,
       zIndex: 20,
-      marginTop,
-      width,
-      marginLeft,
+      marginTop: isPhone ? 0 : -48,
+      width: isPhone ? 'auto' : '100%',
+      marginLeft: 0,
     } as any,
     isPhone,
   };

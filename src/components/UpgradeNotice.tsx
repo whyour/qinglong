@@ -2,7 +2,10 @@ import { CloudDownloadOutlined } from '@ant-design/icons';
 import { Modal, Tooltip } from 'antd';
 import { useState } from 'react';
 import intl from 'react-intl-universal';
-import useUpgrade, { activeStatuses, phaseLabels } from '@/hooks/useUpgrade';
+import useUpgrade, {
+  activeStatuses,
+  upgradeStatusLabel,
+} from '@/hooks/useUpgrade';
 import CheckUpdate from '@/pages/setting/checkUpdate';
 
 export default function UpgradeNotice({
@@ -21,16 +24,15 @@ export default function UpgradeNotice({
   if (!showNotice && !open) return null;
   const text = !connected
     ? intl.get('连接已断开，正在重新连接')
-    : job.status === 'failed'
-    ? intl.get('更新失败')
-    : intl.get(phaseLabels[job.phase || ''] || '检查更新');
+    : intl.get(upgradeStatusLabel(job));
   const label =
+    activeStatuses.includes(job.status) &&
     job.phase === 'downloading' && job.percent != null
       ? `${text} ${job.percent}%`
       : text;
   return (
     <>
-      {showNotice && (
+      {showNotice && !open && (
         <Tooltip title={label} placement="right">
           <button
             type="button"

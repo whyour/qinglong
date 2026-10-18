@@ -25,10 +25,25 @@ export const phaseLabels: Record<string, string> = {
   extracting: '正在解压更新包',
   verifying: '正在校验更新包',
   dependencies: '正在准备依赖',
+  prestarting: '正在预启动验证',
+  repairing: '正在修复运行依赖',
   ready: '更新已就绪',
   restarting: '正在重启并更新',
   completed: '更新完成',
 };
+
+// Status is authoritative; old progress fields must not claim completion.
+export function upgradeStatusLabel(job: UpgradeJob): string {
+  if (job.status === 'ready') return '下载完成，等待重启';
+  if (job.status === 'completed') return '升级成功';
+  if (job.status === 'failed') return '更新失败';
+  if (activeStatuses.includes(job.status)) {
+    return !['ready', 'completed'].includes(job.phase || '')
+      ? phaseLabels[job.phase || ''] || '正在准备更新'
+      : '正在准备更新';
+  }
+  return '检查更新';
+}
 
 // The sidebar and settings share one poller and one mutation state.
 export function createUpgradeStore() {

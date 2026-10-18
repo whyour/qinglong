@@ -830,9 +830,18 @@ esac
         mode: 0o600,
       },
     );
+    // Offline selection and worker ownership belong to this operation only.
+    // Passing them to PM2 would pin future online updates to the old local file.
+    const lifecycleEnv = { ...env };
+    for (const name of [
+      'QL_UPGRADE_FILE',
+      'QL_UPGRADE_REPAIR_DEPS',
+      'QL_UPGRADE_LAUNCHER_PID',
+    ])
+      delete lifecycleEnv[name];
     const hook = (operation, args = [], signal) =>
       runProcess(
-        env,
+        lifecycleEnv,
         'bash',
         ['--', snapshot, operation, ...args],
         false,

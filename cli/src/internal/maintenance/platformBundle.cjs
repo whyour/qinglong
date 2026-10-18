@@ -6,6 +6,11 @@ const os = require('node:os');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const tar = require('tar');
+const {
+  prestartBackend,
+  dependencyFailure,
+  repairDependencies,
+} = require('./upgradePrestart.cjs');
 const execute = promisify(execFile);
 // Heavy archive parsing can hit unsupported V8 JIT paths on ARM1176. Keep
 // upgrade workers interpreted without changing the installed Node or server.
@@ -285,6 +290,8 @@ async function stageBundle({
   verifyStatic,
   download,
   probe = smokeDependencies,
+  prestart = prestartBackend,
+  repair = repairDependencies,
 }) {
   let local = env.QL_UPGRADE_FILE;
   if (!local) {
@@ -407,7 +414,54 @@ async function stageBundle({
     if (build.sourceCommit !== manifest.sourceCommit)
       throw new Error('Bundle and build commit differ');
     await report({ phase: 'dependencies', percent: null });
-    await probe(selected.source, signal);
+    let dependencyFiles;
+    const testCandidate = async () => {
+      await probe(selected.source, signal);
+      await report({ phase: 'prestarting', percent: null });
+      return prestart(selected, { target, signal });
+    };
+    try {
+      await testCandidate();
+    } catch (error) {
+      signal?.throwIfAborted();
+      if (!dependencyFailure(error)) throw error;
+      if (local && env.QL_UPGRADE_REPAIR_DEPS !== '1')
+        throw new Error(
+          `Offline dependency check failed; no network access attempted. Use --repair-deps to allow one repair. ${error.message}`,
+        );
+      await report({ phase: 'repairing', percent: null });
+      await repair(selected.source, { target, signal, env });
+      const repaired = await inventory({
+        source: selected.source,
+        static: selected.static,
+      });
+      dependencyFiles = Object.fromEntries(
+        Object.entries(repaired).filter(([name]) =>
+          name.startsWith('source/node_modules/'),
+        ),
+      );
+      // A repair may change only dependencies, never bless changed application code.
+      await verifyPayload(
+        selected,
+        manifestWithDependencies(manifest, dependencyFiles),
+        target,
+      );
+      await verifyStatic(selected.source, selected.static, env);
+      await testCandidate(); // Exactly one repair; this failure propagates.
+    }
+    await fs.writeFile(
+      path.join(workspace, 'prestart.json'),
+      JSON.stringify({
+        format: 1,
+        sourceCommit: manifest.sourceCommit,
+        manifestSha256: sha256(Buffer.from(JSON.stringify(manifest))),
+        node: process.version,
+        execPath: process.execPath,
+        completedAt: Date.now(),
+        ...(dependencyFiles ? { dependencyFiles } : {}),
+      }),
+      { flag: 'wx', mode: 0o600 },
+    );
     await fs.writeFile(
       path.join(workspace, 'bundle.json'),
       JSON.stringify(manifest),
@@ -453,6 +507,30 @@ async function stageBundle({
   }
 }
 
+function manifestWithDependencies(manifest, dependencyFiles) {
+  if (!dependencyFiles) return manifest;
+  if (
+    typeof dependencyFiles !== 'object' ||
+    Array.isArray(dependencyFiles) ||
+    !Object.keys(dependencyFiles).length ||
+    Object.keys(dependencyFiles).some(
+      (name) => !name.startsWith('source/node_modules/'),
+    )
+  )
+    throw new Error('Invalid repaired dependency inventory');
+  return {
+    ...manifest,
+    files: {
+      ...Object.fromEntries(
+        Object.entries(manifest.files).filter(
+          ([name]) => !name.startsWith('source/node_modules/'),
+        ),
+      ),
+      ...dependencyFiles,
+    },
+  };
+}
+
 async function verifyStagedBundle(selected) {
   const manifest = JSON.parse(
     await fs.readFile(
@@ -460,7 +538,28 @@ async function verifyStagedBundle(selected) {
       'utf8',
     ),
   );
-  await verifyPayload(selected, manifest, await runtimeTarget());
+  const prestart = JSON.parse(
+    await fs.readFile(
+      path.join(path.dirname(selected.source), 'prestart.json'),
+      'utf8',
+    ),
+  );
+  if (
+    prestart.format !== 1 ||
+    prestart.sourceCommit !== manifest.sourceCommit ||
+    prestart.manifestSha256 !== sha256(Buffer.from(JSON.stringify(manifest))) ||
+    prestart.node !== process.version ||
+    prestart.execPath !== process.execPath ||
+    !Number.isSafeInteger(prestart.completedAt)
+  )
+    throw new Error(
+      'Upgrade prestart receipt is missing or stale; prepare the update again',
+    );
+  await verifyPayload(
+    selected,
+    manifestWithDependencies(manifest, prestart.dependencyFiles),
+    await runtimeTarget(),
+  );
   await smokeDependencies(selected.source);
 }
 

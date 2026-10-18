@@ -5,7 +5,7 @@ import { Button, Modal, Progress, Space, Typography, message } from 'antd';
 import { useState } from 'react';
 import useUpgrade, {
   activeStatuses,
-  phaseLabels,
+  upgradeStatusLabel,
   reloadKey,
   upgradeStore,
 } from '@/hooks/useUpgrade';
@@ -100,14 +100,7 @@ const CheckUpdate = ({ systemInfo }: any) => {
       onOk: () => reloadSystem(true),
     });
 
-  const label =
-    job.status === 'failed'
-      ? intl.get('更新失败')
-      : ready
-      ? intl.get('下载完成，等待重启')
-      : completed
-      ? intl.get('升级成功')
-      : intl.get(phaseLabels[job.phase || ''] || '正在准备更新');
+  const label = intl.get(upgradeStatusLabel(job));
   const hasJob = job.status !== 'idle' && job.status !== 'loading';
   const actions = !active && (
     <Space wrap>

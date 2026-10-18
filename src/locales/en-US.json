@@ -734,6 +734,8 @@
   "从开始至load总耗时": "Total load time: {duration} ms",
   "正在解压更新包": "Extracting update",
   "正在校验更新包": "Verifying update",
+  "正在预启动验证": "Verifying backend startup",
+  "正在修复运行依赖": "Repairing runtime dependencies",
   "正在准备依赖": "Preparing dependencies",
   "更新已就绪": "Update ready",
   "正在重启并更新": "Restarting and updating",

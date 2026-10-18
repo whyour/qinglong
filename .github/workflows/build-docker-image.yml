@@ -9,6 +9,7 @@ on:
       - "!cli/**"
       - "cli/src/internal/maintenance/upgradeArtifacts.cjs"
       - "cli/src/internal/maintenance/platformBundle.cjs"
+      - "cli/src/internal/maintenance/upgradePrestart.cjs"
       - "cli/src/internal/maintenance/panelUpgrade.cjs"
       - "!.github/workflows/cli-package.yml"
     branches:

@@ -48,11 +48,12 @@ async function installBundle(argv = process.argv.slice(2), env = process.env) {
       file: { type: 'string' },
       'download-only': { type: 'boolean' },
       install: { type: 'boolean' },
+      'repair-deps': { type: 'boolean' },
     },
   });
   if (!values.file || !(values.root || env.QL_DIR))
     throw new Error(
-      'Usage: node install-bundle.cjs --root /path/to/qinglong --file /path/to/bundle.tar.gz [--download-only | --install]',
+      'Usage: node install-bundle.cjs --root /path/to/qinglong --file /path/to/bundle.tar.gz [--download-only | --install] [--repair-deps]',
     );
   if (values.install && values['download-only'])
     throw new Error('Choose --install or --download-only');
@@ -95,6 +96,7 @@ async function installBundle(argv = process.argv.slice(2), env = process.env) {
       QL_UPGRADE_FILE: path.resolve(values.file),
     };
   }
+  environment.QL_UPGRADE_REPAIR_DEPS = values['repair-deps'] ? '1' : '0';
   const freshWorkspace = values.install
     ? await fs.mkdtemp(path.join(os.tmpdir(), 'ql-offline-install-'))
     : undefined;

@@ -28,6 +28,7 @@ RUN chmod 755 /usr/local/bin/armv6-run && \
     printf '%s\n' 'deb [signed-by=/usr/share/keyrings/raspbian.gpg] https://archive.raspbian.org/raspbian bullseye main' > /armv6/etc/apt/sources.list && \
     mkdir -p /armv6/etc/ssl/certs && \
     cp /etc/ssl/certs/ca-certificates.crt /armv6/etc/ssl/certs/ca-certificates.crt && \
+    printf '127.0.0.1 localhost\n::1 localhost\n' > /armv6/etc/hosts && \
     printf '#!/bin/sh\nexit 101\n' > /armv6/usr/sbin/policy-rc.d && \
     chmod 755 /armv6/usr/sbin/policy-rc.d && \
     armv6-run /bin/sh -ec 'apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential binutils python3 ca-certificates curl git nginx procps jq sudo; rm -rf /var/lib/apt/lists/*'
