@@ -8,9 +8,17 @@ CI 从同次构建的不可变镜像摘要导出完整 tar.gz，包含源码中�
 
 面板下载任务与本地离线入口共用 `platformBundle.cjs`：平台匹配 → 归档安全检查 → 全文件/链接/权限和锁文件校验 → SQLite/Sequelize/cron-parser/gRPC/undici 加载及 SQLite 内存库读写 → 隔离后端预启动 → 发布就绪指针。预启动使用现有 Node、临时数据目录和 loopback 随机端口，运行真实数据库建表/迁移和事务读写、gRPC 服务，以及与正常启动共用的 HTTP 中间件、路由和 WebSocket 初始化，再通过 `/api/health` 确认双服务与目标版本、提交和后端摘要；不运行任务、订阅、通知、用户启动钩子和系统依赖安装。临时库不是用户数据库副本，因此实际应用后的健康检查和回退仍不可省略。点击重启时，接口只检查就绪记录并提交后台任务；完整文件与依赖复验由独立工作进程执行，复验通过后才停止旧服务，避免小设备的预检耗时超过 HTTP 请求期限。离线升级同步面板任务状态，并与在线任务互斥；中断准备时保留之前的可用就绪包。原有服务停止、文件备份、启动健康检查及失败恢复仍由共享升级引擎处理。
 
-正式升级包跟随 master 同一次版本镜像构建，直接使用该次 Alpine/Debian 镜像的不可变 digest；develop 的普通提交和 Git tag 工作流不生成或发布完整包。13 个平台均完成归档、解包后复验及依赖试运行，并且全部上传资产的大小和 SHA256 复验通过后，才更新版本与渠道索引。ARMv6 glibc 继续使用同次 Debian 应用源码及专用 ARM1176 构建和验证环境。
+正式升级包跟随 master 同一次版本镜像构建，直接使用该次 Alpine/Debian 镜像的不可变 digest；develop 的普通提交和 Git tag 工作流不生成或发布完整包。开发包需要手动运行现有镜像工作流：选择 develop，并勾选 `build_development_bundles`（默认为 false，不能与 `static_sync_only` 同时启用）。也可执行：
 
-版本入口为 GitHub prerelease `upgrade-v<version>` 下的 `latest.json`；在线正式渠道保留 `upgrade-master/latest.json`，兼容现有客户端。索引记录版本、源码提交、构建批次、准确字节数、SHA256，以及 `upgrade-build-v<version>-<run-id>-<run-attempt>` 下的固定下载 URL。相同版本的镜像 tag 重新发布时，完整包也重新生成，版本和正式渠道索引同步覆盖到新批次；同一提交重跑也允许产生新内容。已选中旧索引的下载继续使用旧批次资产，避免覆盖文件导致哈希不匹配。master 的镜像构建和完整包发布整条流水线串行执行，避免镜像 tag 与完整包被并发重发交错覆盖；旧工作流明确重跑时也允许同版本、同提交重新发布。过期源码提交不能推进版本或渠道索引；平台包上传失败时不切换索引。`upgrade-develop` 的既有索引保留，但不再随 develop 提交自动更新。
+```sh
+gh workflow run build-docker-image.yml --ref develop -f build_development_bundles=true
+```
+
+手动运行会构建该次 develop 提交的两种镜像，并从输出的固定 digest 导出完整包，更新共用的 `upgrade-develop/latest.json`。`develop` 和 `debian-dev` 镜像都使用该索引，按实际 Node 架构和 musl/glibc 选择包，无需设置测试专用下载源。开发批次位于 `upgrade-build-develop-v<version>-<run-id>-<run-attempt>`，不会改写正式版本或 `upgrade-master`。同一开发渠道的手动发布串行执行，普通 develop CI 不受该队列影响。
+
+开发和正式包都必须在 13 个平台完成归档、解包后复验及依赖试运行，并且全部上传资产的大小和 SHA256 复验通过后，才更新各自索引。ARMv6 glibc 继续使用同次 Debian 应用源码及专用 ARM1176 构建和验证环境。
+
+版本入口为 GitHub prerelease `upgrade-v<version>` 下的 `latest.json`；在线正式渠道保留 `upgrade-master/latest.json`，兼容现有客户端。二者指向同一套完整包，指定版本与 latest 不重复生成产物。索引记录渠道、版本、源码提交、构建批次、准确字节数、SHA256，以及 `upgrade-build-v<version>-<run-id>-<run-attempt>` 下的固定下载 URL。相同版本的镜像 tag 重新发布时，完整包也重新生成，版本和正式渠道索引同步覆盖到新批次；同一提交重跑也允许产生新内容。已选中旧索引的下载继续使用旧批次资产，避免覆盖文件导致哈希不匹配。master 的镜像构建和完整包发布整条流水线串行执行，避免镜像 tag 与完整包被并发重发交错覆盖；旧工作流明确重跑时也允许同版本、同提交重新发布。过期源码提交不能推进对应渠道或版本索引；平台包上传失败时不切换索引。
 
 ## 手动离线安装和升级
 

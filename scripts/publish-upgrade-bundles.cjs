@@ -61,14 +61,20 @@ function publishBundles({
   branch,
   version,
   buildId,
+  allowDevelopment = false,
   gh = (...args) =>
     execFileSync('gh', args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     }),
 }) {
-  if (branch !== 'master')
-    throw new Error('Only master version images publish bundles');
+  if (
+    branch !== 'master' &&
+    !(branch === 'develop' && allowDevelopment === true)
+  )
+    throw new Error(
+      'Only master or explicitly requested development images publish bundles',
+    );
   if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/.test(version || ''))
     throw new Error('Invalid bundle version');
   if (!/^\d+-\d+$/.test(buildId || ''))
@@ -76,7 +82,10 @@ function publishBundles({
   // Rebuilding a version gets new download URLs, including when its commit is
   // unchanged. Only the version/channel pointer is overwritten, never bytes
   // that an in-flight download has already selected by hash.
-  const tag = `upgrade-build-v${version}-${buildId}`;
+  const development = branch === 'develop';
+  const tag = `upgrade-build-${
+    development ? 'develop-' : ''
+  }v${version}-${buildId}`;
   const index = {
     ...releaseIndex(directory, commit, repository, {
       version,
@@ -84,6 +93,7 @@ function publishBundles({
     }),
     version,
     buildId,
+    channel: branch,
   };
   const installer = fs.readFileSync(path.join(directory, 'install-bundle.cjs'));
   index.installer = {
@@ -137,7 +147,7 @@ function publishBundles({
   const currentSource = () =>
     gh(
       'api',
-      `repos/${repository}/git/ref/heads/master`,
+      `repos/${repository}/git/ref/heads/${branch}`,
       '--jq',
       '.object.sha',
     ).trim() === commit;
@@ -189,10 +199,12 @@ function publishBundles({
   )
     throw new Error('Published platform bundle verification failed');
 
-  // The workflow serializes master image builds and these pointer writes as
-  // one release. A rerun of an earlier workflow is allowed to replace the same
+  // Each channel serializes its image builds and pointer writes as one release.
+  // A rerun of an earlier workflow is allowed to replace the same
   // version/commit; an obsolete source commit must never advance either alias.
-  const aliases = [`upgrade-v${version}`, 'upgrade-master'];
+  const aliases = development
+    ? ['upgrade-develop']
+    : [`upgrade-v${version}`, 'upgrade-master'];
   for (const ref of aliases) {
     if (!currentSource()) {
       console.log('Newer source exists; leaving version and channel unchanged');
@@ -200,8 +212,8 @@ function publishBundles({
     }
     ensureRelease(
       ref,
-      ref === 'upgrade-master'
-        ? 'Upgrade channel master'
+      ref === `upgrade-${branch}`
+        ? `Upgrade channel ${branch}`
         : `Platform upgrade v${version}`,
     );
     gh(
@@ -234,5 +246,8 @@ if (require.main === module) {
     branch,
     version,
     buildId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+    allowDevelopment:
+      process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' &&
+      process.env.QL_BUILD_DEVELOPMENT_BUNDLES === 'true',
   });
 }

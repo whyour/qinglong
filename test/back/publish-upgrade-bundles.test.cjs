@@ -19,6 +19,7 @@ function fixture(t) {
   const state = {
     releases: new Map(),
     head: 'a'.repeat(40),
+    developHead: 'c'.repeat(40),
     calls: [],
     nextId: 1,
   };
@@ -67,6 +68,7 @@ function fixture(t) {
     if (args[0] === 'api') {
       const route = args[1];
       if (route.endsWith('/git/ref/heads/master')) return state.head;
+      if (route.endsWith('/git/ref/heads/develop')) return state.developHead;
       if (route.includes('/releases/tags/')) {
         const tag = decodeURIComponent(route.split('/releases/tags/')[1]);
         if (state.lookupFailure === tag)
@@ -313,3 +315,84 @@ test('existing master clients can migrate from indexes without version/build met
   assert.equal(f.publish({ buildId: '100-2' }), true);
   assert.equal(f.index().buildId, '100-2');
 });
+
+test('explicit development publication shares musl/glibc packages without changing version or latest production assets', (t) => {
+  const f = fixture(t);
+  f.publish();
+  const production = f.index();
+  f.write(f.state.developHead, 'development');
+  assert.equal(
+    f.publish({
+      branch: 'develop',
+      commit: f.state.developHead,
+      allowDevelopment: true,
+    }),
+    true,
+  );
+  const development = f.index('upgrade-develop');
+  assert.equal(development.channel, 'develop');
+  assert.equal(development.sourceCommit, f.state.developHead);
+  assert.equal(Object.keys(development.packages).length, 13);
+  assert.ok(development.packages['linux-x64-musl']);
+  assert.ok(development.packages['linux-x64-glibc']);
+  assert.ok(development.packages['linux-armv6-musl']);
+  assert.ok(development.packages['linux-armv6-glibc']);
+  for (const entry of [
+    ...Object.values(development.packages),
+    development.installer,
+  ])
+    assert.ok(entry.url.includes('/upgrade-build-develop-v2.24.0-100-1/'));
+  assert.deepEqual(f.index(), production);
+  assert.deepEqual(f.index('upgrade-v2.24.0'), production);
+  assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 28);
+  assert.equal(
+    f.state.releases.get('upgrade-build-develop-v2.24.0-100-1').size,
+    28,
+  );
+});
+
+test('development builds require explicit boolean opt-in and cannot publish obsolete development source', (t) => {
+  const f = fixture(t);
+  for (const allowDevelopment of [false, undefined, 'true'])
+    assert.throws(
+      () => f.publish({ branch: 'develop', allowDevelopment }),
+      /explicitly requested/,
+    );
+  assert.throws(
+    () => f.publish({ branch: 'feature/test', allowDevelopment: true }),
+    /Only master/,
+  );
+  assert.equal(f.state.calls.length, 0);
+  f.write(f.state.developHead, 'development');
+  const obsolete = f.state.developHead;
+  f.state.developHead = 'd'.repeat(40);
+  assert.equal(
+    f.publish({ branch: 'develop', commit: obsolete, allowDevelopment: true }),
+    false,
+  );
+  assert.equal(f.state.releases.size, 0);
+});
+
+for (const fault of ['failBatchUpload', 'corruptUploadedBatch'])
+  test(`failed manual development publication preserves both channels (${fault})`, (t) => {
+    const f = fixture(t);
+    f.publish();
+    const production = f.index();
+    const options = {
+      branch: 'develop',
+      commit: f.state.developHead,
+      allowDevelopment: true,
+    };
+    f.write(options.commit, 'first development');
+    f.publish(options);
+    const previous = f.index('upgrade-develop');
+    f.write(options.commit, 'next development');
+    f.state[fault] = true;
+    assert.throws(
+      () => f.publish({ ...options, buildId: '100-2' }),
+      /Upload interrupted|Published platform bundle verification failed/,
+    );
+    assert.deepEqual(f.index('upgrade-develop'), previous);
+    assert.deepEqual(f.index(), production);
+    assert.deepEqual(f.index('upgrade-v2.24.0'), production);
+  });
