@@ -41,11 +41,18 @@ class Application {
   }
 
   private startMasterProcess() {
+    const readyTimeout =
+      process.arch === 'arm' &&
+      Number(
+        (process.config.variables as { arm_version?: string | number }).arm_version,
+      ) === 6
+        ? 120000
+        : 30000;
     // Fork gRPC worker first and wait for it to be ready
     const grpcWorker = this.forkWorker('grpc');
     
     // Wait for gRPC worker to signal it's ready before starting HTTP worker
-    this.waitForWorkerReady(grpcWorker, 30000)
+    this.waitForWorkerReady(grpcWorker, readyTimeout)
       .then(() => {
         Logger.info('[boot] gRPC worker is ready, starting HTTP worker');
         this.httpWorker = this.forkWorker('http');
@@ -71,7 +78,7 @@ class Application {
               Logger.warn('Unable to notify HTTP worker of scheduler exit');
             }
             const newGrpcWorker = this.forkWorker('grpc');
-            this.waitForWorkerReady(newGrpcWorker, 30000)
+            this.waitForWorkerReady(newGrpcWorker, readyTimeout)
               .then(() => {
                 Logger.info('gRPC worker restarted and ready');
                 // Re-register cron jobs by notifying the HTTP worker
@@ -148,32 +155,8 @@ class Application {
   }
 
   private async setupMiddlewares(): Promise<express.Application> {
-    // Only the HTTP worker needs an Express application and its middleware.
-    const [
-      { default: createExpress },
-      { default: helmet },
-      { default: cors },
-      { default: compression },
-      { monitoringMiddleware },
-    ] = await Promise.all([
-      import('express'),
-      import('helmet'),
-      import('cors'),
-      import('compression'),
-      import('./middlewares/monitoring'),
-    ]);
-    const app = createExpress();
-    app.use((req, res, next) => {
-      if (req.query.t) delete req.query.t;
-      next();
-    });
-    app.use(helmet({
-      contentSecurityPolicy: false,
-    }));
-    app.use(cors(config.cors));
-    app.use(compression());
-    app.use(monitoringMiddleware);
-    return app;
+    const { createHttpApplication } = await import('./loaders/httpApplication');
+    return createHttpApplication();
   }
 
   private setupMasterShutdown() {

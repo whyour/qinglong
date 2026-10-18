@@ -218,13 +218,19 @@ async function downloadWithProgress(
       '--location',
       ...(quiet ? ['--silent', '--show-error'] : []),
       '--proto',
-      '=https',
+      /^http:\/\/(?:127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url)
+        ? '=http,https'
+        : '=https',
       '--proto-redir',
       '=https',
       '--connect-timeout',
       '30',
       '--max-time',
-      '600',
+      String(
+        artifact === 'qinglong-bundle' && expected?.size
+          ? Math.max(600, Math.min(7200, Math.ceil(expected.size / 8192) + 120))
+          : 600,
+      ),
       '--speed-limit',
       '1024',
       '--speed-time',
@@ -260,6 +266,26 @@ async function stageUpgrade({
   signal,
   onProgress,
 }) {
+  const currentPackage = JSON.parse(
+    await fs
+      .readFile(path.join(root, 'package.json'), 'utf8')
+      .catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+        return '{}';
+      }),
+  );
+  if (env.QL_UPGRADE_FILE || currentPackage.qinglongUpgradeFormat === 2) {
+    return require('./platformBundle.cjs').stageBundle({
+      root,
+      tmp,
+      env,
+      run,
+      signal,
+      onProgress,
+      verifyStatic: verifyUpgrade,
+      download: downloadWithProgress,
+    });
+  }
   const report = onProgress || (async () => {});
   const workspace = await fs.mkdtemp(path.join(tmp, 'upgrade-'));
   const branch = releaseBranch(env);
@@ -469,7 +495,12 @@ async function stageUpgrade({
   }
 }
 
-async function selectedUpgrade(tmp, branch, env = process.env) {
+async function selectedUpgrade(
+  tmp,
+  branch,
+  env = process.env,
+  { metadataOnly = false } = {},
+) {
   const pointer = JSON.parse(
     await fs.readFile(path.join(tmp, `upgrade-ready-${branch}.json`), 'utf8'),
   );
@@ -493,9 +524,13 @@ async function selectedUpgrade(tmp, branch, env = process.env) {
   );
   if (ready.source !== selected.source || ready.static !== selected.static)
     throw new Error(upgradeMessage('暂存升级就绪记录不匹配。', env));
-  const manifest = await verifyUpgrade(selected.source, selected.static, env);
+  const manifest = metadataOnly
+    ? await manifestAt(selected.static, env)
+    : await verifyUpgrade(selected.source, selected.static, env);
   if (ready.sourceCommit !== manifest.sourceCommit)
     throw new Error(upgradeMessage('暂存升级就绪记录不匹配。', env));
+  if (ready.bundle && !metadataOnly)
+    await require('./platformBundle.cjs').verifyStagedBundle(selected);
   if (ready.dependenciesChanged)
     await fs.access(path.join(selected.source, 'node_modules'));
   else {
@@ -571,7 +606,7 @@ async function replaceAndReload(replacements, lifecycle, env = process.env) {
   } catch (error) {
     // Do not modify files under a still-running failed startup. Keep backups
     // for recovery if stopping the new process itself fails.
-    if (attemptedStart) await lifecycle.stop();
+    if (attemptedStart) await lifecycle.stop(true);
     for (const item of changed.reverse()) {
       await fs.rm(item.target, { recursive: true, force: true });
       if (item.existed) {
@@ -640,7 +675,16 @@ async function reloadSystem({
     .catch(() => {});
 }
 
-async function waitForHealth(env, timeout = 60000, signal) {
+function startupHealthTimeout(runtime = process) {
+  // ARMv6 starts the database, scheduler and HTTP workers sequentially. Give
+  // slow devices time to become healthy before deciding to restore a backup.
+  return runtime.arch === 'arm' &&
+    Number(runtime.config.variables.arm_version) === 6
+    ? 300000
+    : 60000;
+}
+
+async function waitForHealth(env, timeout = startupHealthTimeout(), signal) {
   const port = Number(env.QlPort || 5700);
   let base = env.QlBaseUrl || '';
   if (base && !base.startsWith('/')) base = `/${base}`;
@@ -786,9 +830,18 @@ esac
         mode: 0o600,
       },
     );
+    // Offline selection and worker ownership belong to this operation only.
+    // Passing them to PM2 would pin future online updates to the old local file.
+    const lifecycleEnv = { ...env };
+    for (const name of [
+      'QL_UPGRADE_FILE',
+      'QL_UPGRADE_REPAIR_DEPS',
+      'QL_UPGRADE_LAUNCHER_PID',
+    ])
+      delete lifecycleEnv[name];
     const hook = (operation, args = [], signal) =>
       runProcess(
-        env,
+        lifecycleEnv,
         'bash',
         ['--', snapshot, operation, ...args],
         false,
@@ -821,16 +874,21 @@ async function main() {
     tmp,
     () =>
       withLifecycleHooks(root, tmp, env, async (hook) => {
+        let job;
         const lifecycle = {
           signal: controller.signal,
-          stop: () => hook('stop'),
+          stop: async () => {
+            await job?.onStop();
+            await hook('stop');
+          },
           start: async (recover) => {
             await hook('start', [], recover ? undefined : controller.signal);
             await waitForHealth(
               env,
-              60000,
+              undefined,
               recover ? undefined : controller.signal,
             );
+            await job?.onStart(recover);
           },
         };
         if (process.argv[2] === 'update') {
@@ -850,15 +908,38 @@ async function main() {
           if (process.argv[4] !== 'true') return;
         } else if (process.argv[2] !== 'reload')
           throw new Error('Unknown upgrade command.');
-        await reloadSystem({
-          root,
-          tmp,
-          env,
-          data: env.dir_data || path.join(root, 'data'),
-          staticRoot: env.dir_static || path.join(root, 'static'),
-          config: env.dir_config || path.join(root, 'data/config'),
-          lifecycle,
-        });
+        const apply = async (preparedJob) => {
+          job = preparedJob;
+          await reloadSystem({
+            root,
+            tmp,
+            env,
+            data: env.dir_data || path.join(root, 'data'),
+            staticRoot: env.dir_static || path.join(root, 'static'),
+            config: env.dir_config || path.join(root, 'data/config'),
+            lifecycle,
+          });
+        };
+        // Older installations can carry just this self-contained Bash verifier.
+        // Load panel job dependencies only when there is a panel job to reconcile.
+        const hasPanelJob = await fs
+          .access(path.join(tmp, 'panel-upgrade.json'))
+          .then(() => true)
+          .catch((error) => {
+            if (error.code !== 'ENOENT') throw error;
+            return false;
+          });
+        if (hasPanelJob) {
+          const selected = await selectedUpgrade(tmp, releaseBranch(env), env, {
+            metadataOnly: true,
+          });
+          await require('./panelUpgrade.cjs').withPreparedJob(
+            tmp,
+            env,
+            selected,
+            apply,
+          );
+        } else await apply();
         console.log(upgradeMessage('更新及启动检查成功...', env));
       }),
     env,
@@ -875,6 +956,7 @@ module.exports = {
   selectedUpgrade,
   replaceAndReload,
   reloadSystem,
+  startupHealthTimeout,
   waitForHealth,
   runProcess,
   withLifecycleHooks,
