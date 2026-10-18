@@ -8,11 +8,13 @@ CI 从同次构建的不可变镜像摘要导出完整 tar.gz，包含源码中�
 
 面板下载任务与本地离线入口共用 `platformBundle.cjs`：平台匹配 → 归档安全检查 → 全文件/链接/权限和锁文件校验 → SQLite/Sequelize/cron-parser/gRPC/undici 加载及 SQLite 内存库读写 → 隔离后端预启动 → 发布就绪指针。预启动使用现有 Node、临时数据目录和 loopback 随机端口，运行真实数据库建表/迁移和事务读写、gRPC 服务，以及与正常启动共用的 HTTP 中间件、路由和 WebSocket 初始化，再通过 `/api/health` 确认双服务与目标版本、提交和后端摘要；不运行任务、订阅、通知、用户启动钩子和系统依赖安装。临时库不是用户数据库副本，因此实际应用后的健康检查和回退仍不可省略。点击重启时，接口只检查就绪记录并提交后台任务；完整文件与依赖复验由独立工作进程执行，复验通过后才停止旧服务，避免小设备的预检耗时超过 HTTP 请求期限。离线升级同步面板任务状态，并与在线任务互斥；中断准备时保留之前的可用就绪包。原有服务停止、文件备份、启动健康检查及失败恢复仍由共享升级引擎处理。
 
-渠道索引为 GitHub prerelease `upgrade-develop` 或 `upgrade-master` 下的 `latest.json`。索引记录准确字节数、SHA256 和不可变 `upgrade-<commit>` release 资产 URL。13 个平台均完成归档、解包后复验及依赖试运行才发布渠道；过期工作流不能覆盖更新提交的渠道。
+正式升级包跟随 master 同一次版本镜像构建，直接使用该次 Alpine/Debian 镜像的不可变 digest；develop 的普通提交和 Git tag 工作流不生成或发布完整包。13 个平台均完成归档、解包后复验及依赖试运行，并且全部上传资产的大小和 SHA256 复验通过后，才更新版本与渠道索引。ARMv6 glibc 继续使用同次 Debian 应用源码及专用 ARM1176 构建和验证环境。
+
+版本入口为 GitHub prerelease `upgrade-v<version>` 下的 `latest.json`；在线正式渠道保留 `upgrade-master/latest.json`，兼容现有客户端。索引记录版本、源码提交、构建批次、准确字节数、SHA256，以及 `upgrade-build-v<version>-<run-id>-<run-attempt>` 下的固定下载 URL。相同版本的镜像 tag 重新发布时，完整包也重新生成，版本和正式渠道索引同步覆盖到新批次；同一提交重跑也允许产生新内容。已选中旧索引的下载继续使用旧批次资产，避免覆盖文件导致哈希不匹配。master 的镜像构建和完整包发布整条流水线串行执行，避免镜像 tag 与完整包被并发重发交错覆盖；旧工作流明确重跑时也允许同版本、同提交重新发布。过期源码提交不能推进版本或渠道索引；平台包上传失败时不切换索引。`upgrade-develop` 的既有索引保留，但不再随 develop 提交自动更新。
 
 ## 手动离线安装和升级
 
-从同一个 `upgrade-<commit>` release 下载匹配设备的 `.tar.gz` 和独立 `install-bundle.cjs`。独立安装器已内置解析依赖，在目标设备正常情况无需 npm、pnpm 或重新安装 SQLite。离线准备和预启动默认不联网；依赖不符合要求时直接报错。可对照同 release 的 `latest.json` 核对归档 SHA256。
+从 `upgrade-v<version>` 的说明或 `latest.json` 中取得当前批次的下载链接，下载匹配设备的 `.tar.gz` 和独立 `install-bundle.cjs`；两者都来自同一个 `upgrade-build-v<version>-<run-id>-<run-attempt>` release。独立安装器已内置解析依赖，在目标设备正常情况无需 npm、pnpm 或重新安装 SQLite。离线准备和预启动默认不联网；依赖不符合要求时直接报错。可对照同批次 release 的 `latest.json` 核对归档 SHA256。
 
 已有安装（默认应用并重启）：
 

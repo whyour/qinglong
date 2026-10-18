@@ -36,6 +36,13 @@ on:
 permissions:
   contents: read
 
+# Keep master image tags and their bundle indexes in one serialized release.
+# A rerun may intentionally replace a version, including from the same commit.
+# Develop and Git-tag builds remain independent.
+concurrency:
+  group: version-images-${{ github.ref == 'refs/heads/master' && 'master' || format('{0}-{1}', github.run_id, github.run_attempt) }}
+  cancel-in-progress: false
+
 jobs:
   validate:
     if: ${{ !inputs.static_sync_only }}
@@ -574,6 +581,8 @@ jobs:
           fi
 
   build-upgrade-bundles:
+    # Version images are published by master; develop and Git-tag runs skip bundles.
+    if: ${{ github.ref == 'refs/heads/master' }}
     needs: [build-alpine, build-debian]
     runs-on: ubuntu-22.04
     timeout-minutes: 90
@@ -635,6 +644,7 @@ jobs:
           if-no-files-found: error
 
   publish-upgrade-bundles:
+    if: ${{ github.ref == 'refs/heads/master' }}
     needs: build-upgrade-bundles
     runs-on: ubuntu-latest
     permissions:

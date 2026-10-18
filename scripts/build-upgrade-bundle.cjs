@@ -115,6 +115,7 @@ async function buildBundle(root, output) {
     const record = {
       format: 2,
       sourceCommit: build.sourceCommit,
+      version: manifest.version,
       target: bundle.targetKey(target),
       filename,
       baseImage: process.env.QL_BUNDLE_BASE_IMAGE,
