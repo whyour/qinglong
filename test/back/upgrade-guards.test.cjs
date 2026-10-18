@@ -283,3 +283,54 @@ test('unhealthy, malformed and oversized health responses fail within the deadli
     await assert.rejects(waitForHealth({ QlPort: port }, 20), /health check|后端启动检查失败/);
   }
 });
+
+test('ARMv6 startup can become healthy after the standard one-minute deadline', async (t) => {
+  const { EventEmitter } = require('node:events');
+  const descriptors = ['arch', 'config'].map((key) => [
+    key,
+    Object.getOwnPropertyDescriptor(process, key),
+  ]);
+  t.after(() => {
+    for (const [key, descriptor] of descriptors)
+      Object.defineProperty(process, key, descriptor);
+  });
+  Object.defineProperty(process, 'arch', { value: 'arm', configurable: true });
+  Object.defineProperty(process, 'config', {
+    value: { variables: { arm_version: 6 } },
+    configurable: true,
+  });
+  let now = 0;
+  let probes = 0;
+  t.mock.method(Date, 'now', () => now);
+  t.mock.method(http, 'get', (_options, callback) => {
+    const request = new EventEmitter();
+    request.destroy = (error) => request.emit('error', error);
+    queueMicrotask(() => {
+      const response = new EventEmitter();
+      response.statusCode = ++probes === 1 ? 503 : 200;
+      callback(response);
+      now = probes * 70000;
+      response.emit(
+        'data',
+        JSON.stringify({
+          code: response.statusCode,
+          data: { status: probes > 1 ? 'ok' : 'starting' },
+        }),
+      );
+      response.emit('end');
+    });
+    return request;
+  });
+  await waitForHealth({});
+  assert.equal(probes, 2);
+  assert.equal(now, 140000);
+  const { startupHealthTimeout } = require('../../shell/upgrade.cjs');
+  assert.equal(
+    startupHealthTimeout({
+      arch: 'arm',
+      config: { variables: { arm_version: 7 } },
+    }),
+    60000,
+  );
+  assert.equal(startupHealthTimeout({ arch: 'arm64' }), 60000);
+});

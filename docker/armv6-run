@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+export PROOT_NO_SECCOMP=1 QEMU_CPU=arm1176
+# Bind only kernel interfaces; all application files and writable state remain
+# inside this container's ARMv6 root. Child processes also pass through QEMU.
+exec proot -0 -q '/usr/bin/qemu-arm-static -cpu arm1176' \
+  -r /armv6 -b /proc -b /dev -w / "$@"

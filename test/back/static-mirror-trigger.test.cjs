@@ -393,7 +393,10 @@ done
       QL_MIRROR_NOTIFY_REPO: 'fixture/source',
       QL_MIRROR_NOTIFY_ON_START: 'false',
       QL_MIRROR_INCLUDE_VERSION_BRANCH: 'false',
-      QL_MIRROR_RETRY_AFTER_SECONDS: '1',
+      // Bash SECONDS has one-second resolution. Two ticks guarantee a real
+      // wait across a second boundary; a single tick may take only milliseconds.
+      QL_MIRROR_RETRY_AFTER_SECONDS: '2',
+      QL_MIRROR_WAIT_SECONDS: '8',
       QL_TEST_COUNT: countFile,
       QL_TEST_MIRROR: mirror,
     },
@@ -403,6 +406,14 @@ done
     Date.now() - started >= 900,
     'notification should wait for the sync interval',
   );
+  const retry = result.stdout.indexOf('Retrying the GitHub notification');
+  assert.ok(retry >= 0, result.stdout);
+  const elapsed = [
+    ...result.stdout
+      .slice(0, retry)
+      .matchAll(/Waiting for mirror \(attempt \d+, (\d+)\/8s\)/g),
+  ].at(-1);
+  assert.ok(elapsed && Number(elapsed[1]) >= 2, result.stdout);
   assert.equal(fs.readFileSync(countFile, 'utf8'), 'notification\n');
   assert.equal(git('-C', source, 'rev-list', '--count', triggerRef), '1');
   assert.equal(git('-C', source, 'rev-parse', 'develop'), snapshot);

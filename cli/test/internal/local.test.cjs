@@ -322,6 +322,10 @@ test(
   async (t) => {
     if (process.platform === 'win32') return t.skip('POSIX process groups');
     const { runProcess } = require('../../dist/internal/runtime/process');
+    const marker = path.join(sandbox(t), 'timeout');
+    const controller = new AbortController();
+    const guard = setTimeout(() => controller.abort(), 4000);
+    t.after(() => clearTimeout(guard));
     let descendant;
     t.after(() => {
       if (descendant)
@@ -329,13 +333,17 @@ test(
           process.kill(descendant, 'SIGKILL');
         } catch {}
     });
+    // Start the deadline only after the descendant installed its handlers.
+    // Cold Node startup under parallel load need not fit in 350 milliseconds.
     const grandchild =
-      'process.on("SIGINT",()=>{});process.on("SIGTERM",()=>{});console.log(process.pid);setInterval(()=>{},1000)';
+      'process.on("SIGINT",()=>{});process.on("SIGTERM",()=>{});console.log(process.pid);require("node:fs").writeSync(3,"T");setInterval(()=>{},1000)';
     const parent = `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(
       grandchild,
-    )}],{stdio:['ignore',1,2]});setTimeout(()=>process.exit(0),100);`;
+    )}],{stdio:['ignore',1,2,3]});setTimeout(()=>process.exit(0),100);`;
     const result = await runProcess(process.execPath, ['-e', parent], {
       timeoutMs: 350,
+      timeoutControl: { marker },
+      signal: controller.signal,
       graceMs: 100,
       output: (chunk) => {
         const pid = Number(chunk.toString().trim());
@@ -345,6 +353,7 @@ test(
     assert.equal(result.code, 124);
     assert.equal(result.timedOut, true);
     assert.ok(descendant);
+    assert.equal(fs.existsSync(marker), true);
   },
 );
 

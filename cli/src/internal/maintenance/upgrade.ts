@@ -107,7 +107,7 @@ async function selectedUpgrade(
 
 export interface ReloadLifecycle {
   stop(context: LocalContext): Promise<void>;
-  start(context: LocalContext): Promise<unknown>;
+  start(context: LocalContext, recover?: boolean): Promise<unknown>;
 }
 
 // All old entries stay on the same filesystem until service start succeeds.
@@ -202,7 +202,7 @@ export async function replaceAndReload(
         if (item.existed) await fs.rename(item.backup, item.target);
       }
       try {
-        await lifecycle.start(context);
+        await lifecycle.start(context, true);
       } catch {
         throw new Error(
           translate(
@@ -300,14 +300,31 @@ export async function reloadPanel(
     return await artifacts.withUpgradeLock(
       context.paths.dir_tmp!,
       () =>
-        replaceAndReload(context, replacements, {
-          stop: stopPanel,
-          start: async (ctx) => {
-            const service = await startPanel(ctx);
-            await artifacts.waitForHealth(ctx.env, 60000, operationSignal());
-            return service;
-          },
-        }),
+        require('./panelUpgrade.cjs').withPreparedJob(
+          context.paths.dir_tmp!,
+          context.env,
+          selected,
+          (job?: {
+            onStop(): Promise<void>;
+            onStart(recover?: boolean): Promise<void> | undefined;
+          }) =>
+            replaceAndReload(context, replacements, {
+              stop: async (ctx) => {
+                await job?.onStop();
+                await stopPanel(ctx);
+              },
+              start: async (ctx, recover) => {
+                const service = await startPanel(ctx);
+                await artifacts.waitForHealth(
+                  ctx.env,
+                  undefined,
+                  operationSignal(),
+                );
+                await job?.onStart(recover);
+                return service;
+              },
+            }),
+        ),
       context.env,
     );
   } finally {

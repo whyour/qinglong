@@ -150,6 +150,14 @@ export async function startPanel(
       GRPC_PORT: context.env.QlGrpcPort || '5500',
     },
   };
+  // Archive selection and launcher ownership apply only to the upgrade worker.
+  // Retaining them in PM2 would pin the next online update to an offline file.
+  for (const name of [
+    'QL_UPGRADE_FILE',
+    'QL_UPGRADE_REPAIR_DEPS',
+    'QL_UPGRADE_LAUNCHER_PID',
+  ])
+    delete options.env[name as keyof typeof options.env];
   if (await executableAvailable('pm2', context.env)) {
     const flushed = await runProcess('pm2', ['flush'], options);
     if (flushed.code === 0) {

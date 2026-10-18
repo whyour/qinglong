@@ -20,6 +20,40 @@ const {
   sourceCommit,
 } = require('../../../test/helpers/upgrade-fixture.cjs');
 
+test('CLI service startup drops operation-only upgrade variables and preserves user configuration', async (t) => {
+  const ctx = await fixture(t);
+  ctx.env.CALLS = path.join(ctx.root, 'runtime.jsonl');
+  ctx.env.QL_UPGRADE_FILE = '/old/offline.tar.gz';
+  ctx.env.QL_UPGRADE_REPAIR_DEPS = '1';
+  ctx.env.QL_UPGRADE_LAUNCHER_PID = '12345';
+  ctx.env.QA_USER_SETTING = 'preserved';
+  ctx.env.HTTPS_PROXY = 'http://127.0.0.1:7890';
+  await stub(
+    ctx,
+    'pm2',
+    `require('node:fs').appendFileSync(process.env.CALLS,JSON.stringify({
+    file:process.env.QL_UPGRADE_FILE??null,repair:process.env.QL_UPGRADE_REPAIR_DEPS??null,
+    launcher:process.env.QL_UPGRADE_LAUNCHER_PID??null,user:process.env.QA_USER_SETTING,
+    proxy:process.env.HTTPS_PROXY,
+  })+'\\n');`,
+  );
+  await startPanel(ctx);
+  for (const runtime of (await fs.readFile(ctx.env.CALLS, 'utf8'))
+    .trim()
+    .split('\n')
+    .map(JSON.parse))
+    assert.deepEqual(runtime, {
+      file: null,
+      repair: null,
+      launcher: null,
+      user: 'preserved',
+      proxy: 'http://127.0.0.1:7890',
+    });
+  assert.equal(ctx.env.QL_UPGRADE_FILE, '/old/offline.tar.gz');
+  assert.equal(ctx.env.QL_UPGRADE_REPAIR_DEPS, '1');
+  assert.equal(ctx.env.QL_UPGRADE_LAUNCHER_PID, '12345');
+});
+
 async function fixture(t) {
   t.mock.method(
     require('../../dist/internal/maintenance/upgradeArtifacts.cjs'),
