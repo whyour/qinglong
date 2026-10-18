@@ -50,13 +50,13 @@ export class GrpcServerService {
       for (const host of hostsToTry) {
         try {
           const address = this.formatGrpcAddress(host, grpcPort);
-          await bindAsync(address, credentials);
+          const boundPort = await bindAsync(address, credentials);
           Logger.debug(`[boot] gRPC service started successfully on ${address}`);
           metricsService.record('grpc_service_start', 1, {
             port: grpcPort.toString(),
             host
           });
-          return grpcPort;
+          return boundPort;
         } catch (err) {
           lastError = err as Error;
           Logger.warn(`Failed to bind gRPC on ${host}:${grpcPort}, trying next...`, err);

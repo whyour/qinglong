@@ -23,6 +23,9 @@ function fixture() {
   let invalidations = 0;
   const module = { exports: {} };
   const localRequire = createRequire(path.resolve('back/app.ts'));
+  const middlewareRequire = createRequire(
+    path.resolve('back/loaders/httpApplication.ts'),
+  );
   const mocks = {
     './config': { cors: { origin: ['http://localhost'] } },
     './loaders/logger': { error() {}, warn() {}, info() {} },
@@ -37,6 +40,33 @@ function fixture() {
   new Function('require', 'module', 'exports', 'process', compiled)(
     (name) => {
       required.push(name);
+      if (name === './loaders/httpApplication') {
+        const helper = { exports: {} };
+        const code = ts.transpileModule(
+          fs.readFileSync('back/loaders/httpApplication.ts', 'utf8'),
+          {
+            compilerOptions: {
+              module: ts.ModuleKind.CommonJS,
+              target: ts.ScriptTarget.ES2020,
+              esModuleInterop: true,
+            },
+          },
+        ).outputText;
+        new Function('require', 'module', 'exports', code)(
+          (dependency) => {
+            required.push(dependency);
+            const alias = dependency.startsWith('../')
+              ? './' + dependency.slice(3)
+              : dependency;
+            return Object.hasOwn(mocks, alias)
+              ? mocks[alias]
+              : middlewareRequire(dependency);
+          },
+          helper,
+          helper.exports,
+        );
+        return helper.exports;
+      }
       return Object.hasOwn(mocks, name) ? mocks[name] : localRequire(name);
     },
     module,

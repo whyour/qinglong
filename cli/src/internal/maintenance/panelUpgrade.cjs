@@ -6,6 +6,7 @@ const { spawn } = require('node:child_process');
 const http = require('node:http');
 const { setTimeout: delay } = require('node:timers/promises');
 const artifacts = require('./upgradeArtifacts.cjs');
+const { nodeRuntimeArgs } = require('./platformBundle.cjs');
 
 const active = new Set(['starting', 'running', 'restarting']);
 const stateFile = (tmp) => path.join(tmp, 'panel-upgrade.json');
@@ -200,6 +201,93 @@ async function getStatus(tmp) {
   return state;
 }
 
+// Manual restarts accept the currently prepared package, including one retained
+// after a failed preparation. Legacy installs without jobs keep their old path;
+// complete-bundle installs always verify and record the actual running build.
+async function withPreparedJob(tmp, env, selected, operation) {
+  const previous = await getStatus(tmp);
+  if (active.has(previous.status)) throw new Error('已有更新或重载正在执行。');
+  const hasRecord = await fs
+    .access(stateFile(tmp))
+    .then(() => true)
+    .catch((error) => {
+      if (error.code !== 'ENOENT') throw error;
+      return false;
+    });
+  if (!hasRecord) {
+    const pkg = env.QL_DIR
+      ? JSON.parse(
+          await fs
+            .readFile(path.join(env.QL_DIR, 'package.json'), 'utf8')
+            .catch((error) => {
+              if (error.code !== 'ENOENT') throw error;
+              return '{}';
+            }),
+        )
+      : {};
+    if (pkg.qinglongUpgradeFormat !== 2) return operation();
+  }
+  return artifacts.withUpgradeLock(
+    path.join(tmp, 'panel-job-launch'),
+    async () => {
+      const current = await getStatus(tmp);
+      if (active.has(current.status))
+        throw new Error('已有更新或重载正在执行。');
+      const prepared = await artifacts.selectedUpgrade(
+        tmp,
+        artifacts.releaseBranch(env),
+        env,
+        { metadataOnly: true },
+      );
+      if (
+        prepared.source !== selected.source ||
+        prepared.static !== selected.static
+      )
+        throw new Error('暂存更新已变化，请重新下载更新。');
+      const metadata = await stagedMetadata(selected);
+      const previousBuild = await readRunningBuild(env).catch(() => undefined);
+      const { log, error, ...record } = current;
+      let state = {
+        ...record,
+        ...metadata,
+        id: randomUUID(),
+        action: 'apply',
+        status: 'running',
+        phase: 'verifying',
+        startedAt: Date.now(),
+        pid: process.pid,
+      };
+      const report = async (patch) => {
+        state = { ...state, ...patch, updatedAt: Date.now() };
+        await save(tmp, state);
+      };
+      await fs.writeFile(
+        logFile(tmp),
+        'Manual application of prepared update\n',
+        {
+          mode: 0o600,
+        },
+      );
+      await report({});
+      try {
+        const result = await operation({
+          onStop: () => report({ status: 'restarting', phase: 'restarting' }),
+          onStart: (recover) =>
+            recover
+              ? undefined
+              : verifyRunningVersion(env, state, previousBuild),
+        });
+        await report({ status: 'completed', phase: 'completed' });
+        return result;
+      } catch (error) {
+        await report({ status: 'failed', error: error.message });
+        throw error;
+      }
+    },
+    env,
+  );
+}
+
 async function startJob({ root, tmp, env = process.env }, action) {
   if (!['download', 'apply'].includes(action))
     throw new Error('Invalid upgrade action');
@@ -220,12 +308,14 @@ async function startJob({ root, tmp, env = process.env }, action) {
           let selected;
           let metadata;
           if (action === 'apply') {
-            // Fail before launching a process or stopping the working panel.
+            // Keep requests short on slow devices. The detached worker performs
+            // complete file/dependency verification before it can stop the panel.
             try {
               selected = await artifacts.selectedUpgrade(
                 tmp,
                 artifacts.releaseBranch(env),
                 env,
+                { metadataOnly: true },
               );
               metadata = await stagedMetadata(selected);
               if (previous.status === 'ready')
@@ -390,7 +480,7 @@ async function runJob({ root, tmp, env = process.env }, id) {
                       );
                       await artifacts.waitForHealth(
                         env,
-                        60000,
+                        undefined,
                         recover ? undefined : controller.signal,
                       );
                       if (!recover)
@@ -429,16 +519,30 @@ async function runJob({ root, tmp, env = process.env }, id) {
   }
 }
 
-module.exports = { getStatus, startJob, runJob };
+module.exports = {
+  getStatus,
+  saveState: save,
+  startJob,
+  runJob,
+  withPanelLifecycle,
+  readRunningBuild,
+  verifyRunningVersion,
+  stagedMetadata,
+  withPreparedJob,
+};
 async function launchWorker(id) {
   // detached creates a session but keeps the original parent. PM2 kills the
   // backend's entire descendant tree, so an intermediate launcher must exit
   // before the worker is allowed to stop that backend.
-  const child = spawn(process.execPath, [__filename, 'worker', id], {
-    env: { ...process.env, QL_UPGRADE_LAUNCHER_PID: String(process.pid) },
-    detached: true,
-    stdio: 'inherit',
-  });
+  const child = spawn(
+    process.execPath,
+    [...nodeRuntimeArgs(), __filename, 'worker', id],
+    {
+      env: { ...process.env, QL_UPGRADE_LAUNCHER_PID: String(process.pid) },
+      detached: true,
+      stdio: 'inherit',
+    },
+  );
   await new Promise((resolve, reject) => {
     child.once('spawn', resolve);
     child.once('error', reject);

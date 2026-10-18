@@ -186,7 +186,7 @@ test('detached download survives its initiating request and is idempotent; apply
   );
 });
 
-test('invalid staged payload is rejected before spawning a restart', async (t) => {
+test('invalid staged payload fails asynchronously before stopping the panel', async (t) => {
   const f = await fixture(t);
   await startJob(f, 'download');
   assert.equal((await finished(f.tmp)).status, 'ready');
@@ -197,9 +197,16 @@ test('invalid staged payload is rejected before spawning a restart', async (t) =
     path.join(f.tmp, pointer.directory, 'qinglong-static-master/build/app.js'),
     'corrupted',
   );
-  await assert.rejects(startJob(f, 'apply'), /checksum|损坏/);
+  const queued = await startJob(f, 'apply');
+  assert.equal(queued.status, 'starting');
+  const failed = await finished(f.tmp);
+  assert.equal(failed.status, 'failed');
+  assert.match(failed.error, /checksum|损坏/);
   assert.equal(syncFs.existsSync(path.join(f.root, 'stops')), false);
-  assert.equal((await getStatus(f.tmp)).status, 'failed');
+  assert.equal(
+    await fs.readFile(path.join(f.root, 'version.yaml'), 'utf8'),
+    'version: 2.23.0',
+  );
 });
 
 test('failed download persists its failure without stopping the panel and can be retried', async (t) => {
@@ -467,3 +474,15 @@ for (const knownSize of [true, false])
     assert.equal(reports.at(-1).downloadedBytes, 100);
     assert.equal(reports.at(-1).percent, knownSize ? 100 : null);
   });
+
+test('asynchronous apply still rejects unsafe stage pointers before dispatch', async (t) => {
+  const f = await fixture(t);
+  await startJob(f, 'download');
+  assert.equal((await finished(f.tmp)).status, 'ready');
+  await fs.writeFile(
+    path.join(f.tmp, 'upgrade-ready-master.json'),
+    JSON.stringify({ directory: '../outside' }),
+  );
+  await assert.rejects(startJob(f, 'apply'), /指针|pointer/);
+  assert.equal(syncFs.existsSync(path.join(f.root, 'stops')), false);
+});

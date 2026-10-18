@@ -286,3 +286,46 @@ npm_install_2() { printf '%s' "$1" > "$QL_DIR/installed"; exit_status=0; }
   );
   assert.deepEqual(await fs.readdir(f.tmp), []);
 });
+
+test('offline selection and worker ownership do not leak into the restarted backend', async (t) => {
+  const f = await fixture(t);
+  await fs.writeFile(
+    path.join(f.root, 'shell/share.sh'),
+    `${await fs.readFile('shell/share.sh', 'utf8')}
+pm2() { if [ "$1" = startOrGracefulReload ]; then node "$QL_DIR/report-runtime.cjs"; fi; }
+`,
+  );
+  await fs.writeFile(
+    path.join(f.root, 'report-runtime.cjs'),
+    `
+require('node:fs').writeFileSync(process.env.QL_DIR + '/runtime.json', JSON.stringify({
+  file: process.env.QL_UPGRADE_FILE ?? null,
+  repair: process.env.QL_UPGRADE_REPAIR_DEPS ?? null,
+  launcher: process.env.QL_UPGRADE_LAUNCHER_PID ?? null,
+  custom: process.env.QA_USER_SETTING,
+  branch: process.env.QL_BRANCH,
+}));
+`,
+  );
+  const env = Object.freeze({
+    ...f.env,
+    QL_UPGRADE_FILE: path.join(f.root, 'offline.tar.gz'),
+    QL_UPGRADE_REPAIR_DEPS: '1',
+    QL_UPGRADE_LAUNCHER_PID: '12345',
+    QA_USER_SETTING: 'preserved',
+    QL_BRANCH: 'develop',
+  });
+  await withLifecycleHooks(f.root, f.tmp, env, (hook) => hook('start'));
+  assert.deepEqual(
+    JSON.parse(await fs.readFile(path.join(f.root, 'runtime.json'))),
+    {
+      file: null,
+      repair: null,
+      launcher: null,
+      custom: 'preserved',
+      branch: 'develop',
+    },
+  );
+  assert.equal(env.QL_UPGRADE_FILE, path.join(f.root, 'offline.tar.gz'));
+  assert.equal(env.QL_UPGRADE_REPAIR_DEPS, '1');
+});
