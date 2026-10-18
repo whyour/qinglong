@@ -167,7 +167,9 @@ const CheckUpdate = ({ systemInfo }: any) => {
               <div className="upgrade-progress-meta">
                 <Typography.Text type="secondary">
                   {intl.get(
-                    job.artifact === 'qinglong-static'
+                    job.artifact === 'qinglong-bundle'
+                      ? '下载更新包'
+                      : job.artifact === 'qinglong-static'
                       ? '下载构建产物'
                       : '下载源码',
                   )}

@@ -41,11 +41,18 @@ class Application {
   }
 
   private startMasterProcess() {
+    const readyTimeout =
+      process.arch === 'arm' &&
+      Number(
+        (process.config.variables as { arm_version?: string | number }).arm_version,
+      ) === 6
+        ? 120000
+        : 30000;
     // Fork gRPC worker first and wait for it to be ready
     const grpcWorker = this.forkWorker('grpc');
     
     // Wait for gRPC worker to signal it's ready before starting HTTP worker
-    this.waitForWorkerReady(grpcWorker, 30000)
+    this.waitForWorkerReady(grpcWorker, readyTimeout)
       .then(() => {
         Logger.info('[boot] gRPC worker is ready, starting HTTP worker');
         this.httpWorker = this.forkWorker('http');
@@ -71,7 +78,7 @@ class Application {
               Logger.warn('Unable to notify HTTP worker of scheduler exit');
             }
             const newGrpcWorker = this.forkWorker('grpc');
-            this.waitForWorkerReady(newGrpcWorker, 30000)
+            this.waitForWorkerReady(newGrpcWorker, readyTimeout)
               .then(() => {
                 Logger.info('gRPC worker restarted and ready');
                 // Re-register cron jobs by notifying the HTTP worker

@@ -52,6 +52,17 @@ make_dir /etc/nginx/conf.d
 make_dir /run/nginx
 fix_config
 
+# Slow devices may need more than the worker's readiness window to generate
+# first-boot certificates. Reuse the regular initializer before starting workers.
+node <<'QL_PREPARE_GRPC_CERTS'
+require(require('node:path').join(process.env.QL_DIR, 'static/build/config/grpcCerts.js'))
+  .initGrpcCerts()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+QL_PREPARE_GRPC_CERTS
+
 pm2 l &>/dev/null
 
 log_with_style "INFO" "$(t '🔄  2. 启动 nginx...')"
