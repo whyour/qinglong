@@ -294,6 +294,18 @@ delete_pm2() {
   pkill -f "node.*static/build/app.js" 2>/dev/null || true
 }
 
+load_node_runtime_args() {
+  ql_node_runtime_args=()
+  local runtime_args
+  local helper="$dir_root/cli/src/internal/maintenance/nodeRuntime.cjs"
+  if [[ -f "$helper" ]]; then
+    runtime_args=$(node "$helper") || return $?
+    if [[ -n "$runtime_args" ]]; then
+      read -r -a ql_node_runtime_args <<<"$runtime_args"
+    fi
+  fi
+}
+
 reload_pm2() {
   cd "$dir_root" || return $?
   restore_env_vars
@@ -305,6 +317,7 @@ reload_pm2() {
     local exit_code=$?
     t '警告: PM2 启动失败 (退出码: %s)，可能是由于硬件不兼容' "$exit_code"
     t '正在尝试直接使用 Node.js 启动服务...'
+    load_node_runtime_args || return $?
 
     # Kill any existing node processes for qinglong
     pkill -f "node.*static/build/app.js" 2>/dev/null || true
@@ -312,9 +325,9 @@ reload_pm2() {
     # Start node directly in the background. In containers, keep application
     # output on the container streams instead of duplicating Winston logs on disk.
     if [[ "$QL_CONTAINER" == "true" ]]; then
-      nohup node static/build/app.js >/proc/1/fd/1 2>/proc/1/fd/2 &
+      nohup node "${ql_node_runtime_args[@]}" static/build/app.js >/proc/1/fd/1 2>/proc/1/fd/2 &
     else
-      nohup node static/build/app.js >"$dir_log/qinglong.log" 2>&1 &
+      nohup node "${ql_node_runtime_args[@]}" static/build/app.js >"$dir_log/qinglong.log" 2>&1 &
     fi
     local node_pid=$!
 

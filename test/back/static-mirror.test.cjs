@@ -6,6 +6,61 @@ const os = require('node:os');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { writeManifest } = require('../helpers/upgrade-fixture.cjs');
 
+test('both static publication steps supply a token as the HTTPS password and reject missing credentials', () => {
+  const workflow = require('js-yaml').load(
+    fs.readFileSync('.github/workflows/build-docker-image.yml', 'utf8'),
+  );
+  for (const name of [
+    'copy to static repo',
+    'publish verified upgrade download sizes',
+  ]) {
+    const step = workflow.jobs['build-static'].steps.find(
+      (step) => step.name === name,
+    );
+    assert.equal(step.env.STATIC_TOKEN, '${{ secrets.API_TOKEN }}');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-static-auth-'));
+    try {
+      // Capture the real workflow command's argv, without contacting any remote.
+      for (const program of ['bash', 'node']) {
+        fs.writeFileSync(
+          path.join(tmp, program),
+          '#!/bin/sh\nprintf "%s\\n" "$@" > "$QA_ARGS"\n',
+          { mode: 0o755 },
+        );
+      }
+      const argsFile = path.join(tmp, 'args');
+      const env = {
+        PATH: tmp,
+        QA_ARGS: argsFile,
+        STATIC_TOKEN: 'fixture-secret',
+        GITHUB_REPO: 'github.com/fixture/static',
+        GITHUB_BRANCH: 'develop',
+        GITHUB_REF_TYPE: 'branch',
+        GITHUB_SHA: 'a'.repeat(40),
+      };
+      const result = spawnSync('/bin/bash', ['-euc', step.run], {
+        env,
+        encoding: 'utf8',
+      });
+      assert.equal(result.status, 0, result.stderr);
+      const remote = fs.readFileSync(argsFile, 'utf8').split('\n')[1];
+      const url = new URL(remote);
+      assert.equal(url.username, 'x-access-token');
+      assert.equal(url.password, env.STATIC_TOKEN);
+      fs.unlinkSync(argsFile);
+      assert.notEqual(
+        spawnSync('/bin/bash', ['-euc', step.run], {
+          env: { ...env, STATIC_TOKEN: '' },
+        }).status,
+        0,
+      );
+      assert.equal(fs.existsSync(argsFile), false);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+});
+
 test('static mirror receives complete orphan snapshots of each requested branch and reports rejection', (t) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-static-mirror-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));

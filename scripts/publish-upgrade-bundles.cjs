@@ -13,7 +13,6 @@ const platforms = [
   'linux-s390x-musl',
   'linux-ia32-musl',
   'linux-x64-glibc',
-  'linux-armv6-glibc',
   'linux-armv7-glibc',
   'linux-arm64-glibc',
   'linux-ppc64-glibc',
@@ -61,20 +60,14 @@ function publishBundles({
   branch,
   version,
   buildId,
-  allowDevelopment = false,
   gh = (...args) =>
     execFileSync('gh', args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     }),
 }) {
-  if (
-    branch !== 'master' &&
-    !(branch === 'develop' && allowDevelopment === true)
-  )
-    throw new Error(
-      'Only master or explicitly requested development images publish bundles',
-    );
+  if (!['master', 'develop'].includes(branch))
+    throw new Error('Only master or develop images publish bundles');
   if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/.test(version || ''))
     throw new Error('Invalid bundle version');
   if (!/^\d+-\d+$/.test(buildId || ''))
@@ -226,6 +219,45 @@ function publishBundles({
       '--clobber',
     );
     gh('release', 'edit', ref, '--repo', repository, '--notes', notes);
+    if (
+      !matches(
+        lookup(ref)?.assets.find((a) => a.name === 'latest.json'),
+        path.join(directory, 'latest.json'),
+      )
+    )
+      throw new Error('Published channel index verification failed');
+  }
+  // Only prune development releases after the complete new batch and its
+  // channel pointer are verified. Production versions and aliases are retained.
+  if (development && currentSource()) {
+    const pages = JSON.parse(
+      gh(
+        'api',
+        `repos/${repository}/releases?per_page=100`,
+        '--paginate',
+        '--slurp',
+      ),
+    );
+    for (const release of pages.flat()) {
+      if (
+        release.tag_name !== tag &&
+        /^upgrade-build-develop-v\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?-\d+-\d+$/.test(
+          release.tag_name,
+        ) &&
+        release.prerelease === true &&
+        release.draft === false
+      ) {
+        if (!currentSource()) break;
+        gh(
+          'release',
+          'delete',
+          release.tag_name,
+          '--repo',
+          repository,
+          '--yes',
+        );
+      }
+    }
   }
   return true;
 }
@@ -246,8 +278,5 @@ if (require.main === module) {
     branch,
     version,
     buildId: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
-    allowDevelopment:
-      process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' &&
-      process.env.QL_BUILD_DEVELOPMENT_BUNDLES === 'true',
   });
 }

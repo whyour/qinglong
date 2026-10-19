@@ -47,7 +47,19 @@ fi
 for requested_ref in "${refs[@]}"; do
   git check-ref-format "$requested_ref"
 done
-command -v timeout >/dev/null || { echo 'GNU timeout is required' >&2; exit 2; }
+# Ubuntu 26.04's default timeout is from uutils. We require GNU's process-group
+# termination so git transport children cannot keep the query pipes open.
+timeout_command=''
+for candidate in timeout gnutimeout gtimeout; do
+  if version=$("$candidate" --version 2>/dev/null) && [[ "$version" == *'(GNU coreutils)'* ]]; then
+    timeout_command=$candidate
+    break
+  fi
+done
+if [[ -z "$timeout_command" ]]; then
+  echo 'GNU timeout is required (timeout, gnutimeout or gtimeout)' >&2
+  exit 2
+fi
 if [[ -n "$notify_repo" ]]; then
   if [[ ! "$notify_repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
     echo 'QL_MIRROR_NOTIFY_REPO must be a GitHub owner/repository' >&2
@@ -62,7 +74,7 @@ notification_command() {
   local budget=$((notification_deadline - SECONDS))
   if (( budget <= 0 )); then return 1; fi
   if (( budget > 10 )); then budget=10; fi
-  timeout --signal=KILL "${budget}s" "$@"
+  "$timeout_command" --signal=KILL "${budget}s" "$@"
 }
 
 notify_static_mirror() {
@@ -156,7 +168,7 @@ while (( SECONDS < wait_seconds )); do
     fi
     budget=$query_timeout
     if (( budget > remaining )); then budget=$remaining; fi
-    if ! output=$(timeout --signal=KILL "${budget}s" git ls-remote --refs \
+    if ! output=$("$timeout_command" --signal=KILL "${budget}s" git ls-remote --refs \
       "${urls[$index]}" "${refs[@]}" | LC_ALL=C sort); then
       echo "::warning::Could not read ${labels[$index]} refs on attempt $attempt; retrying"
       ready=false

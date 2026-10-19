@@ -69,6 +69,15 @@ function fixture(t) {
       const route = args[1];
       if (route.endsWith('/git/ref/heads/master')) return state.head;
       if (route.endsWith('/git/ref/heads/develop')) return state.developHead;
+      if (route.endsWith('/releases?per_page=100'))
+        return JSON.stringify([
+          Array.from(state.releases.keys(), (tag_name) => ({
+            tag_name,
+            prerelease: true,
+            draft: false,
+            ...state.releaseMetadata?.[tag_name],
+          })),
+        ]);
       if (route.includes('/releases/tags/')) {
         const tag = decodeURIComponent(route.split('/releases/tags/')[1]);
         if (state.lookupFailure === tag)
@@ -118,11 +127,21 @@ function fixture(t) {
           digest: `sha256:${sha256(bytes)}`,
         });
       }
+      if (tag === 'upgrade-develop' && state.corruptChannel)
+        release.get('latest.json').digest = 'sha256:wrong';
       if (files.length > 1) {
         if (state.corruptUploadedBatch)
           release.get(path.basename(files[0])).digest = 'sha256:wrong';
         if (state.changeHeadAfterUpload) state.head = 'b'.repeat(40);
+        if (state.changeDevelopHeadAfterUpload)
+          state.developHead = 'd'.repeat(40);
       }
+      return '';
+    }
+    if (args[0] === 'release' && args[1] === 'delete') {
+      if (state.failDelete) throw new Error('Delete unavailable');
+      assert.ok(state.releases.has(args[2]));
+      state.releases.delete(args[2]);
       return '';
     }
     if (args[0] === 'release' && args[1] === 'edit') return '';
@@ -143,10 +162,10 @@ test('publishes every platform and installer before advancing version and legacy
   assert.equal(index.version, '2.24.0');
   assert.equal(index.buildId, '100-1');
   assert.equal(index.sourceCommit, f.options.commit);
-  assert.equal(Object.keys(index.packages).length, 13);
+  assert.equal(Object.keys(index.packages).length, 12);
   assert.deepEqual(index, f.index('upgrade-v2.24.0'));
   const tag = 'upgrade-build-v2.24.0-100-1';
-  assert.equal(f.state.releases.get(tag).size, 28);
+  assert.equal(f.state.releases.get(tag).size, 26);
   for (const entry of [...Object.values(index.packages), index.installer]) {
     const url = new URL(entry.url),
       filename = path.basename(url.pathname);
@@ -230,7 +249,7 @@ for (const fault of ['missing', 'corrupt', 'wrong-version'])
     const f = fixture(t);
     const archive = path.join(
       f.directory,
-      `qinglong-${f.options.commit}-linux-armv6-glibc.tar.gz`,
+      `qinglong-${f.options.commit}-linux-armv6-musl.tar.gz`,
     );
     if (fault === 'missing') fs.rmSync(archive);
     else if (fault === 'corrupt') fs.appendFileSync(archive, 'corrupt');
@@ -288,7 +307,7 @@ test('an explicitly rerun earlier workflow may replace the same version and comm
 
 test('non-master branches, invalid build IDs and API failures cannot overwrite published versions', (t) => {
   const f = fixture(t);
-  for (const branch of ['develop', 'v2.24.0', 'feature/test'])
+  for (const branch of ['debian-dev', 'v2.24.0', 'feature/test'])
     assert.throws(() => f.publish({ branch }), /Only master/);
   for (const buildId of [undefined, '100', '100-1/other'])
     assert.throws(() => f.publish({ buildId }), /Invalid bundle build ID/);
@@ -316,7 +335,7 @@ test('existing master clients can migrate from indexes without version/build met
   assert.equal(f.index().buildId, '100-2');
 });
 
-test('explicit development publication shares musl/glibc packages without changing version or latest production assets', (t) => {
+test('automatic development publication shares musl/glibc packages without changing version or latest production assets', (t) => {
   const f = fixture(t);
   f.publish();
   const production = f.index();
@@ -325,18 +344,17 @@ test('explicit development publication shares musl/glibc packages without changi
     f.publish({
       branch: 'develop',
       commit: f.state.developHead,
-      allowDevelopment: true,
     }),
     true,
   );
   const development = f.index('upgrade-develop');
   assert.equal(development.channel, 'develop');
   assert.equal(development.sourceCommit, f.state.developHead);
-  assert.equal(Object.keys(development.packages).length, 13);
+  assert.equal(Object.keys(development.packages).length, 12);
   assert.ok(development.packages['linux-x64-musl']);
   assert.ok(development.packages['linux-x64-glibc']);
   assert.ok(development.packages['linux-armv6-musl']);
-  assert.ok(development.packages['linux-armv6-glibc']);
+  assert.equal(development.packages['linux-armv6-glibc'], undefined);
   for (const entry of [
     ...Object.values(development.packages),
     development.installer,
@@ -344,44 +362,30 @@ test('explicit development publication shares musl/glibc packages without changi
     assert.ok(entry.url.includes('/upgrade-build-develop-v2.24.0-100-1/'));
   assert.deepEqual(f.index(), production);
   assert.deepEqual(f.index('upgrade-v2.24.0'), production);
-  assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 28);
+  assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 26);
   assert.equal(
     f.state.releases.get('upgrade-build-develop-v2.24.0-100-1').size,
-    28,
+    26,
   );
 });
 
-test('development builds require explicit boolean opt-in and cannot publish obsolete development source', (t) => {
+test('development builds cannot publish obsolete development source', (t) => {
   const f = fixture(t);
-  for (const allowDevelopment of [false, undefined, 'true'])
-    assert.throws(
-      () => f.publish({ branch: 'develop', allowDevelopment }),
-      /explicitly requested/,
-    );
-  assert.throws(
-    () => f.publish({ branch: 'feature/test', allowDevelopment: true }),
-    /Only master/,
-  );
-  assert.equal(f.state.calls.length, 0);
   f.write(f.state.developHead, 'development');
   const obsolete = f.state.developHead;
   f.state.developHead = 'd'.repeat(40);
-  assert.equal(
-    f.publish({ branch: 'develop', commit: obsolete, allowDevelopment: true }),
-    false,
-  );
+  assert.equal(f.publish({ branch: 'develop', commit: obsolete }), false);
   assert.equal(f.state.releases.size, 0);
 });
 
 for (const fault of ['failBatchUpload', 'corruptUploadedBatch'])
-  test(`failed manual development publication preserves both channels (${fault})`, (t) => {
+  test(`failed automatic development publication preserves both channels (${fault})`, (t) => {
     const f = fixture(t);
     f.publish();
     const production = f.index();
     const options = {
       branch: 'develop',
       commit: f.state.developHead,
-      allowDevelopment: true,
     };
     f.write(options.commit, 'first development');
     f.publish(options);
@@ -396,3 +400,98 @@ for (const fault of ['failBatchUpload', 'corruptUploadedBatch'])
     assert.deepEqual(f.index(), production);
     assert.deepEqual(f.index('upgrade-v2.24.0'), production);
   });
+
+for (const fault of [
+  null,
+  'failBatchUpload',
+  'corruptUploadedBatch',
+  'corruptChannel',
+])
+  test(`development retention deletes old batches only after verified publication (${
+    fault || 'success'
+  })`, (t) => {
+    const f = fixture(t);
+    f.publish();
+    const production = f.index();
+    const options = { branch: 'develop', commit: f.state.developHead };
+    f.write(options.commit, 'development');
+    f.publish(options);
+    const oldTag = 'upgrade-build-develop-v2.24.0-100-1';
+    // Never prune production, channel aliases, legacy/unclassified releases,
+    // drafts or a non-prerelease even when its name resembles a dev build.
+    const protectedTags = [
+      'upgrade-86c37f426a5ba9945d6af1910a7885a26f77e4bc',
+      'v2.24.0',
+      'upgrade-build-develop-v2.24.0-10-1',
+      'upgrade-build-develop-v2.24.0-11-1',
+    ];
+    for (const tag of protectedTags) f.state.releases.set(tag, new Map());
+    f.state.releaseMetadata = {
+      [protectedTags[2]]: { draft: true },
+      [protectedTags[3]]: { prerelease: false },
+    };
+    f.write(options.commit, 'next development');
+    if (fault) f.state[fault] = true;
+    if (fault)
+      assert.throws(
+        () => f.publish({ ...options, buildId: '101-1' }),
+        /Upload interrupted|verification failed/,
+      );
+    else {
+      assert.equal(f.publish({ ...options, buildId: '101-1' }), true);
+      assert.equal(f.index('upgrade-develop').buildId, '101-1');
+      const deletion = f.state.calls.findIndex(
+        (a) => a[0] === 'release' && a[1] === 'delete',
+      );
+      const aliasEdit = f.state.calls.findLastIndex(
+        (a) => a[0] === 'release' && a[1] === 'edit',
+      );
+      assert.ok(deletion > aliasEdit);
+      assert.ok(
+        f.state.calls
+          .slice(aliasEdit + 1, deletion)
+          .some(
+            (a) =>
+              a[0] === 'api' && a[1].includes('/releases/tags/upgrade-develop'),
+          ),
+      );
+      assert.ok(f.state.releases.has('upgrade-build-develop-v2.24.0-101-1'));
+    }
+    assert.equal(f.state.releases.has(oldTag), Boolean(fault));
+    for (const tag of protectedTags) assert.ok(f.state.releases.has(tag));
+    assert.deepEqual(f.index(), production);
+    assert.deepEqual(f.index('upgrade-v2.24.0'), production);
+  });
+
+test('failed development cleanup is retryable without overwriting immutable assets', (t) => {
+  const f = fixture(t);
+  const options = { branch: 'develop', commit: f.state.developHead };
+  f.write(options.commit, 'development');
+  f.publish(options);
+  f.state.failDelete = true;
+  assert.throws(
+    () => f.publish({ ...options, buildId: '101-1' }),
+    /Delete unavailable/,
+  );
+  assert.equal(f.index('upgrade-develop').buildId, '101-1');
+  assert.ok(f.state.releases.has('upgrade-build-develop-v2.24.0-100-1'));
+  f.state.failDelete = false;
+  f.publish({ ...options, buildId: '101-1' });
+  assert.ok(!f.state.releases.has('upgrade-build-develop-v2.24.0-100-1'));
+  assert.ok(f.state.releases.has('upgrade-build-develop-v2.24.0-101-1'));
+});
+
+test('a newer development commit during upload preserves the published channel and its old package', (t) => {
+  const f = fixture(t);
+  const options = { branch: 'develop', commit: f.state.developHead };
+  f.write(options.commit, 'development');
+  f.publish(options);
+  const before = f.index('upgrade-develop');
+  f.state.changeDevelopHeadAfterUpload = true;
+  assert.equal(f.publish({ ...options, buildId: '101-1' }), false);
+  assert.deepEqual(f.index('upgrade-develop'), before);
+  assert.ok(f.state.releases.has('upgrade-build-develop-v2.24.0-100-1'));
+  assert.ok(
+    !f.state.calls.some((a) => a[0] === 'release' && a[1] === 'delete'),
+  );
+});

@@ -3,7 +3,46 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const { findDirectBackendPids } = require('../../dist/internal/runtime/backendProcesses');
+const {
+  findDirectBackendPids,
+} = require('../../dist/internal/runtime/backendProcesses');
+
+test('backend discovery accepts only owned compatibility flags and the exact installation entry', async (t) => {
+  const root = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), 'ql-flagged-proc-')),
+  );
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const proc = path.join(root, 'proc'),
+    panel = path.join(root, 'panel with spaces');
+  const other = path.join(root, 'other/static/build/app.js');
+  const entry = path.join(panel, 'static/build/app.js');
+  for (const file of [entry, other]) {
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, '');
+  }
+  const flags = ['--no-opt', '--no-sparkplug', '--no-maglev'];
+  const cases = [
+    [['/usr/bin/node', ...flags, entry], true],
+    [['node24', ...flags, 'static/build/app.js'], true],
+    [['node', ...flags, other], false],
+    [['node', '-e', entry], false],
+    [['node', '-r', entry], false],
+    [['node', ...flags, entry, 'argument'], false],
+    [['node', '--no-opt', entry], false],
+    [['bash', ...flags, entry], false],
+    [['node', ...flags, '-e', entry], false],
+  ];
+  const expected = [];
+  for (const [i, [args, matches]] of cases.entries()) {
+    const pid = 910001 + i,
+      directory = path.join(proc, String(pid));
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(path.join(directory, 'cmdline'), args.join('\0') + '\0');
+    await fs.symlink(panel, path.join(directory, 'cwd'));
+    if (matches) expected.push(pid);
+  }
+  assert.deepEqual((await findDirectBackendPids(entry, proc)).sort(), expected);
+});
 
 test('Linux backend discovery scopes legacy relative and absolute commands to one installation', async (t) => {
   const root = await fs.realpath(
@@ -64,7 +103,10 @@ test(
     const { spawn } = require('node:child_process');
     const { once } = require('node:events');
     const { createContext } = require('../../dist/internal/runtime/context');
-    const { stopPanel, startPanel } = require('../../dist/internal/maintenance/operator');
+    const {
+      stopPanel,
+      startPanel,
+    } = require('../../dist/internal/maintenance/operator');
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-live-proc-'));
     const children = [];
     let fallbackPid;
@@ -223,7 +265,9 @@ for (const language of ['zh', 'en', 'unsupported']) {
       );
       t.after(() => fs.rm(root, { recursive: true, force: true }));
       const { createContext } = require('../../dist/internal/runtime/context');
-      const { startPanel } = require('../../dist/internal/maintenance/operator');
+      const {
+        startPanel,
+      } = require('../../dist/internal/maintenance/operator');
       const context = createContext({ root }, { PATH: '', QL_LANG: language });
       const entry = path.join(context.paths.dir_static, 'build/app.js');
       await fs.mkdir(path.dirname(entry), { recursive: true });

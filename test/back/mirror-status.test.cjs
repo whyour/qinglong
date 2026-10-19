@@ -50,6 +50,30 @@ test('mirror verification reads matching refs without changing either repository
   assert.equal(git('-C', source, 'status', '--porcelain'), '');
 });
 
+test('mirror verification selects GNU timeout when the default is another implementation', (t) => {
+  const { tmp, source, mirror } = fixture(t);
+  git('-C', source, 'push', mirror, 'develop');
+  const realTimeout = ['timeout', 'gnutimeout', 'gtimeout'].find((name) => {
+    const result = spawnSync(name, ['--version'], { encoding: 'utf8' });
+    return result.status === 0 && result.stdout.includes('(GNU coreutils)');
+  });
+  assert.ok(realTimeout, 'The mirror script requires GNU timeout');
+  const bin = path.join(tmp, 'bin');
+  fs.mkdirSync(bin);
+  fs.symlinkSync(execFileSync('which', [realTimeout], { encoding: 'utf8' }).trim(), path.join(bin, 'gnutimeout'));
+  fs.symlinkSync(execFileSync('which', ['git'], { encoding: 'utf8' }).trim(), path.join(bin, 'git'));
+  fs.symlinkSync(execFileSync('which', ['sort'], { encoding: 'utf8' }).trim(), path.join(bin, 'sort'));
+  fs.writeFileSync(path.join(bin, 'timeout'), '#!/bin/sh\nif [ "$1" = --version ]; then echo "timeout (uutils coreutils)"; exit 0; fi\nexit 98\n', { mode: 0o755 });
+  const args = [script, source, mirror, 'develop'];
+  const result = spawnSync('/bin/bash', args, options({ PATH: bin }));
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.match(result.stdout, /Mirror matches the latest source refs/);
+  fs.unlinkSync(path.join(bin, 'gnutimeout'));
+  const unsupported = spawnSync('/bin/bash', args, options({ PATH: bin }));
+  assert.equal(unsupported.status, 2, unsupported.stderr + unsupported.stdout);
+  assert.match(unsupported.stderr, /GNU timeout is required/);
+});
+
 test('mirror polling follows a source that advances while waiting', async (t) => {
   const { source, mirror } = fixture(t);
   git('-C', source, 'push', mirror, 'develop');

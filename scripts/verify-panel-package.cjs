@@ -29,8 +29,9 @@ const requiredFiles = [
   'shell/preload/esm-loader.mjs', 'shell/preload/notificationAudit.js',
   'sample/config.sample.sh', 'sample/auth.sample.json',
   'static/build-info.json', 'static/build/app.js', 'static/build/token.js',
-  'static/build/bootstrap/upgradeProbe.js', 'static/dist/index.html',
-  ...['upgradeArtifacts', 'platformBundle', 'upgradePrestart', 'panelUpgrade']
+  'static/build/bootstrap/upgradeProbe.js',
+  'static/dist/index.html',
+  ...['upgradeArtifacts', 'platformBundle', 'upgradePrestart', 'panelUpgrade', 'nodeRuntime']
     .map((name) => `cli/src/internal/maintenance/${name}.cjs`),
 ];
 

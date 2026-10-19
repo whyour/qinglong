@@ -7,6 +7,14 @@ const yaml = require('js-yaml');
 const workflow = yaml.load(
   fs.readFileSync('.github/workflows/build-docker-image.yml', 'utf8'),
 );
+
+test('shared server runtime changes trigger the image and upgrade verification workflow', () => {
+  const paths = workflow.on.push.paths;
+  assert.ok(
+    paths.indexOf('cli/src/internal/maintenance/nodeRuntime.cjs') >
+      paths.indexOf('!cli/**'),
+  );
+});
 // These conditions use GitHub's boolean operators and format(), which have the
 // same semantics for the boolean/string contexts exercised here.
 const evaluate = (expression, github, inputs = {}) => {
@@ -25,25 +33,14 @@ const evaluate = (expression, github, inputs = {}) => {
       );
 };
 
-test('both bundle jobs require master or an explicit development dispatch', () => {
-  assert.equal(
-    workflow.on.workflow_dispatch.inputs.build_development_bundles.default,
-    false,
-  );
+test('both channels automatically build bundles, with static-only and Git-tag runs excluded', () => {
   const cases = [
-    ['push', 'refs/heads/develop', {}, false],
-    ['push', 'refs/heads/develop', { build_development_bundles: true }, false],
-    ['workflow_dispatch', 'refs/heads/develop', {}, false],
+    ['push', 'refs/heads/develop', {}, true],
+    ['workflow_dispatch', 'refs/heads/develop', {}, true],
     [
       'workflow_dispatch',
       'refs/heads/develop',
-      { build_development_bundles: true },
-      true,
-    ],
-    [
-      'workflow_dispatch',
-      'refs/heads/develop',
-      { build_development_bundles: true, static_sync_only: true },
+      { static_sync_only: true },
       false,
     ],
     ['push', 'refs/heads/master', {}, true],
@@ -55,12 +52,7 @@ test('both bundle jobs require master or an explicit development dispatch', () =
       false,
     ],
     ['push', 'refs/tags/v2.24.0', {}, false],
-    [
-      'workflow_dispatch',
-      'refs/tags/v2.24.0',
-      { build_development_bundles: true },
-      false,
-    ],
+    ['workflow_dispatch', 'refs/tags/v2.24.0', {}, false],
   ];
   for (const name of ['build-upgrade-bundles', 'publish-upgrade-bundles'])
     for (const [event_name, ref, inputs, expected] of cases)
@@ -84,26 +76,53 @@ test('both bundle jobs require master or an explicit development dispatch', () =
   );
 });
 
-test('manual development releases serialize separately while normal develop CI remains independent', () => {
+test('development image and bundle publication serialize separately from production and static-only runs', () => {
   const group = (event_name, ref, inputs = {}, run_id = '100') =>
     evaluate(workflow.concurrency.group, { event_name, ref, run_id }, inputs);
   const master = group('push', 'refs/heads/master');
-  const development = group('workflow_dispatch', 'refs/heads/develop', {
-    build_development_bundles: true,
-  });
+  const development = group('push', 'refs/heads/develop');
   assert.equal(
     development,
-    group(
-      'workflow_dispatch',
-      'refs/heads/develop',
-      { build_development_bundles: true },
-      '101',
-    ),
+    group('workflow_dispatch', 'refs/heads/develop', {}, '101'),
   );
   assert.equal(master, group('push', 'refs/heads/master', {}, '101'));
   assert.notEqual(master, development);
-  const push = group('push', 'refs/heads/develop');
-  assert.notEqual(push, development);
-  assert.notEqual(push, group('push', 'refs/heads/develop', {}, '101'));
+  assert.notEqual(
+    development,
+    group('workflow_dispatch', 'refs/heads/develop', {
+      static_sync_only: true,
+    }),
+  );
+  assert.notEqual(
+    group('push', 'refs/tags/v2.24.0'),
+    group('push', 'refs/tags/v2.24.0', {}, '101'),
+  );
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
+});
+
+test('bundle targets exactly match the source image platforms and publisher requirements', () => {
+  const targets =
+    workflow.jobs['build-upgrade-bundles'].strategy.matrix.include;
+  for (const [job, libc] of [
+    ['build-alpine', 'musl'],
+    ['build-debian', 'glibc'],
+  ]) {
+    const platforms = workflow.jobs[job].steps
+      .find((step) => step.with?.platforms)
+      .with.platforms.split(',');
+    assert.deepEqual(
+      targets
+        .filter((t) => t.libc === libc)
+        .map((t) => t.platform)
+        .sort(),
+      platforms.sort(),
+    );
+  }
+  const { platforms } = require('../../scripts/publish-upgrade-bundles.cjs');
+  assert.deepEqual(
+    targets.map((t) => `linux-${t.name}`).sort(),
+    [...platforms].sort(),
+  );
+  assert.ok(platforms.includes('linux-armv6-musl'));
+  assert.ok(!platforms.includes('linux-armv6-glibc'));
 });

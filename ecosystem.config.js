@@ -1,4 +1,6 @@
 const isContainer = process.env.QL_CONTAINER === 'true';
+const runtimeArgs =
+  require('./cli/src/internal/maintenance/nodeRuntime.cjs').serverRuntimeArgs();
 
 module.exports = {
   apps: [
@@ -18,6 +20,7 @@ module.exports = {
       // visible through `docker logs` before Winston is initialized.
       error_file: isContainer ? '/proc/1/fd/2' : undefined,
       script: 'static/build/app.js',
+      ...(runtimeArgs.length ? { node_args: runtimeArgs } : {}),
       env: {
         http_proxy: '',
         https_proxy: '',

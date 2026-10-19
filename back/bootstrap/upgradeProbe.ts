@@ -4,6 +4,25 @@ import 'reflect-metadata';
 import dns from 'dns';
 import http from 'http';
 
+// The first scheduler connection can outlive its short RPC deadline. Let the
+// normal single-flight recovery finish within the supervised startup budget.
+async function waitForUpgradeScheduler(
+  readiness: { recover(): Promise<boolean> },
+  timeoutMs: number,
+  retryMs = 250,
+) {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    if (await readiness.recover()) return;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(retryMs, remaining)),
+    );
+  } while (Date.now() < deadline);
+  throw new Error('Upgrade scheduler readiness failed');
+}
+
 async function probeUpgrade() {
   if (!process.send || process.env.QL_UPGRADE_PROBE !== '1')
     throw new Error('Upgrade probe requires its isolated supervisor');
@@ -41,8 +60,16 @@ async function probeUpgrade() {
     config.grpcPort = await grpc.initialize();
     const { default: cronClient } = await import('../schedule/client');
     cronClient.readiness.configure(async () => {});
-    if (!(await cronClient.readiness.recover()))
-      throw new Error('Upgrade scheduler readiness failed');
+    await waitForUpgradeScheduler(
+      cronClient.readiness,
+      process.arch === 'arm' &&
+        Number(
+          (process.config.variables as { arm_version?: string | number })
+            .arm_version,
+        ) === 6
+        ? 60000
+        : 10000,
+    );
     const app = await createHttpApplication();
     loadExpress({ app });
     const listener = await server.initialize(app, 0);

@@ -7,6 +7,10 @@ import type { LocalContext } from '../runtime/context';
 import { atomicWrite } from '../runtime/files';
 import { runProcess, checkedProcess } from '../runtime/process';
 import { findDirectBackendPids } from '../runtime/backendProcesses';
+const { serverRuntimeArgs, armv6ServerArgs } = require('./nodeRuntime.cjs') as {
+  serverRuntimeArgs(): string[];
+  armv6ServerArgs: readonly string[];
+};
 
 export async function repairConfiguration(
   context: LocalContext,
@@ -117,7 +121,11 @@ async function stopDirectBackend(context: LocalContext): Promise<void> {
   for (const line of result.stdout.split('\n')) {
     const match = line.trim().match(/^(\d+)\s+(\S+)\s+(.*)$/);
     if (!match || !/^node(?:\d+)?$/.test(path.basename(match[2]!))) continue;
-    if (match[3] !== entry) continue;
+    if (
+      match[3] !== entry &&
+      match[3] !== `${armv6ServerArgs.join(' ')} ${entry}`
+    )
+      continue;
     const pid = Number(match[1]);
     if (pid === process.pid) continue;
     try {
@@ -179,7 +187,7 @@ export async function startPanel(
     0o600,
   );
   try {
-    const child = spawn(process.execPath, [entry], {
+    const child = spawn(process.execPath, [...serverRuntimeArgs(), entry], {
       ...options,
       detached: true,
       stdio: ['ignore', log.fd, log.fd],

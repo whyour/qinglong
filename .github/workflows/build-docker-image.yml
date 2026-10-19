@@ -11,6 +11,7 @@ on:
       - "cli/src/internal/maintenance/platformBundle.cjs"
       - "cli/src/internal/maintenance/upgradePrestart.cjs"
       - "cli/src/internal/maintenance/panelUpgrade.cjs"
+      - "cli/src/internal/maintenance/nodeRuntime.cjs"
       - "!.github/workflows/cli-package.yml"
     branches:
       - "master"
@@ -19,10 +20,6 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      build_development_bundles:
-        description: Develop only - build and publish shared develop/debian-dev upgrade packages
-        type: boolean
-        default: false
       static_sync_only:
         description: Synchronize an existing static snapshot to GitLab and verify Gitee
         type: boolean
@@ -42,10 +39,10 @@ permissions:
 
 # Keep master image tags and their bundle indexes in one serialized release.
 # A rerun may intentionally replace a version, including from the same commit.
-# Manual development bundle releases are serialized independently of master.
-# Ordinary develop pushes and Git-tag builds remain independent.
+# Develop image builds and their shared bundle index serialize separately.
+# Git-tag builds and static synchronization remain independent.
 concurrency:
-  group: version-images-${{ github.ref == 'refs/heads/master' && 'master' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.build_development_bundles && 'develop-bundles') || format('{0}-{1}', github.run_id, github.run_attempt) }}
+  group: version-images-${{ github.ref == 'refs/heads/master' && 'master' || (github.ref == 'refs/heads/develop' && !inputs.static_sync_only && 'develop') || format('{0}-{1}', github.run_id, github.run_attempt) }}
   cancel-in-progress: false
 
 jobs:
@@ -116,14 +113,19 @@ jobs:
           GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
           GITHUB_BRANCH: ${{ github.ref_name }}
           GITHUB_REF_TYPE: ${{ github.ref_type }}
+          STATIC_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          bash scripts/publish-static.sh "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" "$GITHUB_BRANCH" "$GITHUB_REF_TYPE"
+          : "${STATIC_TOKEN:?Missing static repository token}"
+          bash scripts/publish-static.sh "https://x-access-token:${STATIC_TOKEN}@${GITHUB_REPO}.git" "$GITHUB_BRANCH" "$GITHUB_REF_TYPE"
 
       - name: publish verified upgrade download sizes
         env:
           GITHUB_REPO: github.com/${{ github.repository_owner }}/qinglong-static
           GITHUB_BRANCH: ${{ github.ref_name }}
-        run: node scripts/publish-upgrade-info.cjs "https://${{ secrets.API_TOKEN }}@${GITHUB_REPO}.git" "$GITHUB_BRANCH" "$GITHUB_SHA"
+          STATIC_TOKEN: ${{ secrets.API_TOKEN }}
+        run: |
+          : "${STATIC_TOKEN:?Missing static repository token}"
+          node scripts/publish-upgrade-info.cjs "https://x-access-token:${STATIC_TOKEN}@${GITHUB_REPO}.git" "$GITHUB_BRANCH" "$GITHUB_SHA"
 
   static_gitlab:
     needs: build-static
@@ -657,8 +659,8 @@ jobs:
           fi
 
   build-upgrade-bundles:
-    # Development packages are opt-in; both channels use this run's image digests.
-    if: ${{ !inputs.static_sync_only && (github.ref == 'refs/heads/master' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.build_development_bundles)) }}
+    # Both channels publish packages from this run's immutable image digests.
+    if: ${{ !inputs.static_sync_only && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') }}
     needs: [build-alpine, build-debian]
     runs-on: ubuntu-22.04
     timeout-minutes: 90
@@ -677,7 +679,6 @@ jobs:
           - { platform: linux/s390x, libc: musl, name: s390x-musl }
           - { platform: linux/386, libc: musl, name: ia32-musl }
           - { platform: linux/amd64, libc: glibc, name: x64-glibc }
-          - { platform: linux/arm/v6, libc: glibc, name: armv6-glibc }
           - { platform: linux/arm/v7, libc: glibc, name: armv7-glibc }
           - { platform: linux/arm64, libc: glibc, name: arm64-glibc }
           - { platform: linux/ppc64le, libc: glibc, name: ppc64-glibc }
@@ -692,7 +693,6 @@ jobs:
         env:
           ALPINE_DIGEST: ${{ needs.build-alpine.outputs.image-digest }}
           DEBIAN_DIGEST: ${{ needs.build-debian.outputs.image-digest }}
-          GH_TOKEN: ${{ github.token }}
           BUNDLE_LIBC: ${{ matrix.libc }}
           BUNDLE_PLATFORM: ${{ matrix.platform }}
         run: |
@@ -701,18 +701,7 @@ jobs:
           if [ "$BUNDLE_LIBC" = glibc ]; then digest="$DEBIAN_DIGEST"; fi
           test -n "$digest"
           image="ghcr.io/${GITHUB_REPOSITORY}@${digest}"
-          if [ "$BUNDLE_PLATFORM/$BUNDLE_LIBC" = linux/arm/v6/glibc ]; then
-            # This amd64 helper executes a genuine Raspbian ARMv6 userspace under
-            # ARM1176 QEMU. It is a CI validator, not a user runtime or bundle.
-            echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-            validator="ghcr.io/${GITHUB_REPOSITORY}:upgrade-armv6-glibc-validator-${GITHUB_SHA}"
-            mkdir -p output/validator
-            docker buildx build --platform linux/amd64 --build-arg "SOURCE_IMAGE=$image" --file docker/Dockerfile.armv6-glibc --target runtime --tag "$validator" --push --metadata-file output/validator/image.json .
-            validator_digest="$(jq -er '."containerimage.digest"' output/validator/image.json)"
-            docker buildx build --platform linux/amd64 --build-arg "BASE_IMAGE=${validator%:*}@${validator_digest}" --file docker/Dockerfile.upgrade-bundle-armv6-glibc --output type=local,dest=output/upgrade .
-          else
-            docker buildx build --platform "$BUNDLE_PLATFORM" --build-arg "BASE_IMAGE=$image" --file docker/Dockerfile.upgrade-bundle --output type=local,dest=output/upgrade .
-          fi
+          docker buildx build --platform "$BUNDLE_PLATFORM" --build-arg "BASE_IMAGE=$image" --file docker/Dockerfile.upgrade-bundle --output type=local,dest=output/upgrade .
       - uses: actions/upload-artifact@v6
         with:
           name: upgrade-${{ matrix.name }}-${{ github.sha }}
@@ -720,7 +709,7 @@ jobs:
           if-no-files-found: error
 
   publish-upgrade-bundles:
-    if: ${{ !inputs.static_sync_only && (github.ref == 'refs/heads/master' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.build_development_bundles)) }}
+    if: ${{ !inputs.static_sync_only && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') }}
     needs: build-upgrade-bundles
     runs-on: ubuntu-latest
     permissions:
@@ -747,5 +736,4 @@ jobs:
       - name: Publish complete packages before advancing the channel
         env:
           GH_TOKEN: ${{ github.token }}
-          QL_BUILD_DEVELOPMENT_BUNDLES: ${{ inputs.build_development_bundles }}
         run: node scripts/publish-upgrade-bundles.cjs output/upgrade "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"

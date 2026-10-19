@@ -21,6 +21,10 @@ fs.copyFileSync(
   path.join(root, 'src/internal/maintenance/panelUpgrade.cjs'),
   path.join(root, 'dist/internal/maintenance/panelUpgrade.cjs'),
 );
+fs.copyFileSync(
+  path.join(root, 'src/internal/maintenance/nodeRuntime.cjs'),
+  path.join(root, 'dist/internal/maintenance/nodeRuntime.cjs'),
+);
 // The operational CLI may live outside the panel and has no panel node_modules.
 require('esbuild').buildSync({
   entryPoints: [path.join(root, 'src/internal/maintenance/platformBundle.cjs')],

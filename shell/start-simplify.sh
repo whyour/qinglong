@@ -54,7 +54,8 @@ fix_config
 
 # Slow devices may need more than the worker's readiness window to generate
 # first-boot certificates. Reuse the regular initializer before starting workers.
-node <<'QL_PREPARE_GRPC_CERTS'
+load_node_runtime_args
+node "${ql_node_runtime_args[@]}" <<'QL_PREPARE_GRPC_CERTS'
 require(require('node:path').join(process.env.QL_DIR, 'static/build/config/grpcCerts.js'))
   .initGrpcCerts()
   .catch((error) => {
@@ -63,7 +64,7 @@ require(require('node:path').join(process.env.QL_DIR, 'static/build/config/grpcC
   });
 QL_PREPARE_GRPC_CERTS
 
-pm2 l &>/dev/null
+pm2 l &>/dev/null || true
 
 log_with_style "INFO" "$(t '🔄  2. 启动 nginx...')"
 nginx -s reload 2>/dev/null || nginx -c /etc/nginx/nginx.conf

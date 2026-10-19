@@ -7,6 +7,67 @@ const tar = require('tar');
 const bundle = require('../../cli/src/internal/maintenance/platformBundle.cjs');
 const artifacts = require('../../shell/upgrade.cjs');
 
+test('dependency probes allow slow ARMv6 startup while preserving cancellation and normal Node execution', async () => {
+  const vm = require('node:vm');
+  const filename = require.resolve(
+    '../../cli/src/internal/maintenance/platformBundle.cjs',
+  );
+  const text = await fs.readFile(filename, 'utf8');
+  for (const [arch, armVersion, version, timeout] of [
+    ['arm', 6, '20.18.1', 300000],
+    ['arm', 6, '24.18.1', 300000],
+    ['arm', 7, '24.18.1', 30000],
+    ['x64', undefined, '24.18.1', 30000],
+  ]) {
+    let launch;
+    const m = { exports: {} };
+    const controller = new AbortController();
+    const localRequire = (name) => {
+      if (name === 'node:child_process')
+        return {
+          execFile(program, args, options, callback) {
+            launch = { program, args, options };
+            callback(null, '', '');
+          },
+        };
+      return require(require.resolve(name, {
+        paths: [path.dirname(filename)],
+      }));
+    };
+    vm.runInNewContext(
+      text,
+      {
+        module: m,
+        exports: m.exports,
+        require: localRequire,
+        process: {
+          arch,
+          config: { variables: { arm_version: armVersion } },
+          versions: { node: version },
+          execPath: process.execPath,
+          env: { NODE_OPTIONS: '--jitless', NODE_PATH: '/outside' },
+        },
+      },
+      { filename },
+    );
+    await m.exports.smokeDependencies('/staged/payload', controller.signal);
+    assert.equal(launch.program, process.execPath);
+    assert.equal(launch.args.at(-2), '-e');
+    assert.deepEqual(
+      Array.from(launch.args.slice(0, -2)),
+      arch === 'arm' && armVersion === 6 && version.startsWith('24.')
+        ? ['--no-opt', '--no-sparkplug', '--no-maglev']
+        : [],
+    );
+    assert.ok(!launch.args.includes('--jitless'));
+    assert.equal(launch.options.cwd, '/staged/payload');
+    assert.equal(launch.options.timeout, timeout);
+    assert.equal(launch.options.signal, controller.signal);
+    assert.equal(launch.options.env.NODE_OPTIONS, '');
+    assert.equal(launch.options.env.NODE_PATH, '');
+  }
+});
+
 for (const failure of ['prestart', 'repair'])
   test(`failed ${failure} preserves the installed dependencies and previous ready pointer`, async (t) => {
     const f = await fixture(t);
@@ -395,6 +456,7 @@ test('native target compatibility distinguishes ARMv6/ARMv7 and libc and retains
   bundle.assertCompatible(manifest, target, '20.20.2');
   const glibcTarget = {
     ...target,
+    arch: 'armv7',
     libc: 'glibc',
     libcVersion: '2.31',
     endianness: 'LE',
@@ -405,7 +467,7 @@ test('native target compatibility distinguishes ARMv6/ARMv7 and libc and retains
     target: { ...glibcTarget, libcMinimum: '2.31' },
   };
   bundle.assertCompatible(glibcManifest, glibcTarget, '20.18.1');
-  assert.equal(bundle.targetKey(glibcTarget), 'linux-armv6-glibc');
+  assert.equal(bundle.targetKey(glibcTarget), 'linux-armv7-glibc');
   assert.throws(
     () =>
       bundle.assertCompatible(glibcManifest, {
@@ -529,10 +591,10 @@ test('publishing requires every platform and validates all immutable archive has
     );
   }
   const index = releaseIndex(f.directory, sourceCommit, repository);
-  assert.equal(Object.keys(index.packages).length, 13);
+  assert.equal(Object.keys(index.packages).length, 12);
   const armv6 = path.join(
     f.directory,
-    `qinglong-${sourceCommit}-linux-armv6-glibc.tar.gz`,
+    `qinglong-${sourceCommit}-linux-armv6-musl.tar.gz`,
   );
   const armv6Bytes = await fs.readFile(armv6);
   await fs.rm(armv6);

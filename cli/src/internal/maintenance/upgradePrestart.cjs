@@ -3,6 +3,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
 const os = require('node:os');
+const { serverRuntimeArgs } = require('./nodeRuntime.cjs');
 
 function probeLimits(target) {
   const small = target.arch === 'armv6';
@@ -122,7 +123,7 @@ async function prestartBackend(
       // one backend process. Keep normal V8 mode for Node 20's HTTP/WASM support.
       const child = spawn(
         process.execPath,
-        [`--max-old-space-size=${limits.heapMb}`, entry],
+        [...serverRuntimeArgs(), `--max-old-space-size=${limits.heapMb}`, entry],
         {
           cwd: workspace,
           env,

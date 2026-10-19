@@ -1,5 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+const { armv6ServerArgs } = require('../maintenance/nodeRuntime.cjs') as {
+  armv6ServerArgs: readonly string[];
+};
 
 // Linux preserves argv boundaries in cmdline. Resolve relative entrypoints from
 // each process's cwd, not from the operator's cwd or a broad ps substring match.
@@ -27,11 +30,18 @@ export async function findDirectBackendPids(
       );
       const args = command.split('\0');
       if (args.at(-1) === '') args.pop();
-      // Both the legacy fallback and the TS fallback launch one script without
-      // Node flags or application arguments. Reject other command shapes.
-      if (args.length !== 2 || !/^node(?:\d+)?$/.test(path.basename(args[0]!)))
+      // Accept only the two launch shapes we own. Never treat eval, preload or
+      // application arguments containing this path as a running backend.
+      const scriptIndex =
+        args.length === 2
+          ? 1
+          : args.length === armv6ServerArgs.length + 2 &&
+            armv6ServerArgs.every((flag, i) => args[i + 1] === flag)
+          ? args.length - 1
+          : -1;
+      if (scriptIndex < 0 || !/^node(?:\d+)?$/.test(path.basename(args[0]!)))
         continue;
-      const script = args[1]!;
+      const script = args[scriptIndex]!;
       if (!script) continue;
       const absolute = path.isAbsolute(script)
         ? script

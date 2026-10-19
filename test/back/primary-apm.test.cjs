@@ -2,11 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
+const configRequire = require('node:module').createRequire(require('node:path').resolve('ecosystem.config.js'));
 const source = fs.readFileSync('ecosystem.config.js', 'utf8');
 const appSource = fs.readFileSync('back/app.ts', 'utf8');
 const ts = require('typescript');
 const compiled = ts.transpileModule(appSource.slice(0, appSource.indexOf('\nconst app = new Application();')) + '\nmodule.exports = Application;', {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
-function config(env) {const module={exports:{}};vm.runInNewContext(source,{module,process:{env}});return module.exports.apps[0];}
+function config(env) {const module={exports:{}};vm.runInNewContext(source,{module,process:{env},require:configRequire});return module.exports.apps[0];}
 test('container APM policy keeps worker isolation and can restore all inherited probes', () => {
   for (const primary of [undefined, 'true']) for (const workers of [undefined, 'true']) {
     const env={QL_CONTAINER:'true',QL_PRIMARY_APM:primary,QL_WORKER_APM:workers};
