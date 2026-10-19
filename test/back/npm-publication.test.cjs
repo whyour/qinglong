@@ -36,14 +36,23 @@ for (const [scenario, expectedStatus, published] of [
     fs.mkdirSync(bin);
     fs.writeFileSync(
       path.join(root, 'package.json'),
-      JSON.stringify({ name: '@fixture/qinglong', version: '2.22.0' }),
+      JSON.stringify({ name: '@fixture/unrelated-source', version: '0.0.0' }),
     );
+    fs.mkdirSync(path.join(root, 'package'));
+    fs.mkdirSync(path.join(root, 'npm-panel'));
+    fs.writeFileSync(
+      path.join(root, 'package/package.json'),
+      JSON.stringify({ name: '@whyour/qinglong', version: '2.22.0' }),
+    );
+    const packed = spawnSync('tar', ['-czf', 'npm-panel/verified.tgz', 'package'], { cwd: root });
+    assert.equal(packed.status, 0, String(packed.stderr));
     fs.writeFileSync(
       path.join(bin, 'npm'),
       `#!/usr/bin/env node
 const fs = require('node:fs');
-if (process.argv[2] === 'publish') { fs.writeFileSync('published', 'yes'); process.exit(0); }
+if (process.argv[2] === 'publish') { fs.writeFileSync('published', JSON.stringify(process.argv.slice(3))); process.exit(0); }
 if (process.argv[2] !== 'view') process.exit(99);
+if (process.argv[3] !== '@whyour/qinglong@2.22.0') process.exit(98);
 switch (process.env.QL_PUBLISH_SCENARIO) {
 case 'existing': console.log(JSON.stringify('2.22.0')); break;
 case 'unexpected-version': console.log(JSON.stringify('2.21.0')); break;
@@ -66,5 +75,9 @@ case 'network': console.log('upstream unavailable'); process.exit(1);
     });
     assert.equal(result.status, expectedStatus, result.stdout + result.stderr);
     assert.equal(fs.existsSync(path.join(root, 'published')), published);
+    if (published)
+      assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'published'), 'utf8')), [
+        'npm-panel/verified.tgz', '--ignore-scripts', '--access', 'public', '--registry=https://registry.npmjs.org',
+      ]);
   });
 }

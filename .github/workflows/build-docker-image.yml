@@ -94,12 +94,22 @@ jobs:
           pnpm build:back
           pnpm build:info
 
+      - name: Pack the npm panel archive from the verified build
+        run: node scripts/verify-panel-package.cjs pack "$RUNNER_TEMP/npm-panel"
+
       - uses: actions/upload-artifact@v6
         with:
           name: qinglong-static-${{ github.sha }}
           path: static/
           if-no-files-found: error
           include-hidden-files: true
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: qinglong-npm-${{ github.sha }}
+          path: ${{ runner.temp }}/npm-panel/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: copy to static repo
         env:
@@ -538,30 +548,78 @@ jobs:
           cache-from: type=registry,ref=whyour/qinglong:cache-debian-python3.10
           cache-to: type=registry,ref=whyour/qinglong:cache-debian-python3.10,mode=max
 
+  # One unmodified amd64 package for migration acceptance only. This does not
+  # publish bundles or advance development/formal channel indexes.
+  build-npm-migration-bundle:
+    needs: build-debian
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - name: Export the official platform package from this run's image digest
+        env:
+          IMAGE_DIGEST: ${{ needs.build-debian.outputs.image-digest }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          image="ghcr.io/${GITHUB_REPOSITORY}@${IMAGE_DIGEST}"
+          docker buildx build --platform linux/amd64 --build-arg "BASE_IMAGE=$image" --file docker/Dockerfile.upgrade-bundle --output "type=local,dest=$RUNNER_TEMP/npm-migration-bundle" .
+      - uses: actions/upload-artifact@v6
+        with:
+          name: npm-migration-bundle-${{ github.sha }}
+          path: ${{ runner.temp }}/npm-migration-bundle/*
+          if-no-files-found: error
+          retention-days: 3
+
+  verify-npm-package:
+    needs: [build-static, build-npm-migration-bundle]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20.18.1', '24']
+    container: node:${{ matrix.node }}-bookworm
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v6
+        with:
+          name: qinglong-npm-${{ github.sha }}
+          path: ${{ runner.temp }}/npm-panel/
+      - uses: actions/download-artifact@v6
+        with:
+          name: npm-migration-bundle-${{ github.sha }}
+          path: ${{ runner.temp }}/npm-migration-bundle/
+      - name: Install isolated service test tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 openssl curl jq nginx procps
+          # The published legacy launcher resets PATH to standard directories.
+          # /usr/local is confined to this disposable job container; PM2_HOME
+          # remains private to each verification run.
+          npm install --global --prefix /usr/local --no-audit --no-fund pm2@6.0.14
+      - name: Install and upgrade the exact npm archive
+        env:
+          QL_PANEL_PACKAGE_TEST_ISOLATED: '1'
+          QL_PANEL_TEST_PM2: /usr/local/bin/pm2
+          QL_PANEL_TEST_BUNDLE_DIR: ${{ runner.temp }}/npm-migration-bundle
+        run: node scripts/verify-panel-package.cjs verify "$RUNNER_TEMP/npm-panel" "$RUNNER_TEMP/npm-panel-results"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: qinglong-npm-verification-${{ matrix.node }}-${{ github.sha }}
+          path: ${{ runner.temp }}/npm-panel-results/
+          if-no-files-found: error
+          retention-days: 14
+
   publish:
     if: ${{ github.repository == 'whyour/qinglong' && github.ref == 'refs/heads/master' }}
-    needs: [build-alpine, build-debian, build-alpine310, build-debian310]
+    needs: [build-alpine, build-debian, build-alpine310, build-debian310, verify-npm-package]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: "8.3.1"
-
-      - uses: actions/setup-node@v3
-        with:
-          node-version: "20"
-          cache: "pnpm"
-
-      - name: build front and back
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build:front
-          pnpm build:back
-
       - name: Set up Node for trusted publishing
         uses: actions/setup-node@v6
         with:
@@ -569,17 +627,30 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
+      - uses: actions/download-artifact@v6
+        with:
+          name: qinglong-npm-${{ github.sha }}
+          path: npm-panel/
+
       - name: Publish npm package with OIDC
         shell: bash
         run: |
           set -euo pipefail
-          name=$(node -p 'require("./package.json").name')
-          version=$(node -p 'require("./package.json").version')
+          shopt -s nullglob
+          archives=(npm-panel/*.tgz)
+          if [ "${#archives[@]}" -ne 1 ]; then
+            echo '::error::Expected exactly one verified panel npm archive.'
+            exit 1
+          fi
+          archive="${archives[0]}"
+          metadata=$(tar -xOf "$archive" package/package.json)
+          name=$(jq -er '.name | select(. == "@whyour/qinglong")' <<< "$metadata")
+          version=$(jq -er '.version | select(type == "string")' <<< "$metadata")
           if npm view "$name@$version" version --json --registry=https://registry.npmjs.org > "$RUNNER_TEMP/npm-version.json" 2> "$RUNNER_TEMP/npm-version-error.log"; then
             jq -e --arg version "$version" '. == $version' "$RUNNER_TEMP/npm-version.json" > /dev/null
             echo "::notice::$name@$version is already published; skipping npm publication for this image rebuild."
           elif jq -e '.error.code == "E404"' "$RUNNER_TEMP/npm-version.json" > /dev/null; then
-            npm publish --access public --registry=https://registry.npmjs.org
+            npm publish "$archive" --ignore-scripts --access public --registry=https://registry.npmjs.org
           else
             echo '::error::Could not check the published npm version; refusing to publish.'
             exit 1

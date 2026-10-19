@@ -64,6 +64,20 @@ QL_DIR=/opt/qinglong QL_DATA_DIR=/opt/qinglong/data bash /opt/qinglong/shell/sta
 
 ARMv6 glibc 小设备（例如 Raspberry Pi 1/Zero 的 Raspbian/Raspberry Pi OS 32 位系统）选择 `linux-armv6-glibc.tar.gz`，以同一安装器执行上述离线命令。该包要求 glibc >= 2.31、ARMv6 硬浮点 Node >= 20.18.1，不适用于 ARMv5、软浮点 Node 或旧版 glibc。安装和升级均不需要 Docker，也不会下载或替换 Node。
 
+## npm 面板包
+
+`@whyour/qinglong` 仍通过 npm 安装生产依赖；它包含运行脚本、gRPC proto、升级引擎和完整前后端构建，不包含用户数据、Node、开发 CLI 或生产 `node_modules`。`@whyour/qinglong-cli` 是单独的远程管理包。
+
+npm 会排除根目录的 `pnpm-lock.yaml`。主包的原生 `npm pack/publish` 在 `prepack` 中核对当前 Git 提交、干净工作区、锁文件及完整构建文件的哈希，通过后才将锁文件复制为 `shell/upgrade-lock.yaml`，安装时由仅使用 Node 内置模块的 `postinstall` 校验 SHA256 后恢复标准路径；源代码安装和 Docker 的最小依赖构建阶段继续使用原有锁文件。归档使用精确运行文件白名单，避免打入本地生成的预加载配置、缓存、测试和验收输出。静态构建中的 source map 与 gzip 文件也必须完整保留，否则清单复验会失败。
+
+干净源码完成 `pnpm build:front`、`pnpm build:back`、`pnpm build:info` 后，运行 `node scripts/verify-panel-package.cjs pack /tmp/qinglong-npm` 生成并检查真实 npm 归档。CI 在一次性 Linux 容器中，以 Node 20.18.1 和 Node 24 安装同一个归档，使用真实生产依赖和已安装的 `qinglong`、`ql` 入口，验证启动、损坏下载保留旧服务、在线准备与重启、离线准备与 Bash 重启及账号、配置、环境变量、任务和脚本保留。测试还安装完整性摘要固定的已发布 `@whyour/qinglong@2.23.0`，在旧服务中建立真实数据，再用新 `.tgz` 执行 npm 覆盖安装，验证账号、配置、环境变量、任务和脚本保留。之后升级到同次 Debian 镜像不可变 digest 通过正式 `Dockerfile.upgrade-bundle` 导出的原始平台包，确认运行目录变为 pnpm 布局。该单平台验收包仅上传短期 CI artifact，不发布 Release，也不推进开发或正式更新索引。
+
+服务集成测试只能在专用容器中运行：设置 `QL_PANEL_PACKAGE_TEST_ISOLATED=1`、指向隔离 PM2 的 `QL_PANEL_TEST_PM2` 和指向正式构建脚本输出目录的 `QL_PANEL_TEST_BUNDLE_DIR`，然后执行 `node scripts/verify-panel-package.cjs verify /tmp/qinglong-npm /tmp/qinglong-npm-results`。容器需已有 Bash、curl、OpenSSL、Python、jq、nginx 和 procps。旧正式包会重置 PATH，因此验收容器将 PM2 6.0.14 安装到 `/usr/local/bin/pm2`，并以此设置 `QL_PANEL_TEST_PM2`；隔离通过专属容器和独立 `PM2_HOME` 保证。测试创建独立的 npm prefix、HOME、PM2_HOME 和数据目录，结束后清理。
+
+通过 npm 覆盖升级前，应先停止服务，备份安装目录中的自定义 `.env`，执行新包安装，再恢复 `.env` 并启动服务；持久数据必须放在包目录以外的 `QL_DATA_DIR`。npm 会替换整个包目录，不负责保留包内用户文件。验收按这一流程备份和恢复自定义 `.env`，并直接校验外置用户数据。在线和离线平台包升级仍由事务保留现有 `.env`。
+
+master 发布任务等待上述测试通过，直接发布已验证的 `.tgz`，不重新构建或打包。develop 只生成测试归档与验收记录，不发布 npm。
+
 ## 平台兼容
 
 - 最低 Node 为 20.18.1，Node-API 至少 6；安装器只检查，不替换 Node。

@@ -12,6 +12,45 @@
   "bugs": {
     "url": "https://github.com/whyour/qinglong/issues"
   },
+  "engines": {
+    "node": ">=20.18.1"
+  },
+  "files": [
+    ".env.example",
+    "back/protos/api.proto",
+    "cli/src/internal/maintenance/*.cjs",
+    "ecosystem.config.js",
+    "README*.md",
+    "sample/*.sample.*",
+    "sample/notify.js",
+    "sample/notify.py",
+    "sample/ql_sample.js",
+    "sample/ql_sample.py",
+    "shell/*.cjs",
+    "shell/api.sh",
+    "shell/bot.sh",
+    "shell/check.sh",
+    "shell/env.sh",
+    "shell/lang/*.sh",
+    "shell/node_path_cache.sh",
+    "shell/otask.sh",
+    "shell/preload/client.js",
+    "shell/preload/client.py",
+    "shell/preload/esm-loader.mjs",
+    "shell/preload/notificationAudit.js",
+    "shell/preload/sitecustomize.js",
+    "shell/preload/sitecustomize.py",
+    "shell/rmlog.sh",
+    "shell/share.sh",
+    "shell/start-simplify.sh",
+    "shell/start.sh",
+    "shell/task.sh",
+    "shell/task-timeout.sh",
+    "shell/update.sh",
+    "shell/upgrade-lock.yaml",
+    "static/",
+    "version.yaml"
+  ],
   "scripts": {
     "build:cli": "node cli/scripts/build.cjs",
     "check:cli": "npm --prefix cli run check",
@@ -28,7 +67,9 @@
     "panel": "npm run build:back && node static/build/app.js",
     "gen:proto": "protoc --experimental_allow_proto3_optional --plugin=./node_modules/.bin/protoc-gen-ts_proto ./back/protos/*.proto --ts_proto_out=./ --ts_proto_opt=outputServices=grpc-js,env=node,esModuleInterop=true,snakeToCamel=false",
     "prettier": "prettier --write '**/*.{js,jsx,tsx,ts,less,md,json}'",
-    "postinstall": "max setup 2>/dev/null || true",
+    "prepack": "node scripts/prepare-npm-package.cjs",
+    "postpack": "node scripts/prepare-npm-package.cjs --clean",
+    "postinstall": "node -e \"const fs = require('fs'); if (fs.existsSync('shell/install-package.cjs')) require('./shell/install-package.cjs').restorePackageLock(); else fs.accessSync('pnpm-lock.yaml')\" && (max setup 2>/dev/null || true)",
     "start:simple": "bash shell/start-simplify.sh"
   },
   "gitHooks": {

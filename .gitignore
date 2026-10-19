@@ -29,6 +29,7 @@ __pycache__
 /shell/preload/*-notify.json
 /shell/preload/__ql_notify__.*
 /shell/preload/lang_env.sh
+/shell/upgrade-lock.yaml
 
 .deepseek/
 .claude/
