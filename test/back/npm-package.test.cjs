@@ -9,6 +9,7 @@ const { promisify } = require('node:util');
 const execute = promisify(execFile);
 const { checkPackedFiles } = require('../../scripts/verify-panel-package.cjs');
 const { restorePackageLock } = require('../../shell/install-package.cjs');
+const { restoreEnvironment } = require('../../shell/install-package.cjs');
 
 async function packageFixture(t) {
   const temp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'ql-npm-contract-')));
@@ -70,6 +71,7 @@ test('real npm pack excludes local state and its installed lifecycle restores ve
   const prefix = path.join(temp, 'installed');
   await execute('npm', ['install', '--offline', '--omit=dev', '--no-audit', '--no-fund', '--cache', path.join(temp, 'cache'), '--prefix', prefix, path.join(output, archive.filename)], { cwd: temp, env, timeout: 60000 });
   const installed = path.join(prefix, 'node_modules/@whyour/qinglong');
+  await assert.rejects(fs.access(path.join(installed, '.env')), { code: 'ENOENT' });
   assert.equal(await fs.readFile(path.join(installed, 'pnpm-lock.yaml'), 'utf8'), lock);
   assert.equal(typeof require(path.join(installed, 'shell/upgrade.cjs')).stageUpgrade, 'function');
   assert.ok((await fs.stat(path.join(installed, 'shell/update.sh'))).mode & 0o111);
@@ -93,6 +95,100 @@ test('a missing npm runtime lockfile fails instead of claiming an installed pack
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-npm-lock-missing-'));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
   assert.throws(() => restorePackageLock(temp), /Missing npm package upgrade lockfile/);
+});
+
+test('real npm overwrites preserve .env automatically and failed installs restore the old package', async (t) => {
+  const { root, output, temp, env, pack } = await packageFixture(t);
+  const [packed] = JSON.parse((await pack()).stdout);
+  const archive = path.join(output, packed.filename);
+  const legacy = path.join(temp, 'legacy');
+  await fs.mkdir(legacy);
+  await fs.writeFile(path.join(legacy, 'package.json'), JSON.stringify({ name: '@whyour/qinglong', version: '2.22.0' }));
+  await fs.writeFile(path.join(legacy, 'old-package-marker'), 'legacy');
+  const [old] = JSON.parse((await execute('npm', ['pack', '--ignore-scripts', '--json', '--cache', path.join(temp, 'cache')], { cwd: legacy, env })).stdout);
+  const broken = path.join(temp, 'broken');
+  await fs.mkdir(broken);
+  await fs.cp(root, broken, { recursive: true });
+  await fs.writeFile(path.join(broken, 'shell/upgrade-lock.yaml'), 'invalid lock');
+  const [bad] = JSON.parse((await execute('npm', ['pack', '--ignore-scripts', '--json', '--cache', path.join(temp, 'cache')], { cwd: broken, env })).stdout);
+
+  for (const global of [false, true]) {
+    await t.test(global ? 'global npm install' : 'local npm install', async () => {
+      const prefix = path.join(temp, global ? 'global' : 'local');
+      const linkedPrefix = prefix + '-link';
+      await fs.mkdir(prefix);
+      await fs.symlink(prefix, linkedPrefix);
+      const installed = path.join(prefix, global ? 'lib/node_modules/@whyour/qinglong' : 'node_modules/@whyour/qinglong');
+      const install = (file) => execute('npm', ['install', ...(global ? ['--global'] : []), '--prefix', linkedPrefix, '--force', '--offline', '--omit=dev', '--no-audit', '--no-fund', '--cache', path.join(temp, 'cache'), file], { cwd: temp, env, timeout: 60000 });
+      await install(path.join(legacy, old.filename));
+      const bytes = Buffer.from('QL_DATA_DIR=/external/data\r\nSECRET="配置 test"\r\n# no trailing newline');
+      const external = path.join(prefix, 'external.env');
+      await fs.writeFile(external, bytes);
+      await fs.symlink(external, path.join(installed, '.env'));
+      await assert.rejects(install(archive), (error) => {
+        assert.match(error.stderr, /must be a regular file/);
+        return true;
+      });
+      assert.equal(JSON.parse(await fs.readFile(path.join(installed, 'package.json'))).version, '2.22.0');
+      assert.equal(await fs.readlink(path.join(installed, '.env')), external);
+      assert.deepEqual(await fs.readFile(external), bytes);
+      await fs.rm(path.join(installed, '.env'));
+      await fs.writeFile(path.join(installed, '.env'), bytes, { mode: 0o644 });
+      await assert.rejects(install(path.join(broken, bad.filename)), (error) => {
+        assert.match(error.stderr, /does not match its build manifest/);
+        return true;
+      });
+      assert.equal(JSON.parse(await fs.readFile(path.join(installed, 'package.json'))).version, '2.22.0');
+      assert.equal(await fs.readFile(path.join(installed, 'old-package-marker'), 'utf8'), 'legacy');
+      assert.deepEqual(await fs.readFile(path.join(installed, '.env')), bytes);
+      await install(archive);
+      assert.deepEqual(await fs.readFile(path.join(installed, '.env')), bytes);
+      assert.equal((await fs.stat(path.join(installed, '.env'))).mode & 0o777, 0o600);
+      await assert.rejects(fs.access(path.join(installed, 'old-package-marker')), { code: 'ENOENT' });
+      // Same-version forced reinstall must also retain custom configuration.
+      await install(archive);
+      assert.deepEqual(await fs.readFile(path.join(installed, '.env')), bytes);
+      assert.ok(!(await fs.readdir(installed)).some((name) => name.startsWith('.upgrade-env-')));
+    });
+  }
+});
+
+test('environment recovery uses only the exact retired package and never overwrites existing configuration', async (t) => {
+  const temp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'ql-npm-env-')));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'node_modules/@whyour/qinglong');
+  await fs.mkdir(root, { recursive: true });
+  const suffix = createHash('sha1').update(root).digest('base64').replace(/[^a-zA-Z0-9]+/g, '').slice(0, 8);
+  const retired = path.join(path.dirname(root), `.qinglong-${suffix}`);
+  const destination = path.join(root, '.env');
+  const other = path.join(path.dirname(root), '.qinglong-unrelated');
+  await fs.mkdir(other);
+  await fs.writeFile(path.join(other, '.env'), 'unrelated');
+  restoreEnvironment(root);
+  await assert.rejects(fs.access(destination), { code: 'ENOENT' });
+  await fs.mkdir(retired);
+  await fs.writeFile(path.join(retired, 'package.json'), JSON.stringify({ name: 'another-package' }));
+  await fs.writeFile(path.join(retired, '.env'), 'private');
+  assert.throws(() => restoreEnvironment(root), /Unexpected retired npm package/);
+  await fs.writeFile(path.join(retired, 'package.json'), JSON.stringify({ name: '@whyour/qinglong' }));
+  await fs.rm(path.join(retired, '.env'));
+  restoreEnvironment(root);
+  await assert.rejects(fs.access(destination), { code: 'ENOENT' });
+  await fs.symlink(path.join(other, '.env'), path.join(retired, '.env'));
+  assert.throws(() => restoreEnvironment(root), /must be a regular file/);
+  await fs.rm(path.join(retired, '.env'));
+  await fs.mkdir(path.join(retired, '.env'));
+  assert.throws(() => restoreEnvironment(root), /must be a regular file/);
+  await fs.rm(path.join(retired, '.env'), { recursive: true });
+  await fs.writeFile(path.join(retired, '.env'), '');
+  restoreEnvironment(root);
+  assert.equal(await fs.readFile(destination, 'utf8'), '');
+  assert.equal((await fs.stat(destination)).mode & 0o777, 0o600);
+  await fs.writeFile(destination, 'new custom configuration');
+  await fs.writeFile(path.join(retired, '.env'), 'old configuration');
+  restoreEnvironment(root);
+  assert.equal(await fs.readFile(destination, 'utf8'), 'new custom configuration');
+  assert.ok(!(await fs.readdir(root)).some((name) => name.startsWith('.upgrade-env-')));
 });
 
 test('npm publication consumes the exact archive whose isolated installation passed', () => {

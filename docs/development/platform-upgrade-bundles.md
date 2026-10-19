@@ -74,7 +74,7 @@ npm 会排除根目录的 `pnpm-lock.yaml`。主包的原生 `npm pack/publish` 
 
 服务集成测试只能在专用容器中运行：设置 `QL_PANEL_PACKAGE_TEST_ISOLATED=1`、指向隔离 PM2 的 `QL_PANEL_TEST_PM2` 和指向正式构建脚本输出目录的 `QL_PANEL_TEST_BUNDLE_DIR`，然后执行 `node scripts/verify-panel-package.cjs verify /tmp/qinglong-npm /tmp/qinglong-npm-results`。容器需已有 Bash、curl、OpenSSL、Python、jq、nginx 和 procps。旧正式包会重置 PATH，因此验收容器将 PM2 6.0.14 安装到 `/usr/local/bin/pm2`，并以此设置 `QL_PANEL_TEST_PM2`；隔离通过专属容器和独立 `PM2_HOME` 保证。测试创建独立的 npm prefix、HOME、PM2_HOME 和数据目录，结束后清理。
 
-通过 npm 覆盖升级前，应先停止服务，备份安装目录中的自定义 `.env`，执行新包安装，再恢复 `.env` 并启动服务；持久数据必须放在包目录以外的 `QL_DATA_DIR`。npm 会替换整个包目录，不负责保留包内用户文件。验收按这一流程备份和恢复自定义 `.env`，并直接校验外置用户数据。在线和离线平台包升级仍由事务保留现有 `.env`。
+通过 npm 覆盖升级前，应先停止服务，执行新包安装，再启动服务。正常 npm 安装的 `postinstall` 会从当前路径对应的 npm 旧包临时目录中自动保留 `.env`，逐字节恢复为权限 `0600` 的普通文件，不需要手工备份和恢复；新目录中已有的 `.env` 不会被覆盖。只读取包名匹配的旧包，不扫描其他安装或备份目录；异常配置（如符号链接）会使安装失败，由 npm 回退旧包，避免静默丢失配置。此机制需要启用 npm 安装脚本，不能使用 `--ignore-scripts`。持久数据仍必须放在包目录以外的 `QL_DATA_DIR`。验收直接检查真实旧 npm 包覆盖安装后配置自动保留，并校验外置用户数据。在线和离线平台包升级仍由事务保留现有 `.env`。
 
 master 发布任务等待上述测试通过，直接发布已验证的 `.tgz`，不重新构建或打包。develop 只生成测试归档与验收记录，不发布 npm。
 

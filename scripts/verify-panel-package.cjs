@@ -231,14 +231,13 @@ async function verifyPanel(input, output) {
       assert.equal(await fs.readFile(script, 'utf8'), `console.log(${JSON.stringify(nonce)});\n`);
     };
     await preservedData();
-    console.log('Stopping legacy service, backing up its .env and overwriting with the new npm archive');
+    console.log('Stopping legacy service and verifying npm automatically preserves its .env during overwrite');
     await stop();
-    // npm replaces its entire package directory. Back up a custom root .env
-    // explicitly, as required by the documented package-manager upgrade flow.
     await fs.appendFile(path.join(root, '.env'), `\n# retained custom npm environment ${nonce}\n`);
     const savedEnv = await fs.readFile(path.join(root, '.env'));
     await install(input);
-    await fs.writeFile(path.join(root, '.env'), savedEnv);
+    assert.deepEqual(await fs.readFile(path.join(root, '.env')), savedEnv);
+    assert.equal((await fs.stat(path.join(root, '.env'))).mode & 0o777, 0o600);
     const configSha = hash(savedEnv);
     const local = createRequire(path.join(root, 'package.json'));
     const artifacts = local('./shell/upgrade.cjs');
@@ -322,7 +321,7 @@ async function verifyPanel(input, output) {
       installedProductionDependencies: true, restoredLockVerified: true,
       legacyNpmVersion: legacy.version, legacyNpmIntegrity: legacy.integrity,
       legacyNpmOverwriteInstalled: true, legacyExternalDataPreserved: true,
-      customRootEnvironmentRestoredFromExplicitBackup: true,
+      customRootEnvironmentPreservedAutomatically: true,
       officialPlatformBundle: { baseImage: fixture.baseImage, sourceCommit: fixture.sourceCommit, sha256: fixture.sha256 },
       migratedFromNpmToOfficialPnpmLayout: true,
       existingNodePreserved: true,

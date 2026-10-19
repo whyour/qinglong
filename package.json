@@ -69,7 +69,7 @@
     "prettier": "prettier --write '**/*.{js,jsx,tsx,ts,less,md,json}'",
     "prepack": "node scripts/prepare-npm-package.cjs",
     "postpack": "node scripts/prepare-npm-package.cjs --clean",
-    "postinstall": "node -e \"const fs = require('fs'); if (fs.existsSync('shell/install-package.cjs')) require('./shell/install-package.cjs').restorePackageLock(); else fs.accessSync('pnpm-lock.yaml')\" && (max setup 2>/dev/null || true)",
+    "postinstall": "node -e \"const fs = require('fs'); if (fs.existsSync('shell/install-package.cjs')) require('./shell/install-package.cjs').installPackage(); else fs.accessSync('pnpm-lock.yaml')\" && (max setup 2>/dev/null || true)",
     "start:simple": "bash shell/start-simplify.sh"
   },
   "gitHooks": {
