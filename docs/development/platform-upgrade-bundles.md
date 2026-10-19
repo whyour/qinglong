@@ -70,7 +70,11 @@ ARMv6 glibc 小设备（例如 Raspberry Pi 1/Zero 的 Raspbian/Raspberry Pi OS 
 
 npm 会排除根目录的 `pnpm-lock.yaml`。主包的原生 `npm pack/publish` 在 `prepack` 中核对当前 Git 提交、干净工作区、锁文件及完整构建文件的哈希，通过后才将锁文件复制为 `shell/upgrade-lock.yaml`，安装时由仅使用 Node 内置模块的 `postinstall` 校验 SHA256 后恢复标准路径；源代码安装和 Docker 的最小依赖构建阶段继续使用原有锁文件。归档使用精确运行文件白名单，避免打入本地生成的预加载配置、缓存、测试和验收输出。静态构建中的 source map 与 gzip 文件也必须完整保留，否则清单复验会失败。
 
+`package.json#files` 是 npm 包内容的唯一项目规则，不再维护根 `.npmignore`：npm 在根包使用 `files` 时会停用该目录的 `.npmignore` 和 `.gitignore` 规则。打包测试在没有 `.npmignore` 的独立源码目录中注入私有配置、密钥占位文件、缓存及生成的预加载配置，执行真实 `npm pack` 和安装，检查运行文件完整、私有文件及其内容不进入归档。此规则只用于 npm 包，完整平台 tar.gz 仍由平台包构建器处理。
+
 干净源码完成 `pnpm build:front`、`pnpm build:back`、`pnpm build:info` 后，运行 `node scripts/verify-panel-package.cjs pack /tmp/qinglong-npm` 生成并检查真实 npm 归档。CI 在一次性 Linux 容器中，以 Node 20.18.1 和 Node 24 安装同一个归档，使用真实生产依赖和已安装的 `qinglong`、`ql` 入口，验证启动、损坏下载保留旧服务、在线准备与重启、离线准备与 Bash 重启及账号、配置、环境变量、任务和脚本保留。测试还安装完整性摘要固定的已发布 `@whyour/qinglong@2.23.0`，在旧服务中建立真实数据，再用新 `.tgz` 执行 npm 覆盖安装，验证账号、配置、环境变量、任务和脚本保留。之后升级到同次 Debian 镜像不可变 digest 通过正式 `Dockerfile.upgrade-bundle` 导出的原始平台包，确认运行目录变为 pnpm 布局。该单平台验收包仅上传短期 CI artifact，不发布 Release，也不推进开发或正式更新索引。
+
+Umi 4.4.4 的构建依赖仍使用 Node 24 已移除的 `http_parser`。前端源码构建使用 `.nvmrc` 中的 Node 22，CI 从该文件读取版本，Vercel 前后端项目均配置为 Node 22.x。`package.json` 不声明 `engines.node`，避免 Vercel 用开放的最低运行版本范围覆盖项目的构建版本；`pnpm build:front` 直接执行构建，不下载或切换 Node。面板运行时仍支持 Node 20.18.1 及以上，平台包的清单与安装器独立校验最低 Node 要求，npm 实装验收继续覆盖 Node 20/24。
 
 服务集成测试只能在专用容器中运行：设置 `QL_PANEL_PACKAGE_TEST_ISOLATED=1`、指向隔离 PM2 的 `QL_PANEL_TEST_PM2` 和指向正式构建脚本输出目录的 `QL_PANEL_TEST_BUNDLE_DIR`，然后执行 `node scripts/verify-panel-package.cjs verify /tmp/qinglong-npm /tmp/qinglong-npm-results`。容器需已有 Bash、curl、OpenSSL、Python、jq、nginx 和 procps。旧正式包会重置 PATH，因此验收容器将 PM2 6.0.14 安装到 `/usr/local/bin/pm2`，并以此设置 `QL_PANEL_TEST_PM2`；隔离通过专属容器和独立 `PM2_HOME` 保证。测试创建独立的 npm prefix、HOME、PM2_HOME 和数据目录，结束后清理。
 

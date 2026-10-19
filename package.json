@@ -12,9 +12,6 @@
   "bugs": {
     "url": "https://github.com/whyour/qinglong/issues"
   },
-  "engines": {
-    "node": ">=20.18.1"
-  },
   "files": [
     ".env.example",
     "back/protos/api.proto",

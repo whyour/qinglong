@@ -21,7 +21,7 @@ async function packageFixture(t) {
     await fs.mkdir(path.dirname(path.join(root, name)), { recursive: true });
     await fs.copyFile(path.resolve(name), path.join(root, name));
   };
-  for (const name of ['.gitignore', '.npmignore', 'docker/verify-build.cjs', 'docker/build-manifest.cjs', '.env.example', 'ecosystem.config.js', 'version.yaml', 'README.md', 'LICENSE', 'scripts/prepare-npm-package.cjs', 'back/protos/api.proto']) await copy(name);
+  for (const name of ['.gitignore', 'docker/verify-build.cjs', 'docker/build-manifest.cjs', '.env.example', 'ecosystem.config.js', 'version.yaml', 'README.md', 'LICENSE', 'scripts/prepare-npm-package.cjs', 'back/protos/api.proto']) await copy(name);
   for (const directory of ['shell', 'sample', 'cli/src/internal/maintenance']) {
     await fs.cp(directory, path.join(root, directory), {
       recursive: true,
@@ -43,10 +43,11 @@ async function packageFixture(t) {
     await fs.writeFile(path.join(root, 'static', name), bytes);
     files[name] = createHash('sha256').update(bytes).digest('hex');
   }
-  for (const name of ['.env', 'output/private.json', 'data/config/auth.json', 'shell/preload/env.js', 'shell/preload/__ql_notify__.js', 'shell/preload/__pycache__/env.pyc', 'cli/dist/npm/ql.js']) {
+  for (const name of ['.env', '.env.local', '.env.production', '.aws/credentials', '.ssh/id_rsa', '.vscode/settings.json', '.github/workflows/private.yml', '.tmp/private.json', '.DS_Store', 'output/private.json', 'data/config/auth.json', 'back/private.json', 'back/private.ts', 'sample/tool.ts', 'sample/private.json', 'sample/__pycache__/notify.pyc', 'shell/preload/env.js', 'shell/preload/env.py', 'shell/preload/notify.js', 'shell/preload/__ql_notify__.js', 'shell/preload/lang_env.sh', 'shell/preload/task-notify.json', 'shell/preload/__pycache__/env.pyc', 'cli/dist/npm/ql.js', 'cli/src/internal/private.cjs']) {
     await fs.mkdir(path.dirname(path.join(root, name)), { recursive: true });
     await fs.writeFile(path.join(root, name), 'DO_NOT_PUBLISH');
   }
+  await fs.writeFile(path.join(root, '.npmrc'), '# DO_NOT_PUBLISH\n');
   const env = { ...process.env, HOME: temp, NODE_ENV: 'production' };
   await execute('git', ['init', '-q'], { cwd: root, env });
   await execute('git', ['add', '-A'], { cwd: root, env });
@@ -61,6 +62,8 @@ async function packageFixture(t) {
 
 test('real npm pack excludes local state and its installed lifecycle restores verified runtime files', async (t) => {
   const { root, output, temp, env, lock, files, pack } = await packageFixture(t);
+  // The whitelist must work by itself, even for artifacts ignored by Git.
+  await assert.rejects(fs.access(path.join(root, '.npmignore')), { code: 'ENOENT' });
   const packed = await pack();
   const [archive] = JSON.parse(packed.stdout);
   checkPackedFiles(archive.files);
@@ -71,11 +74,16 @@ test('real npm pack excludes local state and its installed lifecycle restores ve
   const prefix = path.join(temp, 'installed');
   await execute('npm', ['install', '--offline', '--omit=dev', '--no-audit', '--no-fund', '--cache', path.join(temp, 'cache'), '--prefix', prefix, path.join(output, archive.filename)], { cwd: temp, env, timeout: 60000 });
   const installed = path.join(prefix, 'node_modules/@whyour/qinglong');
+  for (const { path: name } of archive.files)
+    assert.equal((await fs.readFile(path.join(installed, name))).includes(Buffer.from('DO_NOT_PUBLISH')), false, `Private fixture content in npm package: ${name}`);
   await assert.rejects(fs.access(path.join(installed, '.env')), { code: 'ENOENT' });
   assert.equal(await fs.readFile(path.join(installed, 'pnpm-lock.yaml'), 'utf8'), lock);
   assert.equal(typeof require(path.join(installed, 'shell/upgrade.cjs')).stageUpgrade, 'function');
   assert.ok((await fs.stat(path.join(installed, 'shell/update.sh'))).mode & 0o111);
-  for (const name of ['ql', 'task', 'qinglong']) await fs.access(path.join(prefix, 'node_modules/.bin', name));
+  for (const [name, file] of Object.entries(JSON.parse(await fs.readFile(path.join(installed, 'package.json'), 'utf8')).bin)) {
+    await fs.access(path.join(prefix, 'node_modules/.bin', name));
+    assert.ok((await fs.stat(path.join(installed, file))).mode & 0o111, file);
+  }
   await fs.writeFile(path.join(installed, 'shell/upgrade-lock.yaml'), 'tampered');
   assert.throws(() => restorePackageLock(installed), /does not match/);
   assert.equal(await fs.readFile(path.join(installed, 'pnpm-lock.yaml'), 'utf8'), lock);
