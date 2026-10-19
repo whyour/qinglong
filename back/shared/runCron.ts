@@ -4,9 +4,6 @@ import taskLimit from './pLimit';
 import Logger from '../loaders/logger';
 import { ICron } from '../protos/cron';
 import { CrontabModel, CrontabStatus } from '../data/cron';
-import { killTask } from '../config/util';
-import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
-import dayjs from 'dayjs';
 import { observeChildProcess, asError } from './childProcess';
 
 export function runCron(
@@ -17,7 +14,7 @@ export function runCron(
   const execute = async () => {
     try {
       if (!isCurrent()) return;
-      // Check if the cron is already running and stop it (only if multiple instances are not allowed)
+      // A single-instance trigger must not interrupt work already in progress.
       try {
         const existingCron = await CrontabModel.findOne({
           where: { id: Number(cron.id) },
@@ -38,27 +35,11 @@ export function runCron(
             existingCron.status === CrontabStatus.queued)
         ) {
           Logger.info(
-            t('[schedule][停止已运行任务] 任务ID: %s, PID: %s'),
+            '[schedule][Skip active single-instance task] Task ID: %s, PID: %s',
             cron.id,
             existingCron.pid,
           );
-          await killTask(existingCron.pid, true);
-          // Mark old running instances as stopped
-          const stoppedAt = dayjs().unix();
-          await RunningInstanceModel.update(
-            { status: InstanceStatus.stopped, finished_at: stoppedAt },
-            {
-              where: {
-                cron_id: Number(cron.id),
-                status: InstanceStatus.running,
-              },
-            },
-          );
-          // Update the status to idle after killing
-          await CrontabModel.update(
-            { status: CrontabStatus.idle, pid: undefined },
-            { where: { id: Number(cron.id) } },
-          );
+          return;
         }
       } catch (error) {
         Logger.error(
@@ -69,7 +50,7 @@ export function runCron(
         throw error;
       }
 
-      // In particular, invalidation can happen while stopping a previous run.
+      // Invalidation can happen during the asynchronous database check.
       if (!isCurrent()) return;
       Logger.info(
         t('[schedule][开始执行任务] 参数 %s'),
