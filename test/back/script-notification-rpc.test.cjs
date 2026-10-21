@@ -29,7 +29,9 @@ test('JS and Python script reports reach the same authenticated RPC with bounded
   server.addService(Api.service, {
     RecordNotifyLog: (call, callback) => {
       received.push(call.request);
-      callback(null, { code: 200 });
+      if (call.request.title === 'Concurrent cold startup')
+        setTimeout(() => callback(null, { code: 200 }), 2000);
+      else callback(null, { code: 200 });
     },
   });
   const credentials = grpc.ServerCredentials.createSsl(
@@ -91,6 +93,46 @@ n.send('Python failure','body')
   );
   assert.ok(received.every((x) => x.taskId === '9'));
   assert.ok(!JSON.stringify(received).includes('private-password'));
+  // A busy host can spend longer than the former 3s timeout starting Node.
+  // All channels must still arrive, using one child and one TLS connection.
+  const coldStart = path.join(data, 'cold-start.cjs');
+  fs.writeFileSync(
+    coldStart,
+    'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,3500);',
+  );
+  const concurrent = `import importlib.util,sys,types,os,threading,json,subprocess
+sys.modules['requests']=types.SimpleNamespace()
+spec=importlib.util.spec_from_file_location('notify',os.path.join(os.environ['QL_DIR'],'sample/notify.py'))
+n=importlib.util.module_from_spec(spec);spec.loader.exec_module(n)
+barrier=threading.Barrier(3)
+def accepted(title,content):
+ barrier.wait(timeout=5);return True
+def rejected(title,content):
+ barrier.wait(timeout=5);raise RuntimeError('private-password')
+def no_result(title,content):
+ barrier.wait(timeout=5)
+n.add_notify_function=lambda:[accepted,rejected,no_result]
+original=subprocess.run
+children=[]
+def tracked(*args,**kwargs):
+ children.append(json.loads(kwargs['input']))
+ return original(*args,**kwargs)
+n.subprocess.run=tracked
+n.send('Concurrent cold startup','body')
+assert len(children)==1,children
+assert len(children[0])==3,children
+`;
+  await run('python3', ['-c', concurrent], {
+    env: { ...env, NODE_OPTIONS: `--require=${coldStart}` },
+    timeout: 14000,
+  });
+  assert.deepEqual(
+    received
+      .filter((x) => x.title === 'Concurrent cold startup')
+      .map((x) => [x.notifyType, x.success])
+      .sort(),
+    [['accepted', true], ['no_result', false], ['rejected', false]],
+  );
   // Missing certificates and an older/unavailable backend must not kill scripts.
   await run(
     process.execPath,
@@ -110,5 +152,5 @@ n.send('Python failure','body')
     ],
     { env, timeout: 8000 },
   );
-  assert.ok(Date.now() - started < 5000);
+  assert.ok(Date.now() - started < 7000);
 });

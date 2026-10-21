@@ -1313,30 +1313,40 @@ def add_notify_function():
 
 
 def report_notification(channel, title, content, success):
+    report_notifications([(channel, success)], title, content)
+
+
+def report_notifications(results, title, content):
     ql_dir = os.getenv("QL_DIR")
-    if not ql_dir:
+    if not ql_dir or not results:
         return
-    payload = {"title": str(title or "")[:512], "content": str(content or "")[:8192],
+    payload = [{"title": str(title or "")[:512], "content": str(content or "")[:8192],
                "success": success, "notifyType": channel,
                "scriptName": os.path.basename(__import__("sys").argv[0]), "taskId": os.getenv("ID", "")}
+               for channel, success in results]
     code = """const fs=require('node:fs'),path=require('node:path');
 const report=require(path.join(process.env.QL_DIR,'shell/preload/notificationAudit.js'));
 report(JSON.parse(fs.readFileSync(0,'utf8'))).catch(()=>{});"""
     try:
+        # One Node startup/TLS connection per send, with room for cold startup
+        # before the reporter's bounded RPC deadline on busy Alpine hosts.
         subprocess.run(["node", "-e", code], input=json.dumps(payload), text=True,
-                       capture_output=True, timeout=3)
+                       capture_output=True, timeout=10)
     except Exception:
         pass  # Audit availability never changes notification delivery.
 
 
-def audited_notification(mode, title, content):
+def audited_notification(mode, title, content, results=None):
     result = None
     try:
         result = mode(title, content)
     except Exception:
         result = False
         print(f"{mode.__name__} 推送失败")
-    report_notification(mode.__name__, title, content, result is True)
+    if results is None:
+        report_notification(mode.__name__, title, content, result is True)
+    else:
+        results.append((mode.__name__, result is True))
 
 
 def send(title: str, content: str, ignore_default_config: bool = False, **kwargs):
@@ -1362,12 +1372,14 @@ def send(title: str, content: str, ignore_default_config: bool = False, **kwargs
     content += "\n\n" + one() if hitokoto not in [False, "false"] else ""
 
     notify_function = add_notify_function()
+    results = []
     ts = [
-        threading.Thread(target=audited_notification, args=(mode, title, content), name=mode.__name__)
+        threading.Thread(target=audited_notification, args=(mode, title, content, results), name=mode.__name__)
         for mode in notify_function
     ]
     [t.start() for t in ts]
     [t.join() for t in ts]
+    report_notifications(results, title, content)
 
 
 def main():

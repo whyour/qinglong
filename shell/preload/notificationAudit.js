@@ -27,14 +27,22 @@ module.exports = async function reportNotificationAudit(payload) {
       credentials,
       { 'grpc.enable_http_proxy': 0 },
     );
-    await new Promise((resolve) => {
-      client.RecordNotifyLog(
-        payload,
-        new grpc.Metadata(),
-        { deadline: new Date(Date.now() + 1500) },
-        () => resolve(),
-      );
-    });
+    // Python sends all channel results together so they share startup and TLS.
+    const records = Array.isArray(payload) ? payload : [payload];
+    const deadline = new Date(Date.now() + 5000);
+    await Promise.all(
+      records.map(
+        (record) =>
+          new Promise((resolve) => {
+            client.RecordNotifyLog(
+              record,
+              new grpc.Metadata(),
+              { deadline },
+              () => resolve(),
+            );
+          }),
+      ),
+    );
   } catch (_) {
     // Missing certificates, old panels and offline services are best effort.
   } finally {
