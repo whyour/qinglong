@@ -14,7 +14,6 @@ function temporary(t) {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
 }
-
 test('environment values remain literal when the generated JavaScript loads', async () => {
   const output = {};
   const Env = load(path.resolve('back/services/env.ts'), {
@@ -42,7 +41,6 @@ test('environment values remain literal when the generated JavaScript loads', as
     assert.equal(context.process.env[`VALUE_${i}`], value),
   );
 });
-
 test('subscription shell parameters round trip without expansion or command substitution', () => {
   const { formatCommand } = load(path.resolve('back/config/subscription.ts'));
   const payload =
@@ -83,7 +81,6 @@ test('subscription shell parameters round trip without expansion or command subs
     }
   }
 });
-
 test('SSH alias traversal and symlinks cannot write or remove outside files', async (t) => {
   const base = temporary(t);
   const root = path.join(base, 'ssh');
@@ -141,14 +138,17 @@ test('SSH alias traversal and symlinks cannot write or remove outside files', as
     service.generateSingleSshConfig('safe', 'host', '$(printf BAD)'),
   );
 });
-
 function cronService(config, updates = []) {
   const Cron = load(path.resolve('back/services/cron.ts'), {
     typedi: decorators,
     '../config': config,
     '../data/cron': {
       CrontabStatus: { running: 0, idle: 1, queued: 3 },
-      CrontabModel: { update: async (v) => updates.push(v) },
+      CrontabModel: {
+        nativeUpdate: async (where, v) => {
+          return updates.push(v);
+        },
+      },
     },
     '../data/runningInstance': { RunningInstanceModel: {}, InstanceStatus: {} },
     '../config/util': { fileExist: async (p) => fs.existsSync(p) },
@@ -183,7 +183,6 @@ function subscriptionService(config, model = {}) {
   }).default;
   return new Subscription(logger, {}, {}, {}, {});
 }
-
 test('stored cron/subscription paths cannot read or enumerate outside the log root', async (t) => {
   const base = temporary(t);
   const root = path.join(base, 'log');
@@ -224,7 +223,6 @@ test('stored cron/subscription paths cannot read or enumerate outside the log ro
     (await subscription.logs(1)).some((x) => x.filename === 'normal.log'),
   );
 });
-
 test('subscription aliases are checked before persistence and forced deletion', async (t) => {
   const base = temporary(t);
   for (const dir of ['scripts', 'repo']) fs.mkdirSync(path.join(base, dir));
@@ -235,8 +233,12 @@ test('subscription aliases are checked before persistence and forced deletion', 
       repoPath: path.join(base, 'repo'),
     },
     {
-      findAll: async () => [{ alias: '../victim' }],
-      destroy: async () => writes++,
+      find: async (where, read = {}) => {
+        return [{ alias: '../victim' }];
+      },
+      nativeDelete: async (where, read = {}) => {
+        return writes++;
+      },
     },
   );
   service.insert = service.updateDb = async () => writes++;
@@ -254,14 +256,17 @@ test('subscription aliases are checked before persistence and forced deletion', 
   );
   assert.equal(writes, 0);
 });
-
 function systemService(config, overrides = {}) {
   const System = load(path.resolve('back/services/system.ts'), {
     typedi: decorators,
     '../config': config,
     '../config/const': {},
     '../data/dependence': {
-      DependenceModel: { findAll: async () => [] },
+      DependenceModel: {
+        find: async (where, read = {}) => {
+          return [];
+        },
+      },
       DependenceTypes: {},
       DependenceStatus: {},
     },
@@ -277,7 +282,6 @@ function systemService(config, overrides = {}) {
   }).default;
   return new System(logger, {}, {});
 }
-
 test('backup rejects unrecognized paths before spawning; valid export uses argv without a shell', async (t) => {
   const base = temporary(t);
   const calls = [];
@@ -333,7 +337,6 @@ test('backup rejects unrecognized paths before spawning; valid export uses argv 
   assert.equal(calls[0][2].shell, undefined);
   assert.equal(downloaded, true);
 });
-
 test('proxy, language and mirror settings stay literal at their shell boundaries', async (t) => {
   const base = temporary(t);
   const commands = [];
@@ -373,7 +376,6 @@ test('proxy, language and mirror settings stay literal at their shell boundaries
   }
   assert.equal((await service.reloadSystem('$(printf BAD)')).code, 400);
 });
-
 test('the ignored-log sentinel remains supported without exposing device files', async (t) => {
   const root = temporary(t);
   const cron = cronService({ logPath: root });
@@ -385,7 +387,6 @@ test('the ignored-log sentinel remains supported without exposing device files',
     cron.status({ ids: [], status: 0, log_path: '/dev/zero' }),
   );
 });
-
 test('normal backup creates an archive containing the selected data directories', async (t) => {
   const base = temporary(t);
   const dataPath = path.join(base, 'data');

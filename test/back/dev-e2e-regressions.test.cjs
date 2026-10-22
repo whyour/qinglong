@@ -5,7 +5,6 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const load = require('../helpers/load-security-module.cjs');
-
 const types = { nodejs: 0, python3: 1, linux: 2 };
 const statuses = { installed: 1, installFailed: 2, queued: 6, cancelled: 7 };
 const util = load('back/config/util.ts', {
@@ -15,7 +14,6 @@ const util = load('back/config/util.ts', {
   '../shared/utils': {},
   '../data/dependence': { DependenceTypes: types },
 });
-
 function serviceFor(docs) {
   const probes = [],
     removed = [],
@@ -28,18 +26,21 @@ function serviceFor(docs) {
       DependenceStatus: statuses,
       versionDependenceCommandTypes: { 0: '@', 1: '==', 2: '=' },
       DependenceModel: {
-        findAll: async ({ where }) =>
-          docs.filter(
+        find: async (where, read = {}) => {
+          return docs.filter(
             (d) =>
               (where.status === undefined || d.status === where.status) &&
               (!where.id || where.id.includes(d.id)),
-          ),
-        update: async (values, { where }) => {
+          );
+        },
+        nativeUpdate: async (where, values) => {
           docs
             .filter((d) => where.id.includes(d.id))
             .forEach((d) => Object.assign(d, values));
         },
-        destroy: async ({ where }) => removed.push(...where.id),
+        nativeDelete: async (where, read = {}) => {
+          return removed.push(...where.id);
+        },
       },
     },
     '../config/util': {
@@ -62,7 +63,6 @@ function serviceFor(docs) {
   };
   return { service, probes, removed, uninstalls };
 }
-
 test('listing preserves Python source results and still detects missing named packages', async () => {
   const docs = [
     ' requirements with spaces/requirements.txt ',
@@ -88,7 +88,6 @@ test('listing preserves Python source results and still detects missing named pa
   // Source installs must continue to execute pip rather than treating the source as a package name.
   assert.equal(util.getGetCommand(1, docs[0].name), 'echo ""');
 });
-
 test('deletion cleans previously misclassified Python sources and only queues intended records', async () => {
   const docs = [
     { id: 1, name: 'requirements.txt', type: 1, status: 2 },
@@ -106,7 +105,6 @@ test('deletion cleans previously misclassified Python sources and only queues in
   ]);
   assert.equal(docs[2].status, 2);
 });
-
 test('Alpine container mirror command runs without sudo and writes valid repositories', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-alpine-mirror-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -151,7 +149,6 @@ test('Alpine container mirror command runs without sudo and writes valid reposit
     ),
   );
 });
-
 test('force deletion removes a source record even when its requirements file is gone', async () => {
   const removed = [],
     updates = [];
@@ -167,8 +164,12 @@ test('force deletion removes a source record even when its requirements file is 
       DependenceTypes: types,
       DependenceStatus: { ...statuses, removeFailed: 5 },
       DependenceModel: {
-        destroy: async ({ where }) => removed.push(...where.id),
-        update: async (values) => updates.push(values),
+        nativeDelete: async (where, read = {}) => {
+          return removed.push(...where.id);
+        },
+        nativeUpdate: async (where, values) => {
+          return updates.push(values);
+        },
       },
     },
     '../shared/pLimit': {
@@ -186,7 +187,6 @@ test('force deletion removes a source record even when its requirements file is 
   await service.installOrUninstallDependency(dep, false, true);
   assert.deepEqual(removed, [1]);
 });
-
 test('Python extras run pip even when the base package version is already installed', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-extra-install-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -217,8 +217,12 @@ test('Python extras run pip even when the base package version is already instal
       DependenceStatus: { ...statuses, installing: 0, cancelled: 7 },
       versionDependenceCommandTypes: { 0: '@', 1: '==', 2: '=' },
       DependenceModel: {
-        findAll: async () => [dep],
-        update: async (values) => Object.assign(dep, values),
+        find: async (where, read = {}) => {
+          return [dep];
+        },
+        nativeUpdate: async (where, values) => {
+          return Object.assign(dep, values);
+        },
       },
     },
     '../shared/pLimit': {

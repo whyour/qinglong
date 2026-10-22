@@ -1,23 +1,16 @@
+const { DatabaseClient } = require('../../back/data/databaseClient');
+const { repository, initialize } = require('../helpers/repository-fixture.cjs');
+const { orderBy } = require('../../back/data/queries');
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { Sequelize, DataTypes } = require('sequelize');
 const load = require('../helpers/load-security-module.cjs');
-
 test('startup closes interrupted instances without inventing exit codes or rewriting history', async (t) => {
-  const db = new Sequelize({
-    dialect: 'sqlite',
-    storage: ':memory:',
-    logging: false,
-  });
+  const db = new DatabaseClient(':memory:');
   t.after(() => db.close());
-  const instances = db.define('Instance', {
-    status: DataTypes.INTEGER,
-    started_at: DataTypes.INTEGER,
-    finished_at: DataTypes.INTEGER,
-    exit_code: DataTypes.INTEGER,
-  });
-  await db.sync();
-  await instances.bulkCreate([
+  const instances = repository(db, 'RunningInstance');
+  await initialize(db);
+  await instances.insertMany([
     { id: 1, status: 0, started_at: 100 },
     { id: 2, status: 1, started_at: 100, finished_at: 110, exit_code: 0 },
     { id: 3, status: 2, started_at: 100, finished_at: 120, exit_code: 143 },
@@ -39,25 +32,25 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     '../services/user': class {},
     '../services/open': class {},
     '../data/cron': {
-      CrontabModel: { update: async () => {}, findAll: async () => [] },
+      CrontabModel: { nativeUpdate: async () => {}, find: async () => [] },
       CrontabStatus: { idle: 1 },
     },
     '../data/dependence': {
-      DependenceModel: { findAll: async () => [], update: async () => {} },
+      DependenceModel: { find: async () => [], nativeUpdate: async () => {} },
       DependenceStatus: { queued: 0 },
     },
     '../data/cronView': {
-      CrontabViewModel: { findAll: async () => [{}] },
+      CrontabViewModel: { find: async () => [{}] },
       CronViewType: { 系统: 0 },
     },
     '../data/env': {},
     '../data/system': {
-      SystemModel: { findOrCreate: async () => [systemConfig] },
+      SystemModel: { getOrCreate: async () => systemConfig },
       AuthDataType: {},
     },
     '../data/open': {
       AppModel: {
-        findOne: async () => ({ get: () => ({ scopes: ['dashboard'] }) }),
+        findOne: async () => ({ scopes: ['dashboard'] }),
       },
     },
     '../data/runningInstance': {
@@ -82,7 +75,12 @@ test('startup closes interrupted instances without inventing exit codes or rewri
   } finally {
     global.setTimeout = originalTimeout;
   }
-  const rows = await instances.findAll({ order: [['id', 'ASC']], raw: true });
+  const rows = await instances.find(
+    {},
+    {
+      orderBy: orderBy([['id', 'ASC']]),
+    },
+  );
   assert.equal(rows[0].status, 2);
   assert.ok(
     rows[0].finished_at >= before &&
@@ -110,7 +108,12 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     global.setTimeout = originalTimeout;
   }
   assert.deepEqual(
-    await instances.findAll({ order: [['id', 'ASC']], raw: true }),
+    await instances.find(
+      {},
+      {
+        orderBy: orderBy([['id', 'ASC']]),
+      },
+    ),
     rows,
   );
 });

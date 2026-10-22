@@ -34,27 +34,27 @@ import {
 } from '../shared/password';
 import { serializeAuthMutation } from '../shared/authMutation';
 import { LoginThrottle } from '../shared/loginThrottle';
-
 @Service()
 export default class UserService {
   private loginThrottle = new LoginThrottle();
   @Inject((type) => NotificationService)
   private notificationService!: NotificationService;
-
   constructor(
-    @Inject('logger') private logger: winston.Logger,
+    @Inject('logger')
+    private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
   ) {}
-
   @serializeAuthMutation
   public async login(
-    payloads: { username: string; password: string },
+    payloads: {
+      username: string;
+      password: string;
+    },
     req: Request,
   ): Promise<any> {
     return this.authenticate(payloads, req);
   }
-
   private async authenticate(
     payloads: {
       username: string;
@@ -89,7 +89,6 @@ export default class UserService {
       platform,
       blockedIps = [],
     } = content;
-
     if (
       ip &&
       blockedIps.some((blockedIp) => normalizeClientIp(blockedIp) === ip)
@@ -107,7 +106,6 @@ export default class UserService {
       this.getLoginLog();
       return { code: 403, message: t('该 IP 已被列入黑名单') };
     }
-
     const waitTime = this.loginThrottle.retryAfter(ip, timestamp);
     if (waitTime > 0) {
       return {
@@ -116,10 +114,8 @@ export default class UserService {
         data: waitTime,
       };
     }
-
     const passwordMatches =
       username === cUsername && (await verifyPassword(password, cPassword));
-
     if (passwordMatches && twoFactorActivated && needTwoFactor) {
       await this.updateAuthInfo(content, {
         isTwoFactorChecking: true,
@@ -130,7 +126,6 @@ export default class UserService {
         message: '',
       };
     }
-
     if (passwordMatches) {
       this.loginThrottle.reset(ip);
       const data = createRandomString(50, 100);
@@ -139,7 +134,6 @@ export default class UserService {
         expiresIn: config.jwt.expiresIn || expiration,
         algorithm: 'HS384',
       });
-
       const tokenInfo: TokenInfo = {
         value: token,
         timestamp,
@@ -147,13 +141,11 @@ export default class UserService {
         address,
         platform: req.platform,
       };
-
       const updatedTokens = this.addTokenToList(
         tokens,
         req.platform,
         tokenInfo,
       );
-
       await this.updateAuthInfo(content, {
         password: isPasswordHash(cPassword)
           ? cPassword
@@ -252,16 +244,13 @@ export default class UserService {
       }
     }
   }
-
   @serializeAuthMutation
   public async logout(platform: string, tokenValue: string): Promise<any> {
     if (!platform || !tokenValue) {
       this.logger.warn('Invalid logout parameters - empty platform or token');
       return;
     }
-
     const authInfo = await this.getAuthInfo();
-
     // Verify the token exists before attempting to remove it
     const tokenExists = this.findTokenInList(
       authInfo.tokens,
@@ -275,45 +264,36 @@ export default class UserService {
       );
       return;
     }
-
     const updatedTokens = this.removeTokenFromList(
       authInfo.tokens,
       platform,
       tokenValue,
     );
-
     await this.updateAuthInfo(authInfo, {
       token: authInfo.token === tokenValue ? '' : authInfo.token,
       tokens: updatedTokens,
     });
   }
-
   public async getLoginLog(): Promise<Array<SystemModelInfo | undefined>> {
-    const docs = await SystemModel.findAll({
-      where: { type: AuthDataType.loginLog },
-    });
+    const docs = await SystemModel.find({ type: AuthDataType.loginLog }, {});
     if (docs && docs.length > 0) {
       const result = docs.sort(
         (a, b) => b.info!.timestamp! - a.info!.timestamp!,
       );
       if (result.length > 100) {
         const ids = result.slice(100).map((x) => x.id!);
-        await SystemModel.destroy({
-          where: { id: ids },
-        });
+        await SystemModel.nativeDelete({ id: ids });
       }
       return result.map((x) => x.info);
     }
     return [];
   }
-
   public async getIpBlacklist(): Promise<string[]> {
     const authInfo = await this.getAuthInfo();
     return uniq((authInfo.blockedIps || []).map(normalizeClientIp)).filter(
       Boolean,
     );
   }
-
   @serializeAuthMutation
   public async blockIp(ip: string): Promise<string[]> {
     const authInfo = await this.getAuthInfo();
@@ -324,7 +304,6 @@ export default class UserService {
     await this.updateAuthInfo(authInfo, { blockedIps });
     return blockedIps;
   }
-
   @serializeAuthMutation
   public async unblockIp(ip: string): Promise<string[]> {
     const authInfo = await this.getAuthInfo();
@@ -335,12 +314,10 @@ export default class UserService {
     await this.updateAuthInfo(authInfo, { blockedIps });
     return blockedIps;
   }
-
   private async insertDb(payload: SystemInfo): Promise<SystemInfo> {
-    const doc = await SystemModel.create({ ...payload }, { returning: true });
+    const doc = await SystemModel.insert({ ...payload });
     return doc;
   }
-
   @serializeAuthMutation
   public async initializeUser({
     username,
@@ -366,7 +343,6 @@ export default class UserService {
     });
     return { code: 200, message: t('更新成功') };
   }
-
   @serializeAuthMutation
   public async updateUsernameAndPassword({
     username,
@@ -389,14 +365,12 @@ export default class UserService {
     });
     return { code: 200, message: t('更新成功') };
   }
-
   @serializeAuthMutation
   public async updateAvatar(avatar: string) {
     const authInfo = await this.getAuthInfo();
     await this.updateAuthInfo(authInfo, { avatar });
     return { code: 200, data: avatar, message: t('更新成功') };
   }
-
   @serializeAuthMutation
   public async initTwoFactor() {
     const secret = authenticator.generateSecret();
@@ -408,7 +382,6 @@ export default class UserService {
     await this.updateAuthInfo(authInfo, { twoFactorSecret: secret });
     return { secret, url: otpauth };
   }
-
   @serializeAuthMutation
   public async activeTwoFactor(code: string) {
     const authInfo = await this.getAuthInfo();
@@ -427,14 +400,17 @@ export default class UserService {
     }
     return isValid;
   }
-
   @serializeAuthMutation
   public async twoFactorLogin(
     {
       username,
       password,
       code,
-    }: { username: string; password: string; code: string },
+    }: {
+      username: string;
+      password: string;
+      code: string;
+    },
     req: any,
   ) {
     const authInfo = await this.getAuthInfo();
@@ -482,7 +458,6 @@ export default class UserService {
       return { code: 430, message: t('验证失败') };
     }
   }
-
   @serializeAuthMutation
   public async deactivateTwoFactor() {
     const authInfo = await this.getAuthInfo();
@@ -496,7 +471,6 @@ export default class UserService {
     });
     return true;
   }
-
   public async getAuthInfo() {
     const authInfo = await shareStore.getAuthInfo();
     if (authInfo) {
@@ -505,7 +479,6 @@ export default class UserService {
     const doc = await this.getDb({ type: AuthDataType.authConfig });
     return (doc.info || {}) as AuthInfo;
   }
-
   private async updateAuthInfo(authInfo: AuthInfo, info: Partial<AuthInfo>) {
     const result = { ...authInfo, ...info };
     await shareStore.updateAuthInfo(result);
@@ -517,34 +490,27 @@ export default class UserService {
       this.sockService.getClients().forEach((conn) => conn.close('401'));
     }
   }
-
   public async getNotificationMode(): Promise<NotificationInfo> {
     const doc = await this.getDb({ type: AuthDataType.notification });
     return (doc.info || {}) as NotificationInfo;
   }
-
   private async updateAuthDb(payload: SystemInfo): Promise<any> {
-    let doc = await SystemModel.findOne({ where: { type: payload.type } });
+    let doc = await SystemModel.findOne({ type: payload.type }, {});
     if (doc) {
-      const updateResult = await SystemModel.update(payload, {
-        where: { id: doc.id },
-        returning: true,
-      });
-      doc = updateResult[1][0];
+      await SystemModel.nativeUpdate({ id: doc.id }, payload);
+      doc = await SystemModel.findOne({ id: doc.id });
     } else {
-      doc = await SystemModel.create(payload, { returning: true });
+      doc = await SystemModel.insert(payload);
     }
     return doc;
   }
-
   public async getDb(query: any): Promise<SystemInfo> {
-    const doc = await SystemModel.findOne({ where: { ...query } });
+    const doc = await SystemModel.findOne({ ...query }, {});
     if (!doc) {
       throw new Error(`${JSON.stringify(query)} not found`);
     }
-    return doc.get({ plain: true });
+    return doc;
   }
-
   public async updateNotificationMode(notificationInfo: NotificationInfo) {
     const code = Math.random().toString().slice(-6);
     const isSuccess = await this.notificationService.testNotify(
@@ -562,12 +528,10 @@ export default class UserService {
       return { code: 400, message: t('通知发送失败，请检查参数') };
     }
   }
-
   private normalizeTokens(
     tokens: Record<string, string | TokenInfo[]>,
   ): Record<string, TokenInfo[]> {
     const normalized: Record<string, TokenInfo[]> = {};
-
     for (const [platform, value] of Object.entries(tokens)) {
       if (typeof value === 'string') {
         // Legacy format: convert string token to TokenInfo array
@@ -589,10 +553,8 @@ export default class UserService {
         normalized[platform] = value || [];
       }
     }
-
     return normalized;
   }
-
   private addTokenToList(
     tokens: Record<string, string | TokenInfo[]>,
     platform: string,
@@ -606,16 +568,12 @@ export default class UserService {
       );
       maxTokensPerPlatform = config.maxTokensPerPlatform;
     }
-
     const normalized = this.normalizeTokens(tokens);
-
     if (!normalized[platform]) {
       normalized[platform] = [];
     }
-
     // Add new token
     normalized[platform].unshift(tokenInfo);
-
     // Limit the number of active tokens per platform
     if (normalized[platform].length > maxTokensPerPlatform) {
       normalized[platform] = normalized[platform].slice(
@@ -623,40 +581,32 @@ export default class UserService {
         maxTokensPerPlatform,
       );
     }
-
     return normalized;
   }
-
   private removeTokenFromList(
     tokens: Record<string, string | TokenInfo[]>,
     platform: string,
     tokenValue: string,
   ): Record<string, TokenInfo[]> {
     const normalized = this.normalizeTokens(tokens);
-
     if (normalized[platform]) {
       normalized[platform] = normalized[platform].filter(
         (t) => t.value !== tokenValue,
       );
     }
-
     return normalized;
   }
-
   private findTokenInList(
     tokens: Record<string, string | TokenInfo[]>,
     platform: string,
     tokenValue: string,
   ): TokenInfo | undefined {
     const normalized = this.normalizeTokens(tokens);
-
     if (normalized[platform]) {
       return normalized[platform].find((t) => t.value === tokenValue);
     }
-
     return undefined;
   }
-
   @serializeAuthMutation
   public async resetAuthInfo(info: Partial<AuthInfo>) {
     const { retries, twoFactorActivated, password, username } = info;
@@ -673,7 +623,6 @@ export default class UserService {
       },
       (x) => !isNil(x),
     );
-
     if (password !== undefined) {
       payload.password = await hashPassword(password);
     }

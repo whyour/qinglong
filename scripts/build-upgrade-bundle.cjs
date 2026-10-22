@@ -1,10 +1,15 @@
 const fs = require('node:fs/promises');
+const { createWriteStream } = require('node:fs');
 const path = require('node:path');
+const { pipeline } = require('node:stream/promises');
 const tar = require('tar');
 const bundle = require('../cli/src/internal/maintenance/platformBundle.cjs');
 const {
   verifyUpgrade,
 } = require('../cli/src/internal/maintenance/upgradeArtifacts.cjs');
+const {
+  prestartBackend,
+} = require('../cli/src/internal/maintenance/upgradePrestart.cjs');
 
 async function normalizeModes(directory) {
   for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
@@ -17,6 +22,17 @@ async function normalizeModes(directory) {
       await fs.chmod(filename, 0o644 | (stat.mode & 0o111));
     }
   }
+}
+
+async function writeBundleArchive(workspace, filename) {
+  // Core streams complete partial writes; tar's file option uses fs-minipass,
+  // whose writer can silently discard a successful short write/writev result.
+  await pipeline(
+    tar.c({ gzip: true, portable: true, noMtime: true, cwd: workspace }, [
+      'qinglong',
+    ]),
+    createWriteStream(filename, { highWaterMark: 256 * 1024 }),
+  );
 }
 
 async function buildBundle(root, output) {
@@ -76,7 +92,7 @@ async function buildBundle(root, output) {
         endianness: target.endianness,
         armFloatAbi: target.armFloatAbi,
       },
-      nodeMinimum: '20.18.1',
+      nodeMinimum: '22.17.0',
       nodeApi: 6,
       files: await bundle.inventory({ source, static: staticRoot }),
     };
@@ -88,16 +104,7 @@ async function buildBundle(root, output) {
     const filename = `qinglong-${build.sourceCommit}-${bundle.targetKey(
       target,
     )}.tar.gz`;
-    await tar.c(
-      {
-        gzip: true,
-        portable: true,
-        noMtime: true,
-        cwd: workspace,
-        file: path.join(output, filename),
-      },
-      ['qinglong'],
-    );
+    await writeBundleArchive(workspace, path.join(output, filename));
     // Verify the bytes users receive, not just the pre-archive build directory.
     const roundtrip = path.join(workspace, 'roundtrip');
     await fs.mkdir(roundtrip);
@@ -111,6 +118,8 @@ async function buildBundle(root, output) {
     await verifyUpgrade(extracted.source, extracted.static);
     await bundle.smokeDependencies(extracted.source);
     console.log('Archived production dependencies and SQLite verified');
+    await prestartBackend(extracted, { target });
+    console.log('Archived backend database, gRPC and HTTP startup verified');
     const bytes = await fs.readFile(path.join(output, filename));
     const record = {
       format: 2,
@@ -132,7 +141,7 @@ async function buildBundle(root, output) {
     await fs.rm(workspace, { recursive: true, force: true });
   }
 }
-module.exports = { buildBundle, normalizeModes };
+module.exports = { buildBundle, normalizeModes, writeBundleArchive };
 if (require.main === module)
   buildBundle(process.argv[2] || '/ql', process.argv[3] || '/out').catch(
     (e) => {

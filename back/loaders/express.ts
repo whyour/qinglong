@@ -16,7 +16,7 @@ import { t } from '../shared/i18n';
 import { AppScope } from '../data/open';
 import uniqueConstraintError from '../middlewares/uniqueConstraintError';
 import protectedPathCase from '../middlewares/protectedPathCase';
-
+import { withAuthAvailability } from '../middlewares/authAvailability';
 function resolveTrustProxy(value = process.env.QL_TRUST_PROXY) {
   const setting = value?.trim();
   if (!setting) {
@@ -30,24 +30,20 @@ function resolveTrustProxy(value = process.env.QL_TRUST_PROXY) {
   }
   return setting;
 }
-
 export default ({ app }: { app: Application }) => {
   // Security: Enable strict routing to prevent case-insensitive path bypass
   app.set('case sensitive routing', true);
   app.set('strict routing', true);
   app.set('trust proxy', resolveTrustProxy());
   app.use(cors());
-
   // Security: Reject case variations under protected API namespaces before
   // authentication checks can interpret the request differently from routing.
   app.use(protectedPathCase);
-
   // Rewrite URLs to strip baseUrl prefix if configured
   // This allows the rest of the app to work without baseUrl awareness
   if (config.baseUrl) {
     app.use(rewrite(`${config.baseUrl}/*`, '/$1'));
   }
-
   app.get(`${config.api.prefix}/env.js`, serveEnv);
   app.use(
     `${config.api.prefix}/static`,
@@ -58,7 +54,6 @@ export default ({ app }: { app: Application }) => {
       },
     }),
   );
-
   const credentialPaths = ['/api', '/open'].flatMap((prefix) =>
     ['/user/login', '/user/init', '/user/two-factor/login'].map(
       (route) => `${prefix}${route}`,
@@ -69,13 +64,10 @@ export default ({ app }: { app: Application }) => {
     bodyParser.json({ limit: '16kb' }),
     bodyParser.urlencoded({ limit: '16kb', extended: false }),
   );
-
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-
   const frontendPath = path.join(config.rootPath, 'static/dist');
   app.use(express.static(frontendPath));
-
   app.use(
     expressjwt({
       secret: config.jwt.secret,
@@ -84,7 +76,6 @@ export default ({ app }: { app: Application }) => {
       path: [...config.apiWhiteList, /^(\/(?!api\/).*)$/i],
     }),
   );
-
   app.use((req: Request, res, next) => {
     if (!req.headers) {
       req.platform = 'desktop';
@@ -94,91 +85,84 @@ export default ({ app }: { app: Application }) => {
     }
     return next();
   });
-
-  app.use(async (req: Request, res, next) => {
-    const pathLower = req.path.toLowerCase();
-    if (!['/open/', '/api/'].some((x) => pathLower.startsWith(x))) {
-      return next();
-    }
-
-    const headerToken = getToken(req);
-    if (pathLower.startsWith('/open/')) {
-      const apps = await shareStore.getApps();
-      const doc = apps?.filter((x) =>
-        x.tokens?.find((y) => y.value === headerToken),
-      )?.[0];
-      if (doc && doc.tokens && doc.tokens.length > 0) {
-        const currentToken = doc.tokens.find((x) => x.value === headerToken);
-        const keyMatch = pathLower.match(/\/open\/([a-z]+)\/*/);
-        const key = keyMatch && keyMatch[1];
-
-        if (!doc.scopes.includes(key as AppScope)) {
-          const err = new UnauthorizedError('credentials_bad_scheme', {
-            message: t('暂无权限'),
-          });
-          return next(err);
-        }
-
-        if (
-          !currentToken ||
-          currentToken.expiration < Math.round(Date.now() / 1000)
-        ) {
-          const err = new UnauthorizedError('invalid_token', {
-            message: t('Token 已失效'),
-          });
-          return next(err);
-        }
-
+  app.use(
+    withAuthAvailability(async (req: Request, res, next) => {
+      const pathLower = req.path.toLowerCase();
+      if (!['/open/', '/api/'].some((x) => pathLower.startsWith(x))) {
         return next();
       }
-    }
-
-    const originPath = `${req.baseUrl}${pathLower === '/' ? '' : pathLower}`;
-    if (
-      !headerToken &&
-      originPath &&
-      config.apiWhiteList.includes(originPath)
-    ) {
-      return next();
-    }
-
-    const authInfo = await shareStore.getAuthInfo();
-    if (isValidToken(authInfo, headerToken, req.platform, config.jwt.secret)) {
-      return next();
-    }
-
-    const errorCode = headerToken ? 'invalid_token' : 'credentials_required';
-    const errorMessage = headerToken ? t('Token 已失效') : t('请先登录');
-    const err = new UnauthorizedError(errorCode, { message: errorMessage });
-    next(err);
-  });
-
-  app.use(async (req, res, next) => {
-    const pathLower = req.path.toLowerCase();
-    if (
-      ![
-        '/api/user/init',
-        '/api/user/notification/init',
-        '/open/user/init',
-        '/open/user/notification/init',
-      ].includes(pathLower)
-    ) {
-      return next();
-    }
-    const authInfo = (await shareStore.getAuthInfo()) || ({} as AuthInfo);
-
-    let isInitialized = !isDefaultAuthInfo(authInfo);
-
-    if (isInitialized) {
-      return res.send({ code: 450, message: t('未知错误') });
-    } else {
-      return next();
-    }
-  });
-
+      const headerToken = getToken(req);
+      if (pathLower.startsWith('/open/')) {
+        const apps = await shareStore.getApps();
+        const doc = apps?.filter((x) =>
+          x.tokens?.find((y) => y.value === headerToken),
+        )?.[0];
+        if (doc && doc.tokens && doc.tokens.length > 0) {
+          const currentToken = doc.tokens.find((x) => x.value === headerToken);
+          const keyMatch = pathLower.match(/\/open\/([a-z]+)\/*/);
+          const key = keyMatch && keyMatch[1];
+          if (!doc.scopes.includes(key as AppScope)) {
+            const err = new UnauthorizedError('credentials_bad_scheme', {
+              message: t('暂无权限'),
+            });
+            return next(err);
+          }
+          if (
+            !currentToken ||
+            currentToken.expiration < Math.round(Date.now() / 1000)
+          ) {
+            const err = new UnauthorizedError('invalid_token', {
+              message: t('Token 已失效'),
+            });
+            return next(err);
+          }
+          return next();
+        }
+      }
+      const originPath = `${req.baseUrl}${pathLower === '/' ? '' : pathLower}`;
+      if (
+        !headerToken &&
+        originPath &&
+        config.apiWhiteList.includes(originPath)
+      ) {
+        return next();
+      }
+      const authInfo = await shareStore.getAuthInfo();
+      if (
+        isValidToken(authInfo, headerToken, req.platform, config.jwt.secret)
+      ) {
+        return next();
+      }
+      const errorCode = headerToken ? 'invalid_token' : 'credentials_required';
+      const errorMessage = headerToken ? t('Token 已失效') : t('请先登录');
+      const err = new UnauthorizedError(errorCode, { message: errorMessage });
+      next(err);
+    }),
+  );
+  app.use(
+    withAuthAvailability(async (req, res, next) => {
+      const pathLower = req.path.toLowerCase();
+      if (
+        ![
+          '/api/user/init',
+          '/api/user/notification/init',
+          '/open/user/init',
+          '/open/user/notification/init',
+        ].includes(pathLower)
+      ) {
+        return next();
+      }
+      const authInfo = (await shareStore.getAuthInfo()) || ({} as AuthInfo);
+      let isInitialized = !isDefaultAuthInfo(authInfo);
+      if (isInitialized) {
+        return res.send({ code: 450, message: t('未知错误') });
+      } else {
+        return next();
+      }
+    }),
+  );
   app.use(rewrite('/open/*', '/api/$1'));
   app.use(config.api.prefix, routes());
-
   app.get('*', (req, res, next) => {
     // Don't serve index.html for API routes
     if (
@@ -196,13 +180,13 @@ export default ({ app }: { app: Application }) => {
       }
     });
   });
-
   app.use(validationErrors);
   app.use(uniqueConstraintError);
-
   app.use(
     (
-      err: Error & { status: number },
+      err: Error & {
+        status: number;
+      },
       req: Request,
       res: Response,
       next: NextFunction,
@@ -216,15 +200,16 @@ export default ({ app }: { app: Application }) => {
       return next(err);
     },
   );
-
   app.use(
     (
-      err: Error & { errors: any[] },
+      err: Error & {
+        errors: any[];
+      },
       req: Request,
       res: Response,
       next: NextFunction,
     ) => {
-      if (err.name.includes('Sequelize')) {
+      if (err.name === 'DatabaseError') {
         return res
           .status(500)
           .send({
@@ -237,10 +222,11 @@ export default ({ app }: { app: Application }) => {
       return next(err);
     },
   );
-
   app.use(
     (
-      err: Error & { status: number },
+      err: Error & {
+        status: number;
+      },
       req: Request,
       res: Response,
       next: NextFunction,

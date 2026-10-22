@@ -1,5 +1,6 @@
+import { textSearch } from '../data/queries';
+import { Query, QuerySpec, orderBy } from '../data/queries';
 import groupBy from 'lodash/groupBy';
-import { FindOptions, Op } from 'sequelize';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
 import config from '../config';
@@ -13,12 +14,13 @@ import {
   stepPosition,
 } from '../data/env';
 import { writeFileWithLock } from '../shared/utils';
-import { sequelize } from '../data';
-
+import { database } from '../data';
 @Service()
 export default class EnvService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
-
+  constructor(
+    @Inject('logger')
+    private logger: winston.Logger,
+  ) {}
   public async create(payloads: Env[]): Promise<Env[]> {
     const envs = await this.envs();
     let position = initPosition;
@@ -39,16 +41,14 @@ export default class EnvService {
     await this.checkPosition(tabs[tabs.length - 1].position!);
     return docs;
   }
-
   public async insert(payloads: Env[]): Promise<Env[]> {
     const result: Env[] = [];
     for (const env of payloads) {
-      const doc = await EnvModel.create(env, { returning: true });
+      const doc = await EnvModel.insert(env);
       result.push(doc);
     }
     return result;
   }
-
   public async update(payload: Env): Promise<Env> {
     const doc = await this.getDb({ id: payload.id });
     const tab = new Env({ ...doc, ...payload });
@@ -56,17 +56,14 @@ export default class EnvService {
     await this.set_envs();
     return newDoc;
   }
-
   private async updateDb(payload: Env): Promise<Env> {
-    await EnvModel.update({ ...payload }, { where: { id: payload.id } });
+    await EnvModel.nativeUpdate({ id: payload.id }, { ...payload });
     return await this.getDb({ id: payload.id });
   }
-
   public async remove(ids: number[]) {
-    await EnvModel.destroy({ where: { id: ids } });
+    await EnvModel.nativeDelete({ id: ids });
     await this.set_envs();
   }
-
   public async move(
     id: number,
     {
@@ -89,16 +86,13 @@ export default class EnvService {
         ? (envs[toIndex].position! + envs[toIndex - 1].position!) / 2
         : (envs[toIndex].position! + envs[toIndex + 1].position!) / 2;
     }
-
     const newDoc = await this.update({
       id,
       position: this.getPrecisionPosition(targetPosition),
     });
-
     await this.checkPosition(targetPosition, envs[toIndex].position!);
     return newDoc;
   }
-
   private async checkPosition(position: number, edge: number = 0) {
     const precisionPosition = this.getPrecisionPosition(position);
     if (
@@ -114,40 +108,20 @@ export default class EnvService {
       }
     }
   }
-
   private getPrecisionPosition(position: number): number {
     return Math.trunc(parseFloat(position.toPrecision(16)));
   }
-
   public async envs(searchText: string = '', query: any = {}): Promise<Env[]> {
     let condition = { ...query };
     if (searchText) {
-      const encodeText = encodeURI(searchText);
-      const reg = {
-        [Op.or]: [
-          { [Op.like]: `%${searchText}%` },
-          { [Op.like]: `%${encodeText}%` },
-        ],
-      };
-
       condition = {
         ...condition,
-        [Op.or]: [
-          {
-            name: reg,
-          },
-          {
-            value: reg,
-          },
-          {
-            remarks: reg,
-          },
-        ],
+        ...textSearch(['name', 'value', 'remarks'], searchText),
       };
     }
     try {
       const result = await this.find(condition, [
-        [sequelize.literal('COALESCE(`isPinned`, 0)'), 'DESC'],
+        ['isPinned', 'DESC'],
         ['position', 'DESC'],
         ['createdAt', 'ASC'],
       ]);
@@ -156,90 +130,73 @@ export default class EnvService {
       throw error;
     }
   }
-
   private async find(query: any, sort: any = []): Promise<Env[]> {
-    const docs = await EnvModel.findAll({
-      where: { ...query },
-      order: [...sort],
-    });
-    return docs.map((x) => x.get({ plain: true }));
+    const docs = await EnvModel.find(
+      { ...query },
+      {
+        orderBy: orderBy([...sort]),
+      },
+    );
+    return docs.map((x) => x);
   }
-
-  public async getDb(query: FindOptions<Env>['where']): Promise<Env> {
-    const doc: any = await EnvModel.findOne({ where: { ...query } });
+  public async getDb(query: QuerySpec['where']): Promise<Env> {
+    const doc: any = await EnvModel.findOne({ ...query }, {});
     if (!doc) {
       throw new Error(`Env ${JSON.stringify(query)} not found`);
     }
-    return doc.get({ plain: true });
+    return doc;
   }
-
   public async disabled(ids: number[]) {
-    await EnvModel.update(
-      { status: EnvStatus.disabled },
-      { where: { id: ids } },
-    );
+    await EnvModel.nativeUpdate({ id: ids }, { status: EnvStatus.disabled });
     await this.set_envs();
   }
-
   public async enabled(ids: number[]) {
-    await EnvModel.update({ status: EnvStatus.normal }, { where: { id: ids } });
+    await EnvModel.nativeUpdate({ id: ids }, { status: EnvStatus.normal });
     await this.set_envs();
   }
-
   public async updateNames({ ids, name }: { ids: number[]; name: string }) {
-    await EnvModel.update({ name }, { where: { id: ids } });
+    await EnvModel.nativeUpdate({ id: ids }, { name });
     await this.set_envs();
   }
-
   public async pin(ids: number[]) {
-    await EnvModel.update({ isPinned: 1 }, { where: { id: ids } });
+    await EnvModel.nativeUpdate({ id: ids }, { isPinned: 1 });
   }
-
   public async unPin(ids: number[]) {
-    await EnvModel.update({ isPinned: 0 }, { where: { id: ids } });
+    await EnvModel.nativeUpdate({ id: ids }, { isPinned: 0 });
   }
-
   public async addLabels(ids: number[], labels: string[]) {
-    await sequelize.transaction(async (transaction) => {
-      const docs = await EnvModel.findAll({
-        where: { id: ids },
-        transaction,
-      });
+    await database.transaction(async () => {
+      const docs = await EnvModel.find({ id: ids }, {});
       for (const doc of docs) {
-        const env = doc.get({ plain: true });
-        await EnvModel.update(
+        const env = doc;
+        await EnvModel.nativeUpdate(
+          { id: env.id },
           { labels: Array.from(new Set([...(env.labels || []), ...labels])) },
-          { where: { id: env.id }, transaction },
         );
       }
     });
     return await this.find({ id: ids });
   }
-
   public async removeLabels(ids: number[], labels: string[]) {
-    await sequelize.transaction(async (transaction) => {
-      const docs = await EnvModel.findAll({
-        where: { id: ids },
-        transaction,
-      });
+    await database.transaction(async () => {
+      const docs = await EnvModel.find({ id: ids }, {});
       for (const doc of docs) {
-        const env = doc.get({ plain: true });
-        await EnvModel.update(
+        const env = doc;
+        await EnvModel.nativeUpdate(
+          { id: env.id },
           {
             labels: (env.labels || []).filter(
               (label: string) => !labels.includes(label),
             ),
           },
-          { where: { id: env.id }, transaction },
         );
       }
     });
     return await this.find({ id: ids });
   }
-
   public async set_envs() {
     const envs = await this.envs('', {
-      name: { [Op.not]: null },
+      name: { ['$ne']: null },
       status: EnvStatus.normal,
     });
     const groups = groupBy(envs, 'name');
@@ -249,7 +206,6 @@ export default class EnvService {
     for (const key in groups) {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
         const group = groups[key];
-
         // 忽略不符合bash要求的环境变量名称
         if (/^[a-zA-Z_][0-9a-zA-Z_]*$/.test(key)) {
           let value = group
@@ -262,9 +218,9 @@ export default class EnvService {
             .map((x) => x.value)
             .join('&')
             .replace(/\\/g, '\\\\')}`;
-          js_env_string += `process.env[${JSON.stringify(key)}]=${JSON.stringify(
-            group.map((x) => x.value).join('&'),
-          )};\n`;
+          js_env_string += `process.env[${JSON.stringify(
+            key,
+          )}]=${JSON.stringify(group.map((x) => x.value).join('&'))};\n`;
           py_env_string += `os.environ['${key}']='''${_env_value.replace(
             /\'/g,
             "\\'",

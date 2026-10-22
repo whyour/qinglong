@@ -1,5 +1,4 @@
-import { sequelize } from '.';
-import { DataTypes, Model, ModelDefined } from 'sequelize';
+import { Repository, RecordRow } from './repository';
 
 export class Dependence {
   timestamp?: string;
@@ -47,17 +46,5 @@ export enum versionDependenceCommandTypes {
   '=',
 }
 
-export interface DependenceInstance
-  extends Model<Dependence, Dependence>,
-    Dependence {}
-export const DependenceModel = sequelize.define<DependenceInstance>(
-  'Dependence',
-  {
-    name: DataTypes.STRING,
-    type: DataTypes.NUMBER,
-    timestamp: DataTypes.STRING,
-    status: DataTypes.NUMBER,
-    log: DataTypes.JSON,
-    remark: DataTypes.STRING,
-  },
-);
+export type DependenceInstance = RecordRow<Dependence>;
+export const DependenceModel = new Repository<Dependence>('Dependence');

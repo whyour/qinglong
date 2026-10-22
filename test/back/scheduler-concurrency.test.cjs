@@ -13,7 +13,9 @@ function createLimit() {
       AuthDataType: { systemConfig: 'systemConfig' },
       SystemModel: {
         sync: async () => {},
-        findOne: async () => ({ info: { cronConcurrency: 1 } }),
+        findOne: async (where, read = {}) => {
+          return { info: { cronConcurrency: 1 } };
+        },
       },
     },
     '../loaders/logger': logger,
@@ -47,11 +49,13 @@ function createSystem(client, limit, options = {}) {
     '../data/system': {
       AuthDataType: { systemConfig: 'systemConfig' },
       SystemModel: {
-        findOne: async () => ({
-          ...store.state,
-          get: () => ({ ...store.state }),
-        }),
-        update: async (values) => {
+        findOne: async (where, read = {}) => {
+          return {
+            ...{ ...store.state },
+            ...store.state,
+          };
+        },
+        nativeUpdate: async (where, values) => {
           writes.push(values);
           store.state = { ...store.state, ...values };
         },
@@ -141,7 +145,6 @@ function enqueue(t, limit, count) {
   });
   return { releases, runs };
 }
-
 test('concurrency changes reach the independent scheduler queue over mTLS immediately and preserve running jobs', async (t) => {
   const f = await rpcFixture(t);
   const { releases, runs } = enqueue(t, f.schedulerLimit, 3);
@@ -175,7 +178,6 @@ test('concurrency changes reach the independent scheduler queue over mTLS immedi
   await runs[2];
   assert.equal(f.state().info.cronConcurrency, 1);
 });
-
 test('zero, null and omitted concurrency restore the default in both API and scheduler queues without a restart', async (t) => {
   const f = await rpcFixture(t);
   for (const value of [0, null, undefined]) {
@@ -200,7 +202,6 @@ test('zero, null and omitted concurrency restore the default in both API and sch
     await Promise.all([...scheduler.runs, ...manual.runs]);
   }
 });
-
 test('invalid concurrency is rejected before configuration writes or queue changes', async () => {
   const mutations = [];
   const f = createSystem(
@@ -225,7 +226,6 @@ test('invalid concurrency is rejected before configuration writes or queue chang
     );
   assert.deepEqual(mutations, []);
 });
-
 for (const code of [grpc.status.UNAVAILABLE, grpc.status.DEADLINE_EXCEEDED]) {
   test(`concurrency RPC failure ${code} invalidates readiness and is not reported as success or retried`, async () => {
     let writes = 0,
@@ -266,13 +266,11 @@ for (const code of [grpc.status.UNAVAILABLE, grpc.status.DEADLINE_EXCEEDED]) {
     assert.equal(invalidations, 1);
   });
 }
-
 function mutationConfig(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-concurrency-lock-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return { crontabFile: path.join(root, 'crontab.list') };
 }
-
 test('independent API service instances serialize database and scheduler updates with the shared filesystem lock', async (t) => {
   const config = mutationConfig(t);
   const store = { state: { id: 1, info: { cronConcurrency: 1 } } };
@@ -310,7 +308,6 @@ test('independent API service instances serialize database and scheduler updates
     [1, 1, 1],
   );
 });
-
 for (const newerLimit of [undefined, 2]) {
   test(`production recovery restores persisted concurrency before health becomes ready (newer limit: ${newerLimit})`, async (t) => {
     const config = mutationConfig(t);

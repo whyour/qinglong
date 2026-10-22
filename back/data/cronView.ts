@@ -1,5 +1,4 @@
-import { sequelize } from '.';
-import { DataTypes, Model } from 'sequelize';
+import { Repository, RecordRow } from './repository';
 
 export enum CronViewType {
   '系统' = 1,
@@ -39,24 +38,5 @@ export class CrontabView {
   }
 }
 
-export interface CronViewInstance
-  extends Model<CrontabView, CrontabView>,
-    CrontabView {}
-export const CrontabViewModel = sequelize.define<CronViewInstance>(
-  'CrontabView',
-  {
-    name: {
-      unique: 'name',
-      type: DataTypes.STRING,
-    },
-    position: DataTypes.NUMBER,
-    isDisabled: DataTypes.NUMBER,
-    filters: DataTypes.JSON,
-    sorts: DataTypes.JSON,
-    filterRelation: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    type: DataTypes.NUMBER,
-  },
-);
+export type CronViewInstance = RecordRow<CrontabView>;
+export const CrontabViewModel = new Repository<CrontabView>('CrontabView');

@@ -1,9 +1,7 @@
 import { AuthInfo } from '../data/system';
 import { App } from '../data/open';
 import Keyv from 'keyv';
-import KeyvSqlite from '@keyv/sqlite';
-import config from '../config';
-import path from 'path';
+import { CacheStore } from '../data/cacheStore';
 
 export enum EKeyv {
   'apps' = 'apps',
@@ -17,8 +15,12 @@ export interface IKeyvStore {
   lang: string;
 }
 
-const keyvSqlite = new KeyvSqlite(path.join(config.dbPath, 'keyv.sqlite'));
-export const keyvStore = new Keyv<IKeyvStore>({ store: keyvSqlite });
+const keyvSqlite = new CacheStore();
+// A stopped database is unavailable, not a cache miss or an expired session.
+export const keyvStore = new Keyv<IKeyvStore>({
+  store: keyvSqlite,
+  throwOnErrors: true,
+});
 
 export const shareStore = {
   getAuthInfo() {

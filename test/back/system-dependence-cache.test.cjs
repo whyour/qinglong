@@ -3,14 +3,12 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-
 test('clearing a dependency cache marks installed entries for reinstall', async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-dependence-'));
   const nodeCache = path.join(directory, 'node');
   await fs.mkdir(nodeCache);
   await fs.writeFile(path.join(nodeCache, 'package'), 'cached');
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
-
   const moduleStubs = new Map();
   const stubModule = (modulePath, exports) => {
     const resolved = require.resolve(modulePath);
@@ -27,7 +25,6 @@ test('clearing a dependency cache marks installed entries for reinstall', async 
   const updates = [];
   const DependenceStatus = { installed: 1, installFailed: 2 };
   const DependenceTypes = { nodejs: 0, python3: 1 };
-
   stubModule('../../back/config', {
     __esModule: true,
     default: { dependenceCachePath: directory },
@@ -49,7 +46,12 @@ test('clearing a dependency cache marks installed entries for reinstall', async 
   });
   stubModule('../../back/data/dependence', {
     DependenceModel: {
-      update: async (values, options) => updates.push({ values, options }),
+      nativeUpdate: async (where, values) => {
+        const options = {
+          where: where,
+        };
+        return updates.push({ values, options });
+      },
     },
     DependenceStatus,
     DependenceTypes,
@@ -80,7 +82,6 @@ test('clearing a dependency cache marks installed entries for reinstall', async 
     __esModule: true,
     default: class SockService {},
   });
-
   const servicePath = require.resolve('../../back/services/system');
   const originalService = require.cache[servicePath];
   delete require.cache[servicePath];
@@ -98,7 +99,6 @@ test('clearing a dependency cache marks installed entries for reinstall', async 
       }
     }
   });
-
   const SystemService = require('../../back/services/system').default;
   const service = new SystemService({}, {}, {});
   assert.deepEqual(await service.cleanDependence('node'), { code: 200 });

@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "node20",
+    "moduleResolution": "node16",
+    "rootDir": "..",
+    "outDir": "../../static/build"
+  },
+  "include": ["./databaseWorker.ts", "./schema.ts"],
+  "exclude": ["node_modules"]
+}

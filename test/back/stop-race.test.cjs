@@ -1,3 +1,6 @@
+const { DatabaseClient } = require('../../back/data/databaseClient');
+const { repository, initialize } = require('../helpers/repository-fixture.cjs');
+const { orderBy } = require('../../back/data/queries');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -8,34 +11,16 @@ const load = require('../helpers/load-security-module.cjs');
 async function fixture(t, onKill = async () => {}) {
   const logPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-stop-log-'));
   t.after(() => fs.rmSync(logPath, { recursive: true, force: true }));
-  const db = new Sequelize({
-    dialect: 'sqlite',
-    storage: ':memory:',
-    logging: false,
-  });
+  const db = new DatabaseClient(':memory:');
   t.after(() => db.close());
-  const crons = db.define('Cron', {
-    command: DataTypes.STRING,
-    status: DataTypes.INTEGER,
-    pid: DataTypes.INTEGER,
-    log_path: DataTypes.STRING,
-        queued_token: DataTypes.STRING,
-    last_execution_time: DataTypes.INTEGER,
-    last_running_time: DataTypes.INTEGER,
-  });
-  const instances = db.define('Instance', {
-    cron_id: DataTypes.INTEGER,
-    pid: DataTypes.INTEGER,
-    status: DataTypes.INTEGER,
-    exit_code: DataTypes.INTEGER,
-    finished_at: DataTypes.INTEGER,
-  });
-  await db.sync();
-  await crons.bulkCreate([
+  const crons = repository(db, 'Crontab');
+  const instances = repository(db, 'RunningInstance');
+  await initialize(db);
+  await crons.insertMany([
     { id: 1, command: 'task one.js', status: 0, pid: 101, log_path: 'one.log' },
     { id: 2, command: 'task two.js', status: 0, pid: 201, log_path: 'two.log' },
   ]);
-  await instances.bulkCreate([
+  await instances.insertMany([
     { id: 1, cron_id: 1, pid: 101, status: 0 },
     { id: 2, cron_id: 1, pid: 102, status: 0 },
     { id: 3, cron_id: 1, pid: 99, status: 1, exit_code: 0 },
@@ -74,7 +59,10 @@ async function fixture(t, onKill = async () => {}) {
     '../shared/childProcess': require('../../back/shared/childProcess'),
   }).default;
   service = new CronService({ info() {}, error() {} });
-  service.getDb = ({ id }) => crons.findByPk(id);
+  service.getDb = ({ id }) =>
+    crons.findOne({
+      id: id,
+    });
   return { service, instances, crons, killed };
 }
 async function report(service, pid, code) {
@@ -94,7 +82,12 @@ test('stop wins when shell exit writes error or success during termination, pres
     await report(service, 102, 0);
   });
   await f.service.stop([1]);
-  const rows = await f.instances.findAll({ order: [['id', 'ASC']], raw: true });
+  const rows = await f.instances.find(
+    {},
+    {
+      orderBy: orderBy([['id', 'ASC']]),
+    },
+  );
   assert.deepEqual(
     rows.map((r) => [r.id, r.status, r.exit_code]),
     [
@@ -110,62 +103,159 @@ test('late shell completion cannot overwrite stopped instances', async (t) => {
   const f = await fixture(t);
   await f.service.stop([1]);
   await report(f.service, 101, 143);
-  assert.equal((await f.instances.findByPk(1)).status, 2);
-  assert.equal((await f.instances.findByPk(2)).status, 2);
+  assert.equal(
+    (
+      await f.instances.findOne({
+        id: 1,
+      })
+    ).status,
+    2,
+  );
+  assert.equal(
+    (
+      await f.instances.findOne({
+        id: 2,
+      })
+    ).status,
+    2,
+  );
 });
 test('rows created after the stop snapshot are not relabelled', async (t) => {
   const f = await fixture(t, async ({ instances }) => {
-    if (!(await instances.findByPk(6)))
-      await instances.create({ id: 6, cron_id: 1, pid: 103, status: 0 });
+    if (
+      !(await instances.findOne({
+        id: 6,
+      }))
+    )
+      await instances.insert({ id: 6, cron_id: 1, pid: 103, status: 0 });
   });
   await f.service.stop([1]);
-  assert.equal((await f.instances.findByPk(6)).status, 0);
-  assert.equal((await f.instances.findByPk(1)).status, 2);
+  assert.equal(
+    (
+      await f.instances.findOne({
+        id: 6,
+      })
+    ).status,
+    0,
+  );
+  assert.equal(
+    (
+      await f.instances.findOne({
+        id: 1,
+      })
+    ).status,
+    2,
+  );
 });
 test('repeated stop does not rewrite historical rows or their finished timestamps', async (t) => {
   const f = await fixture(t);
   await f.service.stop([1]);
-  const before = await f.instances.findAll({
-    raw: true,
-    order: [['id', 'ASC']],
-  });
+  const before = await f.instances.find(
+    {},
+    {
+      orderBy: orderBy([['id', 'ASC']]),
+    },
+  );
   await f.service.stop([1]);
   assert.deepEqual(
-    await f.instances.findAll({ raw: true, order: [['id', 'ASC']] }),
+    await f.instances.find(
+      {},
+      {
+        orderBy: orderBy([['id', 'ASC']]),
+      },
+    ),
     before,
   );
 });
 test('batch stop captures running instances from every requested cron', async (t) => {
   const f = await fixture(t);
   await f.service.stop([1, 2]);
-  assert.equal((await f.instances.findByPk(5)).status, 2);
-  assert.equal((await f.instances.findByPk(3)).status, 1);
+  assert.equal(
+    (
+      await f.instances.findOne({
+        id: 5,
+      })
+    ).status,
+    2,
+  );
+  assert.equal(
+    (
+      await f.instances.findOne({
+        id: 3,
+      })
+    ).status,
+    1,
+  );
 });
-
 test('stop signals every snapshotted PID exactly once and preserves a later running instance', async (t) => {
   const f = await fixture(t, async ({ instances, crons }) => {
-    if (!(await instances.findByPk(6))) {
-      await instances.create({ id: 6, cron_id: 1, pid: 103, status: 0 });
-      await crons.update(
+    if (
+      !(await instances.findOne({
+        id: 6,
+      }))
+    ) {
+      await instances.insert({ id: 6, cron_id: 1, pid: 103, status: 0 });
+      await crons.nativeUpdate(
+        { id: 1 },
         { pid: 103, log_path: 'later.log', status: 0 },
-        { where: { id: 1 } },
       );
     }
   });
   await f.service.stop([1]);
   assert.deepEqual(f.killed, [101, 102]);
-  assert.equal((await f.instances.findByPk(6)).status, 0);
-  assert.equal((await f.crons.findByPk(1)).pid, 103);
-  assert.equal((await f.crons.findByPk(1)).status, 0);
+  assert.equal(
+    (
+      await f.instances.findOne({
+        id: 6,
+      })
+    ).status,
+    0,
+  );
+  assert.equal(
+    (
+      await f.crons.findOne({
+        id: 1,
+      })
+    ).pid,
+    103,
+  );
+  assert.equal(
+    (
+      await f.crons.findOne({
+        id: 1,
+      })
+    ).status,
+    0,
+  );
 });
-
 test('failed termination is not finalized as stopped', async (t) => {
   const f = await fixture(t, async ({ pid }) => {
     if (pid === 102) throw Error('still alive');
   });
   await f.service.stop([1]);
   assert.deepEqual(f.killed, [101, 102]);
-  assert.equal((await f.instances.findByPk(1)).status, 2);
-  assert.equal((await f.instances.findByPk(2)).status, 0);
-  assert.equal((await f.crons.findByPk(1)).status, 0);
+  assert.equal(
+    (
+      await f.instances.findOne({
+        id: 1,
+      })
+    ).status,
+    2,
+  );
+  assert.equal(
+    (
+      await f.instances.findOne({
+        id: 2,
+      })
+    ).status,
+    0,
+  );
+  assert.equal(
+    (
+      await f.crons.findOne({
+        id: 1,
+      })
+    ).status,
+    0,
+  );
 });

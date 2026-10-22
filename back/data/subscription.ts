@@ -1,5 +1,4 @@
-import { sequelize } from '.';
-import { DataTypes, Model, ModelDefined } from 'sequelize';
+import { Repository, RecordRow } from './repository';
 import { SimpleIntervalSchedule } from 'toad-scheduler';
 
 type SimpleIntervalScheduleUnit = keyof SimpleIntervalSchedule;
@@ -70,46 +69,5 @@ export enum SubscriptionStatus {
   'queued',
 }
 
-export interface SubscriptionInstance
-  extends Model<Subscription, Subscription>,
-    Subscription {}
-export const SubscriptionModel = sequelize.define<SubscriptionInstance>(
-  'Subscription',
-  {
-    name: {
-      unique: 'compositeIndex',
-      type: DataTypes.STRING,
-    },
-    url: {
-      unique: 'compositeIndex',
-      type: DataTypes.STRING,
-    },
-    schedule: {
-      unique: 'compositeIndex',
-      type: DataTypes.STRING,
-    },
-    interval_schedule: {
-      unique: 'compositeIndex',
-      type: DataTypes.JSON,
-    },
-    type: DataTypes.STRING,
-    whitelist: DataTypes.STRING,
-    blacklist: DataTypes.STRING,
-    status: DataTypes.NUMBER,
-    dependences: DataTypes.STRING,
-    extensions: DataTypes.STRING,
-    sub_before: DataTypes.STRING,
-    sub_after: DataTypes.STRING,
-    branch: DataTypes.STRING,
-    pull_type: DataTypes.STRING,
-    pull_option: DataTypes.JSON,
-    pid: DataTypes.NUMBER,
-    is_disabled: DataTypes.NUMBER,
-    log_path: DataTypes.STRING,
-    schedule_type: DataTypes.STRING,
-    alias: { type: DataTypes.STRING, unique: 'alias' },
-    proxy: { type: DataTypes.STRING, allowNull: true },
-    autoAddCron: { type: DataTypes.NUMBER, allowNull: true },
-    autoDelCron: { type: DataTypes.NUMBER, allowNull: true },
-  },
-);
+export type SubscriptionInstance = RecordRow<Subscription>;
+export const SubscriptionModel = new Repository<Subscription>('Subscription');

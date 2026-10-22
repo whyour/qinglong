@@ -5,7 +5,6 @@ const os = require('node:os');
 const path = require('node:path');
 const express = require('express');
 const load = require('../helpers/load-security-module.cjs');
-
 function fixture(t, customData = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-access-scope-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -46,12 +45,15 @@ function fixture(t, customData = false) {
     '../config/const': {},
     '../data/runningInstance': {
       InstanceStatus: { running: 'running' },
-      RunningInstanceModel: { findOne: async () => null },
+      RunningInstanceModel: {
+        findOne: async (where, read = {}) => {
+          return null;
+        },
+      },
     },
   };
   return { config, mocks, secret };
 }
-
 function api(name, service, mocks) {
   mocks.typedi = { Container: { get: () => service } };
   const app = express.Router();
@@ -79,7 +81,6 @@ function api(name, service, mocks) {
     return result;
   };
 }
-
 for (const customData of [false, true]) {
   test(`config APIs reject script compatibility paths (custom=${customData})`, async (t) => {
     const { config, mocks, secret } = fixture(t, customData);
@@ -144,7 +145,6 @@ for (const customData of [false, true]) {
     assert.equal(fs.readFileSync(secret, 'utf8'), 'PANEL-SECRET');
   });
 }
-
 test('log APIs allow configuration-like names while retaining directory boundaries', async (t) => {
   const { config, mocks, secret } = fixture(t);
   const Log = load(path.resolve('back/services/log.ts'), mocks).default;

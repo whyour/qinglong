@@ -1,3 +1,4 @@
+import { database } from '../data';
 import { Service } from 'typedi';
 import Logger from '../loaders/logger';
 import cronClient from '../schedule/client';
@@ -10,6 +11,7 @@ interface HealthStatus {
   services: {
     http: boolean;
     grpc: boolean;
+    database: boolean;
   };
   metrics: {
     uptime: number;
@@ -33,6 +35,7 @@ export class HealthService {
       services: {
         http: true,
         grpc: true,
+        database: database.healthy,
       },
       metrics: {
         uptime: Math.floor((Date.now() - this.startTime) / 1000),
@@ -66,6 +69,7 @@ export class HealthService {
       Logger.error('gRPC server check failed:', err);
     }
 
+    if (!status.services.database) status.status = 'error';
     return status;
   }
 }

@@ -135,8 +135,10 @@ export function parseCronSchedule(schedule: unknown): CronSchedule {
   };
   Object.freeze(patterns);
   Object.freeze(parsed);
-  if (scheduleCache.size >= 512)
-    scheduleCache.delete(scheduleCache.keys().next().value);
+  if (scheduleCache.size >= 512) {
+    const oldest = scheduleCache.keys().next().value;
+    if (oldest !== undefined) scheduleCache.delete(oldest);
+  }
   scheduleCache.set(cacheKey, parsed);
   return parsed;
 }

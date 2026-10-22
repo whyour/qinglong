@@ -6,7 +6,6 @@ const os = require('node:os');
 const { spawn } = require('node:child_process');
 const load = require('../helpers/load-security-module.cjs');
 const { LogStreamManager } = require('../../back/shared/logStreamManager');
-
 test(
   'manual execution captures a short child before slow status storage and flushes before release',
   { timeout: 5000 },
@@ -22,10 +21,13 @@ test(
       '../data/cron': {
         CrontabStatus: { queued: 3, running: 0, idle: 1 },
         CrontabModel: {
-          update: async (data, options) => {
+          nativeUpdate: async (where, data) => {
+            const options = {
+              where: where,
+            };
             await new Promise((resolve) => setTimeout(resolve, 40));
             updates.push({ data, options });
-            return [1];
+            return 1;
           },
         },
       },

@@ -3,16 +3,12 @@ const test = require('node:test');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const { Sequelize, QueryTypes } = require('sequelize');
+const { DatabaseClient } = require('../../back/data/databaseClient');
 const { migrateSchema } = require('../../back/shared/schemaMigrations');
 const load = require('../helpers/load-security-module.cjs');
 
 async function createLegacy(storage = ':memory:', omitEnvs = false) {
-  const database = new Sequelize({
-    dialect: 'sqlite',
-    storage,
-    logging: false,
-  });
+  const database = new DatabaseClient(storage);
   for (const table of [
     'CrontabViews',
     'Subscriptions',
@@ -34,15 +30,11 @@ test('legacy database upgrades without losing rows and repeated migration is ide
   t.after(() => database.close());
   await migrateSchema(database);
   await migrateSchema(database);
-  const rows = await database.query('SELECT * FROM "Crontabs"', {
-    type: QueryTypes.SELECT,
-  });
+  const rows = await database.query('SELECT * FROM "Crontabs"');
   assert.equal(rows[0].name, 'keep-me');
   assert.equal(rows[0].queued_token, null);
   assert.ok(Object.hasOwn(rows[0], 'allow_multiple_instances'));
-  const applied = await database.query('SELECT id FROM "SchemaMigrations"', {
-    type: QueryTypes.SELECT,
-  });
+  const applied = await database.query('SELECT id FROM "SchemaMigrations"');
   assert.equal(applied.length, 15);
 });
 
@@ -50,7 +42,12 @@ test('migration failure rolls back added columns and can be retried after repair
   const database = await createLegacy(':memory:', true);
   t.after(() => database.close());
   await assert.rejects(migrateSchema(database));
-  const columns = await database.getQueryInterface().describeTable('Crontabs');
+  const columns = Object.fromEntries(
+    (await database.query('PRAGMA table_info(Crontabs)')).map((row) => [
+      row.name,
+      row,
+    ]),
+  );
   assert.equal(Object.hasOwn(columns, 'work_dir'), false);
   await database.query(
     'CREATE TABLE "Envs" (id INTEGER PRIMARY KEY, name TEXT)',
@@ -58,7 +55,12 @@ test('migration failure rolls back added columns and can be retried after repair
   await migrateSchema(database);
   assert.ok(
     Object.hasOwn(
-      await database.getQueryInterface().describeTable('Crontabs'),
+      Object.fromEntries(
+        (await database.query('PRAGMA table_info(Crontabs)')).map((row) => [
+          row.name,
+          row,
+        ]),
+      ),
       'work_dir',
     ),
   );
@@ -72,30 +74,25 @@ test('offline pre-upgrade backup restores the legacy schema and data', async (t)
   let database = await createLegacy(file);
   await database.close();
   await fs.copyFile(file, backup);
-  database = new Sequelize({
-    dialect: 'sqlite',
-    storage: file,
-    logging: false,
-  });
+  database = new DatabaseClient(file);
   await migrateSchema(database);
   await database.close();
   await fs.copyFile(backup, file);
-  database = new Sequelize({
-    dialect: 'sqlite',
-    storage: file,
-    logging: false,
-  });
+  database = new DatabaseClient(file);
   try {
     assert.equal(
       Object.hasOwn(
-        await database.getQueryInterface().describeTable('Crontabs'),
+        Object.fromEntries(
+          (await database.query('PRAGMA table_info(Crontabs)')).map((row) => [
+            row.name,
+            row,
+          ]),
+        ),
         'work_dir',
       ),
       false,
     );
-    const rows = await database.query('SELECT name FROM "Crontabs"', {
-      type: QueryTypes.SELECT,
-    });
+    const rows = await database.query('SELECT name FROM "Crontabs"');
     assert.equal(rows[0].name, 'keep-me');
   } finally {
     await database.close();
@@ -103,23 +100,15 @@ test('offline pre-upgrade backup restores the legacy schema and data', async (t)
 });
 
 test('database loader rejects initialization failure rather than allowing workers to start', async () => {
-  const mocks = { './logger': { error() {}, info() {} } };
-  for (const [file, model] of [
-    ['env', 'EnvModel'],
-    ['cron', 'CrontabModel'],
-    ['dependence', 'DependenceModel'],
-    ['open', 'AppModel'],
-    ['system', 'SystemModel'],
-    ['subscription', 'SubscriptionModel'],
-    ['cronView', 'CrontabViewModel'],
-    ['cronStats', 'CrontabStatModel'],
-    ['runningInstance', 'RunningInstanceModel'],
-  ])
-    mocks[`../data/${file}`] = { [model]: { sync: async () => {} } };
-  mocks['../data'] = { sequelize: {} };
-  mocks['../shared/schemaMigrations'] = {
-    migrateSchema: async () => {
-      throw new Error('SQLITE_FULL');
+  const mocks = {
+    './logger': { error() {}, info() {} },
+    '../data': {
+      database: { transaction: (action) => action(), query: async () => [] },
+    },
+    '../shared/schemaMigrations': {
+      migrateSchema: async () => {
+        throw new Error('SQLITE_FULL');
+      },
     },
   };
   const initialize = load(path.resolve('back/loaders/db.ts'), mocks).default;
