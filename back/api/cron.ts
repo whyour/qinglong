@@ -503,9 +503,10 @@ export default (app: Router) => {
     }),
     async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       try {
-        const instances = await RunningInstanceModel.find({
-          cron_id: req.params.id,
-        });
+        const instances = await RunningInstanceModel.find(
+          { cron_id: req.params.id },
+          { orderBy: [{ started_at: 'desc' }] },
+        );
         return res.send({ code: 200, data: instances });
       } catch (e) {
         return next(e);
