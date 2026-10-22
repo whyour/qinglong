@@ -28,7 +28,8 @@ function probeNodeRuntime(executable = process.execPath) {
       args.push(...(i % 2 ? [file] : ['-e', source]));
       const child = spawnSync(executable, args, {
         encoding: 'utf8',
-        timeout: 20000,
+        // Multi-architecture CI runs this same probe through QEMU.
+        timeout: 120000,
         maxBuffer: 65536,
         env: { ...process.env, NODE_OPTIONS: '' },
       });
