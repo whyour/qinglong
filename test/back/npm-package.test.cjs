@@ -484,14 +484,18 @@ test('npm publication consumes the exact archive whose isolated installation pas
   assert.deepEqual(verify.needs, [
     'build-static',
     'build-npm-migration-bundle',
+    'build-alpine',
   ]);
   assert.ok(
     verify.steps.some(
-      (step) => step.with?.name === 'npm-migration-bundle-${{ github.sha }}',
+      (step) =>
+        step.with?.name ===
+        "npm-migration-bundle-${{ matrix.node == 'alpine' && 'musl' || 'glibc' }}-${{ github.sha }}",
     ),
   );
   const migration = workflow.jobs['build-npm-migration-bundle'];
-  assert.equal(migration.needs, 'build-debian');
+  assert.deepEqual(migration.needs, ['build-debian', 'build-alpine']);
+  assert.deepEqual(migration.strategy.matrix.libc, ['glibc', 'musl']);
   assert.ok(
     migration.steps.some((step) =>
       /Dockerfile.upgrade-bundle/.test(step.run || ''),
@@ -502,8 +506,17 @@ test('npm publication consumes the exact archive whose isolated installation pas
       /publish-upgrade-bundles/.test(step.run || ''),
     ),
   );
-  assert.deepEqual(verify.strategy.matrix.node, ['20.18.1', '22.17.0', '24']);
-  assert.match(verify.container, /node:.*bookworm/);
+  assert.deepEqual(verify.strategy.matrix.node, [
+    '20.18.1',
+    '22.17.0',
+    '24',
+    'alpine',
+  ]);
+  assert.match(
+    verify.container.image,
+    /needs\.build-alpine\.outputs\.image-digest/,
+  );
+  assert.match(verify.container.image, /node:.*bookworm/);
   const tools = verify.steps.find(
     (step) => step.name === 'Install isolated service test tools',
   );

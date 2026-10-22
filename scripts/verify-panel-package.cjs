@@ -33,6 +33,7 @@ const requiredFiles = [
   'shell/install-package.cjs',
   'shell/upgrade-lock.yaml',
   'shell/runtime-guard.cjs',
+  'shell/node-runtime-probe.cjs',
   'shell/start.sh',
   'shell/start-simplify.sh',
   'shell/task.sh',
@@ -381,6 +382,16 @@ async function verifyPanel(input, output) {
     ).stdout.trim();
     root = path.join(globalRoot, '@whyour/qinglong');
     env.QL_DIR = root;
+    const runtimeProbes = [];
+    const checkRuntime = async () => {
+      const result = await run(
+        process.execPath,
+        [path.join(root, 'shell/node-runtime-probe.cjs')],
+        { cwd: temp, env },
+      );
+      runtimeProbes.push(JSON.parse(result.stdout.trim()));
+    };
+    await checkRuntime();
     // Use a subprocess: cached candidate modules must not mask missing files
     // after old-package installation and the real npm overwrite below.
     await run(
@@ -566,6 +577,7 @@ async function verifyPanel(input, output) {
     const applying = await api('update/system', 'PUT');
     await job(applying.id, 'completed');
     const afterOnline = await healthy();
+    await checkRuntime();
     assert.notEqual(afterOnline.build.instanceId, original.build.instanceId);
     assert.equal(afterOnline.build.sourceCommit, fixture.sourceCommit);
     await fs.access(path.join(root, 'node_modules/.pnpm'));
@@ -617,6 +629,7 @@ async function verifyPanel(input, output) {
       timeout: 240000,
     });
     const afterOffline = await healthy();
+    await checkRuntime();
     assert.notEqual(
       afterOffline.build.instanceId,
       afterOnline.build.instanceId,
@@ -662,6 +675,7 @@ async function verifyPanel(input, output) {
       },
       migratedFromNpmToOfficialPnpmLayout: true,
       existingNodePreserved: true,
+      nativeUrlRuntimeProbes: runtimeProbes,
       frontendAndBackendStarted: true,
       checksumFailureKeptOldService: true,
       prestartBeforeReady: true,
