@@ -1,5 +1,4 @@
-import { sequelize } from '.';
-import { DataTypes, Model, ModelDefined } from 'sequelize';
+import { Repository, RecordRow } from './repository';
 
 export class App {
   name: string;
@@ -24,13 +23,14 @@ export interface AppToken {
   expiration: number;
 }
 
-export type AppScope = 'envs' | 'crons' | 'configs' | 'scripts' | 'logs' | 'system' | 'dashboard';
+export type AppScope =
+  | 'envs'
+  | 'crons'
+  | 'configs'
+  | 'scripts'
+  | 'logs'
+  | 'system'
+  | 'dashboard';
 
-export interface AppInstance extends Model<App, App>, App {}
-export const AppModel = sequelize.define<AppInstance>('App', {
-  name: { type: DataTypes.STRING, unique: 'name' },
-  scopes: DataTypes.JSON,
-  client_id: DataTypes.STRING,
-  client_secret: DataTypes.STRING,
-  tokens: DataTypes.JSON,
-});
+export type AppInstance = RecordRow<App>;
+export const AppModel = new Repository<App>('App');

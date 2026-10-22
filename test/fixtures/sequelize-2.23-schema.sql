@@ -1,0 +1,28 @@
+-- Frozen Sequelize 6 schema. No user rows or credentials.
+CREATE TABLE `Apps` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(255), `scopes` JSON, `client_id` VARCHAR(255), `client_secret` VARCHAR(255), `tokens` JSON, `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL, UNIQUE (`name`));
+CREATE TABLE `Auths` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `ip` VARCHAR(255), `type` VARCHAR(255), `info` JSON, `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL);
+CREATE TABLE `CrontabStats` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `ref_id` NUMBER NOT NULL, `date` VARCHAR(255) NOT NULL, `run_count` NUMBER DEFAULT 0, `success_count` NUMBER DEFAULT 0, `fail_count` NUMBER DEFAULT 0, `total_time` NUMBER DEFAULT 0, `max_time` NUMBER DEFAULT 0, `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL);
+CREATE TABLE `CrontabViews` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(255), `position` NUMBER, `isDisabled` NUMBER, `filters` JSON, `sorts` JSON, `filterRelation` VARCHAR(255), `type` NUMBER, `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL, UNIQUE (`name`));
+CREATE TABLE `Crontabs` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(255), `command` VARCHAR(255), `schedule` VARCHAR(255), `timestamp` VARCHAR(255), `saved` TINYINT(1), `status` NUMBER, `isSystem` NUMBER, `pid` NUMBER, `isDisabled` NUMBER, `isPinned` NUMBER, `log_path` VARCHAR(255), `queued_token` VARCHAR(255), `labels` JSON, `last_running_time` NUMBER, `last_execution_time` NUMBER, `sub_id` NUMBER, `extra_schedules` JSON, `task_before` VARCHAR(255), `task_after` VARCHAR(255), `log_name` VARCHAR(255), `allow_multiple_instances` NUMBER, `work_dir` VARCHAR(255), `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL, UNIQUE (`name`, `command`, `schedule`));
+CREATE TABLE `Dependences` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(255), `type` NUMBER, `timestamp` VARCHAR(255), `status` NUMBER, `log` JSON, `remark` VARCHAR(255), `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL);
+CREATE TABLE `Envs` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `value` VARCHAR(255), `timestamp` VARCHAR(255), `status` NUMBER, `position` NUMBER, `name` VARCHAR(255), `remarks` VARCHAR(255), `isPinned` NUMBER, `labels` JSON, `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL, UNIQUE (`value`, `name`));
+CREATE TABLE `RunningInstances` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `cron_id` NUMBER NOT NULL, `pid` NUMBER, `log_path` VARCHAR(255), `started_at` NUMBER NOT NULL, `finished_at` NUMBER, `status` NUMBER NOT NULL DEFAULT 0, `exit_code` NUMBER, `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL);
+CREATE TABLE "SchemaMigrations" ("id" TEXT PRIMARY KEY, "applied_at" TEXT NOT NULL);
+CREATE TABLE `Subscriptions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` VARCHAR(255), `url` VARCHAR(255), `schedule` VARCHAR(255), `interval_schedule` JSON, `type` VARCHAR(255), `whitelist` VARCHAR(255), `blacklist` VARCHAR(255), `status` NUMBER, `dependences` VARCHAR(255), `extensions` VARCHAR(255), `sub_before` VARCHAR(255), `sub_after` VARCHAR(255), `branch` VARCHAR(255), `pull_type` VARCHAR(255), `pull_option` JSON, `pid` NUMBER, `is_disabled` NUMBER, `log_path` VARCHAR(255), `schedule_type` VARCHAR(255), `alias` VARCHAR(255), `proxy` VARCHAR(255), `autoAddCron` NUMBER, `autoDelCron` NUMBER, `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL, UNIQUE (`name`, `url`, `schedule`, `interval_schedule`), UNIQUE (`alias`));
+CREATE INDEX `crontab_stats_date` ON `CrontabStats` (`date`);
+CREATE UNIQUE INDEX `crontab_stats_ref_id_date` ON `CrontabStats` (`ref_id`, `date`);
+INSERT INTO SchemaMigrations VALUES ('add-CrontabViews-filterRelation','2026-10-21T02:14:29.981Z');
+INSERT INTO SchemaMigrations VALUES ('add-CrontabViews-type','2026-10-21T02:14:29.994Z');
+INSERT INTO SchemaMigrations VALUES ('add-Crontabs-allow_multiple_instances','2026-10-21T02:14:30.047Z');
+INSERT INTO SchemaMigrations VALUES ('add-Crontabs-extra_schedules','2026-10-21T02:14:30.027Z');
+INSERT INTO SchemaMigrations VALUES ('add-Crontabs-log_name','2026-10-21T02:14:30.042Z');
+INSERT INTO SchemaMigrations VALUES ('add-Crontabs-queued_token','2026-10-21T02:14:30.065Z');
+INSERT INTO SchemaMigrations VALUES ('add-Crontabs-sub_id','2026-10-21T02:14:30.024Z');
+INSERT INTO SchemaMigrations VALUES ('add-Crontabs-task_after','2026-10-21T02:14:30.036Z');
+INSERT INTO SchemaMigrations VALUES ('add-Crontabs-task_before','2026-10-21T02:14:30.032Z');
+INSERT INTO SchemaMigrations VALUES ('add-Crontabs-work_dir','2026-10-21T02:14:30.055Z');
+INSERT INTO SchemaMigrations VALUES ('add-Envs-isPinned','2026-10-21T02:14:30.057Z');
+INSERT INTO SchemaMigrations VALUES ('add-Envs-labels','2026-10-21T02:14:30.061Z');
+INSERT INTO SchemaMigrations VALUES ('add-Subscriptions-autoAddCron','2026-10-21T02:14:29.998Z');
+INSERT INTO SchemaMigrations VALUES ('add-Subscriptions-autoDelCron','2026-10-21T02:14:30.007Z');
+INSERT INTO SchemaMigrations VALUES ('add-Subscriptions-proxy','2026-10-21T02:14:29.990Z');

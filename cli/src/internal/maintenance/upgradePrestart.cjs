@@ -299,7 +299,8 @@ async function repairDependencies(source, { target, signal, env }) {
       '--child-concurrency=1',
       '--network-concurrency=2',
     ]);
-    await run(['rebuild', 'sqlite3', '@whyour/sqlite3']);
+    if (pkg.dependencies?.sqlite3)
+      await run(['rebuild', 'sqlite3', '@whyour/sqlite3']);
     if (
       !(await fs.readFile(path.join(source, 'pnpm-lock.yaml'))).equals(
         await fs.readFile(path.join(workspace, 'pnpm-lock.yaml')),

@@ -4,6 +4,7 @@ import path from 'path';
 import { request } from 'undici';
 import { HealthCheckRequest, HealthCheckResponse } from '../protos/health';
 import config from '../config';
+import { database } from '../data';
 
 function formatError(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -54,7 +55,7 @@ const check = async (
   switch (call.request.service) {
     // Local scheduler liveness only: never call HTTP from this probe.
     case 'scheduler':
-      return callback(null, { status: 1 });
+      return callback(null, { status: database.healthy ? 1 : 2 });
     case 'cron': {
       const healthUrl = `http://localhost:${config.port}${
         config.baseUrl || ''

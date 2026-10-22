@@ -581,7 +581,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['20.18.1', '24']
+        node: ['20.18.1', '22.17.0', '24']
     container: node:${{ matrix.node }}-bookworm
     steps:
       - uses: actions/checkout@v6
@@ -602,11 +602,15 @@ jobs:
           # remains private to each verification run.
           npm install --global --prefix /usr/local --no-audit --no-fund pm2@6.0.14
       - name: Install and upgrade the exact npm archive
+        if: matrix.node != '20.18.1'
         env:
           QL_PANEL_PACKAGE_TEST_ISOLATED: '1'
           QL_PANEL_TEST_PM2: /usr/local/bin/pm2
           QL_PANEL_TEST_BUNDLE_DIR: ${{ runner.temp }}/npm-migration-bundle
         run: node scripts/verify-panel-package.cjs verify "$RUNNER_TEMP/npm-panel" "$RUNNER_TEMP/npm-panel-results"
+      - name: Reject an unsupported runtime while preserving the old installation
+        if: matrix.node == '20.18.1'
+        run: node scripts/verify-panel-runtime-floor.cjs "$RUNNER_TEMP/npm-panel" "$RUNNER_TEMP/npm-panel-results"
       - uses: actions/upload-artifact@v6
         with:
           name: qinglong-npm-verification-${{ matrix.node }}-${{ github.sha }}
@@ -721,7 +725,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
       - uses: pnpm/action-setup@v6
         with:
           version: '8.3.1'

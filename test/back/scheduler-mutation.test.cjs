@@ -1,3 +1,6 @@
+const { DatabaseClient } = require('../../back/data/databaseClient');
+const { repository, initialize } = require('../helpers/repository-fixture.cjs');
+const { orderBy } = require('../../back/data/queries');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -9,7 +12,6 @@ const { setTimeout: delay } = require('node:timers/promises');
 const { Sequelize, DataTypes } = require('sequelize');
 const { status } = require('@grpc/grpc-js');
 const load = require('../helpers/load-security-module.cjs');
-
 function gate() {
   let release;
   const promise = new Promise((resolve) => {
@@ -17,25 +19,13 @@ function gate() {
   });
   return { promise, release };
 }
-
 async function fixture(t) {
   const root = await fs.mkdtemp(
     path.join(os.tmpdir(), 'ql-scheduler-mutation-'),
   );
-  const db = new Sequelize({
-    dialect: 'sqlite',
-    storage: ':memory:',
-    logging: false,
-  });
-  const crons = db.define('Cron', {
-    name: DataTypes.STRING,
-    command: DataTypes.STRING,
-    schedule: DataTypes.STRING,
-    isDisabled: DataTypes.INTEGER,
-    saved: DataTypes.BOOLEAN,
-    queued_token: DataTypes.STRING,
-  });
-  await db.sync();
+  const db = new DatabaseClient(':memory:');
+  const crons = repository(db, 'Crontab');
+  await initialize(db);
   t.after(async () => {
     await db.close();
     await fs.rm(root, { recursive: true, force: true });
@@ -75,15 +65,14 @@ async function fixture(t) {
   service.getLogName = async () => 'task';
   service.shouldUseCronClient = () => true;
   service.makeCommand = (doc) => doc.command;
-  service.crontabs = async () => ({ data: await crons.findAll({ raw: true }) });
+  service.crontabs = async () => ({ data: await crons.find({}, {}) });
   service.setCrontab = async () => {};
   return { service, crons, jobs, client, root };
 }
-
 for (const operation of ['create', 'update', 'remove', 'disabled', 'enabled']) {
   test(`recovery snapshot cannot overwrite concurrent ${operation}`, async (t) => {
     const { service, crons, jobs } = await fixture(t);
-    await crons.create({
+    await crons.insert({
       id: 1,
       command: 'old',
       schedule: '* * * * *',
@@ -101,7 +90,7 @@ for (const operation of ['create', 'update', 'remove', 'disabled', 'enabled']) {
     };
     const recovery = service.autosave_crontab(true);
     await entered.promise;
-    const before = await crons.findAll({ raw: true });
+    const before = await crons.find({}, {});
     const mutation =
       operation === 'create'
         ? service.create({ command: 'new', schedule: '* * * * *' })
@@ -110,13 +99,13 @@ for (const operation of ['create', 'update', 'remove', 'disabled', 'enabled']) {
         : service[operation]([1]);
     await delay(50);
     assert.deepEqual(
-      await crons.findAll({ raw: true }),
+      await crons.find({}, {}),
       before,
       'DB writes must also wait for recovery',
     );
     release.release();
     await Promise.all([recovery, mutation]);
-    const rows = await crons.findAll({ raw: true });
+    const rows = await crons.find({}, {});
     assert.deepEqual(
       [...jobs.entries()].sort(),
       rows
@@ -126,7 +115,6 @@ for (const operation of ['create', 'update', 'remove', 'disabled', 'enabled']) {
     );
   });
 }
-
 test('recovery waits for an admitted mutation to finish registration before reading the DB', async (t) => {
   const { service, client, jobs } = await fixture(t);
   const entered = gate(),
@@ -154,12 +142,11 @@ test('recovery waits for an admitted mutation to finish registration before read
   await Promise.all([mutation, recovery]);
   assert.deepEqual([...jobs.values()], ['new']);
 });
-
 for (const operation of ['create', 'update', 'enabled']) {
   test(`${operation} preserves scheduler 503 after rollback and releases its lock`, async (t) => {
     const { service, crons, client } = await fixture(t);
     if (operation !== 'create')
-      await crons.create({
+      await crons.insert({
         id: 1,
         command: 'old',
         schedule: '* * * * *',
@@ -180,9 +167,11 @@ for (const operation of ['create', 'update', 'enabled']) {
       (err) =>
         err.status === 503 && err.cause === cause && /回滚/.test(err.message),
     );
-    if (operation === 'create') assert.equal(await crons.count(), 0);
+    if (operation === 'create') assert.equal(await crons.count({}), 0);
     else {
-      const row = await crons.findByPk(1);
+      const row = await crons.findOne({
+        id: 1,
+      });
       assert.equal(row.command, 'old');
       assert.equal(row.isDisabled, operation === 'enabled' ? 1 : 0);
     }
@@ -190,7 +179,6 @@ for (const operation of ['create', 'update', 'enabled']) {
     await service.autosave_crontab(true);
   });
 }
-
 test(
   'scheduler lock excludes a second OS process and leaves no lock after completion',
   { timeout: 10000 },
@@ -247,18 +235,23 @@ test(
     });
   },
 );
-
 for (const operation of ['update', 'remove', 'disabled']) {
   for (const code of [status.DEADLINE_EXCEEDED, status.UNAVAILABLE]) {
     for (const applied of [false, true]) {
       test(`${operation} aborts on RPC ${code} with deletion applied=${applied} and reconciles the original DB`, async (t) => {
         const { service, crons, client, jobs } = await fixture(t);
-        await crons.create({
-          id: 1, command: 'old', schedule: '* * * * *', isDisabled: 0,
+        await crons.insert({
+          id: 1,
+          command: 'old',
+          schedule: '* * * * *',
+          isDisabled: 0,
         });
         jobs.set('1', 'old');
-        const before = await crons.findAll({ raw: true });
-        const failure = Object.assign(Error('uncertain deletion'), { code, status: 503 });
+        const before = await crons.find({}, {});
+        const failure = Object.assign(Error('uncertain deletion'), {
+          code,
+          status: 503,
+        });
         let deletes = 0;
         client.delCron = async (ids) => {
           deletes++;
@@ -266,8 +259,10 @@ for (const operation of ['update', 'remove', 'disabled']) {
           throw failure;
         };
         const add = client.addCron;
-        client.addCron = async () => assert.fail('must not register after failed deletion');
-        service.setCrontab = async () => assert.fail('must not publish after failed deletion');
+        client.addCron = async () =>
+          assert.fail('must not register after failed deletion');
+        service.setCrontab = async () =>
+          assert.fail('must not publish after failed deletion');
         await assert.rejects(
           operation === 'update'
             ? service.update({ id: 1, command: 'new' })
@@ -275,7 +270,7 @@ for (const operation of ['update', 'remove', 'disabled']) {
           (error) => error === failure && error.status === 503,
         );
         assert.equal(deletes, 1, 'must not replay an uncertain deletion');
-        assert.deepEqual(await crons.findAll({ raw: true }), before);
+        assert.deepEqual(await crons.find({}, {}), before);
         client.addCron = add;
         service.setCrontab = async () => {};
         await service.autosave_crontab(true);
@@ -284,10 +279,9 @@ for (const operation of ['update', 'remove', 'disabled']) {
     }
   }
 }
-
 test('configuration rollback cannot restore an obsolete manual queue token', async (t) => {
   const { service, crons, client } = await fixture(t);
-  await crons.create({
+  await crons.insert({
     id: 1,
     command: 'old',
     schedule: '* * * * *',
@@ -298,7 +292,7 @@ test('configuration rollback cannot restore an obsolete manual queue token', asy
   client.addCron = async () => {
     if (first) {
       first = false;
-      await crons.update({ queued_token: 'new-token' }, { where: { id: 1 } });
+      await crons.nativeUpdate({ id: 1 }, { queued_token: 'new-token' });
       throw Object.assign(Error('unavailable'), { status: 503 });
     }
   };
@@ -306,7 +300,9 @@ test('configuration rollback cannot restore an obsolete manual queue token', asy
     service.update({ id: 1, command: 'new' }),
     (err) => err.status === 503,
   );
-  const row = await crons.findByPk(1);
+  const row = await crons.findOne({
+    id: 1,
+  });
   assert.equal(row.command, 'old');
   assert.equal(row.queued_token, 'new-token');
 });

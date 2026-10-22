@@ -1,9 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const load = require('../helpers/load-security-module.cjs');
-
 const logger = { info() {}, error() {} };
-
 function cronFixture(killTask) {
   const events = [];
   const { runCron } = load('back/shared/runCron.ts', {
@@ -25,23 +23,30 @@ function cronFixture(killTask) {
     '../config/util': { killTask },
     '../data/cron': {
       CrontabModel: {
-        findOne: async () => ({
-          pid: 100,
-          status: 0,
-          allow_multiple_instances: 0,
-        }),
-        update: async () => events.push('idle'),
+        findOne: async (where, read = {}) => {
+          return {
+            pid: 100,
+            status: 0,
+            allow_multiple_instances: 0,
+          };
+        },
+        nativeUpdate: async (where, data) => {
+          return events.push('idle');
+        },
       },
       CrontabStatus: { running: 0, idle: 1, queued: 3 },
     },
     '../data/runningInstance': {
-      RunningInstanceModel: { update: async () => events.push('stopped') },
+      RunningInstanceModel: {
+        nativeUpdate: async (where, data) => {
+          return events.push('stopped');
+        },
+      },
       InstanceStatus: { running: 0, stopped: 2 },
     },
   });
   return { run: () => runCron('ignored', { id: '1' }), events };
 }
-
 test('single-instance replacement does not spawn or finalize when termination fails', async () => {
   const f = cronFixture(async () => {
     throw Error('EPERM');
@@ -49,7 +54,6 @@ test('single-instance replacement does not spawn or finalize when termination fa
   await f.run();
   assert.deepEqual(f.events, ['release']);
 });
-
 test('single-instance replacement waits for verified exit before spawning', async () => {
   let finish, entered, verified;
   const pending = new Promise((resolve) => {
@@ -72,7 +76,6 @@ test('single-instance replacement waits for verified exit before spawning', asyn
   assert.equal(verified, true);
   assert.deepEqual(f.events, ['stopped', 'idle', 'spawn', 'release']);
 });
-
 function subscriptionFixture(killTask) {
   const updates = [];
   const Service = load('back/services/subscription.ts', {
@@ -81,11 +84,18 @@ function subscriptionFixture(killTask) {
     '../config/const': {},
     '../data/subscription': {
       SubscriptionModel: {
-        findAll: async () => [
-          { id: 1, pid: 101 },
-          { id: 2, pid: 102 },
-        ],
-        update: async (values, query) => updates.push({ values, query }),
+        find: async (where, read = {}) => {
+          return [
+            { id: 1, pid: 101 },
+            { id: 2, pid: 102 },
+          ];
+        },
+        nativeUpdate: async (where, values) => {
+          const query = {
+            where: where,
+          };
+          return updates.push({ values, query });
+        },
       },
       SubscriptionStatus: { idle: 1 },
     },
@@ -102,7 +112,6 @@ function subscriptionFixture(killTask) {
   }).default;
   return { service: new Service(logger, {}, {}, {}, {}), updates };
 }
-
 test('batch subscription stop preserves failed items and reports failure while stopping others', async () => {
   const calls = [];
   const denied = Error('EPERM');
@@ -119,7 +128,6 @@ test('batch subscription stop preserves failed items and reports failure while s
   assert.equal(f.updates[0].query.where.id, 2);
   assert.equal(f.updates[0].values.status, 1);
 });
-
 function scriptFixture(killTask, pid = 100) {
   const Service = load('back/services/script.ts', {
     '../config': { scriptPath: '/scripts' },
@@ -133,7 +141,6 @@ function scriptFixture(killTask, pid = 100) {
   }).default;
   return new Service(logger, {}, {}, {});
 }
-
 test('script stop propagates failure instead of returning success', async () => {
   const denied = Error('EPERM');
   const service = scriptFixture(async () => {
@@ -144,7 +151,6 @@ test('script stop propagates failure instead of returning success', async () => 
     (e) => e === denied,
   );
 });
-
 test('script stop verifies exit and treats an absent queued process as already stopped', async () => {
   const calls = [];
   const service = scriptFixture(async (...args) => calls.push(args), undefined);

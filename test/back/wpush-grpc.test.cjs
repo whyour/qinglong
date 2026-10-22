@@ -2,13 +2,11 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const test = require('node:test');
 const load = require('../helpers/load-security-module.cjs');
-
 const back = (file) => path.join(__dirname, '../../back', file);
 const protocol = load(back('protos/api.ts'));
 const constants = load(back('config/const.ts'), {
   './container': { maybeSudo: (x) => x },
 });
-
 test('WPUSH survives protobuf and JSON round trips without changing existing modes', () => {
   assert.equal(protocol.NotificationMode.wpush, 22);
   for (let value = 0; value <= 22; value++) {
@@ -40,7 +38,6 @@ test('WPUSH survives protobuf and JSON round trips without changing existing mod
     request,
   );
 });
-
 test('decoded SystemNotify requests reach WPUSH with explicit or saved configuration', async () => {
   const calls = [];
   const decorators = { Service: () => (x) => x, Inject: () => () => {} };
@@ -64,7 +61,16 @@ test('decoded SystemNotify requests reach WPUSH with explicit or saved configura
     '../config/const': constants,
     '../config/util': {},
     '../data/dependence': {},
-    '../data/system': { AuthDataType: { notifyLog: 'notifyLog' }, NotifyStatus: { success: 0, fail: 1 }, SystemModel: { create: async () => {}, findAll: async () => [] } },
+    '../data/system': {
+      AuthDataType: { notifyLog: 'notifyLog' },
+      NotifyStatus: { success: 0, fail: 1 },
+      SystemModel: {
+        insert: async () => {},
+        find: async (where, read = {}) => {
+          return [];
+        },
+      },
+    },
     '../shared/pLimit': {},
     '../schedule/client': {},
     '../shared/i18n': { t: (x) => x },
@@ -81,7 +87,6 @@ test('decoded SystemNotify requests reach WPUSH with explicit or saved configura
   };
   const system = new SystemService({ error() {} });
   system.notificationService = notification;
-
   for (const info of [
     {
       type: 22,

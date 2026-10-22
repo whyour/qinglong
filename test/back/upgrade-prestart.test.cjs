@@ -60,7 +60,10 @@ for (const phase of ['install', 'rebuild'])
     await fs.mkdir(bin);
     await fs.writeFile(
       path.join(source, 'package.json'),
-      JSON.stringify({ packageManager: 'pnpm@8.3.1' }),
+      JSON.stringify({
+        packageManager: 'pnpm@8.3.1',
+        dependencies: { sqlite3: 'legacy-fixture' },
+      }),
     );
     await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
     await fs.writeFile(path.join(source, 'node_modules/old'), 'preserved');
@@ -121,7 +124,10 @@ test('cancelled dependency repair kills descendants and retains the original tre
   await fs.mkdir(bin);
   await fs.writeFile(
     path.join(source, 'package.json'),
-    JSON.stringify({ packageManager: 'pnpm@8.3.1' }),
+    JSON.stringify({
+      packageManager: 'pnpm@8.3.1',
+      dependencies: { sqlite3: 'legacy-fixture' },
+    }),
   );
   await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
   await fs.writeFile(path.join(source, 'node_modules/old'), 'preserved');
@@ -214,7 +220,10 @@ test('ARMv6 repair isolates configuration, uses frozen install, one compiler job
   await fs.mkdir(bin);
   await fs.writeFile(
     path.join(source, 'package.json'),
-    JSON.stringify({ packageManager: 'pnpm@8.3.1' }),
+    JSON.stringify({
+      packageManager: 'pnpm@8.3.1',
+      dependencies: { sqlite3: 'legacy-fixture' },
+    }),
   );
   await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
   await fs.writeFile(
@@ -347,4 +356,50 @@ test('repair refuses an unsupported package manager before invoking a network co
     /Unsupported frozen-lockfile/,
   );
   assert.deepEqual(await fs.readdir(root), ['source']);
+});
+
+test('MikroORM dependency repair uses the frozen production tree without running a native rebuild', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-repair-mikro-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const source = path.join(root, 'source'),
+    bin = path.join(root, 'bin');
+  await fs.mkdir(path.join(source, 'node_modules'), { recursive: true });
+  await fs.mkdir(bin);
+  await fs.writeFile(
+    path.join(source, 'package.json'),
+    JSON.stringify({
+      packageManager: 'pnpm@8.3.1',
+      dependencies: { '@mikro-orm/core': '7.2.5', '@mikro-orm/sql': '7.2.5' },
+    }),
+  );
+  await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
+  await fs.writeFile(path.join(source, 'node_modules/broken'), 'old');
+  await fs.writeFile(
+    path.join(bin, 'pnpm'),
+    `#!${process.execPath}
+    const fs=require('node:fs');
+    if(process.argv[2]==='--version') console.log('8.3.1');
+    else if(process.argv[2]==='install') {
+      if(!['--prod','--frozen-lockfile','--ignore-scripts'].every(x=>process.argv.includes(x))) throw Error('unsafe install');
+      fs.mkdirSync('node_modules');fs.writeFileSync('node_modules/repaired','new');
+    } else throw Error('MikroORM must not rebuild sqlite3');
+  `,
+    { mode: 0o755 },
+  );
+  await repairDependencies(source, {
+    target: { arch: 'armv6' },
+    env: { PATH: bin },
+  });
+  assert.equal(
+    await fs.readFile(path.join(source, 'node_modules/repaired'), 'utf8'),
+    'new',
+  );
+  await assert.rejects(fs.access(path.join(source, 'node_modules/broken')), {
+    code: 'ENOENT',
+  });
+  assert.equal(
+    await fs.readFile(path.join(source, 'pnpm-lock.yaml'), 'utf8'),
+    'frozen lock',
+  );
+  assert.deepEqual((await fs.readdir(root)).sort(), ['bin', 'source']);
 });

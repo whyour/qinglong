@@ -1,3 +1,6 @@
+const { DatabaseClient } = require('../../back/data/databaseClient');
+const { repository, initialize } = require('../helpers/repository-fixture.cjs');
+const { orderBy } = require('../../back/data/queries');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -9,36 +12,21 @@ const { Sequelize, DataTypes } = require('sequelize');
 const load = require('../helpers/load-security-module.cjs');
 const { killTask } = require('../../back/config/util');
 const { LogStreamManager } = require('../../back/shared/logStreamManager');
-
 for (const conflict of ['stop', 'newer-queue', 'stop-requeue']) {
   test(
     `manual startup loses its conditional claim after ${conflict} and terminates the late child`,
     { timeout: 10000 },
     async (t) => {
       const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-manual-claim-'));
-      const db = new Sequelize({
-        dialect: 'sqlite',
-        storage: ':memory:',
-        logging: false,
-      });
+      const db = new DatabaseClient(':memory:');
       t.after(async () => {
         await db.close();
         await fs.rm(root, { recursive: true, force: true });
       });
-      const crons = db.define('Cron', {
-        status: DataTypes.INTEGER,
-        pid: DataTypes.INTEGER,
-        log_path: DataTypes.STRING,
-        queued_token: DataTypes.STRING,
-        command: DataTypes.STRING,
-      });
-      const instances = db.define('Instance', {
-        cron_id: DataTypes.INTEGER,
-        status: DataTypes.INTEGER,
-        pid: DataTypes.INTEGER,
-      });
-      await db.sync();
-      await crons.create({
+      const crons = repository(db, 'Crontab');
+      const instances = repository(db, 'RunningInstance');
+      await initialize(db);
+      await crons.insert({
         id: 1,
         status: 3,
         pid: null,
@@ -102,7 +90,9 @@ for (const conflict of ['stop', 'newer-queue', 'stop-requeue']) {
       }).default;
       const service = new CronService({ info() {}, error() {} });
       service.getDb = async () =>
-        (await crons.findByPk(1)).get({ plain: true });
+        await crons.findOne({
+          id: 1,
+        });
       service.makeCommand = () => 'ignored';
       const running = service.runSingle(1);
       await pending;
@@ -115,16 +105,22 @@ for (const conflict of ['stop', 'newer-queue', 'stop-requeue']) {
         assert.equal(pendingRuns.length, 1);
         assert.equal(
           pendingRuns[0].token,
-          (await crons.findByPk(1)).queued_token,
+          (
+            await crons.findOne({
+              id: 1,
+            })
+          ).queued_token,
         );
       } else if (conflict === 'stop') await service.stop([1]);
-      else await crons.update({ log_path: 'newer.log' }, { where: { id: 1 } });
+      else await crons.nativeUpdate({ id: 1 }, { log_path: 'newer.log' });
       release();
       const result = await running;
       assert.match(result.error.message, /stopped or superseded/);
       assert.ok(child.signalCode || child.exitCode !== null);
       assert.throws(() => process.kill(child.pid, 0), { code: 'ESRCH' });
-      const row = await crons.findByPk(1);
+      const row = await crons.findOne({
+        id: 1,
+      });
       assert.equal(row.status, conflict === 'stop' ? 1 : 3);
       assert.equal(
         row.log_path,
@@ -135,7 +131,6 @@ for (const conflict of ['stop', 'newer-queue', 'stop-requeue']) {
     },
   );
 }
-
 test(
   'verified termination waits for a SIGTERM-resistant target to exit',
   { timeout: 5000 },
@@ -158,22 +153,12 @@ test(
     assert.equal(child.signalCode, 'SIGKILL');
   },
 );
-
 test('a runner waiting for a concurrency slot cannot adopt a newer queued generation', async (t) => {
-  const db = new Sequelize({
-    dialect: 'sqlite',
-    storage: ':memory:',
-    logging: false,
-  });
+  const db = new DatabaseClient(':memory:');
   t.after(() => db.close());
-  const crons = db.define('Cron', {
-    status: DataTypes.INTEGER,
-    pid: DataTypes.INTEGER,
-    log_path: DataTypes.STRING,
-    queued_token: DataTypes.STRING,
-  });
-  await db.sync();
-  await crons.create({ id: 1, status: 1, log_path: 'same.log' });
+  const crons = repository(db, 'Crontab');
+  await initialize(db);
+  await crons.insert({ id: 1, status: 1, log_path: 'same.log' });
   const waiting = [];
   const CronService = load('back/services/cron.ts', {
     '../config': {},
@@ -182,7 +167,7 @@ test('a runner waiting for a concurrency slot cannot adopt a newer queued genera
       CrontabStatus: { queued: 3, idle: 1, running: 0 },
     },
     '../data/runningInstance': {
-      RunningInstanceModel: { findAll: async () => [] },
+      RunningInstanceModel: { find: async () => [] },
       InstanceStatus: { running: 0 },
     },
     '../config/util': {
@@ -205,14 +190,24 @@ test('a runner waiting for a concurrency slot cannot adopt a newer queued genera
   const errors = [];
   const service = new CronService({ error: (...args) => errors.push(args) });
   await service.run([1]);
-  const first = (await crons.findByPk(1)).queued_token;
+  const first = (
+    await crons.findOne({
+      id: 1,
+    })
+  ).queued_token;
   await service.stop([1]);
   await service.run([1]);
-  const second = (await crons.findByPk(1)).queued_token;
+  const second = (
+    await crons.findOne({
+      id: 1,
+    })
+  ).queued_token;
   assert.notEqual(first, second);
   assert.equal(waiting.length, 2);
   await waiting[0]();
-  const row = await crons.findByPk(1);
+  const row = await crons.findOne({
+    id: 1,
+  });
   assert.equal(row.status, 3);
   assert.equal(row.queued_token, second);
   assert.equal(row.log_path, 'same.log');

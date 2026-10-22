@@ -12,16 +12,23 @@ const req = {
   headers: {},
   socket: { remoteAddress: '127.0.0.1' },
 };
-
 function fixture(initial) {
   let auth = structuredClone(initial);
   let closed = 0;
   const model = {
-    findOne: async () => ({ id: 1 }),
-    update: async () => [1, [{}]],
-    create: async (x) => x,
-    findAll: async () => [],
-    destroy: async () => {},
+    findOne: async (where, read = {}) => {
+      return { id: 1 };
+    },
+    nativeUpdate: async (where, data) => {
+      return 1;
+    },
+    insert: async (x) => {
+      return x;
+    },
+    find: async (where, read = {}) => {
+      return [];
+    },
+    nativeDelete: async (where, read = {}) => {},
   };
   const mocks = {
     typedi: { Service: () => (x) => x, Inject: () => () => {} },
@@ -85,7 +92,6 @@ const initialized = () => ({
   retries: 0,
   lastlogon: 0,
 });
-
 test('initialization checks state inside a serialized mutation', async () => {
   const f = fixture({ username: 'admin', password: 'admin' });
   assert.equal(
@@ -116,7 +122,6 @@ test('initialization checks state inside a serialized mutation', async () => {
     450,
   );
 });
-
 test('password change revokes sessions and closes connected clients', async () => {
   const f = fixture(initialized());
   await f.user.updateUsernameAndPassword({
@@ -139,7 +144,6 @@ test('password change revokes sessions and closes connected clients', async () =
   assert.equal(login.code, 200);
   jwt.verify(login.data.token, 'test-secret', { algorithms: ['HS384'] });
 });
-
 test('a concurrent old-password login cannot restore a session after reset', async () => {
   const f = fixture(initialized());
   const results = await Promise.all([
@@ -151,7 +155,6 @@ test('a concurrent old-password login cannot restore a session after reset', asy
   assert.deepEqual(f.auth.tokens, {});
   assert.equal(await verifyPassword('new-password', f.auth.password), true);
 });
-
 test('legacy plaintext migrates after a successful login', async () => {
   const f = fixture(initialized());
   assert.equal(
@@ -162,7 +165,6 @@ test('legacy plaintext migrates after a successful login', async () => {
   assert.equal(isPasswordHash(f.auth.password), true);
   assert.equal(await verifyPassword('old-password', f.auth.password), true);
 });
-
 test('TOTP failures are counted serially and further attempts are throttled', async () => {
   const secret = authenticator.generateSecret();
   const f = fixture({
@@ -189,7 +191,6 @@ test('TOTP failures are counted serially and further attempts are throttled', as
   assert.equal(results.filter((x) => x.code === 430).length, 3);
   assert.equal(results.filter((x) => x.code === 410).length, 117);
 });
-
 test('TOTP challenge expires and valid codes cannot be reused in the same step', async () => {
   const secret = authenticator.generateSecret();
   const f = fixture({
@@ -210,7 +211,6 @@ test('TOTP challenge expires and valid codes cannot be reused in the same step',
   await f.user.login({ username: 'owner', password: 'old-password' }, req);
   assert.equal((await f.user.twoFactorLogin(payload, req)).code, 430);
 });
-
 test('active two-factor secret cannot be silently replaced and disabling revokes sessions', async () => {
   const f = fixture({
     ...initialized(),
@@ -223,7 +223,6 @@ test('active two-factor secret cannot be silently replaced and disabling revokes
   assert.deepEqual(f.auth.tokens, {});
   assert.equal(f.auth.twoFactorSecret, '');
 });
-
 test('default credentials with historical metadata still require initialization', async () => {
   const f = fixture({
     username: 'admin',
@@ -246,7 +245,6 @@ test('default credentials with historical metadata still require initialization'
   );
   assert.equal(f.auth.token, '');
 });
-
 test('one source cannot lock out another or revive a persisted global lock', async () => {
   const f = fixture({ ...initialized(), retries: 40, lastlogon: Date.now() });
   const attacker = { ...req, socket: { remoteAddress: '192.0.2.1' } };
@@ -289,7 +287,6 @@ test('one source cannot lock out another or revive a persisted global lock', asy
     200,
   );
 });
-
 test('TOTP guesses from another source do not lock the owner out', async () => {
   const secret = authenticator.generateSecret();
   const f = fixture({
@@ -332,7 +329,6 @@ test('TOTP guesses from another source do not lock the owner out', async () => {
     200,
   );
 });
-
 test('source backoff is capped and expires after inactivity', () => {
   const { LoginThrottle } = load(path.resolve('back/shared/loginThrottle.ts'));
   const throttle = new LoginThrottle();

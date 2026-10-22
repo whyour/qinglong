@@ -1,3 +1,5 @@
+import { textSearch } from '../data/queries';
+import { Query, QuerySpec, orderBy } from '../data/queries';
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
 import config from '../config';
@@ -10,7 +12,6 @@ import {
 } from '../data/dependence';
 import { spawn } from 'cross-spawn';
 import SockService from './sock';
-import { FindOptions, Op } from 'sequelize';
 import {
   fileExist,
   getPid,
@@ -27,14 +28,13 @@ import taskLimit from '../shared/pLimit';
 import { detectOS } from '../config/util';
 import { LINUX_DEPENDENCE_COMMAND } from '../config/const';
 import { t, tf } from '../shared/i18n';
-
 @Service()
 export default class DependenceService {
   constructor(
-    @Inject('logger') private logger: winston.Logger,
+    @Inject('logger')
+    private logger: winston.Logger,
     private sockService: SockService,
   ) {}
-
   public async create(payloads: Dependence[]): Promise<Dependence[]> {
     const tabs = payloads.map((x) => {
       getInstallCommand(x.type, x.name);
@@ -45,14 +45,14 @@ export default class DependenceService {
     this.installDependenceOneByOne(docs);
     return docs;
   }
-
   public async insert(payloads: Dependence[]): Promise<Dependence[]> {
-    const docs = await DependenceModel.bulkCreate(payloads);
+    const docs = await DependenceModel.insertMany(payloads);
     return docs;
   }
-
   public async update(
-    payload: Dependence & { id: string },
+    payload: Dependence & {
+      id: string;
+    },
   ): Promise<Dependence> {
     const { id, ...other } = payload;
     const doc = await this.getDb({ id });
@@ -66,14 +66,12 @@ export default class DependenceService {
     this.installDependenceOneByOne([newDoc]);
     return newDoc;
   }
-
   private async updateDb(payload: Dependence): Promise<Dependence> {
-    await DependenceModel.update(payload, { where: { id: payload.id } });
+    await DependenceModel.nativeUpdate({ id: payload.id }, payload);
     return await this.getDb({ id: payload.id });
   }
-
   public async remove(ids: number[], force = false): Promise<Dependence[]> {
-    const docs = await DependenceModel.findAll({ where: { id: ids } });
+    const docs = await DependenceModel.find({ id: ids }, {});
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
     }
@@ -88,22 +86,18 @@ export default class DependenceService {
     );
     const unInstalledDeps = docs.filter((x) => !installedDeps.includes(x));
     await this.removeDb(unInstalledDeps.map((x) => x.id!));
-
     if (installedDeps.length) {
-      await DependenceModel.update(
+      await DependenceModel.nativeUpdate(
+        { id: installedDeps.map((x) => x.id!) },
         { status: DependenceStatus.queued, log: [] },
-        { where: { id: installedDeps.map((x) => x.id!) } },
       );
-
       this.installDependenceOneByOne(installedDeps, false, force);
     }
     return docs;
   }
-
   public async removeDb(ids: number[]) {
-    await DependenceModel.destroy({ where: { id: ids } });
+    await DependenceModel.nativeDelete({ id: ids });
   }
-
   public async dependencies(
     {
       searchValue,
@@ -130,13 +124,7 @@ export default class DependenceService {
       condition.status = status.split(',').map(Number);
     }
     if (searchValue) {
-      const encodeText = encodeURI(searchValue);
-      condition.name = {
-        [Op.or]: [
-          { [Op.like]: `%${searchValue}%` },
-          { [Op.like]: `%${encodeText}%` },
-        ],
-      };
+      Object.assign(condition, textSearch(['name'], searchValue));
     }
     try {
       return await this.find(condition, sort);
@@ -144,7 +132,6 @@ export default class DependenceService {
       throw error;
     }
   }
-
   private async refreshInstalledStatuses(type?: DependenceTypes) {
     const cacheDependenceTypes = [
       DependenceTypes.nodejs,
@@ -153,13 +140,13 @@ export default class DependenceService {
     if (type !== undefined && !cacheDependenceTypes.includes(type)) {
       return;
     }
-
-    const docs = await DependenceModel.findAll({
-      where: {
+    const docs = await DependenceModel.find(
+      {
         status: DependenceStatus.installed,
-        type: type === undefined ? { [Op.in]: cacheDependenceTypes } : type,
+        type: type === undefined ? { ['$in']: cacheDependenceTypes } : type,
       },
-    });
+      {},
+    );
     const checks = await concurrentRun(
       docs
         .filter(
@@ -175,15 +162,13 @@ export default class DependenceService {
     const missingIds = (checks || []).filter(
       (id): id is number => id !== undefined,
     );
-
     if (missingIds.length) {
-      await DependenceModel.update(
+      await DependenceModel.nativeUpdate(
+        { id: missingIds },
         { status: DependenceStatus.installFailed },
-        { where: { id: missingIds } },
       );
     }
   }
-
   private async isDependenceInstalled(dependency: Dependence) {
     let depName = dependency.name.trim();
     const depVersionStr = versionDependenceCommandTypes[dependency.type];
@@ -201,7 +186,6 @@ export default class DependenceService {
         depVersion = parsedVersion;
       }
     }
-
     const depInfo = (
       await promiseExecSuccess(getGetCommand(dependency.type, depName))
     )
@@ -211,12 +195,10 @@ export default class DependenceService {
       (dependency.type === DependenceTypes.nodejs &&
         depInfo.split(' ')?.[0] === depName) ||
       dependency.type === DependenceTypes.python3;
-
     return Boolean(
       depInfo && nameMatches && (!depVersion || depInfo.includes(depVersion)),
     );
   }
-
   public installDependenceOneByOne(
     docs: Dependence[],
     isInstall: boolean = true,
@@ -225,32 +207,27 @@ export default class DependenceService {
     docs.forEach((dep) => {
       this.installOrUninstallDependency(dep, isInstall, force);
     });
-
     return taskLimit.waitDependencyQueueDone();
   }
-
   public async reInstall(ids: number[]): Promise<Dependence[]> {
-    await DependenceModel.update(
+    await DependenceModel.nativeUpdate(
+      { id: ids },
       { status: DependenceStatus.queued, log: [] },
-      { where: { id: ids } },
     );
-
-    const docs = await DependenceModel.findAll({ where: { id: ids } });
+    const docs = await DependenceModel.find({ id: ids }, {});
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
     }
     this.installDependenceOneByOne(docs, true, true);
     return docs;
   }
-
   public async cancel(ids: number[]) {
-    const docs = await DependenceModel.findAll({ where: { id: ids } });
+    const docs = await DependenceModel.find({ id: ids }, {});
     for (const doc of docs) {
       taskLimit.removeQueuedDependency(doc);
       let depInstallCommand = getInstallCommand(doc.type, doc.name);
       let depUnInstallCommand = getUninstallCommand(doc.type, doc.name);
       const isLinuxDependence = doc.type === DependenceTypes.linux;
-
       if (isLinuxDependence) {
         const osType = await detectOS();
         if (!osType) {
@@ -268,44 +245,37 @@ export default class DependenceService {
         pid && (await killTask(pid));
       }
     }
-    await DependenceModel.update(
+    await DependenceModel.nativeUpdate(
+      { id: ids },
       { status: DependenceStatus.cancelled },
-      { where: { id: ids } },
     );
   }
-
   private async find(query: any, sort: any = []): Promise<Dependence[]> {
-    const docs = await DependenceModel.findAll({
-      where: { ...query },
-      order: [...sort, ['createdAt', 'DESC']],
-    });
+    const docs = await DependenceModel.find(
+      { ...query },
+      {
+        orderBy: orderBy([...sort, ['createdAt', 'DESC']]),
+      },
+    );
     return docs;
   }
-
-  public async getDb(
-    query: FindOptions<Dependence>['where'],
-  ): Promise<Dependence> {
-    const doc: any = await DependenceModel.findOne({ where: { ...query } });
+  public async getDb(query: QuerySpec['where']): Promise<Dependence> {
+    const doc: any = await DependenceModel.findOne({ ...query }, {});
     if (!doc) {
       throw new Error(`Dependency ${JSON.stringify(query)} not found`);
     }
-    return doc.get({ plain: true });
+    return doc;
   }
-
   private async updateLog(ids: number[], log: string): Promise<void> {
     taskLimit.updateDepLog(async () => {
-      const docs = await DependenceModel.findAll({ where: { id: ids } });
+      const docs = await DependenceModel.find({ id: ids }, {});
       for (const doc of docs) {
         const newLog = doc?.log ? [...doc.log, log] : [log];
-        await DependenceModel.update(
-          { log: newLog },
-          { where: { id: doc.id } },
-        );
+        await DependenceModel.nativeUpdate({ id: doc.id }, { log: newLog });
       }
       return null;
     });
   }
-
   public installOrUninstallDependency(
     dependency: Dependence,
     isInstall: boolean = true,
@@ -322,14 +292,14 @@ export default class DependenceService {
         if (!isInstall && force) {
           return this.removeDb([dependency.id!]).then(() => null);
         }
-        return DependenceModel.update(
+        return DependenceModel.nativeUpdate(
+          { id: dependency.id },
           {
             status: isInstall
               ? DependenceStatus.installFailed
               : DependenceStatus.removeFailed,
             log: [String(error)],
           },
-          { where: { id: dependency.id } },
         ).then(() => null);
       }
       return new Promise(async (resolve) => {
@@ -350,9 +320,9 @@ export default class DependenceService {
         taskLimit.removeQueuedDependency(dependency);
         if (isLinuxDependence) {
           if (!osType) {
-            await DependenceModel.update(
+            await DependenceModel.nativeUpdate(
+              { id: depIds },
               { status: DependenceStatus.installFailed },
-              { where: { id: depIds } },
             );
             const startTime = dayjs();
             const message = tf(
@@ -375,12 +345,10 @@ export default class DependenceService {
           }
           linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
         }
-
         const status = isInstall
           ? DependenceStatus.installing
           : DependenceStatus.removing;
-        await DependenceModel.update({ status }, { where: { id: depIds } });
-
+        await DependenceModel.nativeUpdate({ id: depIds }, { status });
         let command = validatedCommand;
         if (isLinuxDependence) {
           command = isInstall
@@ -388,7 +356,6 @@ export default class DependenceService {
             : `${linuxCommand.uninstall} ${depName.trim()}`;
         }
         const startTime = dayjs();
-
         const message = tf(
           '开始%s依赖 %s，开始时间 %s\n\n',
           actionText,
@@ -402,7 +369,6 @@ export default class DependenceService {
           status,
         });
         this.updateLog(depIds, message);
-
         // 判断是否已经安装过依赖
         // pip must resolve optional dependencies even if the base distribution
         // is already present; its version alone cannot prove extras are ready.
@@ -416,7 +382,6 @@ export default class DependenceService {
           if (isLinuxDependence) {
             getCommand = `${linuxCommand.info} ${depName}`;
           }
-
           let depVersion = '';
           if (!isPythonDependence && depName.includes(depVersionStr)) {
             const symbolRegx = new RegExp(
@@ -431,7 +396,6 @@ export default class DependenceService {
           const depInfo = (await promiseExecSuccess(getCommand))
             .replace(/\s{2,}/, ' ')
             .replace(/\s+$/, '');
-
           if (
             depInfo &&
             ((isNodeDependence && depInfo.split(' ')?.[0] === depName) ||
@@ -456,9 +420,9 @@ export default class DependenceService {
               status: DependenceStatus.installed,
             });
             this.updateLog(depIds, _message);
-            await DependenceModel.update(
+            await DependenceModel.nativeUpdate(
+              { id: depIds },
               { status: DependenceStatus.installed },
-              { where: { id: depIds } },
             );
             return resolve(null);
           }
@@ -472,7 +436,6 @@ export default class DependenceService {
         const cp = spawn(`${proxyStr} ${command}`, {
           shell: '/bin/bash',
         });
-
         cp.stdout.on('data', async (data) => {
           this.sockService.sendMessage({
             type: socketMessageType,
@@ -482,7 +445,6 @@ export default class DependenceService {
           });
           this.updateLog(depIds, data.toString());
         });
-
         cp.stderr.on('data', async (data) => {
           this.sockService.sendMessage({
             type: socketMessageType,
@@ -492,7 +454,6 @@ export default class DependenceService {
           });
           this.updateLog(depIds, data.toString());
         });
-
         cp.on('error', async (err) => {
           this.sockService.sendMessage({
             type: socketMessageType,
@@ -502,12 +463,10 @@ export default class DependenceService {
           });
           this.updateLog(depIds, JSON.stringify(err));
         });
-
         cp.on('exit', async (code) => {
           const endTime = dayjs();
           const isSucceed = code === 0;
           const resultText = isSucceed ? t('成功') : t('失败');
-
           const message =
             '\n' +
             tf(
@@ -531,24 +490,20 @@ export default class DependenceService {
             status: exitStatus,
           });
           this.updateLog(depIds, message);
-
-          const docs = await DependenceModel.findAll({ where: { id: depIds } });
+          const docs = await DependenceModel.find({ id: depIds }, {});
           const _docIds = docs
             .filter((x) => x.status !== DependenceStatus.cancelled)
             .map((x) => x.id!);
-
           if (_docIds.length > 0) {
-            await DependenceModel.update(
+            await DependenceModel.nativeUpdate(
+              { id: _docIds },
               { status: exitStatus },
-              { where: { id: _docIds } },
             );
           }
-
           // 如果删除依赖成功或者强制删除
           if ((isSucceed || force) && !isInstall) {
             this.removeDb(depIds);
           }
-
           resolve(null);
         });
       });

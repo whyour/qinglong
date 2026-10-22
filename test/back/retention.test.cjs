@@ -3,7 +3,6 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { Op } = require('sequelize');
 
 const {
   getDirectorySize,
@@ -62,7 +61,7 @@ test('cleanup previews first, protects running instances, and uses explicit opti
       paths: [],
     };
   };
-  stubModule('../../back/data', { sequelize });
+  stubModule('../../back/data', { database: sequelize });
   stubModule('../../back/data/cronStats', { CrontabStatModel });
   stubModule('../../back/data/runningInstance', {
     InstanceStatus,
@@ -85,12 +84,12 @@ test('cleanup previews first, protects running instances, and uses explicit opti
   let instanceCountCalls = 0;
   let statCountCalls = 0;
   config.dependenceCachePath = directory;
-  RunningInstanceModel.count = async ({ where }) => {
+  RunningInstanceModel.count = async (where) => {
     instanceCountCalls++;
     instanceWhere = where;
     return 2;
   };
-  RunningInstanceModel.destroy = async ({ where }) => {
+  RunningInstanceModel.nativeDelete = async (where) => {
     instanceWhere = where;
     return 2;
   };
@@ -98,7 +97,7 @@ test('cleanup previews first, protects running instances, and uses explicit opti
     statCountCalls++;
     return 3;
   };
-  CrontabStatModel.destroy = async () => 3;
+  CrontabStatModel.nativeDelete = async () => 3;
   sequelize.transaction = async (callback) => callback({});
   sequelize.query = async (query) => {
     vacuumed = query === 'VACUUM';
@@ -122,7 +121,7 @@ test('cleanup previews first, protects running instances, and uses explicit opti
     compactDatabase: true,
   });
 
-  assert.equal(instanceWhere.status[Op.ne], InstanceStatus.running);
+  assert.equal(instanceWhere.status.$ne, InstanceStatus.running);
   assert.equal(result.deleted.runningInstances, 2);
   assert.equal(result.deleted.cronStats, 3);
   assert.equal(result.deleted.dependenceCacheBytes, 13);

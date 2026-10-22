@@ -9,10 +9,8 @@ const path = require('node:path');
 const load = require('../helpers/load-security-module.cjs');
 const { observeChildProcess } = require('../../back/shared/childProcess');
 const { LogStreamManager } = require('../../back/shared/logStreamManager');
-
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const logger = { info() {}, error() {} };
-
 test(
   'spawn failure settles without exit, and the next scheduled run can proceed',
   { timeout: 3000 },
@@ -36,7 +34,11 @@ test(
       },
       '../loaders/logger': logger,
       '../data/cron': {
-        CrontabModel: { findOne: async () => ({ isDisabled: 0 }) },
+        CrontabModel: {
+          findOne: async (where, read = {}) => {
+            return { isDisabled: 0 };
+          },
+        },
         CrontabStatus: {},
       },
       '../data/runningInstance': {
@@ -51,7 +53,6 @@ test(
     assert.equal(releases, 2);
   },
 );
-
 test(
   'completion waits for slow log consumers and preserves the final output',
   { timeout: 5000 },
@@ -79,7 +80,6 @@ test(
     assert.match(chunks.join(''), /错误/);
   },
 );
-
 test('exit is not completion, and UTF-8 split across writes remains intact', async () => {
   const child = new EventEmitter();
   child.stdout = new PassThrough();
@@ -105,7 +105,6 @@ test('exit is not completion, and UTF-8 split across writes remains intact', asy
   await observed.completed;
   assert.equal(chunks.join(''), '末尾中文');
 });
-
 test(
   'failed log sink drains large output instead of blocking the child',
   { timeout: 5000 },
@@ -124,7 +123,6 @@ test(
     assert.equal(result.error.message, 'ENOSPC');
   },
 );
-
 function scheduleFixture() {
   let active = 0;
   const limit = async (_params, fn) => {
@@ -150,7 +148,6 @@ function scheduleFixture() {
   }).default;
   return { service: new Schedule(logger), active: () => active };
 }
-
 test(
   'PID response keeps queue capacity occupied until cleanup completes',
   { timeout: 4000 },
@@ -178,7 +175,6 @@ test(
     assert.equal(fixture.active(), 0);
   },
 );
-
 test(
   'before/error/end callback failures settle and release capacity',
   { timeout: 3000 },
@@ -207,7 +203,6 @@ test(
     assert.equal(fixture.active(), 0);
   },
 );
-
 test(
   'concurrent writes and closes preserve all bytes, and failed files can be closed',
   { timeout: 5000 },

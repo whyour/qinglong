@@ -84,3 +84,17 @@ test('schedule health check uses the HTTP health endpoint and system logs', asyn
     },
   );
 });
+
+test('scheduler liveness reports a failed database process without calling HTTP', async () => {
+  const load=require('../helpers/load-security-module.cjs');
+  const database={healthy:true};
+  const {check}=load('back/schedule/health.ts',{
+    '../data':{database},
+    '../config':{},
+    undici:{request:()=>assert.fail('local scheduler checks must not call HTTP')},
+  });
+  const probe=()=>new Promise(resolve=>check({request:{service:'scheduler'}},(error,response)=>resolve({error,response})));
+  assert.deepEqual((await probe()).response,{status:1});
+  database.healthy=false;
+  assert.deepEqual((await probe()).response,{status:2});
+});

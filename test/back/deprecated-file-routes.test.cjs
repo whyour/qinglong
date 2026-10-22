@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const express = require('express');
-
 function mockModule(modulePath, exports) {
   const filename = require.resolve(modulePath);
   require.cache[filename] = {
@@ -13,7 +12,6 @@ function mockModule(modulePath, exports) {
     paths: [],
   };
 }
-
 mockModule('../../back/config', {
   __esModule: true,
   default: {
@@ -49,15 +47,17 @@ for (const service of ['config', 'script', 'log']) {
 }
 mockModule('../../back/data/runningInstance', {
   InstanceStatus: { running: 'running' },
-  RunningInstanceModel: { findOne: async () => null },
+  RunningInstanceModel: {
+    findOne: async (where, read = {}) => {
+      return null;
+    },
+  },
 });
-
 const deprecatedRoutes = [
   ['config', '/configs/detail'],
   ['script', '/scripts/detail'],
   ['log', '/logs/detail'],
 ];
-
 for (const [moduleName, replacement] of deprecatedRoutes) {
   test(`${moduleName} filename route points callers to its detail API`, () => {
     const app = express.Router();
@@ -68,12 +68,10 @@ for (const [moduleName, replacement] of deprecatedRoutes) {
     );
     const handler = deprecatedRoute.route.stack.at(-1).handle;
     let responseBody;
-
     handler(
       { params: { file: 'Example.js' }, query: {} },
       { send: (body) => (responseBody = body) },
     );
-
     assert.deepEqual(responseBody, {
       code: 410,
       message: `接口已下线，请使用 ${replacement} 接口`,

@@ -1,5 +1,4 @@
-import { sequelize } from '.';
-import { DataTypes, Model, ModelDefined } from 'sequelize';
+import { Repository, RecordRow } from './repository';
 import { NotificationInfo } from './notify';
 
 export class SystemInfo {
@@ -106,14 +105,5 @@ export type SystemModelInfo = SystemConfigInfo &
   Partial<NotifyLogInfo> &
   Partial<AuthInfo>;
 
-export interface SystemInstance
-  extends Model<SystemInfo, SystemInfo>,
-    SystemInfo {}
-export const SystemModel = sequelize.define<SystemInstance>('Auth', {
-  ip: DataTypes.STRING,
-  type: DataTypes.STRING,
-  info: {
-    type: DataTypes.JSON,
-    allowNull: true,
-  },
-});
+export type SystemInstance = RecordRow<SystemInfo>;
+export const SystemModel = new Repository<SystemInfo>('Auth');

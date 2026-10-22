@@ -1,4 +1,4 @@
-import { QueryTypes, Sequelize } from 'sequelize';
+import { DatabaseClient } from '../data/databaseClient';
 
 // Append new entries; IDs are persisted and must not be renumbered or reused.
 const columns = [
@@ -27,25 +27,19 @@ const columns = [
   { table: 'Crontabs', column: 'queued_token', type: 'VARCHAR(255)' },
 ];
 
-export async function migrateSchema(database: Sequelize): Promise<void> {
-  await database.transaction(async (transaction) => {
+export async function migrateSchema(database: DatabaseClient): Promise<void> {
+  await database.transaction(async () => {
     await database.query(
       'CREATE TABLE IF NOT EXISTS "SchemaMigrations" ("id" TEXT PRIMARY KEY, "applied_at" TEXT NOT NULL)',
-      { transaction },
     );
     const applied = await database.query<{ id: string }>(
       'SELECT "id" FROM "SchemaMigrations"',
-      { type: QueryTypes.SELECT, transaction },
     );
     const appliedIds = new Set(applied.map(({ id }) => id));
     for (const { table, column, type } of columns) {
       const id = `add-${table}-${column}`;
       const fields = await database.query<{ name: string }>(
         `PRAGMA table_info("${table}")`,
-        {
-          type: QueryTypes.SELECT,
-          transaction,
-        },
       );
       if (fields.length === 0)
         throw new Error(`Migration table is missing: ${table}`);
@@ -53,16 +47,12 @@ export async function migrateSchema(database: Sequelize): Promise<void> {
         // table/column/type come only from the static migration manifest above.
         await database.query(
           `ALTER TABLE "${table}" ADD COLUMN "${column}" ${type}`,
-          { transaction },
         );
       }
       if (!appliedIds.has(id)) {
         await database.query(
-          'INSERT INTO "SchemaMigrations" ("id", "applied_at") VALUES (:id, :appliedAt)',
-          {
-            replacements: { id, appliedAt: new Date().toISOString() },
-            transaction,
-          },
+          'INSERT INTO "SchemaMigrations" ("id", "applied_at") VALUES (?, ?)',
+          [id, new Date().toISOString()],
         );
       }
     }

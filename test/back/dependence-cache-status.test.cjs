@@ -1,6 +1,5 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-
 test('dependency listing marks cache entries missing from disk for reinstall', async (t) => {
   const moduleStubs = new Map();
   const stubModule = (modulePath, exports) => {
@@ -15,7 +14,6 @@ test('dependency listing marks cache entries missing from disk for reinstall', a
       paths: [],
     };
   };
-
   const DependenceStatus = {
     installing: 0,
     installed: 1,
@@ -28,7 +26,7 @@ test('dependency listing marks cache entries missing from disk for reinstall', a
   ];
   const updates = [];
   const DependenceModel = {
-    findAll: async ({ where }) => {
+    find: async (where, read = {}) => {
       if (where.status === DependenceStatus.installed) {
         return docs;
       }
@@ -39,11 +37,10 @@ test('dependency listing marks cache entries missing from disk for reinstall', a
           : doc.status,
       }));
     },
-    update: async ({ status }, { where }) => {
+    nativeUpdate: async (where, { status }) => {
       updates.push({ status, ids: where.id });
     },
   };
-
   stubModule('../../back/config', {
     __esModule: true,
     default: {},
@@ -83,7 +80,6 @@ test('dependency listing marks cache entries missing from disk for reinstall', a
     __esModule: true,
     default: class SockService {},
   });
-
   const servicePath = require.resolve('../../back/services/dependence');
   const originalService = require.cache[servicePath];
   delete require.cache[servicePath];
@@ -101,7 +97,6 @@ test('dependency listing marks cache entries missing from disk for reinstall', a
       }
     }
   });
-
   const DependenceService = require('../../back/services/dependence').default;
   const service = new DependenceService({}, {});
   const result = await service.dependencies({
@@ -109,7 +104,6 @@ test('dependency listing marks cache entries missing from disk for reinstall', a
     type: 'nodejs',
     status: '',
   });
-
   assert.deepEqual(updates, [
     { status: DependenceStatus.installFailed, ids: [1] },
   ]);
@@ -120,7 +114,6 @@ test('dependency listing marks cache entries missing from disk for reinstall', a
       { id: 2, status: DependenceStatus.installed },
     ],
   );
-
   await service.dependencies({ searchValue: '', type: 'linux', status: '' });
   assert.equal(updates.length, 1);
 });

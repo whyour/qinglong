@@ -1,17 +1,16 @@
-import { Op } from 'sequelize';
+import { Query, QuerySpec, orderBy } from '../data/queries';
 import {
   SystemModel,
   AuthDataType,
   NotifyStatus,
   NotifyLogInfo,
 } from '../data/system';
-
 // Both backend sends and script reports use the same bounded, best-effort sink.
 export async function persistNotificationAudit(
   info: NotifyLogInfo,
 ): Promise<void> {
   try {
-    await SystemModel.create({
+    await SystemModel.insert({
       type: AuthDataType.notifyLog,
       info: {
         timestamp: Date.now(),
@@ -27,19 +26,19 @@ export async function persistNotificationAudit(
         taskId: /^\d+$/.test(info.taskId || '') ? info.taskId : undefined,
       },
     });
-    const oldest = await SystemModel.findAll({
-      where: { type: AuthDataType.notifyLog },
-      attributes: ['id'],
-      order: [['id', 'DESC']],
-      offset: 200,
-      limit: 1,
-    });
+    const oldest = await SystemModel.find(
+      { type: AuthDataType.notifyLog },
+      {
+        fields: ['id'],
+        orderBy: orderBy([['id', 'DESC']]),
+        offset: 200,
+        limit: 1,
+      },
+    );
     if (oldest[0]?.id) {
-      await SystemModel.destroy({
-        where: {
-          type: AuthDataType.notifyLog,
-          id: { [Op.lte]: oldest[0].id },
-        },
+      await SystemModel.nativeDelete({
+        type: AuthDataType.notifyLog,
+        id: { ['$lte']: oldest[0].id },
       });
     }
   } catch (error) {

@@ -10,15 +10,40 @@ test('system and node modes route extended cron once and keep portable rules in 
   const end = source.indexOf('  private async getLogName', begin);
   const saveBegin = source.indexOf('  private async setCrontab(');
   const saveEnd = source.indexOf('  public importCrontab(', saveBegin);
-  const js = ts.transpileModule(`class Fixture {${source.slice(begin, end)}${source.slice(saveBegin, saveEnd)}}; module.exports = Fixture;`, {
-    compilerOptions: { target: ts.ScriptTarget.ES2020 },
-  }).outputText;
+  const js = ts.transpileModule(
+    `class Fixture {${source.slice(begin, end)}${source.slice(
+      saveBegin,
+      saveEnd,
+    )}}; module.exports = Fixture;`,
+    {
+      compilerOptions: { target: ts.ScriptTarget.ES2020 },
+    },
+  ).outputText;
   for (const mode of ['system', 'node']) {
     const module = { exports: {} };
-    let file = '', installs = 0;
-    new Function('module', 'process', 'execSync', 'ScheduleType', 'config', 'writeFileWithLock', 'CrontabModel', js)(
-      module, { env: { QL_SCHEDULER: mode } }, () => { installs++; }, ScheduleType,
-      { crontabFile: '/unused' }, async (_, data) => { file = data; }, { update: async () => {} },
+    let file = '',
+      installs = 0;
+    new Function(
+      'module',
+      'process',
+      'execSync',
+      'ScheduleType',
+      'config',
+      'writeFileWithLock',
+      'CrontabModel',
+      js,
+    )(
+      module,
+      { env: { QL_SCHEDULER: mode } },
+      () => {
+        installs++;
+      },
+      ScheduleType,
+      { crontabFile: '/unused' },
+      async (_, data) => {
+        file = data;
+      },
+      { nativeUpdate: async () => {} },
     );
     const service = new module.exports();
     service.makeCommand = (row) => `task ${row.id}.js`;
@@ -40,20 +65,52 @@ test('system and node modes route extended cron once and keep portable rules in 
       { id: 'named', schedule: '0 0 * JAN MON' },
       { id: 'macro', schedule: '@daily' },
       { id: 'short', schedule: '*' },
-      { id: 'extra', schedule: '* * * * *', extra_schedules: [{ schedule: '0 * * * *' }] },
+      {
+        id: 'extra',
+        schedule: '* * * * *',
+        extra_schedules: [{ schedule: '0 * * * *' }],
+      },
       { id: 'once', schedule: '@once' },
       { id: 'boot', schedule: '@boot' },
     ];
     for (const row of rows) {
       const special = ['once', 'boot'].includes(row.id);
       const portable = ['plain', 'spaces'].includes(row.id);
-      assert.equal(service.shouldUseCronClient(row), !special && (mode === 'node' || !portable), `${mode}: ${row.id}`);
+      assert.equal(
+        service.shouldUseCronClient(row),
+        !special && (mode === 'node' || !portable),
+        `${mode}: ${row.id}`,
+      );
     }
     await service.setCrontab({ data: rows, total: rows.length });
     assert.equal(installs, mode === 'system' ? 1 : 0);
-    for (const id of ['numeric-step', 'sunday-seven', 'day-step', 'restricted-days', 'restricted-week', 'annually', 'midnight', 'minutely', 'seconds', 'question', 'last', 'nth', 'named', 'macro', 'short', 'extra', 'once', 'boot']) {
-      const line = file.split('\n').find((line) => line.endsWith(`task ${id}.js`));
-      assert.ok(line.startsWith('# '), `${mode}: ${id} cannot also run from system crontab`);
+    for (const id of [
+      'numeric-step',
+      'sunday-seven',
+      'day-step',
+      'restricted-days',
+      'restricted-week',
+      'annually',
+      'midnight',
+      'minutely',
+      'seconds',
+      'question',
+      'last',
+      'nth',
+      'named',
+      'macro',
+      'short',
+      'extra',
+      'once',
+      'boot',
+    ]) {
+      const line = file
+        .split('\n')
+        .find((line) => line.endsWith(`task ${id}.js`));
+      assert.ok(
+        line.startsWith('# '),
+        `${mode}: ${id} cannot also run from system crontab`,
+      );
     }
   }
 });

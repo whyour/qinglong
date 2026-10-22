@@ -1,28 +1,19 @@
+const { DatabaseClient } = require('../../back/data/databaseClient');
+const { repository, initialize } = require('../helpers/repository-fixture.cjs');
+const { orderBy } = require('../../back/data/queries');
 require('ts-node/register/transpile-only');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { Sequelize, DataTypes } = require('sequelize');
 const dayjs = require('dayjs');
 const express = require('express');
-
 test('today result lists include mixed and deleted tasks and exclude other dates', async (t) => {
-  const db = new Sequelize({
-    dialect: 'sqlite',
-    storage: ':memory:',
-    logging: false,
-  });
+  const db = new DatabaseClient(':memory:');
   t.after(() => db.close());
-  const crons = db.define('Cron', {
-    name: DataTypes.STRING,
-    command: DataTypes.STRING,
-  });
-  const stats = db.define('Stat', {
-    ref_id: DataTypes.INTEGER,
-    date: DataTypes.STRING,
-    fail_count: DataTypes.INTEGER,
-    success_count: DataTypes.INTEGER,
-  });
+  const crons = repository(db, 'Crontab');
+  const stats = repository(db, 'CrontabStat');
   const replacements = {
+    '../../back/data': { database: db },
     '../../back/data/cron': { CrontabModel: crons },
     '../../back/data/cronStats': { CrontabStatModel: stats },
     '../../back/data/runningInstance': {},
@@ -42,14 +33,14 @@ test('today result lists include mixed and deleted tasks and exclude other dates
       else delete require.cache[resolved];
     });
   }
-  await db.sync();
-  await crons.bulkCreate([
+  await initialize(db);
+  await crons.insertMany([
     { id: 1, name: 'Recovered task', command: 'task recovered.js' },
     { id: 2, name: '', command: 'task unnamed.js' },
     { id: 3, name: 'Successful task', command: 'task success.js' },
   ]);
   const today = dayjs().format('YYYY-MM-DD');
-  await stats.bulkCreate([
+  await stats.insertMany([
     { ref_id: 1, date: today, fail_count: 2, success_count: 1 },
     { ref_id: 2, date: today, fail_count: 1, success_count: 0 },
     { ref_id: 3, date: today, fail_count: 0, success_count: 4 },
@@ -135,7 +126,7 @@ test('today result lists include mixed and deleted tasks and exclude other dates
       },
     ],
   });
-  await stats.destroy({ where: {} });
+  await stats.nativeDelete({});
   await successHandler(
     {},
     {
@@ -160,7 +151,7 @@ test('today result lists include mixed and deleted tasks and exclude other dates
     },
   );
   assert.deepEqual(response, { code: 200, data: [] });
-  await stats.drop();
+  await db.query('DROP TABLE CrontabStats');
   let forwarded;
   await handler(
     {},

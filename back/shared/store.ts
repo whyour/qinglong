@@ -1,9 +1,7 @@
 import { AuthInfo } from '../data/system';
 import { App } from '../data/open';
 import Keyv from 'keyv';
-import KeyvSqlite from '@keyv/sqlite';
-import config from '../config';
-import path from 'path';
+import { CacheStore } from '../data/cacheStore';
 
 export enum EKeyv {
   'apps' = 'apps',
@@ -17,7 +15,7 @@ export interface IKeyvStore {
   lang: string;
 }
 
-const keyvSqlite = new KeyvSqlite(path.join(config.dbPath, 'keyv.sqlite'));
+const keyvSqlite = new CacheStore();
 export const keyvStore = new Keyv<IKeyvStore>({ store: keyvSqlite });
 
 export const shareStore = {
