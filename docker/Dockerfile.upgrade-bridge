@@ -10,6 +10,7 @@ USER root
 COPY --from=legacy /ql/ /legacy/
 RUN ulimit -c 0; if [ "$TARGETARCH/$TARGETVARIANT" = arm/v6 ]; then \
       export QEMU_CPU=arm1176; \
+      apk add --no-cache build-base nodejs-dev && \
       node --jitless /ql/scripts/build-migration-bridge.cjs /legacy /ql /out && \
       for archive in /out/qinglong-*-linux-armv6-musl.tar.gz; do \
         case "$archive" in */qinglong-migration-*) continue ;; esac; \

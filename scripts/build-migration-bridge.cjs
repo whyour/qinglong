@@ -13,6 +13,7 @@ const { buildBundle } = require('./build-upgrade-bundle.cjs');
 const artifacts = require('../cli/src/internal/maintenance/upgradeArtifacts.cjs');
 const bundle = require('../cli/src/internal/maintenance/platformBundle.cjs');
 const baseline = require('../docker/migration-bridge-images.json');
+const { rebuildMigrationSqlite } = require('./rebuild-migration-sqlite.cjs');
 const read = async (file) => JSON.parse(await fs.readFile(file, 'utf8'));
 
 async function prepareBridge(legacy, current, destination) {
@@ -236,6 +237,7 @@ async function buildMigrationBridge(legacy, current, output) {
   try {
     const root = path.join(workspace, 'root');
     await prepareBridge(legacy, current, root);
+    await rebuildMigrationSqlite(root);
     const runtime = await buildBundle(current, output);
     bridge = await buildBundle(root, output);
     const verification = await verifyBothDownloads(legacy, current, output, [
