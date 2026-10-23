@@ -25,35 +25,32 @@ test('does not inspect or modify any other architecture, libc or Node version', 
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-bridge-armv6-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  for (const name of ['node_modules/sqlite3', 'node_modules/@mapbox/node-pre-gyp/bin', 'node_modules/node-gyp/bin', 'runtime/include/node', 'runtime/bin'])
+  for (const name of ['node_modules/sqlite3', 'runtime/include/node', 'runtime/bin'])
     await fs.mkdir(path.join(root, name), { recursive: true });
   await fs.writeFile(root + '/package.json', JSON.stringify({ qinglongMigrationBridge: { format: 1 }, dependencies: { sqlite3: 'legacy' } }));
   await fs.writeFile(root + '/pnpm-lock.yaml', 'fixed legacy lock');
   await fs.writeFile(root + '/node_modules/sqlite3/package.json', '{}');
-  await fs.writeFile(root + '/node_modules/@mapbox/node-pre-gyp/bin/node-pre-gyp', '');
-  await fs.writeFile(root + '/node_modules/node-gyp/bin/node-gyp.js', '');
   await fs.writeFile(root + '/runtime/include/node/node_version.h', '#define NODE_MAJOR_VERSION 24\n#define NODE_MINOR_VERSION 18\n#define NODE_PATCH_VERSION 1\n');
   return { root, runtime: { execPath: root + '/runtime/bin/node', versions: { node: '24.18.1' }, env: { PATH: '/qa/bin', NODE_OPTIONS: '--require=untrusted', CFLAGS: '-march=armv7' } } };
 }
 
-test('rebuilds only the bridge addon with matching local headers, bounded jobs and ARMv6 flags', async (t) => {
+test('uses frozen repair even when the legacy image has no optional node-gyp', async (t) => {
   const { root, runtime } = await fixture(t);
   const calls = [];
-  await rebuildMigrationSqlite(root, { target, runtime, run: async (program, args, options) => {
+  let repaired = false;
+  await rebuildMigrationSqlite(root, { target, runtime, repair: async (source, options) => {
+    assert.equal(source, root);
+    assert.equal(options.target, target);
+    assert.equal(options.env, runtime.env);
+    repaired = true;
+  }, run: async (program, args, options) => {
+    assert.equal(repaired, true);
     calls.push({ program, args, options });
     return { stdout: armv6 };
   } });
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].program, runtime.execPath);
-  assert(calls[0].args.includes('--build-from-source'));
-  assert(calls[0].args.includes('--napi_build_version=6'));
-  assert(calls[0].args.includes('--nodedir=' + root + '/runtime'));
-  assert.equal(calls[0].options.cwd, await fs.realpath(root + '/node_modules/sqlite3'));
-  assert.equal(calls[0].options.env.MAKEFLAGS, '-j1');
-  assert.equal(calls[0].options.env.NODE_OPTIONS, '--jitless --max-old-space-size=256');
-  assert.equal(calls[0].options.env.CXXFLAGS, '-march=armv6 -mfpu=vfp -mfloat-abi=hard');
-  assert.equal(calls[0].options.timeout, 1800000);
-  assert.equal(calls[1].program, 'readelf');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].program, 'readelf');
+  assert(calls[0].args[1].endsWith('/lib/binding/napi-v6-linux-arm/node_sqlite3.node'));
   assert.equal(await fs.readFile(root + '/pnpm-lock.yaml', 'utf8'), 'fixed legacy lock');
 });
 
@@ -63,10 +60,11 @@ for (const fault of ['runtime-package', 'headers', 'compiler', 'armv7-output', '
     if (fault === 'runtime-package') await fs.writeFile(root + '/package.json', JSON.stringify({ dependencies: { '@mikro-orm/sql': '7' } }));
     if (fault === 'headers') runtime.versions.node = '22.17.0';
     let commands = 0;
-    await assert.rejects(rebuildMigrationSqlite(root, { target, runtime, run: async () => {
+    await assert.rejects(rebuildMigrationSqlite(root, { target, runtime, repair: async () => {
       commands++;
       if (fault === 'compiler') throw new Error('compiler failed');
       if (fault === 'lock-change') await fs.appendFile(root + '/pnpm-lock.yaml', 'changed');
+    }, run: async () => {
       return { stdout: fault === 'armv7-output' ? armv6.replace('v6', 'v7') : armv6 };
     } }), /Only a legacy|matching the existing Node|compiler failed|ARMv6 hard-float|changed the frozen lockfile/);
     if (['runtime-package', 'headers'].includes(fault)) assert.equal(commands, 0);
