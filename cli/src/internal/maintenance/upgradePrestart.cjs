@@ -210,6 +210,18 @@ async function prestartBackend(
   }
 }
 
+async function cleanSqliteBuildArtifacts(directory) {
+  const names = await fs.readdir(directory).catch((error) => {
+    if (error.code !== 'ENOENT') throw error;
+    return [];
+  });
+  // node-pre-gyp's runtime copy lives in lib/binding. Its build directories
+  // retain compiler objects and an absolute node_gyp_bins/python3 symlink.
+  for (const name of names)
+    if (name === 'build' || /^build-tmp-napi-v\d+$/.test(name))
+      await fs.rm(path.join(directory, name), { recursive: true, force: true });
+}
+
 async function repairDependencies(source, { target, signal, env }) {
   const workspace = await fs.mkdtemp(
     path.join(path.dirname(source), 'repair-'),
@@ -299,8 +311,12 @@ async function repairDependencies(source, { target, signal, env }) {
       '--child-concurrency=1',
       '--network-concurrency=2',
     ]);
-    if (pkg.dependencies?.sqlite3)
+    if (pkg.dependencies?.sqlite3) {
       await run(['rebuild', 'sqlite3', '@whyour/sqlite3']);
+      await cleanSqliteBuildArtifacts(
+        path.join(workspace, 'node_modules/sqlite3'),
+      );
+    }
     if (
       !(await fs.readFile(path.join(source, 'pnpm-lock.yaml'))).equals(
         await fs.readFile(path.join(workspace, 'pnpm-lock.yaml')),
@@ -391,5 +407,6 @@ module.exports = {
   prestartBackend,
   dependencyFailure,
   repairDependencies,
+  cleanSqliteBuildArtifacts,
   probeLimits,
 };

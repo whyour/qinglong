@@ -7,7 +7,7 @@ const { createRequire } = require('node:module');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const bundle = require('../cli/src/internal/maintenance/platformBundle.cjs');
-const { repairDependencies } = require('../cli/src/internal/maintenance/upgradePrestart.cjs');
+const { repairDependencies, cleanSqliteBuildArtifacts } = require('../cli/src/internal/maintenance/upgradePrestart.cjs');
 
 function assertArmv6Addon(attributes) {
   // Alpine's ARM CRT objects are ARMv6KZ (the ARM1176 architecture). Linking
@@ -56,9 +56,7 @@ async function rebuildMigrationSqlite(root, {
   // node-pre-gyp copies the addon to lib/binding and then renames build to
   // build-tmp-napi-v<N>. Both layouts contain compiler objects and an absolute
   // node_gyp_bins/python3 link; none belongs in a portable runtime archive.
-  for (const name of await fs.readdir(rebuilt))
-    if (name === 'build' || /^build-tmp-napi-v\d+$/.test(name))
-      await fs.rm(path.join(rebuilt, name), { recursive: true, force: true });
+  await cleanSqliteBuildArtifacts(rebuilt);
   console.log('Legacy bridge SQLite rebuilt and verified for ARMv6 hard-float');
   return true;
 }

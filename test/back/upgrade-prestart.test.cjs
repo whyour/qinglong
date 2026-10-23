@@ -261,6 +261,76 @@ test('ARMv6 repair isolates configuration, uses frozen install, one compiler job
   assert.deepEqual((await fs.readdir(root)).sort(), ['bin', 'source']);
 });
 
+test('successful legacy repair publishes only portable runtime files from a pnpm alias', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-repair-portable-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const source = path.join(root, 'source'),
+    bin = path.join(root, 'bin');
+  const outside = path.join(root, 'outside');
+  await fs.mkdir(path.join(source, 'node_modules'), { recursive: true });
+  await fs.mkdir(bin);
+  await fs.mkdir(outside);
+  await fs.writeFile(path.join(outside, 'keep'), 'unrelated file');
+  await fs.writeFile(
+    path.join(source, 'node_modules/old'),
+    'previous dependency',
+  );
+  await fs.writeFile(
+    path.join(source, 'package.json'),
+    JSON.stringify({
+      packageManager: 'pnpm@8.3.1',
+      dependencies: { sqlite3: 'npm:@whyour/sqlite3@1.1.2' },
+    }),
+  );
+  await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
+  await fs.writeFile(
+    path.join(bin, 'pnpm'),
+    `#!${process.execPath}
+    const fs = require('node:fs');
+    if (process.argv[2] === '--version') { console.log('8.3.1'); process.exit(0); }
+    const pkg = 'node_modules/.pnpm/@whyour+sqlite3@1.1.2/node_modules/@whyour/sqlite3';
+    if (process.argv[2] === 'install') {
+      fs.mkdirSync(pkg + '/lib/binding/napi-v6-linux-arm', {recursive:true});
+      fs.writeFileSync(pkg + '/package.json', '{}');
+      fs.symlinkSync('.pnpm/@whyour+sqlite3@1.1.2/node_modules/@whyour/sqlite3', 'node_modules/sqlite3');
+    } else if (process.argv[2] === 'rebuild') {
+      fs.writeFileSync(pkg + '/lib/binding/napi-v6-linux-arm/node_sqlite3.node', 'compiled addon');
+      for (const name of ['build', 'build-tmp-napi-v6']) {
+        fs.mkdirSync(pkg + '/' + name + '/node_gyp_bins', {recursive:true});
+        fs.symlinkSync('/usr/bin/python3', pkg + '/' + name + '/node_gyp_bins/python3');
+      }
+      fs.symlinkSync(${JSON.stringify(outside)}, pkg + '/build-tmp-napi-v3');
+    } else { throw Error('unexpected command'); }
+  `,
+    { mode: 0o755 },
+  );
+  await repairDependencies(source, {
+    target: { arch: 'armv6' },
+    env: { PATH: bin },
+  });
+  const sqlite = path.join(source, 'node_modules/sqlite3');
+  assert.equal(
+    await fs.readFile(
+      path.join(sqlite, 'lib/binding/napi-v6-linux-arm/node_sqlite3.node'),
+      'utf8',
+    ),
+    'compiled addon',
+  );
+  for (const name of ['build', 'build-tmp-napi-v3', 'build-tmp-napi-v6'])
+    await assert.rejects(fs.lstat(path.join(sqlite, name)), { code: 'ENOENT' });
+  assert.equal(
+    await fs.readFile(path.join(outside, 'keep'), 'utf8'),
+    'unrelated file',
+  );
+  await assert.rejects(fs.access(path.join(source, 'node_modules/old')), {
+    code: 'ENOENT',
+  });
+  const {
+    inventory,
+  } = require('../../cli/src/internal/maintenance/platformBundle.cjs');
+  await inventory({ source });
+});
+
 test('repair classification excludes application, platform, config, database, OOM and timeouts', () => {
   for (const error of [
     { code: 'MODULE_NOT_FOUND', message: "Cannot find module './api/missing'" },
