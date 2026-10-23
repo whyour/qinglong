@@ -456,7 +456,10 @@ test('sidebar and dialog use the same authoritative status even when old phase f
   );
   f.store.setJob({ status: 'ready', phase: 'downloading', percent: 62 });
   notice.render();
-  assert.equal(notice.nodes('button')[0].props['aria-label'], '下载完成，等待重启');
+  assert.equal(
+    notice.nodes('button')[0].props['aria-label'],
+    '下载完成，等待重启',
+  );
   f.store.setJob({ status: 'completed', phase: 'ready' });
   assert.equal(notice.render(), null);
   panel.render();
@@ -465,4 +468,50 @@ test('sidebar and dialog use the same authoritative status even when old phase f
       .nodes('Text')
       .some((node) => node.props.children.includes?.('升级成功')),
   );
+});
+
+test('the first hop stays visible and offers the second download without an unrelated version check', async () => {
+  const f = fixture(),
+    notice = f.component('src/components/UpgradeNotice.tsx'),
+    panel = f.component('src/pages/setting/checkUpdate.tsx');
+  f.store.setJob({
+    id: 'bridge',
+    status: 'completed',
+    migrationRequired: true,
+  });
+  notice.render();
+  panel.render();
+  assert.equal(
+    notice.nodes('button')[0].props['aria-label'],
+    '升级器已更新，请继续升级新版',
+  );
+  const button = panel
+    .nodes('Button')
+    .find((n) => n.props.children === '继续升级新版');
+  assert(button);
+  await button.props.onClick();
+  assert.equal(f.confirms.at(-1).title, '继续升级新版');
+  assert.equal(f.requests.length, 0);
+  await f.confirms.at(-1).onOk();
+  assert.equal(f.requests[0].url, '/panel/api/system/update');
+  f.store.setJob({ status: 'completed', migrationRequired: false });
+  assert.equal(notice.render(), null);
+});
+
+test('a completed updater hop never emits the final runtime success notification', async () => {
+  const f = fixture();
+  f.storage.setItem(f.hooks.completionKey, 'bridge');
+  f.responses.push({
+    id: 'bridge',
+    status: 'completed',
+    migrationRequired: true,
+  });
+  const unsubscribe = f.store.subscribe(() => {});
+  await f.settle();
+  assert.equal(f.notifications[0].message, '升级器已更新');
+  assert.equal(
+    f.notifications[0].description,
+    '当前仍运行旧版，请继续下载并重启以完成新版升级。',
+  );
+  unsubscribe();
 });

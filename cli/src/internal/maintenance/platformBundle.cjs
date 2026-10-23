@@ -1,5 +1,6 @@
 // One installed verifier handles release downloads and local offline archives.
 const fs = require('node:fs/promises');
+const { constants, createReadStream } = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const os = require('node:os');
@@ -176,23 +177,39 @@ async function verifyPayload(selected, manifest, target) {
   });
   const names = Object.keys(actual).sort(),
     expected = Object.keys(manifest.files).sort();
-  if (
-    JSON.stringify(names) !== JSON.stringify(expected) ||
-    names.some(
-      (name) =>
-        JSON.stringify(actual[name]) !== JSON.stringify(manifest.files[name]),
-    )
-  )
+  const differences = [...new Set([...expected, ...names])].filter(
+    (name) =>
+      !Object.hasOwn(actual, name) ||
+      !Object.hasOwn(manifest.files, name) ||
+      JSON.stringify(actual[name]) !== JSON.stringify(manifest.files[name]),
+  );
+  if (differences.length)
     throw new Error(
-      'Platform bundle files or dependency checksums do not match',
+      'Platform bundle files or dependency checksums do not match: ' +
+        JSON.stringify({
+          count: differences.length,
+          files: differences.slice(0, 5).map((name) => ({
+            name,
+            expected: manifest.files[name] || null,
+            actual: actual[name] || null,
+          })),
+        }),
     );
   if (
     sha256(await fs.readFile(path.join(selected.source, 'pnpm-lock.yaml'))) !==
     manifest.lockfileSha256
   )
     throw new Error('Platform bundle lockfile mismatch');
+  const pkg = JSON.parse(
+    await fs.readFile(path.join(selected.source, 'package.json'), 'utf8'),
+  );
   await fs.access(
-    path.join(selected.source, 'node_modules/sqlite3/package.json'),
+    path.join(
+      selected.source,
+      pkg.dependencies?.['@mikro-orm/sql']
+        ? 'node_modules/@mikro-orm/sql/package.json'
+        : 'node_modules/sqlite3/package.json',
+    ),
   );
 }
 
@@ -202,34 +219,58 @@ async function smokeDependencies(source, signal) {
     const path = require('node:path'),fs = require('node:fs');
     const root = fs.realpathSync(process.cwd());
     const r = require('node:module').createRequire(path.join(root,'package.json'));
-    for (const name of ['sqlite3','sequelize','cron-parser','@grpc/grpc-js','undici']) {
+    const pkg=r('./package.json'), modern=Boolean(pkg.dependencies?.['@mikro-orm/sql']);
+    if (modern) {
+      const [major,minor]=process.versions.node.split('.').map(Number);
+      if(major<22 || (major===22 && minor<17)) throw new Error('Bundle requires Node >=22.17; the existing Node is retained');
+    }
+    for (const name of [...(modern?['@mikro-orm/core','@mikro-orm/sql']:['sqlite3','sequelize']),'cron-parser','@grpc/grpc-js','undici']) {
       if (!fs.realpathSync(r.resolve(name)).startsWith(root + path.sep)) throw new Error('Dependency outside staged payload: '+name);
       r(name);
     }
+    if (modern) {
+      const {DatabaseSync}=require('node:sqlite'), db=new DatabaseSync(':memory:');
+      try {
+        db.exec('CREATE TABLE verify_bundle(value INTEGER);INSERT INTO verify_bundle VALUES(42)');
+        if(db.prepare('SELECT value FROM verify_bundle').get().value!==42) throw new Error('SQLite readback failed');
+      } finally {db.close();}
+    } else {
     const sqlite=r('sqlite3'), db=new sqlite.Database(':memory:');
     db.serialize(()=>{db.run('CREATE TABLE verify_bundle(value INTEGER)');db.run('INSERT INTO verify_bundle VALUES(42)');
       db.get('SELECT value FROM verify_bundle',(err,row)=>{if(err||row.value!==42){console.error(err||'SQLite readback failed');process.exitCode=1;}db.close();});});
+    }
   `;
   // Match the server's normal runtime. Node 20.18's built-in HTTP parser needs
   // WebAssembly, which --jitless disables; only archive workers need that flag.
-  await execute(process.execPath, [...serverRuntimeArgs(process), '-e', probe], {
-    cwd: source,
-    env: { ...process.env, NODE_PATH: '', NODE_OPTIONS: '' },
-    // ARM1176 devices need the same startup allowance as the backend probe.
-    // Keep this bounded and cancellable without forcing an unnecessary repair.
-    timeout: nodeRuntimeArgs().length ? 300000 : 30000,
-    signal,
-  });
+  await execute(
+    process.execPath,
+    [...serverRuntimeArgs(process), '-e', probe],
+    {
+      cwd: source,
+      env: { ...process.env, NODE_PATH: '', NODE_OPTIONS: '' },
+      // ARM1176 devices need the same startup allowance as the backend probe.
+      // Keep this bounded and cancellable without forcing an unnecessary repair.
+      timeout: nodeRuntimeArgs().length ? 300000 : 30000,
+      signal,
+    },
+  );
 }
 
 async function extractArchive(archive, destination) {
   const entries = new Map(),
-    links = new Set();
+    directories = new Map([['qinglong', 0o755]]);
+  const header = (entry) => ({
+    type: entry.type,
+    size: entry.size,
+    mode: entry.mode,
+    linkpath: entry.linkpath,
+  });
   let unpacked = 0,
     invalid;
   await tar.t({
     file: archive,
     strict: true,
+    maxReadSize: 256 * 1024,
     onReadEntry(entry) {
       try {
         const name = entry.path.replace(/\/$/, '');
@@ -237,16 +278,19 @@ async function extractArchive(archive, destination) {
           !name ||
           name.includes('\\') ||
           /[\x00-\x1f\x7f]/.test(name) ||
+          name.split('/').length > 1024 ||
           name.split('/').some((p) => !p || p === '.' || p === '..') ||
           !(name === 'qinglong' || name.startsWith('qinglong/')) ||
           entries.has(name) ||
           !['File', 'OldFile', 'Directory', 'SymbolicLink'].includes(entry.type)
         )
           throw new Error(`Unsafe bundle archive entry: ${name}`);
+        if (!Number.isSafeInteger(entry.size) || entry.size < 0)
+          throw new Error('Invalid bundle archive entry size');
         unpacked += entry.size;
         if (unpacked > 2 * 1024 ** 3 || entries.size > 200000)
           throw new Error('Bundle archive exceeds extraction limits');
-        entries.set(name, entry.type);
+        entries.set(name, header(entry));
         if (entry.type === 'SymbolicLink') {
           if (
             path.posix.isAbsolute(entry.linkpath) ||
@@ -257,7 +301,6 @@ async function extractArchive(archive, destination) {
             )
           )
             throw new Error('Unsafe bundle symlink');
-          links.add(name);
         }
       } catch (error) {
         invalid ||= error;
@@ -265,22 +308,101 @@ async function extractArchive(archive, destination) {
     },
   });
   if (invalid) throw invalid;
-  for (const name of entries.keys()) {
+  for (const [name, entry] of entries) {
+    if (entry.type === 'Directory')
+      directories.set(name, ((entry.mode ?? 0o755) & 0o777) | 0o700);
     let parent = path.posix.dirname(name);
     while (parent !== '.') {
-      if (links.has(parent))
-        throw new Error('Archive writes through a symlink');
+      if (entries.has(parent) && entries.get(parent).type !== 'Directory')
+        throw new Error('Archive writes through a symlink or non-directory');
+      if (!directories.has(parent)) directories.set(parent, 0o755);
       parent = path.posix.dirname(parent);
     }
   }
-  await tar.x({
-    file: archive,
+  // The extraction root must be new and private. Create every parent before
+  // links, and keep directories private/searchable until all writes finish.
+  const directoryNames = [...directories.keys()].sort(
+    (a, b) => a.split('/').length - b.split('/').length,
+  );
+  for (const name of directoryNames) {
+    const filename = path.join(destination, name);
+    await fs.mkdir(filename, { mode: 0o700 });
+    await fs.chmod(filename, 0o700);
+  }
+  let writes = Promise.resolve(),
+    failure;
+  const active = new Set(),
+    seen = new Set();
+  const parser = tar.t({
     cwd: destination,
     strict: true,
-    preservePaths: false,
-    noChown: true,
-    umask: 0,
+    noResume: true,
+    onReadEntry(entry) {
+      active.add(entry);
+      // A parser failure can destroy queued entries before their turn starts.
+      entry.on('error', () => {});
+      writes = writes
+        .then(async () => {
+          if (failure) return entry.resume();
+          const name = entry.path.replace(/\/$/, '');
+          if (
+            seen.has(name) ||
+            JSON.stringify(entries.get(name)) !== JSON.stringify(header(entry))
+          )
+            throw new Error('Archive changed during extraction');
+          seen.add(name);
+          const filename = path.join(destination, name);
+          if (entry.type === 'Directory') return entry.resume();
+          if (entry.type === 'SymbolicLink') {
+            await fs.symlink(entry.linkpath, filename);
+            return entry.resume();
+          }
+          const mode = (entry.mode ?? 0o644) & 0o777;
+          const handle = await fs.open(
+            filename,
+            constants.O_WRONLY |
+              constants.O_CREAT |
+              constants.O_EXCL |
+              constants.O_NOFOLLOW,
+            0o600,
+          );
+          try {
+            // tar's fs-minipass writer discards successful partial write/writev
+            // results. Node's writeFile loops until each chunk is fully written.
+            // One entry/chunk at a time bounds memory and open FDs on ARMv6.
+            for await (const chunk of entry) await handle.writeFile(chunk);
+            await handle.chmod(mode);
+          } finally {
+            await handle.close();
+          }
+        })
+        .catch((error) => {
+          failure ||= error;
+          entry.resume();
+        })
+        .finally(() => active.delete(entry));
+    },
   });
+  const input = createReadStream(archive, { highWaterMark: 256 * 1024 });
+  try {
+    await new Promise((resolve, reject) => {
+      input.once('error', reject);
+      parser.once('error', reject);
+      parser.once('end', resolve);
+      input.pipe(parser);
+    });
+  } catch (error) {
+    failure ||= error;
+    for (const entry of active) entry.destroy(error);
+  } finally {
+    input.destroy();
+  }
+  await writes;
+  if (failure) throw failure;
+  if (seen.size !== entries.size)
+    throw new Error('Archive changed during extraction');
+  for (const name of directoryNames.reverse())
+    await fs.chmod(path.join(destination, name), directories.get(name));
 }
 
 async function stageBundle({
@@ -297,6 +419,8 @@ async function stageBundle({
   repair = repairDependencies,
 }) {
   let local = env.QL_UPGRADE_FILE;
+  let pendingMigration = false,
+    requiresModern = false;
   if (!local) {
     const current = JSON.parse(
       await fs
@@ -307,6 +431,9 @@ async function stageBundle({
         }),
     );
     if (current.qinglongUpgradeFormat !== 2) return null; // One-time compatibility path for older releases.
+    pendingMigration = Boolean(current.qinglongMigrationBridge);
+    requiresModern =
+      pendingMigration || Boolean(current.dependencies?.['@mikro-orm/sql']);
   }
   const target = await runtimeTarget();
   const branch = ['develop', 'debian-dev'].includes(env.QL_BRANCH)
@@ -361,7 +488,16 @@ async function stageBundle({
         indexUrl,
       ]);
       const index = JSON.parse(await fs.readFile(indexFile, 'utf8'));
-      const entry = index.packages?.[targetKey(target)];
+      if (pendingMigration && !Object.hasOwn(index, 'runtimePackages'))
+        throw new Error('更新索引尚未提供第二步运行包，请稍后重试');
+      requiresModern ||= Object.hasOwn(index, 'runtimePackages');
+      // Old format-2 clients read packages and receive an updater bridge. Once
+      // installed, this selector uses only the actual runtime packages. A broken
+      // runtime entry must never fall back to the bridge or a different platform.
+      const packages = Object.hasOwn(index, 'runtimePackages')
+        ? index.runtimePackages
+        : index.packages;
+      const entry = packages?.[targetKey(target)];
       if (
         index.format !== 2 ||
         !/^[a-f0-9]{40}$/.test(index.sourceCommit) ||
@@ -403,6 +539,10 @@ async function stageBundle({
     const manifest = JSON.parse(
       await fs.readFile(path.join(incoming, 'bundle.json'), 'utf8'),
     );
+    if (manifest.migrationBridge)
+      throw new Error(
+        'This is a legacy upgrader bridge; download the runtime package instead',
+      );
     if (expectedCommit && manifest.sourceCommit !== expectedCommit)
       throw new Error('Update index and bundle commit differ');
     const selected = {
@@ -413,6 +553,15 @@ async function stageBundle({
     await fs.rename(path.join(incoming, 'static'), selected.static);
     await report({ phase: 'verifying', percent: null });
     await verifyPayload(selected, manifest, target);
+    if (
+      requiresModern &&
+      !JSON.parse(
+        await fs.readFile(path.join(selected.source, 'package.json'), 'utf8'),
+      ).dependencies?.['@mikro-orm/sql']
+    )
+      throw new Error(
+        '第二步更新包仍是旧数据库后端，已保留当前服务，请稍后重试',
+      );
     const build = await verifyStatic(selected.source, selected.static, env);
     if (build.sourceCommit !== manifest.sourceCommit)
       throw new Error('Bundle and build commit differ');

@@ -550,10 +550,14 @@ jobs:
           cache-from: type=registry,ref=whyour/qinglong:cache-debian-python3.10
           cache-to: type=registry,ref=whyour/qinglong:cache-debian-python3.10,mode=max
 
-  # One unmodified amd64 package for migration acceptance only. This does not
+  # Unmodified amd64 packages for glibc and musl migration acceptance. This does not
   # publish bundles or advance development/formal channel indexes.
   build-npm-migration-bundle:
-    needs: build-debian
+    needs: [build-debian, build-alpine]
+    strategy:
+      fail-fast: false
+      matrix:
+        libc: [glibc, musl]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -561,7 +565,7 @@ jobs:
       - uses: docker/setup-buildx-action@v4
       - name: Export the official platform package from this run's image digest
         env:
-          IMAGE_DIGEST: ${{ needs.build-debian.outputs.image-digest }}
+          IMAGE_DIGEST: ${{ matrix.libc == 'musl' && needs.build-alpine.outputs.image-digest || needs.build-debian.outputs.image-digest }}
         run: |
           set -euo pipefail
           [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
@@ -569,20 +573,21 @@ jobs:
           docker buildx build --platform linux/amd64 --build-arg "BASE_IMAGE=$image" --file docker/Dockerfile.upgrade-bundle --output "type=local,dest=$RUNNER_TEMP/npm-migration-bundle" .
       - uses: actions/upload-artifact@v6
         with:
-          name: npm-migration-bundle-${{ github.sha }}
+          name: npm-migration-bundle-${{ matrix.libc }}-${{ github.sha }}
           path: ${{ runner.temp }}/npm-migration-bundle/*
           if-no-files-found: error
           retention-days: 3
 
   verify-npm-package:
-    needs: [build-static, build-npm-migration-bundle]
+    needs: [build-static, build-npm-migration-bundle, build-alpine]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        node: ['20.18.1', '24']
-    container: node:${{ matrix.node }}-bookworm
+        node: ['20.18.1', '22.17.0', '24', 'alpine']
+    container:
+      image: ${{ matrix.node == 'alpine' && format('ghcr.io/{0}@{1}', github.repository, needs.build-alpine.outputs.image-digest) || format('node:{0}-bookworm', matrix.node) }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v6
@@ -591,22 +596,30 @@ jobs:
           path: ${{ runner.temp }}/npm-panel/
       - uses: actions/download-artifact@v6
         with:
-          name: npm-migration-bundle-${{ github.sha }}
+          name: npm-migration-bundle-${{ matrix.node == 'alpine' && 'musl' || 'glibc' }}-${{ github.sha }}
           path: ${{ runner.temp }}/npm-migration-bundle/
       - name: Install isolated service test tools
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends python3 openssl curl jq nginx procps
+          if [ -f /etc/alpine-release ]; then
+            apk add --no-cache python3 openssl curl jq nginx procps make g++
+          else
+            apt-get update
+            apt-get install -y --no-install-recommends python3 openssl curl jq nginx procps
+          fi
           # The published legacy launcher resets PATH to standard directories.
           # /usr/local is confined to this disposable job container; PM2_HOME
           # remains private to each verification run.
           npm install --global --prefix /usr/local --no-audit --no-fund pm2@6.0.14
       - name: Install and upgrade the exact npm archive
+        if: matrix.node != '20.18.1'
         env:
           QL_PANEL_PACKAGE_TEST_ISOLATED: '1'
           QL_PANEL_TEST_PM2: /usr/local/bin/pm2
           QL_PANEL_TEST_BUNDLE_DIR: ${{ runner.temp }}/npm-migration-bundle
         run: node scripts/verify-panel-package.cjs verify "$RUNNER_TEMP/npm-panel" "$RUNNER_TEMP/npm-panel-results"
+      - name: Reject an unsupported runtime while preserving the old installation
+        if: matrix.node == '20.18.1'
+        run: node scripts/verify-panel-runtime-floor.cjs "$RUNNER_TEMP/npm-panel" "$RUNNER_TEMP/npm-panel-results"
       - uses: actions/upload-artifact@v6
         with:
           name: qinglong-npm-verification-${{ matrix.node }}-${{ github.sha }}
@@ -701,7 +714,8 @@ jobs:
           if [ "$BUNDLE_LIBC" = glibc ]; then digest="$DEBIAN_DIGEST"; fi
           test -n "$digest"
           image="ghcr.io/${GITHUB_REPOSITORY}@${digest}"
-          docker buildx build --platform "$BUNDLE_PLATFORM" --build-arg "BASE_IMAGE=$image" --file docker/Dockerfile.upgrade-bundle --output type=local,dest=output/upgrade .
+          legacy=$(node -p "require('./docker/migration-bridge-images.json')['$BUNDLE_LIBC']")
+          docker buildx build --platform "$BUNDLE_PLATFORM" --build-arg "BASE_IMAGE=$image" --build-arg "LEGACY_IMAGE=$legacy" --file docker/Dockerfile.upgrade-bridge --output type=local,dest=output/upgrade .
       - uses: actions/upload-artifact@v6
         with:
           name: upgrade-${{ matrix.name }}-${{ github.sha }}
@@ -721,7 +735,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
       - uses: pnpm/action-setup@v6
         with:
           version: '8.3.1'

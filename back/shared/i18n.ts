@@ -1,6 +1,8 @@
 const messages: Record<string, Record<string, string>> = {
   zh: {},
   en: {
+    '认证服务暂时不可用，请稍后重试':
+      'Authentication service is temporarily unavailable; try again shortly.',
     '升级任务启动失败，请检查日志后重试':
       'Failed to start the update. Check the logs and try again.',
     '[schedule][停止已运行任务] 任务ID: %s, PID: %s':

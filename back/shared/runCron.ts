@@ -20,7 +20,7 @@ export function runCron(
       // Check if the cron is already running and stop it (only if multiple instances are not allowed)
       try {
         const existingCron = await CrontabModel.findOne({
-          where: { id: Number(cron.id) },
+          id: Number(cron.id),
         });
 
         // A mutation may commit while this queued run is reading the database.
@@ -45,19 +45,17 @@ export function runCron(
           await killTask(existingCron.pid, true);
           // Mark old running instances as stopped
           const stoppedAt = dayjs().unix();
-          await RunningInstanceModel.update(
-            { status: InstanceStatus.stopped, finished_at: stoppedAt },
+          await RunningInstanceModel.nativeUpdate(
             {
-              where: {
-                cron_id: Number(cron.id),
-                status: InstanceStatus.running,
-              },
+              cron_id: Number(cron.id),
+              status: InstanceStatus.running,
             },
+            { status: InstanceStatus.stopped, finished_at: stoppedAt },
           );
           // Update the status to idle after killing
-          await CrontabModel.update(
+          await CrontabModel.nativeUpdate(
+            { id: Number(cron.id) },
             { status: CrontabStatus.idle, pid: undefined },
-            { where: { id: Number(cron.id) } },
           );
         }
       } catch (error) {

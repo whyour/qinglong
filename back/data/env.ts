@@ -1,5 +1,4 @@
-import { DataTypes, Model } from 'sequelize';
-import { sequelize } from '.';
+import { Repository, RecordRow } from './repository';
 
 export class Env {
   value?: string;
@@ -38,14 +37,5 @@ export const initPosition = 4500000000000000;
 export const stepPosition = 10000000000;
 export const minPosition = 100;
 
-export interface EnvInstance extends Model<Env, Env>, Env {}
-export const EnvModel = sequelize.define<EnvInstance>('Env', {
-  value: { type: DataTypes.STRING, unique: 'compositeIndex' },
-  timestamp: DataTypes.STRING,
-  status: DataTypes.NUMBER,
-  position: DataTypes.NUMBER,
-  name: { type: DataTypes.STRING, unique: 'compositeIndex' },
-  remarks: DataTypes.STRING,
-  isPinned: DataTypes.NUMBER,
-  labels: DataTypes.JSON,
-});
+export type EnvInstance = RecordRow<Env>;
+export const EnvModel = new Repository<Env>('Env');

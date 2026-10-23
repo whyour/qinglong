@@ -1,5 +1,7 @@
 # Node.js 原生部署与 Python venv
 
+面板要求 Node.js >=22.17，推荐 Node.js 24，并要求该 Node 构建提供 `node:sqlite`。应用升级保留现有 Node；旧 Node 20 环境需先升级运行时。远程管理 CLI 的最低版本要求独立于面板。
+
 设置 `QL_DIR` 为安装目录，`QL_DATA_DIR` 为以 `/data` 结尾的绝对持久化数据路径。
 如需隔离 Python，请在启动进程的环境中显式设置 `PYTHON_VENV_DIR`（绝对路径或相对 `QL_DIR` 的路径），例如 `export PYTHON_VENV_DIR=/srv/qinglong/.venv`。未设置时保留现有 Python prefix 行为。
 

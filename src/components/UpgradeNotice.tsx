@@ -20,14 +20,16 @@ export default function UpgradeNotice({
   const showNotice =
     activeStatuses.includes(job.status) ||
     job.status === 'ready' ||
-    job.status === 'failed';
+    job.status === 'failed' ||
+    Boolean(job.migrationRequired);
   if (!showNotice && !open) return null;
   const text = !connected
     ? intl.get('连接已断开，正在重新连接')
     : intl.get(upgradeStatusLabel(job));
   const label =
     activeStatuses.includes(job.status) &&
-    job.phase === 'downloading' && job.percent != null
+    job.phase === 'downloading' &&
+    job.percent != null
       ? `${text} ${job.percent}%`
       : text;
   return (

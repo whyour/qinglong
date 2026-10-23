@@ -68,7 +68,6 @@ function shellNames(doc) {
   }
   return { script: stem, repo: stem };
 }
-
 test('subscription deletion paths match the actual shell URL/branch naming for public, private and raw subscriptions', () => {
   for (const doc of cases)
     assert.deepEqual(
@@ -77,7 +76,6 @@ test('subscription deletion paths match the actual shell URL/branch naming for p
       doc.url,
     );
 });
-
 function fixture(t, values) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-storage-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -104,9 +102,10 @@ function fixture(t, values) {
         }
       },
       SubscriptionModel: {
-        findAll: async ({ where }) =>
-          docs.filter((doc) => !where.id || where.id.includes(doc.id)),
-        create: async (value) => {
+        find: async (where, read = {}) => {
+          return docs.filter((doc) => !where.id || where.id.includes(doc.id));
+        },
+        insert: async (value) => {
           const doc = {
             ...value,
             get() {
@@ -116,14 +115,16 @@ function fixture(t, values) {
           docs.push(doc);
           return doc;
         },
-        findOne: async ({ where }) => docs.find((doc) => doc.id === where.id),
-        update: async (value, { where }) => {
+        findOne: async (where, read = {}) => {
+          return docs.find((doc) => doc.id === where.id);
+        },
+        nativeUpdate: async (where, value) => {
           Object.assign(
             docs.find((doc) => doc.id === where.id),
             value,
           );
         },
-        destroy: async ({ where }) => {
+        nativeDelete: async (where, read = {}) => {
           events.push('destroy');
           for (let i = docs.length - 1; i >= 0; i--) {
             if (where.id.includes(docs[i].id)) docs.splice(i, 1);
@@ -131,7 +132,13 @@ function fixture(t, values) {
         },
       },
     },
-    '../data/cron': { CrontabModel: { findAll: async () => [{ id: 99 }] } },
+    '../data/cron': {
+      CrontabModel: {
+        find: async (where, read = {}) => {
+          return [{ id: 99 }];
+        },
+      },
+    },
     '../config/util': {
       rmPath: (p) => fs.promises.rm(p, { recursive: true, force: true }),
     },
@@ -169,7 +176,6 @@ function fixture(t, values) {
   };
   return { root, config, docs, events, service, paths, write };
 }
-
 test('force deletion cleans URL-derived clone/script/raw artifacts and associated jobs, preserving unrelated alias folders', async (t) => {
   const f = fixture(t, cases);
   const artifacts = [];
@@ -201,7 +207,6 @@ test('force deletion cleans URL-derived clone/script/raw artifacts and associate
     2,
   );
 });
-
 test('ordinary deletion preserves subscription artifacts', async (t) => {
   const f = fixture(t, [cases[0]]);
   const file = path.join(f.paths(cases[0])[0], 'job.js');
@@ -209,7 +214,6 @@ test('ordinary deletion preserves subscription artifacts', async (t) => {
   await f.service.remove([1], {});
   assert.equal(fs.readFileSync(file, 'utf8'), 'fixture');
 });
-
 test('a URL-derived symlink escape rejects the entire force deletion before cancelling jobs or deleting rows', async (t) => {
   const f = fixture(t, [cases[0], cases[6]]);
   const outside = path.join(f.root, 'outside');
@@ -224,7 +228,6 @@ test('a URL-derived symlink escape rejects the entire force deletion before canc
   assert.deepEqual(f.events, []);
   assert.equal(fs.readFileSync(path.join(outside, 'keep'), 'utf8'), 'keep');
 });
-
 const cliCases = [
   {
     type: 'public-repo',
@@ -240,7 +243,6 @@ const cliCases = [
   { type: 'file', url: 'https://example.com/owner/job.py?version=2' },
   { type: 'file', url: 'https://example.com/owner/job' },
 ].map((doc, index) => ({ ...doc, id: index + 1, alias: `cli-${index}` }));
-
 test('cleanup candidates match both actual CLI naming and legacy Shell naming', () => {
   const { repositoryName } = load(
     'cli/src/internal/subscription/subscriptionRunner.ts',
@@ -264,7 +266,6 @@ test('cleanup candidates match both actual CLI naming and legacy Shell naming', 
     assert.deepEqual(getSubscriptionStorageNames(doc), shellNames(doc));
   }
 });
-
 test('force deletion removes CLI and legacy artifacts for trailing slashes, SCP URLs and raw URL queries', async (t) => {
   const f = fixture(t, cliCases);
   const artifacts = [];
@@ -292,7 +293,6 @@ test('force deletion removes CLI and legacy artifacts for trailing slashes, SCP 
   );
   for (const file of artifacts) assert.equal(fs.existsSync(file), false, file);
 });
-
 for (const type of ['public-repo', 'file']) {
   test(`force deletion retains shared ${type} artifacts until the last subscription is removed`, async (t) => {
     const first = { ...cases[type === 'file' ? 6 : 0], id: 1, alias: 'first' };
@@ -309,7 +309,6 @@ for (const type of ['public-repo', 'file']) {
       assert.equal(fs.existsSync(file), false, file);
   });
 }
-
 test('batch deletion of every reference removes shared storage once', async (t) => {
   const f = fixture(t, [
     { ...cases[0], id: 1 },
@@ -320,7 +319,6 @@ test('batch deletion of every reference removes shared storage once', async (t) 
   await f.service.remove([1, 2], { force: true });
   for (const file of artifacts) assert.equal(fs.existsSync(file), false, file);
 });
-
 test('recursive cleanup retains overlapping parent and nested branch directories', async (t) => {
   const parent = { ...cases[0], id: 1, branch: 'main', alias: 'parent' };
   const child = { ...parent, id: 2, branch: 'main/nested', alias: 'child' };
@@ -334,7 +332,6 @@ test('recursive cleanup retains overlapping parent and nested branch directories
     for (const file of artifacts) assert.equal(fs.existsSync(file), true, file);
   }
 });
-
 test('unrelated malformed historical rows do not block force deletion, and malformed shared references still retain storage', async (t) => {
   const selected = { ...cases[1], id: 1, branch: 'main', alias: 'selected' };
   for (const shared of [false, true]) {
@@ -357,7 +354,6 @@ test('unrelated malformed historical rows do not block force deletion, and malfo
     for (const file of files) assert.equal(fs.existsSync(file), shared);
   }
 });
-
 test('an unused invalid Shell candidate does not block cleanup of the valid CLI raw files', async (t) => {
   const doc = {
     id: 1,
@@ -376,7 +372,6 @@ test('an unused invalid Shell candidate does not block cleanup of the valid CLI 
   assert.deepEqual(f.docs, []);
   for (const file of files) assert.equal(fs.existsSync(file), false);
 });
-
 for (const mutation of ['create', 'update']) {
   test(`force deletion prevents a concurrent ${mutation} from changing ownership after its reference snapshot`, async (t) => {
     const selected = { ...cases[0], id: 1, alias: 'selected' };
@@ -414,7 +409,6 @@ for (const mutation of ['create', 'update']) {
     await Promise.all([deletion, change]);
     assert.equal(f.docs.find((doc) => doc.id === 2).url, selected.url);
   });
-
   test(`force deletion observes shared storage ownership established by an in-flight ${mutation}`, async (t) => {
     const selected = { ...cases[0], id: 1, alias: 'selected' };
     const other = {
@@ -456,7 +450,6 @@ for (const mutation of ['create', 'update']) {
     assert.equal(fs.existsSync(file), true);
   });
 }
-
 test('an unrelated dangling or outside symlink reference does not block safe cleanup', async (t) => {
   const selected = { ...cases[0], id: 1, alias: 'selected' };
   const other = {
@@ -476,16 +469,19 @@ test('an unrelated dangling or outside symlink reference does not block safe cle
   assert.equal(fs.existsSync(file), false);
   assert.equal(fs.readFileSync(path.join(outside, 'keep'), 'utf8'), 'keep');
 });
-
 test('URL-derived storage accepts legal directory names longer than user aliases and containing spaces', async (t) => {
-  const doc = { ...cases[0], id: 1, alias: 'short-alias', url: `/tmp/owner/${'r'.repeat(205)} repo.git` };
+  const doc = {
+    ...cases[0],
+    id: 1,
+    alias: 'short-alias',
+    url: `/tmp/owner/${'r'.repeat(205)} repo.git`,
+  };
   const f = fixture(t, [doc]);
   const files = f.paths(doc).map((p) => path.join(p, 'job.js'));
   files.forEach(f.write);
   await f.service.remove([1], { force: true });
   for (const file of files) assert.equal(fs.existsSync(file), false, file);
 });
-
 test('an unrepresentable unused Shell filename does not block valid CLI raw cleanup', async (t) => {
   const doc = {
     id: 1,
@@ -504,9 +500,13 @@ test('an unrepresentable unused Shell filename does not block valid CLI raw clea
   assert.deepEqual(f.docs, []);
   for (const file of files) assert.equal(fs.existsSync(file), false);
 });
-
 test('cleanup retains each representable path when only its prefixed Shell script name is too long', async (t) => {
-  const doc = { id: 1, alias: 'partial-raw', type: 'file', url: 'https://example.com/job.js?token=' };
+  const doc = {
+    id: 1,
+    alias: 'partial-raw',
+    type: 'file',
+    url: 'https://example.com/job.js?token=',
+  };
   const prefix = getSubscriptionStorageNames(doc).raw;
   doc.url += 'a'.repeat(255 - Buffer.byteLength(prefix));
   const shell = getSubscriptionStorageNames(doc);
@@ -524,7 +524,6 @@ test('cleanup retains each representable path when only its prefixed Shell scrip
   assert.deepEqual(f.docs, []);
   for (const file of files) assert.equal(fs.existsSync(file), false);
 });
-
 test('a legal Unicode alias with an unrepresentable unused directory does not block URL-derived cleanup', async (t) => {
   const doc = { ...cases[0], id: 1, alias: '中'.repeat(86) };
   const f = fixture(t, [doc]);
@@ -534,9 +533,13 @@ test('a legal Unicode alias with an unrepresentable unused directory does not bl
   assert.deepEqual(f.docs, []);
   for (const file of files) assert.equal(fs.existsSync(file), false);
 });
-
 test('Unicode storage follows filesystem limits rather than imposing a UTF-8 byte cap', async (t) => {
-  const doc = { ...cases[0], id: 1, alias: 'short-alias', url: `/tmp/owner/${'中'.repeat(86)}.git` };
+  const doc = {
+    ...cases[0],
+    id: 1,
+    alias: 'short-alias',
+    url: `/tmp/owner/${'中'.repeat(86)}.git`,
+  };
   const f = fixture(t, [doc]);
   const files = f.paths(doc).map((p) => path.join(p, 'job.js'));
   for (const file of files) {

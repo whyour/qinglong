@@ -1,5 +1,4 @@
-import { sequelize } from '.';
-import { DataTypes, Model, ModelDefined } from 'sequelize';
+import { Repository, RecordRow } from './repository';
 
 export class Crontab {
   name?: string;
@@ -62,37 +61,5 @@ export enum CrontabStatus {
   'queued' = 3,
 }
 
-export interface CronInstance extends Model<Crontab, Crontab>, Crontab {}
-export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
-  name: {
-    unique: 'compositeIndex',
-    type: DataTypes.STRING,
-  },
-  command: {
-    unique: 'compositeIndex',
-    type: DataTypes.STRING,
-  },
-  schedule: {
-    unique: 'compositeIndex',
-    type: DataTypes.STRING,
-  },
-  timestamp: DataTypes.STRING,
-  saved: DataTypes.BOOLEAN,
-  status: DataTypes.NUMBER,
-  isSystem: DataTypes.NUMBER,
-  pid: DataTypes.NUMBER,
-  isDisabled: DataTypes.NUMBER,
-  isPinned: DataTypes.NUMBER,
-  log_path: DataTypes.STRING,
-  queued_token: DataTypes.STRING,
-  labels: DataTypes.JSON,
-  last_running_time: DataTypes.NUMBER,
-  last_execution_time: DataTypes.NUMBER,
-  sub_id: { type: DataTypes.NUMBER, allowNull: true },
-  extra_schedules: DataTypes.JSON,
-  task_before: DataTypes.STRING,
-  task_after: DataTypes.STRING,
-  log_name: DataTypes.STRING,
-  allow_multiple_instances: DataTypes.NUMBER,
-  work_dir: DataTypes.STRING,
-});
+export type CronInstance = RecordRow<Crontab>;
+export const CrontabModel = new Repository<Crontab>('Crontab');

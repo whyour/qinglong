@@ -7,6 +7,295 @@ const tar = require('tar');
 const bundle = require('../../cli/src/internal/maintenance/platformBundle.cjs');
 const artifacts = require('../../shell/upgrade.cjs');
 
+for (const fault of ['writeBuffer', 'writeBuffers'])
+  test(`archive creation completes a native partial ${fault} result`, async (t) => {
+    const directory = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'ql-archive-create-'),
+    );
+    t.after(() => fs.rm(directory, { recursive: true, force: true }));
+    await fs.mkdir(path.join(directory, 'qinglong'));
+    const bytes = require('node:crypto').randomBytes(512 * 1024 + 137);
+    await fs.writeFile(path.join(directory, 'qinglong/probe'), bytes);
+    const archive = path.join(directory, 'archive.tar.gz'),
+      destination = path.join(directory, 'extracted');
+    await fs.mkdir(destination);
+    const execute = require('node:util').promisify(
+      require('node:child_process').execFile,
+    );
+    const result = await execute(
+      process.execPath,
+      [
+        '-e',
+        `
+      const fs=require('node:fs/promises'),path=require('node:path');
+      const {writeBundleArchive}=require(process.argv[1]),bundle=require(process.argv[2]);
+      const binding=process.binding('fs'),fault=process.argv[6],original=binding[fault];
+      let injected=0;
+      binding[fault]=function(...args) {
+        if(!injected) {
+          if(fault==='writeBuffer' && args[3]>1) {args[3]=Math.floor(args[3]/2);injected++;}
+          else if(fault==='writeBuffers') {
+            let remaining=Math.floor(args[1].reduce((n,b)=>n+b.byteLength,0)/2);
+            if(remaining) {
+              const short=[];for(const b of args[1]) {const part=b.subarray(0,remaining);if(part.length)short.push(part);remaining-=part.length;if(!remaining)break;}
+              args[1]=short;injected++;
+            }
+          }
+        }
+        return original.apply(this,args);
+      };
+      (async()=>{
+        await writeBundleArchive(process.argv[3],process.argv[4]);
+        binding[fault]=original;
+        await bundle.extractArchive(process.argv[4],process.argv[5]);
+        const bytes=await fs.readFile(path.join(process.argv[5],'qinglong/probe'));
+        console.log(JSON.stringify({injected,length:bytes.length,sha256:require('node:crypto').createHash('sha256').update(bytes).digest('hex')}));
+      })().catch(error=>{binding[fault]=original;console.error(error);process.exitCode=1});
+    `,
+        require.resolve('../../scripts/build-upgrade-bundle.cjs'),
+        require.resolve(
+          '../../cli/src/internal/maintenance/platformBundle.cjs',
+        ),
+        directory,
+        archive,
+        destination,
+        fault,
+      ],
+      { timeout: 15000 },
+    );
+    const observed = JSON.parse(result.stdout);
+    assert.equal(observed.injected, 1);
+    assert.equal(observed.length, bytes.length);
+    assert.equal(observed.sha256, bundle.sha256(bytes));
+  });
+
+test('archive creation rejects an output filesystem error', async (t) => {
+  const f = await fixture(t);
+  await assert.rejects(
+    require('../../scripts/build-upgrade-bundle.cjs').writeBundleArchive(
+      f.directory,
+      path.join(f.directory, 'qinglong'),
+    ),
+    { code: 'EISDIR' },
+  );
+});
+
+test('archive extraction completes a native partial write before publishing the file', async (t) => {
+  const directory = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'ql-archive-short-write-'),
+  );
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  await fs.mkdir(path.join(directory, 'qinglong'));
+  const bytes = require('node:crypto').randomBytes(512 * 1024 + 137);
+  await fs.writeFile(path.join(directory, 'qinglong/probe'), bytes);
+  const archive = path.join(directory, 'archive.tar.gz');
+  await tar.c({ file: archive, gzip: true, cwd: directory }, ['qinglong']);
+  const destination = path.join(directory, 'extracted');
+  await fs.mkdir(destination);
+  const execute = require('node:util').promisify(
+    require('node:child_process').execFile,
+  );
+  const result = await execute(
+    process.execPath,
+    [
+      '-e',
+      `
+    const fs=require('node:fs/promises'),path=require('node:path');
+    const bundle=require(process.argv[1]);
+    // Isolate native I/O fault injection in this child. Both callback writers
+    // and FileHandle.writeFile receive the real shortened write result.
+    const binding=process.binding('fs'),write=binding.writeBuffer;
+    let injected=0,calls=0;
+    binding.writeBuffer=function(...args) {
+      calls++;
+      if(!injected && args[3]>1) {injected++;args[3]=Math.floor(args[3]/2);}
+      return write.apply(this,args);
+    };
+    (async()=>{
+      await bundle.extractArchive(process.argv[2],process.argv[3]);
+      binding.writeBuffer=write;
+      const bytes=await fs.readFile(path.join(process.argv[3],'qinglong/probe'));
+      console.log(JSON.stringify({injected,calls,length:bytes.length,sha256:require('node:crypto').createHash('sha256').update(bytes).digest('hex')}));
+    })().catch(error=>{binding.writeBuffer=write;console.error(error);process.exitCode=1});
+  `,
+      require.resolve('../../cli/src/internal/maintenance/platformBundle.cjs'),
+      archive,
+      destination,
+    ],
+    { timeout: 15000 },
+  );
+  const observed = JSON.parse(result.stdout);
+  assert.equal(observed.injected, 1);
+  assert.ok(observed.calls >= 2);
+  assert.equal(observed.length, bytes.length);
+  assert.equal(observed.sha256, bundle.sha256(bytes));
+});
+
+test('archive extraction refuses an existing payload root, including a link to another directory', async (t) => {
+  const f = await fixture(t);
+  const outside = path.join(f.directory, 'outside'),
+    destination = path.join(f.directory, 'existing-extract');
+  await fs.mkdir(outside);
+  await fs.writeFile(path.join(outside, 'keep'), 'unchanged');
+  await fs.mkdir(destination);
+  await fs.symlink(outside, path.join(destination, 'qinglong'));
+  await assert.rejects(bundle.extractArchive(f.archive, destination), {
+    code: 'EEXIST',
+  });
+  assert.deepEqual(await fs.readdir(outside), ['keep']);
+  assert.equal(
+    await fs.readFile(path.join(outside, 'keep'), 'utf8'),
+    'unchanged',
+  );
+});
+
+for (const fault of ['write', 'parse', 'read'])
+  test(`archive ${fault} failure closes pending writes before cleanup`, async (t) => {
+    const f = await fixture(t);
+    await fs.writeFile(
+      path.join(f.source, 'probe-large'),
+      require('node:crypto').randomBytes(512 * 1024 + 137),
+    );
+    f.manifest.files = await bundle.inventory({
+      source: f.source,
+      static: f.staticRoot,
+    });
+    await f.pack();
+    const execute = require('node:util').promisify(
+      require('node:child_process').execFile,
+    );
+    const destination = path.join(f.directory, 'failed-extract');
+    await fs.mkdir(destination);
+    const result = await execute(
+      process.execPath,
+      [
+        '-e',
+        `
+      const fs=require('node:fs'),p=fs.promises,path=require('node:path'),{Readable}=require('node:stream');
+      const fault=process.argv[4];
+      if(fault!=='write') {
+        const bytes=fs.readFileSync(process.argv[2]);
+        fs.createReadStream=()=>fault==='parse'
+          ? Readable.from([bytes.subarray(0,Math.floor(bytes.length/2))])
+          : new Readable({read(){this.destroy(Object.assign(new Error('read failed'),{code:'EIO'}))}});
+      }
+      const bundle=require(process.argv[1]);
+      const open=p.open;
+      let opened=0,closed=0,faultFd;
+      p.open=async(...args)=>{
+        const handle=await open(...args),close=handle.close.bind(handle);opened++;
+        if(String(args[0]).endsWith('/probe-large'))faultFd=handle.fd;
+        handle.close=async()=>{try{return await close()}finally{closed++}};
+        return handle;
+      };
+      if(fault==='write') {
+        const binding=process.binding('fs'),write=binding.writeBuffer;
+        binding.writeBuffer=function(...args){
+          if(args[0]===faultFd)return Promise.reject(Object.assign(new Error('disk full'),{code:'ENOSPC'}));
+          return write.apply(this,args);
+        };
+      }
+      (async()=>{
+        let error;
+        try {await bundle.extractArchive(process.argv[2],process.argv[3]);}catch(e){error=e;}
+        if(!error)throw new Error('Fault was not rejected');
+        if(opened!==closed)throw new Error('Open write handles remain: '+opened+'/'+closed);
+        await p.rm(process.argv[3],{recursive:true});
+        await new Promise(r=>setTimeout(r,100));
+        if(fs.existsSync(process.argv[3]))throw new Error('Extraction continued after failure');
+        console.log(JSON.stringify({rejected:true,opened,closed}));
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    `,
+        require.resolve(
+          '../../cli/src/internal/maintenance/platformBundle.cjs',
+        ),
+        f.archive,
+        destination,
+        fault,
+      ],
+      { timeout: 15000 },
+    );
+    assert.equal(JSON.parse(result.stdout).rejected, true);
+  });
+
+test('payload rejection identifies missing, extra, changed bytes and modes without logging contents', async (t) => {
+  const f = await fixture(t);
+  const changed = path.join(f.source, 'sample/config.sample.sh');
+  await fs.writeFile(changed, 'private contents never printed');
+  await fs.chmod(changed, 0o700);
+  await fs.rm(path.join(f.source, 'version.yaml'));
+  await fs.writeFile(path.join(f.source, 'unexpected'), 'extra contents');
+  await assert.rejects(
+    bundle.verifyPayload(
+      { source: f.source, static: f.staticRoot },
+      f.manifest,
+      f.target,
+    ),
+    (error) => {
+      assert.doesNotMatch(error.message, /private contents|extra contents/);
+      const detail = JSON.parse(error.message.split('match: ')[1]);
+      assert.equal(detail.count, 3);
+      assert.equal(
+        detail.files.find((x) => x.name === 'source/version.yaml').actual,
+        null,
+      );
+      assert.equal(
+        detail.files.find((x) => x.name === 'source/unexpected').expected,
+        null,
+      );
+      const item = detail.files.find(
+        (x) => x.name === 'source/sample/config.sample.sh',
+      );
+      assert.equal(item.actual.mode, 0o700);
+      assert.notEqual(item.actual.sha256, item.expected.sha256);
+      return true;
+    },
+  );
+});
+
+test('archive extraction retains exact artifact modes under a private umask without changing it', async (t) => {
+  const f = await fixture(t);
+  await fs.chmod(path.join(f.source, 'sample/config.sample.sh'), 0o755);
+  await fs.chmod(path.join(f.source, 'version.yaml'), 0o644);
+  f.manifest.files = await bundle.inventory({
+    source: f.source,
+    static: f.staticRoot,
+  });
+  await f.pack();
+  const destination = path.join(f.directory, 'private-mask-extraction');
+  await fs.mkdir(destination);
+  const execute = require('node:util').promisify(
+    require('node:child_process').execFile,
+  );
+  const result = await execute(process.execPath, [
+    '-e',
+    `
+    const fs=require('node:fs/promises'),path=require('node:path');
+    const bundle=require(process.argv[1]);
+    (async()=>{
+      process.umask(0o077);
+      const destination=process.argv[3];
+      await bundle.extractArchive(process.argv[2],destination);
+      const selected={source:path.join(destination,'qinglong/source'),static:path.join(destination,'qinglong/static')};
+      const manifest=JSON.parse(await fs.readFile(path.join(destination,'qinglong/bundle.json')));
+      await bundle.verifyPayload(selected,manifest,JSON.parse(process.argv[4]));
+      console.log(JSON.stringify({umask:process.umask(),script:(await fs.stat(path.join(selected.source,'sample/config.sample.sh'))).mode&0o777,metadata:(await fs.stat(path.join(selected.source,'version.yaml'))).mode&0o777,directory:(await fs.stat(selected.source)).mode&0o777,link:(await fs.lstat(path.join(selected.source,'node_modules/sqlite3'))).isSymbolicLink()}));
+    })().catch(error=>{console.error(error);process.exitCode=1});
+  `,
+    require.resolve('../../cli/src/internal/maintenance/platformBundle.cjs'),
+    f.archive,
+    destination,
+    JSON.stringify(f.target),
+  ]);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    umask: 0o077,
+    script: 0o755,
+    metadata: 0o644,
+    directory: 0o755,
+    link: true,
+  });
+});
+
 test('dependency probes allow slow ARMv6 startup while preserving cancellation and normal Node execution', async () => {
   const vm = require('node:vm');
   const filename = require.resolve(
@@ -873,4 +1162,52 @@ test('full dependency bundles get a bounded slow-link download budget instead of
     /stop before transfer/,
   );
   assert.ok(observed);
+});
+
+test('MikroORM bundles load the official dialect and built-in SQLite while ignoring unusable legacy addons', async (t) => {
+  const { createRequire } = require('node:module');
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-mikro-smoke-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(
+    path.join(root, 'package.json'),
+    JSON.stringify({
+      dependencies: { '@mikro-orm/core': '7.2.5', '@mikro-orm/sql': '7.2.5' },
+    }),
+  );
+  const resolver = createRequire(require.resolve('@mikro-orm/sql'));
+  for (const name of ['@mikro-orm/core', '@mikro-orm/sql', 'kysely']) {
+    let source = path.dirname(resolver.resolve(name));
+    while (
+      JSON.parse(
+        await fs
+          .readFile(path.join(source, 'package.json'), 'utf8')
+          .catch(() => '{"name":""}'),
+      ).name !== name
+    )
+      source = path.dirname(source);
+    await fs.cp(source, path.join(root, 'node_modules', name), {
+      recursive: true,
+    });
+  }
+  for (const name of [
+    'sqlite3',
+    'sequelize',
+    'cron-parser',
+    '@grpc/grpc-js',
+    'undici',
+  ]) {
+    const directory = path.join(root, 'node_modules', name);
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(
+      path.join(directory, 'package.json'),
+      JSON.stringify({ name, main: 'index.js' }),
+    );
+    await fs.writeFile(
+      path.join(directory, 'index.js'),
+      ['sqlite3', 'sequelize'].includes(name)
+        ? 'throw Error("legacy addon must not load")'
+        : 'module.exports={}',
+    );
+  }
+  await bundle.smokeDependencies(root);
 });

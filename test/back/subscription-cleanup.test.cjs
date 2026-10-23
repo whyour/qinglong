@@ -3,7 +3,6 @@ const test = require('node:test');
 const path = require('node:path');
 const dayjs = require('dayjs');
 const load = require('../helpers/load-security-module.cjs');
-
 test('subscription becomes idle and closes its log even when completion logging fails', async () => {
   const updates = [];
   let closed = 0;
@@ -11,7 +10,11 @@ test('subscription becomes idle and closes its log even when completion logging 
   const Subscription = load(path.resolve('back/services/subscription.ts'), {
     '../config': {},
     '../data/subscription': {
-      SubscriptionModel: { update: async (values) => updates.push(values) },
+      SubscriptionModel: {
+        nativeUpdate: async (where, values) => {
+          return updates.push(values);
+        },
+      },
       SubscriptionStatus: { idle: 1 },
     },
     '../data/cron': {},

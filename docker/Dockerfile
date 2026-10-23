@@ -1,6 +1,6 @@
 # Run Node package installation natively on the builder. Node/npm can spin at
 # 100% CPU when Alpine s390x is emulated through QEMU.
-FROM --platform=$BUILDPLATFORM node:18-alpine3.18 AS builder
+FROM --platform=$BUILDPLATFORM node:24-alpine3.24 AS builder
 
 ARG TARGETARCH
 ENV NPM_CONFIG_PREFIX=/opt/node-global
@@ -20,9 +20,17 @@ RUN set -x \
   && npm_config_target_platform=linux \
     npm_config_target_arch="${NODE_ARCH}" \
     npm_config_target_libc=musl \
-    pnpm install --prod --frozen-lockfile
+    QL_BUILD_ONLY=1 pnpm install --prod --frozen-lockfile
+
+# The amd64 APK runtime has crashed in native URL parsing on dev. Keep its
+# URL implementation bundled with the pinned upstream musl Node binary.
+FROM --platform=linux/amd64 node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS node-runtime-amd64
 
 FROM python:3.11-alpine
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+COPY --from=node-runtime-amd64 /usr/local/bin/node /tmp/node-runtime-amd64
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -62,6 +70,10 @@ RUN set -x \
   netcat-openbsd \
   unzip \
   npm \
+  && if [ "$TARGETARCH" = amd64 ]; then \
+       mv /tmp/node-runtime-amd64 /usr/local/bin/node; \
+       ln -sf /usr/local/bin/node /usr/bin/node; \
+     else rm /tmp/node-runtime-amd64; fi \
   && rm -rf /var/cache/apk/* \
   && apk update \
   && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
@@ -86,6 +98,10 @@ COPY static/ /ql/static/
 COPY docker/verify-build.cjs docker/build-manifest.cjs /tmp/
 COPY --from=builder /tmp/build/pnpm-lock.yaml /tmp/dependency-lock.yaml
 RUN cd ${QL_DIR} && node /tmp/verify-build.cjs /tmp/dependency-lock.yaml
+RUN if [ "$TARGETARCH" = arm ] && [ "${TARGETVARIANT:-}" = v6 ]; then \
+      QEMU_CPU=arm1176 node --jitless ${QL_DIR}/shell/node-runtime-probe.cjs; \
+    else node ${QL_DIR}/shell/node-runtime-probe.cjs; fi
+
 
 ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \

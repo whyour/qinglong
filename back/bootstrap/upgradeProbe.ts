@@ -3,11 +3,12 @@
 import 'reflect-metadata';
 import dns from 'dns';
 import http from 'http';
-
 // The first scheduler connection can outlive its short RPC deadline. Let the
 // normal single-flight recovery finish within the supervised startup budget.
 async function waitForUpgradeScheduler(
-  readiness: { recover(): Promise<boolean> },
+  readiness: {
+    recover(): Promise<boolean>;
+  },
   timeoutMs: number,
   retryMs = 250,
 ) {
@@ -22,13 +23,12 @@ async function waitForUpgradeScheduler(
   } while (Date.now() < deadline);
   throw new Error('Upgrade scheduler readiness failed');
 }
-
 async function probeUpgrade() {
   if (!process.send || process.env.QL_UPGRADE_PROBE !== '1')
     throw new Error('Upgrade probe requires its isolated supervisor');
   dns.setDefaultResultOrder('ipv4first');
   const { default: config } = await import('../config');
-  const { sequelize } = await import('../data');
+  const { database } = await import('../data');
   const { default: loadDatabase } = await import('../loaders/db');
   const { Container } = await import('typedi');
   const { GrpcServerService } = await import('../services/grpc');
@@ -43,17 +43,17 @@ async function probeUpgrade() {
   try {
     await loadDatabase();
     // Exercise an actual on-disk transaction as well as schema initialization.
-    await sequelize.transaction(async (transaction) => {
-      await sequelize.query('CREATE TABLE upgrade_probe (value INTEGER)', {
-        transaction,
-      });
-      await sequelize.query('INSERT INTO upgrade_probe VALUES (42)', {
-        transaction,
-      });
-      const [rows] = await sequelize.query('SELECT value FROM upgrade_probe', {
-        transaction,
-      });
-      if ((rows[0] as { value: number })?.value !== 42)
+    await database.transaction(async () => {
+      await database.query('CREATE TABLE upgrade_probe (value INTEGER)');
+      await database.query('INSERT INTO upgrade_probe VALUES (42)');
+      const rows = await database.query('SELECT value FROM upgrade_probe');
+      if (
+        (
+          rows[0] as {
+            value: number;
+          }
+        )?.value !== 42
+      )
         throw new Error('Upgrade database readback failed');
     });
     inject();
@@ -64,8 +64,11 @@ async function probeUpgrade() {
       cronClient.readiness,
       process.arch === 'arm' &&
         Number(
-          (process.config.variables as { arm_version?: string | number })
-            .arm_version,
+          (
+            process.config.variables as {
+              arm_version?: string | number;
+            }
+          ).arm_version,
         ) === 6
         ? 60000
         : 10000,
@@ -119,10 +122,9 @@ async function probeUpgrade() {
   } finally {
     await server.shutdown();
     grpc.getServer().forceShutdown();
-    await sequelize.close();
+    await database.close();
   }
 }
-
 process.once('disconnect', () => process.exit(1));
 probeUpgrade()
   .then(() => process.exit(0))

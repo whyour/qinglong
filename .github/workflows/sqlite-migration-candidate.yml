@@ -1,0 +1,201 @@
+name: SQLite migration candidate
+
+on:
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sqlite-migration-candidate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  build-static:
+    if: ${{ (github.event_name == 'pull_request' && github.head_ref == 'codex/sqlite-runtime-migration' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/sqlite-runtime-migration') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.17.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: npm test
+      - run: npm run build:front && npm run build:back && npm run build:info
+      - uses: actions/upload-artifact@v6
+        with:
+          name: migration-static-${{ env.SOURCE_COMMIT }}
+          path: static/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  test-node24:
+    needs: build-static
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: npm test
+
+  build-images:
+    needs: build-static
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - libc: musl
+            file: docker/Dockerfile
+            platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x,linux/386
+          - libc: glibc
+            file: docker/Dockerfile.debian
+            platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+      - uses: actions/download-artifact@v6
+        with:
+          name: migration-static-${{ env.SOURCE_COMMIT }}
+          path: static/
+      - uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@v7
+        id: image
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: ${{ matrix.platforms }}
+          build-args: |
+            QL_BRANCH=codex/sqlite-runtime-migration
+            SOURCE_COMMIT=${{ env.SOURCE_COMMIT }}
+          push: true
+          tags: ghcr.io/${{ github.repository }}:migration-candidate-${{ env.SOURCE_COMMIT }}-${{ matrix.libc }}
+          cache-from: type=registry,ref=whyour/qinglong:cache-${{ matrix.libc == 'musl' && 'alpine' || 'debian' }}
+      - name: Record the immutable candidate image
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          BUNDLE_LIBC: ${{ matrix.libc }}
+        run: |
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          printf '%s\n' "ghcr.io/$GITHUB_REPOSITORY@$IMAGE_DIGEST" > "$BUNDLE_LIBC-image.txt"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: migration-${{ matrix.libc }}-image-${{ env.SOURCE_COMMIT }}
+          path: ${{ matrix.libc }}-image.txt
+          retention-days: 7
+
+  build-bundles:
+    needs: build-images
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux/amd64, libc: musl, name: x64-musl }
+          - { platform: linux/arm/v6, libc: musl, name: armv6-musl }
+          - { platform: linux/arm/v7, libc: musl, name: armv7-musl }
+          - { platform: linux/arm64, libc: musl, name: arm64-musl }
+          - { platform: linux/ppc64le, libc: musl, name: ppc64-musl }
+          - { platform: linux/s390x, libc: musl, name: s390x-musl }
+          - { platform: linux/386, libc: musl, name: ia32-musl }
+          - { platform: linux/amd64, libc: glibc, name: x64-glibc }
+          - { platform: linux/arm/v7, libc: glibc, name: armv7-glibc }
+          - { platform: linux/arm64, libc: glibc, name: arm64-glibc }
+          - { platform: linux/ppc64le, libc: glibc, name: ppc64-glibc }
+          - { platform: linux/s390x, libc: glibc, name: s390x-glibc }
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+      - uses: actions/download-artifact@v6
+        with:
+          name: migration-${{ matrix.libc }}-image-${{ env.SOURCE_COMMIT }}
+      - uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+      - uses: docker/setup-buildx-action@v4
+      - name: Build and verify both online hops using the unchanged legacy client
+        env:
+          BUNDLE_PLATFORM: ${{ matrix.platform }}
+          BUNDLE_LIBC: ${{ matrix.libc }}
+        run: |
+          set -euo pipefail
+          image=$(cat "$BUNDLE_LIBC-image.txt")
+          legacy=$(node -p "require('./docker/migration-bridge-images.json')['$BUNDLE_LIBC']")
+          docker buildx build --platform "$BUNDLE_PLATFORM" --build-arg "BASE_IMAGE=$image" --build-arg "LEGACY_IMAGE=$legacy" --file docker/Dockerfile.upgrade-bridge --output type=local,dest=output/upgrade .
+      - uses: actions/upload-artifact@v6
+        with:
+          name: migration-bundles-${{ matrix.name }}-${{ env.SOURCE_COMMIT }}
+          path: output/upgrade/*
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-index:
+    needs: [build-bundles, test-node24]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '8.3.1'
+      - run: pnpm install --prod --frozen-lockfile && npm --prefix cli ci
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: migration-bundles-*-${{ env.SOURCE_COMMIT }}
+          path: output/upgrade/
+          merge-multiple: true
+      - run: node scripts/build-bundle-installer.cjs output/upgrade/install-bundle.cjs
+      - name: Validate every platform without publishing a channel
+        run: |
+          node -e "const fs=require('fs'),{releaseIndex}=require('./scripts/publish-upgrade-bundles.cjs'); const index=releaseIndex('output/upgrade',process.env.SOURCE_COMMIT,process.env.GITHUB_REPOSITORY,{migration:true}); fs.writeFileSync('output/upgrade/candidate-index.json',JSON.stringify(index));"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: migration-candidate-index-${{ env.SOURCE_COMMIT }}
+          path: |
+            output/upgrade/candidate-index.json
+            output/upgrade/install-bundle.cjs
+          retention-days: 7

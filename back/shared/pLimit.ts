@@ -137,13 +137,20 @@ class TaskLimit {
       this.manualCronoLimit.concurrency = limit;
       return;
     }
-    await SystemModel.sync();
-    const doc = await SystemModel.findOne({
-      where: { type: AuthDataType.systemConfig },
-    });
-    if (doc?.info?.cronConcurrency) {
-      this.cronLimit.concurrency = doc.info.cronConcurrency;
-      this.manualCronoLimit.concurrency = doc.info.cronConcurrency;
+
+    try {
+      const doc = await SystemModel.findOne({
+        type: AuthDataType.systemConfig,
+      });
+      if (doc?.info?.cronConcurrency) {
+        this.cronLimit.concurrency = doc.info.cronConcurrency;
+        this.manualCronoLimit.concurrency = doc.info.cronConcurrency;
+      }
+    } catch (error) {
+      // Imports can precede the isolated initializer on a fresh installation.
+      // Use defaults until that initializer creates Auths; never create schema here.
+      if ((error as { code?: string }).code !== 'DATABASE_SCHEMA_MISSING')
+        throw error;
     }
   }
 

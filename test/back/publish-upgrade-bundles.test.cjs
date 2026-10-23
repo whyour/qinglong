@@ -36,23 +36,38 @@ function fixture(t) {
     content = 'first',
     version = options.version,
   ) => {
-    for (const target of platforms) {
-      const filename = `qinglong-${commit}-${target}.tar.gz`;
-      const bytes = Buffer.from(`${version}/${content}/${target}`);
-      fs.writeFileSync(path.join(directory, filename), bytes);
-      fs.writeFileSync(
-        path.join(directory, filename + '.json'),
-        JSON.stringify({
-          format: 2,
-          sourceCommit: commit,
-          version,
-          target,
-          filename,
-          size: bytes.length,
-          sha256: sha256(bytes),
-        }),
-      );
-    }
+    for (const target of platforms)
+      for (const bridge of [false, true]) {
+        const filename = `qinglong-${
+          bridge ? 'migration-' : ''
+        }${commit}-${target}.tar.gz`;
+        const bytes = Buffer.from(`${version}/${content}/${target}`);
+        fs.writeFileSync(path.join(directory, filename), bytes);
+        fs.writeFileSync(
+          path.join(directory, filename + '.json'),
+          JSON.stringify({
+            format: 2,
+            sourceCommit: commit,
+            version,
+            target,
+            filename,
+            size: bytes.length,
+            sha256: sha256(bytes),
+            ...(bridge
+              ? {
+                  migrationVerified: true,
+                  migrationBridge: {
+                    sourceCommit: commit,
+                    targetVersion: version,
+                    legacySourceCommit:
+                      require('../../docker/migration-bridge-images.json')
+                        .sourceCommit,
+                  },
+                }
+              : {}),
+          }),
+        );
+      }
     fs.writeFileSync(
       path.join(directory, 'install-bundle.cjs'),
       `// ${content} installer`,
@@ -165,8 +180,13 @@ test('publishes every platform and installer before advancing version and legacy
   assert.equal(Object.keys(index.packages).length, 12);
   assert.deepEqual(index, f.index('upgrade-v2.24.0'));
   const tag = 'upgrade-build-v2.24.0-100-1';
-  assert.equal(f.state.releases.get(tag).size, 26);
-  for (const entry of [...Object.values(index.packages), index.installer]) {
+  assert.equal(f.state.releases.get(tag).size, 50);
+  assert.equal(Object.keys(index.runtimePackages).length, 12);
+  for (const entry of [
+    ...Object.values(index.packages),
+    ...Object.values(index.runtimePackages),
+    index.installer,
+  ]) {
     const url = new URL(entry.url),
       filename = path.basename(url.pathname);
     assert.ok(url.pathname.includes(`/releases/download/${tag}/`));
@@ -182,6 +202,19 @@ test('publishes every platform and installer before advancing version and legacy
     [tag, 'upgrade-v2.24.0', 'upgrade-master'],
   );
   assert.ok(writes.slice(1).every((a) => a.includes('--clobber')));
+});
+
+test('missing or unverified bridges cannot advance an index whose runtime packages are complete', (t) => {
+  const f = fixture(t);
+  const file = path.join(
+    f.directory,
+    `qinglong-migration-${f.options.commit}-${platforms[0]}.tar.gz.json`,
+  );
+  const receipt = JSON.parse(fs.readFileSync(file));
+  delete receipt.migrationVerified;
+  fs.writeFileSync(file, JSON.stringify(receipt));
+  assert.throws(() => f.publish(), /Unverified platform bundle/);
+  assert.equal(f.state.calls.length, 0);
 });
 
 for (const sameCommit of [false, true])
@@ -362,10 +395,10 @@ test('automatic development publication shares musl/glibc packages without chang
     assert.ok(entry.url.includes('/upgrade-build-develop-v2.24.0-100-1/'));
   assert.deepEqual(f.index(), production);
   assert.deepEqual(f.index('upgrade-v2.24.0'), production);
-  assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 26);
+  assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 50);
   assert.equal(
     f.state.releases.get('upgrade-build-develop-v2.24.0-100-1').size,
-    26,
+    50,
   );
 });
 

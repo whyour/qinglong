@@ -8,6 +8,7 @@ const {
   dependencyFailure,
   probeLimits,
   repairDependencies,
+  cleanSqliteBuildArtifacts,
 } = require('../../cli/src/internal/maintenance/upgradePrestart.cjs');
 
 for (const exitCode of [0, 1])
@@ -60,7 +61,10 @@ for (const phase of ['install', 'rebuild'])
     await fs.mkdir(bin);
     await fs.writeFile(
       path.join(source, 'package.json'),
-      JSON.stringify({ packageManager: 'pnpm@8.3.1' }),
+      JSON.stringify({
+        packageManager: 'pnpm@8.3.1',
+        dependencies: { sqlite3: 'legacy-fixture' },
+      }),
     );
     await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
     await fs.writeFile(path.join(source, 'node_modules/old'), 'preserved');
@@ -121,7 +125,10 @@ test('cancelled dependency repair kills descendants and retains the original tre
   await fs.mkdir(bin);
   await fs.writeFile(
     path.join(source, 'package.json'),
-    JSON.stringify({ packageManager: 'pnpm@8.3.1' }),
+    JSON.stringify({
+      packageManager: 'pnpm@8.3.1',
+      dependencies: { sqlite3: 'legacy-fixture' },
+    }),
   );
   await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
   await fs.writeFile(path.join(source, 'node_modules/old'), 'preserved');
@@ -214,7 +221,10 @@ test('ARMv6 repair isolates configuration, uses frozen install, one compiler job
   await fs.mkdir(bin);
   await fs.writeFile(
     path.join(source, 'package.json'),
-    JSON.stringify({ packageManager: 'pnpm@8.3.1' }),
+    JSON.stringify({
+      packageManager: 'pnpm@8.3.1',
+      dependencies: { sqlite3: 'legacy-fixture' },
+    }),
   );
   await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
   await fs.writeFile(
@@ -250,6 +260,96 @@ test('ARMv6 repair isolates configuration, uses frozen install, one compiler job
   assert.equal(flags.jobs, '1');
   assert.equal(flags.make, '-j1');
   assert.deepEqual((await fs.readdir(root)).sort(), ['bin', 'source']);
+});
+
+test('successful legacy repair publishes only portable runtime files from a pnpm alias', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-repair-portable-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const source = path.join(root, 'source'),
+    bin = path.join(root, 'bin');
+  const outside = path.join(root, 'outside');
+  await fs.mkdir(path.join(source, 'node_modules'), { recursive: true });
+  await fs.mkdir(bin);
+  await fs.mkdir(outside);
+  await fs.writeFile(path.join(outside, 'keep'), 'unrelated file');
+  await fs.writeFile(
+    path.join(source, 'node_modules/old'),
+    'previous dependency',
+  );
+  await fs.writeFile(
+    path.join(source, 'package.json'),
+    JSON.stringify({
+      packageManager: 'pnpm@8.3.1',
+      dependencies: { sqlite3: 'npm:@whyour/sqlite3@1.1.2' },
+    }),
+  );
+  await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
+  await fs.writeFile(
+    path.join(bin, 'pnpm'),
+    `#!${process.execPath}
+    const fs = require('node:fs');
+    if (process.argv[2] === '--version') { console.log('8.3.1'); process.exit(0); }
+    const pkg = 'node_modules/.pnpm/@whyour+sqlite3@1.1.2/node_modules/@whyour/sqlite3';
+    if (process.argv[2] === 'install') {
+      fs.mkdirSync(pkg + '/lib/binding/napi-v6-linux-arm', {recursive:true});
+      fs.writeFileSync(pkg + '/package.json', JSON.stringify({binary:{module_path:'./lib/binding/napi-v{napi_build_version}-{platform}-{arch}'}}));
+      fs.symlinkSync('.pnpm/@whyour+sqlite3@1.1.2/node_modules/@whyour/sqlite3', 'node_modules/sqlite3');
+    } else if (process.argv[2] === 'rebuild') {
+      fs.writeFileSync(pkg + '/lib/binding/napi-v6-linux-arm/node_sqlite3.node', 'compiled addon');
+      for (const name of ['build', 'build-tmp-napi-v6']) {
+        fs.mkdirSync(pkg + '/' + name + '/node_gyp_bins', {recursive:true});
+        fs.symlinkSync('/usr/bin/python3', pkg + '/' + name + '/node_gyp_bins/python3');
+      }
+      fs.symlinkSync(${JSON.stringify(outside)}, pkg + '/build-tmp-napi-v3');
+    } else { throw Error('unexpected command'); }
+  `,
+    { mode: 0o755 },
+  );
+  await repairDependencies(source, {
+    target: { arch: 'armv6' },
+    env: { PATH: bin },
+  });
+  const sqlite = path.join(source, 'node_modules/sqlite3');
+  assert.equal(
+    await fs.readFile(
+      path.join(sqlite, 'lib/binding/napi-v6-linux-arm/node_sqlite3.node'),
+      'utf8',
+    ),
+    'compiled addon',
+  );
+  for (const name of ['build', 'build-tmp-napi-v3', 'build-tmp-napi-v6'])
+    await assert.rejects(fs.lstat(path.join(sqlite, name)), { code: 'ENOENT' });
+  assert.equal(
+    await fs.readFile(path.join(outside, 'keep'), 'utf8'),
+    'unrelated file',
+  );
+  await assert.rejects(fs.access(path.join(source, 'node_modules/old')), {
+    code: 'ENOENT',
+  });
+  const {
+    inventory,
+  } = require('../../cli/src/internal/maintenance/platformBundle.cjs');
+  await inventory({ source });
+});
+
+test('cleanup retains sqlite3 runtimes loaded from build/Release and never follows a build symlink', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-sqlite-release-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const sqlite = path.join(root, 'sqlite3'), outside = path.join(root, 'outside');
+  await fs.mkdir(path.join(sqlite, 'build/Release'), { recursive: true });
+  await fs.mkdir(path.join(sqlite, 'build/node_gyp_bins'));
+  await fs.mkdir(path.join(outside, 'node_gyp_bins'), { recursive: true });
+  await fs.writeFile(path.join(outside, 'node_gyp_bins/keep'), 'untouched');
+  await fs.writeFile(path.join(sqlite, 'package.json'), JSON.stringify({ name: 'sqlite3', binary: { napi_versions: [3, 6] } }));
+  await fs.writeFile(path.join(sqlite, 'build/Release/node_sqlite3.node'), 'runtime addon');
+  await fs.symlink('/usr/bin/python3', path.join(sqlite, 'build/node_gyp_bins/python3'));
+  await fs.symlink(outside, path.join(sqlite, 'build-tmp-napi-v3'));
+  await cleanSqliteBuildArtifacts(sqlite);
+  assert.equal(await fs.readFile(path.join(sqlite, 'build/Release/node_sqlite3.node'), 'utf8'), 'runtime addon');
+  await assert.rejects(fs.access(path.join(sqlite, 'build/node_gyp_bins')), { code: 'ENOENT' });
+  await assert.rejects(fs.lstat(path.join(sqlite, 'build-tmp-napi-v3')), { code: 'ENOENT' });
+  assert.equal(await fs.readFile(path.join(outside, 'node_gyp_bins/keep'), 'utf8'), 'untouched');
+  await require('../../cli/src/internal/maintenance/platformBundle.cjs').inventory({ source: sqlite });
 });
 
 test('repair classification excludes application, platform, config, database, OOM and timeouts', () => {
@@ -347,4 +447,50 @@ test('repair refuses an unsupported package manager before invoking a network co
     /Unsupported frozen-lockfile/,
   );
   assert.deepEqual(await fs.readdir(root), ['source']);
+});
+
+test('MikroORM dependency repair uses the frozen production tree without running a native rebuild', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-repair-mikro-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const source = path.join(root, 'source'),
+    bin = path.join(root, 'bin');
+  await fs.mkdir(path.join(source, 'node_modules'), { recursive: true });
+  await fs.mkdir(bin);
+  await fs.writeFile(
+    path.join(source, 'package.json'),
+    JSON.stringify({
+      packageManager: 'pnpm@8.3.1',
+      dependencies: { '@mikro-orm/core': '7.2.5', '@mikro-orm/sql': '7.2.5' },
+    }),
+  );
+  await fs.writeFile(path.join(source, 'pnpm-lock.yaml'), 'frozen lock');
+  await fs.writeFile(path.join(source, 'node_modules/broken'), 'old');
+  await fs.writeFile(
+    path.join(bin, 'pnpm'),
+    `#!${process.execPath}
+    const fs=require('node:fs');
+    if(process.argv[2]==='--version') console.log('8.3.1');
+    else if(process.argv[2]==='install') {
+      if(!['--prod','--frozen-lockfile','--ignore-scripts'].every(x=>process.argv.includes(x))) throw Error('unsafe install');
+      fs.mkdirSync('node_modules');fs.writeFileSync('node_modules/repaired','new');
+    } else throw Error('MikroORM must not rebuild sqlite3');
+  `,
+    { mode: 0o755 },
+  );
+  await repairDependencies(source, {
+    target: { arch: 'armv6' },
+    env: { PATH: bin },
+  });
+  assert.equal(
+    await fs.readFile(path.join(source, 'node_modules/repaired'), 'utf8'),
+    'new',
+  );
+  await assert.rejects(fs.access(path.join(source, 'node_modules/broken')), {
+    code: 'ENOENT',
+  });
+  assert.equal(
+    await fs.readFile(path.join(source, 'pnpm-lock.yaml'), 'utf8'),
+    'frozen lock',
+  );
+  assert.deepEqual((await fs.readdir(root)).sort(), ['bin', 'source']);
 });

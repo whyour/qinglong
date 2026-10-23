@@ -19,39 +19,63 @@ const platforms = [
   'linux-s390x-glibc',
 ];
 function releaseIndex(directory, commit, repository, options = {}) {
-  const { version, releaseTag = `upgrade-${commit}` } = options;
+  const {
+    version,
+    releaseTag = `upgrade-${commit}`,
+    migration = false,
+  } = options;
   if (
     !/^[a-f0-9]{40}$/.test(commit) ||
     !/^[\w.-]+\/[\w.-]+$/.test(repository) ||
     !/^[\w.+-]+$/.test(releaseTag)
   )
     throw new Error('Invalid release source');
-  const packages = {};
-  for (const target of platforms) {
-    const filename = `qinglong-${commit}-${target}.tar.gz`;
-    const record = JSON.parse(
-      fs.readFileSync(path.join(directory, filename + '.json')),
-    );
-    const bytes = fs.readFileSync(path.join(directory, filename));
-    if (
-      record.format !== 2 ||
-      record.sourceCommit !== commit ||
-      (version !== undefined && record.version !== version) ||
-      record.target !== target ||
-      record.filename !== filename ||
-      record.size !== bytes.length ||
-      record.sha256 !== sha256(bytes)
-    )
-      throw new Error(`Unverified platform bundle: ${target}`);
-    packages[target] = {
-      size: record.size,
-      sha256: record.sha256,
-      url: `https://github.com/${repository}/releases/download/${encodeURIComponent(
-        releaseTag,
-      )}/${filename}`,
-    };
-  }
-  return { format: 2, sourceCommit: commit, packages };
+  const readPackages = (bridge) => {
+    const packages = {};
+    for (const target of platforms) {
+      const filename = `qinglong-${
+        bridge ? 'migration-' : ''
+      }${commit}-${target}.tar.gz`;
+      const record = JSON.parse(
+        fs.readFileSync(path.join(directory, filename + '.json')),
+      );
+      const bytes = fs.readFileSync(path.join(directory, filename));
+      if (
+        record.format !== 2 ||
+        record.sourceCommit !== commit ||
+        (version !== undefined &&
+          (bridge ? record.migrationBridge?.targetVersion : record.version) !==
+            version) ||
+        (bridge &&
+          (record.migrationVerified !== true ||
+            record.migrationBridge?.sourceCommit !== commit ||
+            record.migrationBridge?.legacySourceCommit !==
+              require('../docker/migration-bridge-images.json')
+                .sourceCommit)) ||
+        (!bridge && record.migrationBridge) ||
+        record.target !== target ||
+        record.filename !== filename ||
+        record.size !== bytes.length ||
+        record.sha256 !== sha256(bytes)
+      )
+        throw new Error(`Unverified platform bundle: ${target}`);
+      packages[target] = {
+        size: record.size,
+        sha256: record.sha256,
+        url: `https://github.com/${repository}/releases/download/${encodeURIComponent(
+          releaseTag,
+        )}/${filename}`,
+      };
+    }
+    return packages;
+  };
+  const runtimePackages = readPackages(false);
+  return {
+    format: 2,
+    sourceCommit: commit,
+    packages: migration ? readPackages(true) : runtimePackages,
+    ...(migration ? { runtimePackages } : {}),
+  };
 }
 function publishBundles({
   directory,
@@ -83,6 +107,7 @@ function publishBundles({
     ...releaseIndex(directory, commit, repository, {
       version,
       releaseTag: tag,
+      migration: true,
     }),
     version,
     buildId,
@@ -115,10 +140,12 @@ function publishBundles({
   };
   const notes =
     `Verified platform bundles for v${version}, source ${commit}, build ${buildId}. Existing Node runtime is retained.\n\n` +
-    Object.entries(index.packages)
+    Object.entries(index.runtimePackages)
       .map(([target, entry]) => `- [${target}](${entry.url})`)
       .join('\n') +
-    `\n- [Standalone offline installer](${index.installer.url})`;
+    `\n- [Standalone offline installer](${index.installer.url})\n\n` +
+    'Legacy format-2 panels update the upgrader first, then download the runtime. ' +
+    'The packages index contains the separate legacy bridge; runtimePackages contains the normal online/offline packages.';
   const ensureRelease = (ref, title) => {
     if (!lookup(ref))
       gh(
@@ -150,13 +177,15 @@ function publishBundles({
   }
   ensureRelease(tag, `Platform upgrade v${version} (${buildId})`);
   const assets = platforms
-    .flatMap((target) => {
-      const archive = path.join(
-        directory,
-        `qinglong-${commit}-${target}.tar.gz`,
-      );
-      return [archive, archive + '.json'];
-    })
+    .flatMap((target) =>
+      [false, true].flatMap((bridge) => {
+        const archive = path.join(
+          directory,
+          `qinglong-${bridge ? 'migration-' : ''}${commit}-${target}.tar.gz`,
+        );
+        return [archive, archive + '.json'];
+      }),
+    )
     .concat(
       path.join(directory, 'install-bundle.cjs'),
       path.join(directory, 'latest.json'),

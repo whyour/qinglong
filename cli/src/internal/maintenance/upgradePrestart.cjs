@@ -210,6 +210,28 @@ async function prestartBackend(
   }
 }
 
+async function cleanSqliteBuildArtifacts(directory) {
+  const entries = await fs.readdir(directory, { withFileTypes: true }).catch((error) => {
+    if (error.code !== 'ENOENT') throw error;
+    return [];
+  });
+  if (!entries.length) return;
+  const pkg = JSON.parse(await fs.readFile(path.join(directory, 'package.json'), 'utf8'));
+  const runtimePath = path.posix.normalize(pkg.binary?.module_path || '.');
+  const copiedRuntime = runtimePath.startsWith('lib/binding/');
+  // Our legacy fork copies its runtime to lib/binding. Other sqlite3 versions
+  // load build/Release directly: retain that addon and remove only the compiler
+  // helper directory. Never traverse a build-directory symlink while cleaning.
+  for (const entry of entries) {
+    if (entry.name !== 'build' && !/^build-tmp-napi-v\d+$/.test(entry.name)) continue;
+    const build = path.join(directory, entry.name);
+    await fs.rm(
+      copiedRuntime || entry.isSymbolicLink() ? build : path.join(build, 'node_gyp_bins'),
+      { recursive: true, force: true },
+    );
+  }
+}
+
 async function repairDependencies(source, { target, signal, env }) {
   const workspace = await fs.mkdtemp(
     path.join(path.dirname(source), 'repair-'),
@@ -299,7 +321,12 @@ async function repairDependencies(source, { target, signal, env }) {
       '--child-concurrency=1',
       '--network-concurrency=2',
     ]);
-    await run(['rebuild', 'sqlite3', '@whyour/sqlite3']);
+    if (pkg.dependencies?.sqlite3) {
+      await run(['rebuild', 'sqlite3', '@whyour/sqlite3']);
+      await cleanSqliteBuildArtifacts(
+        path.join(workspace, 'node_modules/sqlite3'),
+      );
+    }
     if (
       !(await fs.readFile(path.join(source, 'pnpm-lock.yaml'))).equals(
         await fs.readFile(path.join(workspace, 'pnpm-lock.yaml')),
@@ -390,5 +417,6 @@ module.exports = {
   prestartBackend,
   dependencyFailure,
   repairDependencies,
+  cleanSqliteBuildArtifacts,
   probeLimits,
 };

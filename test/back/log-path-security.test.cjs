@@ -5,7 +5,6 @@ const os = require('node:os');
 const path = require('node:path');
 const load = require('../helpers/load-security-module.cjs');
 const { LogStreamManager } = require('../../back/shared/logStreamManager');
-
 async function fixture(t) {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-log-boundary-'));
   t.after(() => fs.rm(base, { recursive: true, force: true }));
@@ -31,7 +30,6 @@ async function fixture(t) {
   ];
   return { root, outside, victim, invalid };
 }
-
 test('log streams reject traversal, sibling prefixes and escaping symlinks before writing', async (t) => {
   const { root, outside, victim, invalid } = await fixture(t);
   const manager = new LogStreamManager(root);
@@ -58,7 +56,6 @@ test('log streams reject traversal, sibling prefixes and escaping symlinks befor
   await manager.closeAll();
   assert.equal(await fs.readFile(log, 'utf8'), '开始\n结束\n');
 });
-
 test('log initialization rejects unsafe paths before mkdir or file writes', async (t) => {
   const { root, outside, victim, invalid } = await fixture(t);
   const { handleLogPath } = load(path.resolve('back/config/util.ts'), {
@@ -87,7 +84,6 @@ test('log initialization rejects unsafe paths before mkdir or file writes', asyn
   assert.equal(await handleLogPath(log, 'ignored'), log);
   assert.equal(await fs.readFile(log, 'utf8'), 'initial');
 });
-
 test('manual execution rejects escaping log names before creating directories or spawning', async (t) => {
   const { root, outside, victim } = await fixture(t);
   let spawned = 0;
@@ -97,7 +93,7 @@ test('manual execution rejects escaping log names before creating directories or
     '../config': { logPath: root },
     '../data/cron': {
       CrontabStatus: { queued: 3, idle: 1 },
-      CrontabModel: { update: async () => {} },
+      CrontabModel: { nativeUpdate: async (where, data) => {} },
     },
     '../data/runningInstance': { RunningInstanceModel: {}, InstanceStatus: {} },
     '../config/util': {},

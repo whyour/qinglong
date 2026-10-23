@@ -5,10 +5,7 @@ import CronService from '../services/cron';
 import CronViewService from '../services/cronView';
 import { celebrate, Joi } from 'celebrate';
 import { commonCronSchema } from '../validation/schedule';
-import {
-  RunningInstanceModel,
-  InstanceStatus,
-} from '../data/runningInstance';
+import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
 import { t } from '../shared/i18n';
 import cronClient from '../schedule/client';
 
@@ -19,8 +16,17 @@ export default (app: Router) => {
 
   route.use(async (req, res, next) => {
     // Keep stop/status callbacks available even when the scheduler is down.
-    if (['POST', 'PUT', 'DELETE'].includes(req.method) &&
-      ['/', '/run', '/enable', '/disable', '/views/enable', '/views/disable'].includes(req.path)) {
+    if (
+      ['POST', 'PUT', 'DELETE'].includes(req.method) &&
+      [
+        '/',
+        '/run',
+        '/enable',
+        '/disable',
+        '/views/enable',
+        '/views/disable',
+      ].includes(req.path)
+    ) {
       try {
         await cronClient.readiness.ensureReady();
       } catch (error) {
@@ -497,13 +503,10 @@ export default (app: Router) => {
     }),
     async (req: Request<{ id: number }>, res: Response, next: NextFunction) => {
       try {
-        const instances = await RunningInstanceModel.findAll({
-          where: {
-            cron_id: req.params.id,
-          },
-          order: [['started_at', 'DESC']],
-          raw: true,
-        });
+        const instances = await RunningInstanceModel.find(
+          { cron_id: req.params.id },
+          { orderBy: [{ started_at: 'desc' }] },
+        );
         return res.send({ code: 200, data: instances });
       } catch (e) {
         return next(e);
@@ -519,7 +522,11 @@ export default (app: Router) => {
         instanceId: Joi.number().required(),
       }),
     }),
-    async (req: Request<{ id: number; instanceId: number }>, res: Response, next: NextFunction) => {
+    async (
+      req: Request<{ id: number; instanceId: number }>,
+      res: Response,
+      next: NextFunction,
+    ) => {
       try {
         const cronService = Container.get(CronService);
         const data = await cronService.stopInstance(req.params.instanceId);

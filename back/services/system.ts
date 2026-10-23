@@ -1,3 +1,4 @@
+import { Query, QuerySpec, orderBy } from '../data/queries';
 import { persistNotificationAudit } from '../shared/notificationAudit';
 import { spawn } from 'cross-spawn';
 import { execFile } from 'child_process';
@@ -46,18 +47,16 @@ import os from 'os';
 import dayjs from 'dayjs';
 import { t, setLang } from '../shared/i18n';
 import { updateLinuxMirrorFile } from '../config/util';
-
 @Service()
 export default class SystemService {
   @Inject((type) => NotificationService)
   private notificationService!: NotificationService;
-
   constructor(
-    @Inject('logger') private logger: winston.Logger,
+    @Inject('logger')
+    private logger: winston.Logger,
     private scheduleService: ScheduleService,
     private sockService: SockService,
   ) {}
-
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
     return {
@@ -65,22 +64,19 @@ export default class SystemService {
       info: { ...doc.info, timezone: doc.info?.timezone || 'Asia/Shanghai' },
     };
   }
-
   private async updateAuthDb(payload: SystemInfo): Promise<SystemInfo> {
     const { id, ...others } = payload;
-    await SystemModel.update(others, { where: { id } });
+    await SystemModel.nativeUpdate({ id }, others);
     const doc = await this.getDb({ id });
     return doc;
   }
-
   public async getDb(query: any): Promise<SystemInfo> {
-    const doc = await SystemModel.findOne({ where: query });
+    const doc = await SystemModel.findOne(query, {});
     if (!doc) {
       throw new Error(`System ${JSON.stringify(query)} not found`);
     }
-    return doc.get({ plain: true });
+    return doc;
   }
-
   public async updateNotificationMode(notificationInfo: NotificationInfo) {
     const code = Math.random().toString().slice(-6);
     const isSuccess = await this.notificationService.testNotify(
@@ -98,7 +94,6 @@ export default class SystemService {
       return { code: 400, message: t('通知发送失败，请检查参数') };
     }
   }
-
   public async updateLogRemoveFrequency(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     const result = await this.updateAuthDb({
@@ -125,7 +120,6 @@ export default class SystemService {
     }
     return { code: 200, data: info };
   }
-
   public async updateCronConcurrency(info: SystemModelInfo) {
     const limit = info.cronConcurrency ?? 0;
     if (!Number.isInteger(limit) || limit < 0 || limit > 2147483647) {
@@ -142,7 +136,6 @@ export default class SystemService {
       return { code: 200, data: info };
     });
   }
-
   public async restoreCronConcurrency() {
     await withSchedulerMutation(async () => {
       const doc = await this.getSystemConfig();
@@ -151,7 +144,6 @@ export default class SystemService {
       await cronClient.setConcurrency(limit);
     });
   }
-
   public async updateDependenceProxy(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     await this.updateAuthDb({
@@ -170,7 +162,6 @@ export default class SystemService {
     }
     return { code: 200, data: info };
   }
-
   public async updateNodeMirror(info: SystemModelInfo, res?: Response) {
     const oDoc = await this.getSystemConfig();
     await this.updateAuthDb({
@@ -182,12 +173,13 @@ export default class SystemService {
       cmd = `pnpm config set registry ${shellQuote(info.nodeMirror)}`;
     }
     let command = `cd && ${cmd}`;
-    const docs = await DependenceModel.findAll({
-      where: {
+    const docs = await DependenceModel.find(
+      {
         type: DependenceTypes.nodejs,
         status: DependenceStatus.installed,
       },
-    });
+      {},
+    );
     if (docs.length > 0) {
       command += ` && pnpm i -g`;
     }
@@ -219,7 +211,6 @@ export default class SystemService {
       },
     );
   }
-
   public async updatePythonMirror(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     await this.updateAuthDb({
@@ -233,7 +224,6 @@ export default class SystemService {
     await promiseExec(cmd);
     return { code: 200, data: info };
   }
-
   public async updateLinuxMirror(
     info: SystemModelInfo,
     res?: Response,
@@ -280,13 +270,11 @@ export default class SystemService {
       },
     );
   }
-
   public async checkUpdate() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const currentVersionContent = await parseVersion(config.versionFile);
-
       const { body, statusCode } = await request(
         `${config.lastVersionFile}?t=${Date.now()}`,
         { signal: controller.signal },
@@ -301,7 +289,6 @@ export default class SystemService {
       ) {
         throw new Error('Invalid version response');
       }
-
       return {
         code: 200,
         data: {
@@ -323,7 +310,6 @@ export default class SystemService {
       clearTimeout(timeout);
     }
   }
-
   private checkHasNewVersion(curVersion: string, lastVersion: string) {
     const curArr = curVersion.split('.').map((x) => parseInt(x, 10));
     const lastArr = lastVersion.split('.').map((x) => parseInt(x, 10));
@@ -342,25 +328,21 @@ export default class SystemService {
     }
     return false;
   }
-
   public async updateSystem() {
     return this.startUpgradeJob('download');
   }
-
   private upgradeJobs() {
     return require(path.join(
       config.rootPath,
       'cli/src/internal/maintenance/panelUpgrade.cjs',
     ));
   }
-
   public async getUpgradeStatus() {
     return {
       code: 200,
       data: await this.upgradeJobs().getStatus(config.tmpPath),
     };
   }
-
   private async startUpgradeJob(action: 'download' | 'apply') {
     try {
       const data = await this.upgradeJobs().startJob(
@@ -383,7 +365,6 @@ export default class SystemService {
       return { code: 400, message: t('升级任务启动失败，请检查日志后重试') };
     }
   }
-
   public async reloadSystem(target?: 'system' | 'data') {
     if (target && !['system', 'data'].includes(target)) {
       return { code: 400, message: t('参数错误') };
@@ -401,7 +382,6 @@ export default class SystemService {
     });
     return { code: 200 };
   }
-
   public async notify({
     title,
     content,
@@ -418,35 +398,38 @@ export default class SystemService {
     if (notificationInfo && typeString) {
       notificationInfo.type = typeString;
     }
-
     const isSuccess = await this.notificationService.notify(
       title,
       content,
       notificationInfo,
     );
-
     if (isSuccess) {
       return { code: 200, message: t('通知发送成功') };
     } else {
       return { code: 400, message: t('通知发送失败，请检查系统设置/通知配置') };
     }
   }
-
   public async recordNotifyLog(info: NotifyLogInfo): Promise<void> {
     await persistNotificationAudit(info);
   }
-
   public async getNotifyLog(): Promise<Array<NotifyLogInfo>> {
-    const docs = await SystemModel.findAll({
-      where: { type: AuthDataType.notifyLog },
-      order: [['id', 'DESC']],
-      limit: 200,
-    });
+    const docs = await SystemModel.find(
+      { type: AuthDataType.notifyLog },
+      {
+        orderBy: orderBy([['id', 'DESC']]),
+        limit: 200,
+      },
+    );
     return docs.map((x) => ({ ...x.info, id: x.id }));
   }
-
   public async run(
-    { command, logPath }: { command: string; logPath?: string },
+    {
+      command,
+      logPath,
+    }: {
+      command: string;
+      logPath?: string;
+    },
     callback: TaskCallbacks,
   ) {
     if (!command.startsWith(TASK_COMMAND)) {
@@ -463,17 +446,14 @@ export default class SystemService {
       },
     );
   }
-
   public async stop({ command, pid }: { command: string; pid: number }) {
     if (!pid && !command) {
       return { code: 400, message: t('参数错误') };
     }
-
     if (pid) {
       await killTask(pid);
       return { code: 200 };
     }
-
     if (!command.startsWith(TASK_COMMAND)) {
       command = `${TASK_COMMAND} ${command}`;
     }
@@ -485,7 +465,6 @@ export default class SystemService {
       return { code: 400, message: t('任务未找到') };
     }
   }
-
   public async exportData(res: Response, type?: string[]) {
     try {
       let dataDirs = ['db', 'upload'];
@@ -527,7 +506,6 @@ export default class SystemService {
       return res.send({ code: 400, message: error.message });
     }
   }
-
   public async importData() {
     try {
       await promiseExec(`rm -rf ${path.join(config.tmpPath, 'data')}`);
@@ -539,7 +517,6 @@ export default class SystemService {
       return { code: 400, message: error.message };
     }
   }
-
   public async getSystemLog(
     res: Response,
     query: {
@@ -559,7 +536,6 @@ export default class SystemService {
       .reverse()
       .filter((x) => x.title.endsWith('.log'))
       .filter((x) => x.createTime >= startTime && x.createTime <= endTime);
-
     const limit = Math.min(
       Math.max(Number(query.limit) || 1024 * 1024, 1),
       1024 * 1024,
@@ -567,7 +543,10 @@ export default class SystemService {
     const total = logs.reduce((size, log) => size + (log.size || 0), 0);
     let remaining = limit;
     const selected: Array<
-      (typeof logs)[number] & { start: number; length: number }
+      (typeof logs)[number] & {
+        start: number;
+        length: number;
+      }
     > = [];
     for (let index = logs.length - 1; index >= 0 && remaining > 0; index--) {
       const log = logs[index];
@@ -578,7 +557,6 @@ export default class SystemService {
         remaining -= length;
       }
     }
-
     const contentLength = selected.reduce((size, log) => size + log.length, 0);
     res.set({
       'Content-Length': contentLength,
@@ -590,7 +568,6 @@ export default class SystemService {
         res.end();
         return;
       }
-
       const currentLog = fileNames.shift();
       if (currentLog) {
         const currentFileStream = fs.createReadStream(
@@ -607,7 +584,6 @@ export default class SystemService {
       }
     })(res, selected);
   }
-
   public async deleteSystemLog() {
     const result = await readDirs(config.systemLogPath, config.systemLogPath);
     const logs = result.reverse().filter((x) => x.title.endsWith('.log'));
@@ -625,7 +601,6 @@ export default class SystemService {
       }
     }
   }
-
   public async updateTimezone(info: SystemModelInfo) {
     if (!info.timezone) {
       info.timezone = 'Asia/Shanghai';
@@ -642,7 +617,6 @@ export default class SystemService {
       return { code: 400, message: t('设置时区失败') };
     }
   }
-
   public async updateLanguage(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     const lang = info.lang || 'zh';
@@ -662,7 +636,6 @@ export default class SystemService {
     setLang(lang);
     return { code: 200, data: { lang } };
   }
-
   public async updatePanelTitle(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     const panelTitle = info.panelTitle?.trim() || '';
@@ -672,43 +645,36 @@ export default class SystemService {
     });
     return { code: 200, data: { panelTitle } };
   }
-
   public async updateGlobalSshKey(info: SystemModelInfo) {
     const oDoc = await this.getSystemConfig();
     const result = await this.updateAuthDb({
       ...oDoc,
       info: { ...oDoc.info, ...info },
     });
-
     // Apply the global SSH key
     const SshKeyService = require('./sshKey').default;
     const Container = require('typedi').Container;
     const sshKeyService = Container.get(SshKeyService);
-
     if (info.globalSshKey) {
       await sshKeyService.addGlobalSSHKey(info.globalSshKey, 'global');
     } else {
       await sshKeyService.removeGlobalSSHKey('global');
     }
-
     return { code: 200, data: result };
   }
-
   public async cleanDependence(type: 'node' | 'python3') {
     if (!type || !['node', 'python3'].includes(type)) {
       return { code: 400, message: t('参数错误') };
     }
     const finalPath = path.join(config.dependenceCachePath, type);
     await fs.promises.rm(finalPath, { recursive: true, force: true });
-    await DependenceModel.update(
-      { status: DependenceStatus.installFailed },
+    await DependenceModel.nativeUpdate(
       {
-        where: {
-          type:
-            type === 'node' ? DependenceTypes.nodejs : DependenceTypes.python3,
-          status: DependenceStatus.installed,
-        },
+        type:
+          type === 'node' ? DependenceTypes.nodejs : DependenceTypes.python3,
+        status: DependenceStatus.installed,
       },
+      { status: DependenceStatus.installFailed },
     );
     return { code: 200 };
   }

@@ -1,5 +1,4 @@
-import { DataTypes, Model } from 'sequelize';
-import { sequelize } from '.';
+import { Repository, RecordRow } from './repository';
 
 export class CrontabStat {
   id?: number;
@@ -23,49 +22,5 @@ export class CrontabStat {
   }
 }
 
-export interface CrontabStatInstance extends Model<CrontabStat, CrontabStat>, CrontabStat {}
-
-export const CrontabStatModel = sequelize.define<CrontabStatInstance>(
-  'CrontabStat',
-  {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true,
-    },
-    ref_id: {
-      type: DataTypes.NUMBER,
-      allowNull: false,
-    },
-    date: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    run_count: {
-      type: DataTypes.NUMBER,
-      defaultValue: 0,
-    },
-    success_count: {
-      type: DataTypes.NUMBER,
-      defaultValue: 0,
-    },
-    fail_count: {
-      type: DataTypes.NUMBER,
-      defaultValue: 0,
-    },
-    total_time: {
-      type: DataTypes.NUMBER,
-      defaultValue: 0,
-    },
-    max_time: {
-      type: DataTypes.NUMBER,
-      defaultValue: 0,
-    },
-  },
-  {
-    indexes: [
-      { unique: true, fields: ['ref_id', 'date'] },
-      { fields: ['date'] },
-    ],
-  },
-);
+export type CrontabStatInstance = RecordRow<CrontabStat>;
+export const CrontabStatModel = new Repository<CrontabStat>('CrontabStat');
