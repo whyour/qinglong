@@ -8,6 +8,7 @@ const {
   dependencyFailure,
   probeLimits,
   repairDependencies,
+  cleanSqliteBuildArtifacts,
 } = require('../../cli/src/internal/maintenance/upgradePrestart.cjs');
 
 for (const exitCode of [0, 1])
@@ -291,7 +292,7 @@ test('successful legacy repair publishes only portable runtime files from a pnpm
     const pkg = 'node_modules/.pnpm/@whyour+sqlite3@1.1.2/node_modules/@whyour/sqlite3';
     if (process.argv[2] === 'install') {
       fs.mkdirSync(pkg + '/lib/binding/napi-v6-linux-arm', {recursive:true});
-      fs.writeFileSync(pkg + '/package.json', '{}');
+      fs.writeFileSync(pkg + '/package.json', JSON.stringify({binary:{module_path:'./lib/binding/napi-v{napi_build_version}-{platform}-{arch}'}}));
       fs.symlinkSync('.pnpm/@whyour+sqlite3@1.1.2/node_modules/@whyour/sqlite3', 'node_modules/sqlite3');
     } else if (process.argv[2] === 'rebuild') {
       fs.writeFileSync(pkg + '/lib/binding/napi-v6-linux-arm/node_sqlite3.node', 'compiled addon');
@@ -329,6 +330,26 @@ test('successful legacy repair publishes only portable runtime files from a pnpm
     inventory,
   } = require('../../cli/src/internal/maintenance/platformBundle.cjs');
   await inventory({ source });
+});
+
+test('cleanup retains sqlite3 runtimes loaded from build/Release and never follows a build symlink', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-sqlite-release-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const sqlite = path.join(root, 'sqlite3'), outside = path.join(root, 'outside');
+  await fs.mkdir(path.join(sqlite, 'build/Release'), { recursive: true });
+  await fs.mkdir(path.join(sqlite, 'build/node_gyp_bins'));
+  await fs.mkdir(path.join(outside, 'node_gyp_bins'), { recursive: true });
+  await fs.writeFile(path.join(outside, 'node_gyp_bins/keep'), 'untouched');
+  await fs.writeFile(path.join(sqlite, 'package.json'), JSON.stringify({ name: 'sqlite3', binary: { napi_versions: [3, 6] } }));
+  await fs.writeFile(path.join(sqlite, 'build/Release/node_sqlite3.node'), 'runtime addon');
+  await fs.symlink('/usr/bin/python3', path.join(sqlite, 'build/node_gyp_bins/python3'));
+  await fs.symlink(outside, path.join(sqlite, 'build-tmp-napi-v3'));
+  await cleanSqliteBuildArtifacts(sqlite);
+  assert.equal(await fs.readFile(path.join(sqlite, 'build/Release/node_sqlite3.node'), 'utf8'), 'runtime addon');
+  await assert.rejects(fs.access(path.join(sqlite, 'build/node_gyp_bins')), { code: 'ENOENT' });
+  await assert.rejects(fs.lstat(path.join(sqlite, 'build-tmp-napi-v3')), { code: 'ENOENT' });
+  assert.equal(await fs.readFile(path.join(outside, 'node_gyp_bins/keep'), 'utf8'), 'untouched');
+  await require('../../cli/src/internal/maintenance/platformBundle.cjs').inventory({ source: sqlite });
 });
 
 test('repair classification excludes application, platform, config, database, OOM and timeouts', () => {

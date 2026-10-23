@@ -37,7 +37,7 @@ async function fixture(t) {
     await fs.mkdir(path.join(root, name), { recursive: true });
   await fs.writeFile(root + '/package.json', JSON.stringify({ qinglongMigrationBridge: { format: 1 }, dependencies: { sqlite3: 'legacy' } }));
   await fs.writeFile(root + '/pnpm-lock.yaml', 'fixed legacy lock');
-  await fs.writeFile(root + '/node_modules/sqlite3/package.json', '{}');
+  await fs.writeFile(root + '/node_modules/sqlite3/package.json', JSON.stringify({ binary: { module_path: './lib/binding/napi-v{napi_build_version}-{platform}-{arch}' } }));
   await fs.writeFile(root + '/runtime/include/node/node_version.h', '#define NODE_MAJOR_VERSION 24\n#define NODE_MINOR_VERSION 18\n#define NODE_PATCH_VERSION 1\n');
   return { root, runtime: { execPath: root + '/runtime/bin/node', versions: { node: '24.18.1' }, env: { PATH: '/qa/bin', NODE_OPTIONS: '--require=untrusted', CFLAGS: '-march=armv7' } } };
 }

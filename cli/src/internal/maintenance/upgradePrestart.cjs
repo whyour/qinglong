@@ -211,15 +211,25 @@ async function prestartBackend(
 }
 
 async function cleanSqliteBuildArtifacts(directory) {
-  const names = await fs.readdir(directory).catch((error) => {
+  const entries = await fs.readdir(directory, { withFileTypes: true }).catch((error) => {
     if (error.code !== 'ENOENT') throw error;
     return [];
   });
-  // node-pre-gyp's runtime copy lives in lib/binding. Its build directories
-  // retain compiler objects and an absolute node_gyp_bins/python3 symlink.
-  for (const name of names)
-    if (name === 'build' || /^build-tmp-napi-v\d+$/.test(name))
-      await fs.rm(path.join(directory, name), { recursive: true, force: true });
+  if (!entries.length) return;
+  const pkg = JSON.parse(await fs.readFile(path.join(directory, 'package.json'), 'utf8'));
+  const runtimePath = path.posix.normalize(pkg.binary?.module_path || '.');
+  const copiedRuntime = runtimePath.startsWith('lib/binding/');
+  // Our legacy fork copies its runtime to lib/binding. Other sqlite3 versions
+  // load build/Release directly: retain that addon and remove only the compiler
+  // helper directory. Never traverse a build-directory symlink while cleaning.
+  for (const entry of entries) {
+    if (entry.name !== 'build' && !/^build-tmp-napi-v\d+$/.test(entry.name)) continue;
+    const build = path.join(directory, entry.name);
+    await fs.rm(
+      copiedRuntime || entry.isSymbolicLink() ? build : path.join(build, 'node_gyp_bins'),
+      { recursive: true, force: true },
+    );
+  }
 }
 
 async function repairDependencies(source, { target, signal, env }) {
