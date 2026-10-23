@@ -22,7 +22,13 @@ RUN set -x \
     npm_config_target_libc=musl \
     pnpm install --prod --frozen-lockfile
 
+# Pin amd64 to upstream's musl runtime after native URL parser crashes with APK Node.
+FROM --platform=linux/amd64 node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS node-runtime-amd64
+
 FROM python:3.10-alpine
+
+ARG TARGETARCH
+ARG TARGETVARIANT
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -44,7 +50,8 @@ EXPOSE 5700
 COPY --from=builder /opt/node-global/lib/node_modules/. /usr/local/lib/node_modules/
 COPY --from=builder /opt/node-global/bin/. /usr/local/bin/
 
-RUN set -x \
+RUN --mount=type=bind,from=node-runtime-amd64,source=/usr/local/bin/node,target=/tmp/node-runtime-amd64 \
+  set -x \
   && apk update -f \
   && apk upgrade \
   && apk --no-cache add -f bash \
@@ -62,6 +69,10 @@ RUN set -x \
   netcat-openbsd \
   unzip \
   npm \
+  && if [ "$TARGETARCH" = amd64 ]; then \
+       cp /tmp/node-runtime-amd64 /usr/local/bin/node; \
+       ln -sf /usr/local/bin/node /usr/bin/node; \
+     fi \
   && rm -rf /var/cache/apk/* \
   && apk update \
   && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
@@ -86,6 +97,10 @@ COPY static/ /ql/static/
 COPY docker/verify-build.cjs docker/build-manifest.cjs /tmp/
 COPY --from=builder /tmp/build/pnpm-lock.yaml /tmp/dependency-lock.yaml
 RUN cd ${QL_DIR} && node /tmp/verify-build.cjs /tmp/dependency-lock.yaml
+RUN if [ "$TARGETARCH" = arm ] && [ "${TARGETVARIANT:-}" = v6 ]; then \
+      QEMU_CPU=arm1176 node --jitless ${QL_DIR}/shell/node-runtime-probe.cjs; \
+    else node ${QL_DIR}/shell/node-runtime-probe.cjs; fi
+
 
 ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
   PYTHON_HOME=${QL_DIR}/data/dep_cache/python3 \

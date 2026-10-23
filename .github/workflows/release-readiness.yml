@@ -6,6 +6,11 @@ on:
       - '.github/workflows/release-readiness.yml'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - 'docker/Dockerfile*'
+      - 'shell/node-runtime-probe.cjs'
+      - 'scripts/verify-panel-package.cjs'
+      - 'scripts/verify-image-node-layers.py'
+      - 'test/back/node-runtime-probe.test.cjs'
   workflow_dispatch:
 
 permissions:
@@ -40,6 +45,13 @@ jobs:
           name: release-readiness-static
           path: static/
           include-hidden-files: true
+          if-no-files-found: error
+      - name: Pack the verified npm archive for isolated runtime validation
+        run: node scripts/verify-panel-package.cjs pack "$RUNNER_TEMP/npm-panel"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-readiness-npm-panel
+          path: ${{ runner.temp }}/npm-panel/
           if-no-files-found: error
 
   images:
@@ -121,16 +133,38 @@ jobs:
           docker run --rm --network none --entrypoint node \
             qinglong-readiness:${{ matrix.image }} \
             -e 'const assert=require("node:assert/strict"); const {createRequire}=require("node:module"); for(const [name,want] of Object.entries({"@grpc/grpc-js":"1.14.5",compression:"1.8.2",multer:"2.4.0",sequelize:"6.37.8"}))assert.equal(require(name+"/package.json").version,want); const expressRequire=createRequire(require.resolve("express")); assert.equal(expressRequire("proxy-addr/package.json").version,"2.0.8"); const sockRequire=createRequire(require.resolve("sockjs")); assert.equal(sockRequire("websocket-driver/package.json").version,"0.7.5"); require("sqlite3"); require("nodemailer"); require("undici"); console.log("Minimal production patches and runtime imports verified")'
-      - name: Export native Debian image for isolated dev validation
-        if: matrix.image == 'debian'
-        run: |
-          docker save qinglong-readiness:debian | gzip -1 > release-readiness-debian-image.tar.gz
-          sha256sum release-readiness-debian-image.tar.gz > release-readiness-debian-image.sha256
-          docker image inspect qinglong-readiness:debian > release-readiness-debian-image.json
-      - uses: actions/upload-artifact@v6
-        if: matrix.image == 'debian'
+      - name: Export ARMv6 image layers for Node regression checks
+        if: startsWith(matrix.image, 'alpine')
+        uses: docker/build-push-action@v7
         with:
-          name: release-readiness-debian-image
-          path: release-readiness-debian-image.*
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/arm/v6
+          build-args: |
+            QL_URL=${{ steps.source.outputs.url }}
+            QL_BRANCH=${{ steps.source.outputs.branch }}
+            SOURCE_COMMIT=${{ steps.source.outputs.sha }}
+          outputs: type=docker,dest=${{ runner.temp }}/node-layers-arm.tar
+          push: false
+          provenance: false
+          sbom: false
+      - name: Check Node binaries in every serialized image layer
+        if: startsWith(matrix.image, 'alpine')
+        run: |
+          docker save qinglong-readiness:${{ matrix.image }} -o "$RUNNER_TEMP/node-layers-amd64.tar"
+          python3 scripts/verify-image-node-layers.py "$RUNNER_TEMP/node-layers-amd64.tar" amd64
+          python3 scripts/verify-image-node-layers.py "$RUNNER_TEMP/node-layers-arm.tar" arm
+          rm "$RUNNER_TEMP/node-layers-amd64.tar" "$RUNNER_TEMP/node-layers-arm.tar"
+      - name: Export native image for isolated dev validation
+        if: matrix.image == 'debian' || matrix.image == 'alpine'
+        run: |
+          docker save qinglong-readiness:${{ matrix.image }} | gzip -1 > release-readiness-${{ matrix.image }}-image.tar.gz
+          sha256sum release-readiness-${{ matrix.image }}-image.tar.gz > release-readiness-${{ matrix.image }}-image.sha256
+          docker image inspect qinglong-readiness:${{ matrix.image }} > release-readiness-${{ matrix.image }}-image.json
+      - uses: actions/upload-artifact@v6
+        if: matrix.image == 'debian' || matrix.image == 'alpine'
+        with:
+          name: release-readiness-${{ matrix.image }}-image
+          path: release-readiness-${{ matrix.image }}-image.*
           compression-level: 0
           if-no-files-found: error
