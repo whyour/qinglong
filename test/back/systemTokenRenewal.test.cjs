@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
+const { processFailure } = require('../helpers/process-failure.cjs');
 const environment = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-token-env-'));
 fs.writeFileSync(path.join(environment, '.env'), '');
 fs.mkdirSync(path.join(environment, 'data/db'), { recursive: true });
@@ -622,11 +623,7 @@ test('real SQLite and authentication cache retain concurrent process updates', a
     assert.equal(
       outcome.status,
       'fulfilled',
-      JSON.stringify({
-        code: outcome.reason?.code,
-        signal: outcome.reason?.signal,
-        killed: outcome.reason?.killed,
-      }),
+      JSON.stringify(processFailure(outcome.reason)),
     );
     return outcome.value;
   });
