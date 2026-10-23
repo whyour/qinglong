@@ -164,7 +164,10 @@ async function readState(tmp) {
   }
 }
 
-async function getStatus(tmp) {
+async function getStatus(
+  tmp,
+  { root = path.resolve(__dirname, '../../../..') } = {},
+) {
   const state = await readState(tmp);
   if (active.has(state.status)) {
     let alive = false;
@@ -198,7 +201,17 @@ async function getStatus(tmp) {
       await handle.close();
     }
   }
-  return state;
+  const pkg = JSON.parse(
+    await fs
+      .readFile(path.join(root, 'package.json'), 'utf8')
+      .catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+        return '{}';
+      }),
+  );
+  // Read the installed package on every poll: the worker's completion record
+  // survives replacement, while this marker disappears only with the new runtime.
+  return { ...state, migrationRequired: Boolean(pkg.qinglongMigrationBridge) };
 }
 
 // Manual restarts accept the currently prepared package, including one retained

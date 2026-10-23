@@ -15,6 +15,7 @@ export interface UpgradeJob {
   version?: string;
   error?: string;
   log?: string;
+  migrationRequired?: boolean;
 }
 
 export const activeStatuses = ['starting', 'running', 'restarting'];
@@ -34,6 +35,8 @@ export const phaseLabels: Record<string, string> = {
 
 // Status is authoritative; old progress fields must not claim completion.
 export function upgradeStatusLabel(job: UpgradeJob): string {
+  if (job.migrationRequired && ['idle', 'completed'].includes(job.status))
+    return '升级器已更新，请继续升级新版';
   if (job.status === 'ready') return '下载完成，等待重启';
   if (job.status === 'completed') return '升级成功';
   if (job.status === 'failed') return '更新失败';
@@ -94,8 +97,14 @@ export function createUpgradeStore() {
       ) {
         sessionStorage.removeItem(completionKey);
         notification.success({
-          message: intl.get('升级成功'),
-          description: intl.get('已重新启动并运行新版本，无需再次重启。'),
+          message: intl.get(
+            result.data.migrationRequired ? '升级器已更新' : '升级成功',
+          ),
+          description: intl.get(
+            result.data.migrationRequired
+              ? '当前仍运行旧版，请继续下载并重启以完成新版升级。'
+              : '已重新启动并运行新版本，无需再次重启。',
+          ),
           duration: 8,
         });
       }

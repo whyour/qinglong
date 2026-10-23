@@ -483,7 +483,13 @@ async function stageBundle({
         indexUrl,
       ]);
       const index = JSON.parse(await fs.readFile(indexFile, 'utf8'));
-      const entry = index.packages?.[targetKey(target)];
+      // Old format-2 clients read packages and receive an updater bridge. Once
+      // installed, this selector uses only the actual runtime packages. A broken
+      // runtime entry must never fall back to the bridge or a different platform.
+      const packages = Object.hasOwn(index, 'runtimePackages')
+        ? index.runtimePackages
+        : index.packages;
+      const entry = packages?.[targetKey(target)];
       if (
         index.format !== 2 ||
         !/^[a-f0-9]{40}$/.test(index.sourceCommit) ||
@@ -525,6 +531,10 @@ async function stageBundle({
     const manifest = JSON.parse(
       await fs.readFile(path.join(incoming, 'bundle.json'), 'utf8'),
     );
+    if (manifest.migrationBridge)
+      throw new Error(
+        'This is a legacy upgrader bridge; download the runtime package instead',
+      );
     if (expectedCommit && manifest.sourceCommit !== expectedCommit)
       throw new Error('Update index and bundle commit differ');
     const selected = {

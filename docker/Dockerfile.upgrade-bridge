@@ -1,0 +1,21 @@
+ARG LEGACY_IMAGE
+ARG BASE_IMAGE
+FROM ${LEGACY_IMAGE} AS legacy
+FROM ${BASE_IMAGE} AS bridge
+ARG BASE_IMAGE
+ENV QL_BUNDLE_BASE_IMAGE=${BASE_IMAGE}
+ARG TARGETARCH
+ARG TARGETVARIANT
+USER root
+COPY --from=legacy /ql/ /legacy/
+RUN ulimit -c 0; if [ "$TARGETARCH/$TARGETVARIANT" = arm/v6 ]; then \
+      export QEMU_CPU=arm1176; \
+      node --jitless /ql/scripts/build-migration-bridge.cjs /legacy /ql /out && \
+      for archive in /out/qinglong-*-linux-armv6-musl.tar.gz; do \
+        case "$archive" in */qinglong-migration-*) continue ;; esac; \
+        node /ql/shell/install-bundle.cjs --root /tmp/ql-bundle-offline-smoke --file "$archive" --install && \
+        rm -rf /tmp/ql-bundle-offline-smoke || exit 1; \
+      done; \
+    else node /ql/scripts/build-migration-bridge.cjs /legacy /ql /out; fi
+FROM scratch
+COPY --from=bridge /out/ /

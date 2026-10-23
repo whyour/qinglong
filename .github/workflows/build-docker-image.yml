@@ -714,7 +714,8 @@ jobs:
           if [ "$BUNDLE_LIBC" = glibc ]; then digest="$DEBIAN_DIGEST"; fi
           test -n "$digest"
           image="ghcr.io/${GITHUB_REPOSITORY}@${digest}"
-          docker buildx build --platform "$BUNDLE_PLATFORM" --build-arg "BASE_IMAGE=$image" --file docker/Dockerfile.upgrade-bundle --output type=local,dest=output/upgrade .
+          legacy=$(node -p "require('./docker/migration-bridge-images.json')['$BUNDLE_LIBC']")
+          docker buildx build --platform "$BUNDLE_PLATFORM" --build-arg "BASE_IMAGE=$image" --build-arg "LEGACY_IMAGE=$legacy" --file docker/Dockerfile.upgrade-bridge --output type=local,dest=output/upgrade .
       - uses: actions/upload-artifact@v6
         with:
           name: upgrade-${{ matrix.name }}-${{ github.sha }}

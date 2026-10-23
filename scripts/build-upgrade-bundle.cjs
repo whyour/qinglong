@@ -42,6 +42,10 @@ async function buildBundle(root, output) {
   if (process.platform !== 'linux')
     throw new Error('Release bundles must be built and probed on Linux');
   const build = await verifyUpgrade(root, path.join(root, 'static'));
+  const pkg = JSON.parse(
+    await fs.readFile(path.join(root, 'package.json'), 'utf8'),
+  );
+  const migrationBridge = pkg.qinglongMigrationBridge;
   await bundle.smokeDependencies(root);
   await fs.mkdir(output, { recursive: true });
   const workspace = await fs.mkdtemp(path.join(output, '.bundle-'));
@@ -80,9 +84,8 @@ async function buildBundle(root, output) {
     const manifest = {
       format: 2,
       sourceCommit: build.sourceCommit,
-      version: JSON.parse(
-        await fs.readFile(path.join(root, 'package.json'), 'utf8'),
-      ).version,
+      version: pkg.version,
+      ...(migrationBridge ? { migrationBridge } : {}),
       lockfileSha256: build.lockfileSha256,
       target: {
         platform: target.platform,
@@ -101,9 +104,9 @@ async function buildBundle(root, output) {
       JSON.stringify(manifest),
     );
     console.log('Bundle inventory verified; writing archive');
-    const filename = `qinglong-${build.sourceCommit}-${bundle.targetKey(
-      target,
-    )}.tar.gz`;
+    const filename = `qinglong-${migrationBridge ? 'migration-' : ''}${
+      build.sourceCommit
+    }-${bundle.targetKey(target)}.tar.gz`;
     await writeBundleArchive(workspace, path.join(output, filename));
     // Verify the bytes users receive, not just the pre-archive build directory.
     const roundtrip = path.join(workspace, 'roundtrip');
@@ -128,6 +131,7 @@ async function buildBundle(root, output) {
       target: bundle.targetKey(target),
       filename,
       baseImage: process.env.QL_BUNDLE_BASE_IMAGE,
+      ...(migrationBridge ? { migrationBridge } : {}),
       size: bytes.length,
       sha256: bundle.sha256(bytes),
     };

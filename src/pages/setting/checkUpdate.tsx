@@ -35,6 +35,18 @@ const CheckUpdate = ({ systemInfo }: any) => {
   };
 
   const checkUpgrade = async () => {
+    if (job.migrationRequired) {
+      Modal.confirm({
+        title: intl.get('继续升级新版'),
+        content: intl.get(
+          '升级器已更新。第二步将下载并预启动新版，准备成功后再重启应用。',
+        ),
+        okText: intl.get('下载新版'),
+        cancelText: intl.get('以后再说'),
+        onOk: startUpdate,
+      });
+      return;
+    }
     if (!upgradeStore.beginMutation()) return;
     try {
       const { code, data } = await request.put(
@@ -101,7 +113,9 @@ const CheckUpdate = ({ systemInfo }: any) => {
     });
 
   const label = intl.get(upgradeStatusLabel(job));
-  const hasJob = job.status !== 'idle' && job.status !== 'loading';
+  const hasJob =
+    Boolean(job.migrationRequired) ||
+    (job.status !== 'idle' && job.status !== 'loading');
   const actions = !active && (
     <Space wrap>
       <Button
@@ -110,9 +124,15 @@ const CheckUpdate = ({ systemInfo }: any) => {
         disabled={!connected || job.status === 'loading'}
         onClick={ready ? showReloadModal : checkUpgrade}
       >
-        {intl.get(ready ? '重启并更新' : '检查更新')}
+        {intl.get(
+          ready
+            ? '重启并更新'
+            : job.migrationRequired
+            ? '继续升级新版'
+            : '检查更新',
+        )}
       </Button>
-      {!ready && !completed && (
+      {!ready && !completed && !job.migrationRequired && (
         <Button
           disabled={busy || !connected || job.status === 'loading'}
           onClick={() => reloadSystem(false)}
@@ -148,7 +168,9 @@ const CheckUpdate = ({ systemInfo }: any) => {
               ? intl.get(job.error || '更新失败，请检查网络及日志或稍后再试') ||
                 job.error
               : intl.get(
-                  completed
+                  job.migrationRequired && !ready && !active
+                    ? '当前仍运行旧版，请继续下载并重启以完成新版升级。'
+                    : completed
                     ? '已重新启动并运行新版本，无需再次重启。'
                     : ready
                     ? '更新已就绪，重启后应用新版本'

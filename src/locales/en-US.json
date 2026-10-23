@@ -758,6 +758,12 @@
   "暂存更新已变化，请重新下载更新。": "The staged update changed. Download the update again.",
   "启动版本与更新包不一致": "The running build does not match the update package.",
   "下载完成，等待重启": "Download complete, restart to update",
+  "升级器已更新，请继续升级新版": "Upgrader updated; continue to the new version",
+  "升级器已更新": "Upgrader updated",
+  "当前仍运行旧版，请继续下载并重启以完成新版升级。": "The previous version is still running. Download the new version and restart to finish upgrading.",
+  "继续升级新版": "Continue upgrading",
+  "升级器已更新。第二步将下载并预启动新版，准备成功后再重启应用。": "The upgrader is updated. Step 2 downloads and tests the new backend before you restart to apply it.",
+  "下载新版": "Download new version",
   "升级成功": "Update successful",
   "已重新启动并运行新版本，无需再次重启。": "Restarted and running the new version. No further restart is needed."
 }
