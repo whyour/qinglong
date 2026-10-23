@@ -29,7 +29,6 @@ FROM python:3.11-alpine
 
 ARG TARGETARCH
 ARG TARGETVARIANT
-COPY --from=node-runtime-amd64 /usr/local/bin/node /tmp/node-runtime-amd64
 
 ARG QL_MAINTAINER="whyour"
 LABEL maintainer="${QL_MAINTAINER}"
@@ -51,7 +50,8 @@ EXPOSE 5700
 COPY --from=builder /opt/node-global/lib/node_modules/. /usr/local/lib/node_modules/
 COPY --from=builder /opt/node-global/bin/. /usr/local/bin/
 
-RUN set -x \
+RUN --mount=type=bind,from=node-runtime-amd64,source=/usr/local/bin/node,target=/tmp/node-runtime-amd64 \
+  set -x \
   && apk update -f \
   && apk upgrade \
   && apk --no-cache add -f bash \
@@ -70,9 +70,9 @@ RUN set -x \
   unzip \
   npm \
   && if [ "$TARGETARCH" = amd64 ]; then \
-       mv /tmp/node-runtime-amd64 /usr/local/bin/node; \
+       cp /tmp/node-runtime-amd64 /usr/local/bin/node; \
        ln -sf /usr/local/bin/node /usr/bin/node; \
-     else rm /tmp/node-runtime-amd64; fi \
+     fi \
   && rm -rf /var/cache/apk/* \
   && apk update \
   && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
