@@ -32,6 +32,7 @@ jobs:
           node-version: '22.17.0'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
       - run: npm test
       - run: npm run build:front && npm run build:back && npm run build:info
       - uses: actions/upload-artifact@v6
@@ -58,6 +59,7 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
       - run: npm test
 
   build-images:
