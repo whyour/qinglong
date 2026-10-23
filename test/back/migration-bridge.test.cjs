@@ -43,6 +43,125 @@ test('new online/offline engines reject an upgrader bridge rather than downgrade
   assert.deepEqual(await fs.readdir(tmp), []);
 });
 
+test('a pending second hop cannot use an old index without runtimePackages', async (t) => {
+  const root = await directory(t),
+    tmp = path.join(root, '.tmp');
+  await fs.mkdir(tmp);
+  await fs.writeFile(
+    path.join(root, 'package.json'),
+    JSON.stringify({
+      qinglongUpgradeFormat: 2,
+      qinglongMigrationBridge: { format: 1 },
+    }),
+  );
+  const key = bundle.targetKey(await bundle.runtimeTarget());
+  const entry = {
+    url: 'https://example.com/legacy.tar.gz',
+    size: 10,
+    sha256: 'b'.repeat(64),
+  };
+  const index = {
+    format: 2,
+    sourceCommit: 'a'.repeat(40),
+    packages: { [key]: entry },
+  };
+  let downloaded = false;
+  await assert.rejects(
+    bundle.stageBundle({
+      root,
+      tmp,
+      env: { QL_UPGRADE_INDEX_URL: 'https://example.com/latest.json' },
+      run: async (_program, args) =>
+        fs.writeFile(args[args.indexOf('--output') + 1], JSON.stringify(index)),
+      download: async () => {
+        downloaded = true;
+        throw new Error('legacy download requested');
+      },
+    }),
+    /尚未提供第二步运行包/,
+  );
+  assert.equal(downloaded, false);
+});
+
+test('a runtime index cannot prepare a correctly hashed legacy database backend as the second hop', async (t) => {
+  const root = await directory(t),
+    tmp = path.join(root, '.tmp');
+  await fs.mkdir(tmp);
+  await fs.writeFile(
+    path.join(root, 'package.json'),
+    JSON.stringify({ qinglongUpgradeFormat: 2 }),
+  );
+  const selected = {
+    source: root + '/qinglong/source',
+    static: root + '/qinglong/static',
+  };
+  await fs.mkdir(selected.source + '/node_modules/sqlite3', {
+    recursive: true,
+  });
+  await fs.mkdir(selected.static, { recursive: true });
+  await fs.writeFile(
+    selected.source + '/package.json',
+    JSON.stringify({
+      dependencies: { sqlite3: 'legacy', sequelize: 'legacy' },
+    }),
+  );
+  await fs.writeFile(
+    selected.source + '/node_modules/sqlite3/package.json',
+    '{}',
+  );
+  await fs.writeFile(selected.source + '/pnpm-lock.yaml', 'legacy lock');
+  const target = await bundle.runtimeTarget(),
+    sourceCommit = 'a'.repeat(40);
+  await fs.writeFile(
+    root + '/qinglong/bundle.json',
+    JSON.stringify({
+      format: 2,
+      sourceCommit,
+      lockfileSha256: bundle.sha256(Buffer.from('legacy lock')),
+      nodeApi: 6,
+      nodeMinimum: '22.17.0',
+      target: { ...target, libcMinimum: target.libcVersion },
+      files: await bundle.inventory(selected),
+    }),
+  );
+  const archive = root + '/legacy.tar.gz';
+  await tar.c({ cwd: root, file: archive, gzip: true }, ['qinglong']);
+  const bytes = await fs.readFile(archive),
+    key = bundle.targetKey(target);
+  const index = {
+    format: 2,
+    sourceCommit,
+    runtimePackages: {
+      [key]: {
+        url: 'https://example.com/runtime.tar.gz',
+        size: bytes.length,
+        sha256: bundle.sha256(bytes),
+      },
+    },
+  };
+  let probed = false;
+  await assert.rejects(
+    bundle.stageBundle({
+      root,
+      tmp,
+      env: { QL_UPGRADE_INDEX_URL: 'https://example.com/latest.json' },
+      run: async (_program, args) =>
+        fs.writeFile(args[args.indexOf('--output') + 1], JSON.stringify(index)),
+      download: async (_run, file) => fs.copyFile(archive, file),
+      verifyStatic: async () => ({ sourceCommit }),
+      probe: async () => {
+        probed = true;
+      },
+      prestart: async () => {},
+    }),
+    /第二步更新包仍是旧数据库后端/,
+  );
+  assert.equal(probed, false);
+  await assert.rejects(fs.access(tmp + '/upgrade-ready-master.json'), {
+    code: 'ENOENT',
+  });
+});
+
 test('the installed marker explains partial completion and disappears without relying on stale job fields', async (t) => {
   const root = await directory(t);
   await saveState(root, {

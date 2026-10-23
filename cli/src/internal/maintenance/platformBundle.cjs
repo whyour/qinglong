@@ -419,6 +419,8 @@ async function stageBundle({
   repair = repairDependencies,
 }) {
   let local = env.QL_UPGRADE_FILE;
+  let pendingMigration = false,
+    requiresModern = false;
   if (!local) {
     const current = JSON.parse(
       await fs
@@ -429,6 +431,9 @@ async function stageBundle({
         }),
     );
     if (current.qinglongUpgradeFormat !== 2) return null; // One-time compatibility path for older releases.
+    pendingMigration = Boolean(current.qinglongMigrationBridge);
+    requiresModern =
+      pendingMigration || Boolean(current.dependencies?.['@mikro-orm/sql']);
   }
   const target = await runtimeTarget();
   const branch = ['develop', 'debian-dev'].includes(env.QL_BRANCH)
@@ -483,6 +488,9 @@ async function stageBundle({
         indexUrl,
       ]);
       const index = JSON.parse(await fs.readFile(indexFile, 'utf8'));
+      if (pendingMigration && !Object.hasOwn(index, 'runtimePackages'))
+        throw new Error('更新索引尚未提供第二步运行包，请稍后重试');
+      requiresModern ||= Object.hasOwn(index, 'runtimePackages');
       // Old format-2 clients read packages and receive an updater bridge. Once
       // installed, this selector uses only the actual runtime packages. A broken
       // runtime entry must never fall back to the bridge or a different platform.
@@ -545,6 +553,15 @@ async function stageBundle({
     await fs.rename(path.join(incoming, 'static'), selected.static);
     await report({ phase: 'verifying', percent: null });
     await verifyPayload(selected, manifest, target);
+    if (
+      requiresModern &&
+      !JSON.parse(
+        await fs.readFile(path.join(selected.source, 'package.json'), 'utf8'),
+      ).dependencies?.['@mikro-orm/sql']
+    )
+      throw new Error(
+        '第二步更新包仍是旧数据库后端，已保留当前服务，请稍后重试',
+      );
     const build = await verifyStatic(selected.source, selected.static, env);
     if (build.sourceCommit !== manifest.sourceCommit)
       throw new Error('Bundle and build commit differ');
