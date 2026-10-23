@@ -612,12 +612,22 @@ test('real SQLite and authentication cache retain concurrent process updates', a
           external.client_id,
           external.client_secret,
         ],
-        { cwd: root, timeout: 20000, env: process.env },
+        // Seven ts-node processes also start isolated database workers. Their
+        // compilation/startup on minimum-Node CI is outside the lock operation.
+        { cwd: root, timeout: 60000, env: process.env },
       ),
     ),
   );
   const results = outcomes.map((outcome) => {
-    assert.equal(outcome.status, 'fulfilled', outcome.reason?.stderr);
+    assert.equal(
+      outcome.status,
+      'fulfilled',
+      JSON.stringify({
+        code: outcome.reason?.code,
+        signal: outcome.reason?.signal,
+        killed: outcome.reason?.killed,
+      }),
+    );
     return outcome.value;
   });
   const database = await service.findApps();
