@@ -53,9 +53,12 @@ async function rebuildMigrationSqlite(root, {
   assertArmv6Addon(stdout);
   if (!lock.equals(await fs.readFile(path.join(root, 'pnpm-lock.yaml'))))
     throw new Error('Migration SQLite rebuild changed the frozen lockfile');
-  // node-pre-gyp copied the addon to lib/binding; compiler objects are not
-  // needed on the small target device or in the transition download.
-  await fs.rm(path.join(rebuilt, 'build'), { recursive: true, force: true });
+  // node-pre-gyp copies the addon to lib/binding and then renames build to
+  // build-tmp-napi-v<N>. Both layouts contain compiler objects and an absolute
+  // node_gyp_bins/python3 link; none belongs in a portable runtime archive.
+  for (const name of await fs.readdir(rebuilt))
+    if (name === 'build' || /^build-tmp-napi-v\d+$/.test(name))
+      await fs.rm(path.join(rebuilt, name), { recursive: true, force: true });
   console.log('Legacy bridge SQLite rebuilt and verified for ARMv6 hard-float');
   return true;
 }

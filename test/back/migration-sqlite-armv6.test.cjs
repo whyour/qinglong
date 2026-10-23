@@ -62,6 +62,32 @@ test('uses frozen repair even when the legacy image has no optional node-gyp', a
   assert.equal(await fs.readFile(root + '/pnpm-lock.yaml', 'utf8'), 'fixed legacy lock');
 });
 
+test('removes node-pre-gyp build directories and external compiler links while retaining the runtime addon', async (t) => {
+  const { root, runtime } = await fixture(t);
+  const sqlite = path.join(root, 'node_modules/sqlite3');
+  const addon = path.join(sqlite, 'lib/binding/napi-v6-linux-arm/node_sqlite3.node');
+  await fs.mkdir(path.dirname(addon), { recursive: true });
+  await fs.writeFile(addon, 'compiled ARM1176 addon');
+  const statics = path.join(root, 'static');
+  await fs.mkdir(statics);
+  const { inventory } = require('../../cli/src/internal/maintenance/platformBundle.cjs');
+  for (const name of ['build', 'build-tmp-napi-v3', 'build-tmp-napi-v6']) {
+    const directory = path.join(sqlite, name, 'node_gyp_bins');
+    await fs.mkdir(directory, { recursive: true });
+    await fs.symlink('/usr/bin/python3', path.join(directory, 'python3'));
+  }
+  await assert.rejects(inventory({ source: root, static: statics }), /Bundle link escapes/);
+  await rebuildMigrationSqlite(root, {
+    target, runtime,
+    repair: async () => {},
+    run: async () => ({ stdout: armv6 }),
+  });
+  assert.equal(await fs.readFile(addon, 'utf8'), 'compiled ARM1176 addon');
+  for (const name of ['build', 'build-tmp-napi-v3', 'build-tmp-napi-v6'])
+    await assert.rejects(fs.access(path.join(sqlite, name)), { code: 'ENOENT' });
+  await inventory({ source: root, static: statics });
+});
+
 for (const fault of ['runtime-package', 'headers', 'compiler', 'armv7-output', 'lock-change'])
   test('fails closed for bridge rebuild fault: ' + fault, async (t) => {
     const { root, runtime } = await fixture(t);
