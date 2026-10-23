@@ -10,12 +10,17 @@ const bundle = require('../cli/src/internal/maintenance/platformBundle.cjs');
 const { repairDependencies } = require('../cli/src/internal/maintenance/upgradePrestart.cjs');
 
 function assertArmv6Addon(attributes) {
+  // Alpine's ARM CRT objects are ARMv6KZ (the ARM1176 architecture). Linking
+  // them raises a base-v6 object's ELF tag without introducing ARMv7/Thumb-2.
   if (
-    !/Tag_CPU_arch:\s+v6\s*$/m.test(attributes) ||
-    /Tag_THUMB_ISA_use:\s+Thumb-2|Tag_FP_arch:\s+VFPv[3-9]/.test(attributes) ||
+    !/Tag_CPU_arch:\s+v6(?:K|KZ|ZK)?\s*$/m.test(attributes) ||
+    /Tag_THUMB_ISA_use:\s+Thumb-2|Tag_FP_arch:\s+VFPv[3-9]|Tag_Advanced_SIMD_arch:\s+\S/.test(attributes) ||
     !/Tag_ABI_VFP_args:\s+VFP registers/.test(attributes)
   )
-    throw new Error('Legacy migration SQLite must use ARMv6 hard-float instructions');
+    throw new Error('Legacy migration SQLite must use ARMv6 hard-float instructions: ' +
+      String(attributes).split('\n').filter((line) =>
+        /Tag_(CPU_arch|THUMB_ISA_use|FP_arch|ABI_VFP_args|Advanced_SIMD_arch):/.test(line),
+      ).slice(0, 5).map((line) => line.trim()).join('; '));
 }
 
 async function rebuildMigrationSqlite(root, {

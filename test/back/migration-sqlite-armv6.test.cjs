@@ -15,6 +15,14 @@ test('rejects the actual legacy ARMv7/Thumb-2/VFPv3 prebuild on ARM1176', () => 
   assert.doesNotThrow(() => assertArmv6Addon(armv6));
 });
 
+test('accepts the actual Alpine GCC ARMv6KZ CRT while retaining ARM1176 instruction limits', () => {
+  const crt = 'Tag_CPU_name: "6KZ"\nTag_CPU_arch: v6KZ\nTag_ARM_ISA_use: Yes\nTag_THUMB_ISA_use: Thumb-1\nTag_FP_arch: VFPv2\nTag_ABI_VFP_args: VFP registers\n';
+  for (const arch of ['v6KZ', 'v6ZK', 'v6K'])
+    assert.doesNotThrow(() => assertArmv6Addon(crt.replace('v6KZ', arch)));
+  for (const attributes of [crt.replace('v6KZ', 'v6T2'), crt.replace('v6KZ', 'v7'), crt.replace('Thumb-1', 'Thumb-2'), crt.replace('VFPv2', 'VFPv3-D16'), crt + 'Tag_Advanced_SIMD_arch: NEONv1\n'])
+    assert.throws(() => assertArmv6Addon(attributes), /ARMv6 hard-float/);
+});
+
 test('does not inspect or modify any other architecture, libc or Node version', async () => {
   for (const arch of ['x64', 'armv7', 'arm64', 'ia32', 's390x', 'ppc64'])
     for (const node of ['20.20.2', '22.17.0', '24.18.1'])
