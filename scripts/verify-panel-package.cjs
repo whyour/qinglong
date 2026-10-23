@@ -23,7 +23,7 @@ const run = (program, args, options = {}) => execute(program, args, {
 const requiredFiles = [
   '.env.example', 'back/protos/api.proto', 'ecosystem.config.js', 'version.yaml',
   'shell/upgrade.cjs', 'shell/install-bundle.cjs', 'shell/install-package.cjs',
-  'shell/upgrade-lock.yaml', 'shell/start.sh', 'shell/start-simplify.sh',
+  'shell/upgrade-lock.yaml', 'shell/node-runtime-probe.cjs', 'shell/start.sh', 'shell/start-simplify.sh',
   'shell/task.sh', 'shell/preload/client.js', 'shell/preload/client.py',
   'shell/preload/sitecustomize.js', 'shell/preload/sitecustomize.py',
   'shell/preload/esm-loader.mjs', 'shell/preload/notificationAudit.js',
@@ -191,6 +191,12 @@ async function verifyPanel(input, output) {
     const globalRoot = (await run('npm', ['root', '--global', '--prefix', prefix], { cwd: temp, env })).stdout.trim();
     root = path.join(globalRoot, '@whyour/qinglong');
     env.QL_DIR = root;
+    const runtimeProbes = [];
+    const checkRuntime = async () => {
+      const result = await run(process.execPath, [path.join(root, 'shell/node-runtime-probe.cjs')], { cwd: temp, env, timeout: 540000 });
+      runtimeProbes.push(JSON.parse(result.stdout.trim()));
+    };
+    await checkRuntime();
     // Use a subprocess: cached candidate modules must not mask missing files
     // after old-package installation and the real npm overwrite below.
     await run(process.execPath, ['-e', `const root=process.argv[1],p=require('node:path');const m=require(root+'/package.json');for(const target of Object.values(m.bin))require('node:fs').accessSync(p.join(root,target));for(const name of ['platformBundle','upgradePrestart','panelUpgrade'])require(root+'/cli/src/internal/maintenance/'+name+'.cjs');require(root+'/shell/upgrade.cjs').verifyUpgrade(root,p.join(root,'static')).catch(e=>{console.error(e);process.exitCode=1});`, root], { env, cwd: temp });
@@ -287,6 +293,7 @@ async function verifyPanel(input, output) {
     const applying = await api('update/system', 'PUT');
     await job(applying.id, 'completed');
     const afterOnline = await healthy();
+    await checkRuntime();
     assert.notEqual(afterOnline.build.instanceId, original.build.instanceId);
     assert.equal(afterOnline.build.sourceCommit, fixture.sourceCommit);
     await fs.access(path.join(root, 'node_modules/.pnpm'));
@@ -302,6 +309,7 @@ async function verifyPanel(input, output) {
     assert.equal((await healthy()).build.instanceId, afterOnline.build.instanceId);
     await run(path.join(prefix, 'bin/ql'), ['reload', 'system'], { cwd: temp, env, timeout: 240000 });
     const afterOffline = await healthy();
+    await checkRuntime();
     assert.notEqual(afterOffline.build.instanceId, afterOnline.build.instanceId);
     assert.equal(afterOffline.build.sourceCommit, fixture.sourceCommit);
     await fs.access(path.join(root, 'node_modules/.pnpm'));
@@ -325,7 +333,7 @@ async function verifyPanel(input, output) {
       customRootEnvironmentPreservedAutomatically: true,
       officialPlatformBundle: { baseImage: fixture.baseImage, sourceCommit: fixture.sourceCommit, sha256: fixture.sha256 },
       migratedFromNpmToOfficialPnpmLayout: true,
-      existingNodePreserved: true,
+      existingNodePreserved: true, nativeUrlRuntimeProbes: runtimeProbes,
       frontendAndBackendStarted: true, checksumFailureKeptOldService: true,
       prestartBeforeReady: true, onlineActualRestart: true,
       offlinePreparationDidNotContactIndex: true, offlineBashActualRestart: true,
