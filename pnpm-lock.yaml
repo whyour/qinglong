@@ -1,7 +1,7 @@
 lockfileVersion: '6.0'
 
 overrides:
-  sqlite3: npm:@whyour/sqlite3@1.1.3
+  sqlite3: npm:@whyour/sqlite3@1.1.4
   '@codemirror/state': 6.5.4
   '@codemirror/view': 6.39.16
   proxy-addr: 2.0.8
@@ -120,13 +120,13 @@ dependencies:
     version: 3.3.0
   sequelize:
     specifier: 6.37.8
-    version: 6.37.8(@whyour/sqlite3@1.1.3)
+    version: 6.37.8(@whyour/sqlite3@1.1.4)
   sockjs:
     specifier: ^0.3.24
     version: 0.3.24
   sqlite3:
-    specifier: npm:@whyour/sqlite3@1.1.3
-    version: /@whyour/sqlite3@1.1.3
+    specifier: npm:@whyour/sqlite3@1.1.4
+    version: /@whyour/sqlite3@1.1.4
   tar:
     specifier: 7.5.20
     version: 7.5.20
@@ -3193,7 +3193,7 @@ packages:
     resolution: {integrity: sha512-Ngs9jhElXN7efS9WvvCC/p6rXMbihna8eNLVBc421Zf+VcFd+pR4DOcS6yA9V22EKtAy4DEj7LtvEEIm0bb80A==}
     engines: {node: '>= 18'}
     dependencies:
-      sqlite3: /@whyour/sqlite3@1.1.3
+      sqlite3: /@whyour/sqlite3@1.1.4
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -5611,8 +5611,8 @@ packages:
       - supports-color
     dev: true
 
-  /@whyour/sqlite3@1.1.3:
-    resolution: {integrity: sha512-VeiureU2gq11OMeSMWlpckNfbY5QF+V0KEpRi1Zqh/s5GEPgCazt06xIg528tPAwK0MS9KCUEyLb+dKDIIFoEg==}
+  /@whyour/sqlite3@1.1.4:
+    resolution: {integrity: sha512-MlWzqOdpZ0KPuBx/FYRrHZ8p3S0eCbaf2d8duDzWmfko/aky25Xoss67qDjFgbRjnwj9z0i0KNdNtQI02dnWKA==}
     requiresBuild: true
     peerDependenciesMeta:
       node-gyp:
@@ -13903,7 +13903,7 @@ packages:
     engines: {node: '>= 10.0.0'}
     dev: false
 
-  /sequelize@6.37.8(@whyour/sqlite3@1.1.3):
+  /sequelize@6.37.8(@whyour/sqlite3@1.1.4):
     resolution: {integrity: sha512-HJ0IQFqcTsTiqbEgiuioYFMSD00TP6Cz7zoTti+zVVBwVe9fEhev9cH6WnM3XU31+ABS356durAb99ZuOthnKw==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
@@ -13948,7 +13948,7 @@ packages:
       retry-as-promised: 7.0.4
       semver: 7.7.4
       sequelize-pool: 7.1.0
-      sqlite3: /@whyour/sqlite3@1.1.3
+      sqlite3: /@whyour/sqlite3@1.1.4
       toposort-class: 1.0.1
       uuid: 8.3.2
       validator: 13.12.0
