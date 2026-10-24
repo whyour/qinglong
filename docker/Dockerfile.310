@@ -3,6 +3,7 @@
 FROM --platform=$BUILDPLATFORM node:18-alpine3.18 AS builder
 
 ARG TARGETARCH
+ARG TARGETVARIANT
 ENV NPM_CONFIG_PREFIX=/opt/node-global
 ENV PATH=/opt/node-global/bin:${PATH}
 
@@ -17,10 +18,16 @@ RUN set -x \
     ppc64le) NODE_ARCH=ppc64 ;; \
     *) NODE_ARCH="${TARGETARCH}" ;; \
   esac \
+  && case "${TARGETARCH}/${TARGETVARIANT:-}" in \
+    arm/v6) NODE_LIBC=musl-armv6 ;; \
+    arm/v7) NODE_LIBC=musl-armv7 ;; \
+    arm/*) echo "Unsupported ARM variant: ${TARGETVARIANT:-unknown}" >&2; exit 1 ;; \
+    *) NODE_LIBC=musl ;; \
+  esac \
   && npm_config_target_platform=linux \
     npm_config_target_arch="${NODE_ARCH}" \
-    npm_config_target_libc=musl \
-    pnpm install --prod --frozen-lockfile
+    npm_config_target_libc="${NODE_LIBC}" \
+    pnpm install --prod --frozen-lockfile --side-effects-cache=false
 
 # Pin amd64 to upstream's musl runtime after native URL parser crashes with APK Node.
 FROM --platform=linux/amd64 node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS node-runtime-amd64
