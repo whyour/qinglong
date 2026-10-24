@@ -4,6 +4,8 @@ import taskLimit from './pLimit';
 import Logger from '../loaders/logger';
 import { ICron } from '../protos/cron';
 import { CrontabModel, CrontabStatus } from '../data/cron';
+import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
+import dayjs from 'dayjs';
 import { observeChildProcess, asError } from './childProcess';
 
 export function runCron(
@@ -27,19 +29,93 @@ export function runCron(
         const allowSingleInstances =
           existingCron?.allow_multiple_instances === 0;
 
-        if (
-          allowSingleInstances &&
-          existingCron &&
-          existingCron.pid &&
-          (existingCron.status === CrontabStatus.running ||
-            existingCron.status === CrontabStatus.queued)
-        ) {
-          Logger.info(
-            '[schedule][Skip active single-instance task] Task ID: %s, PID: %s',
-            cron.id,
-            existingCron.pid,
-          );
-          return;
+        if (allowSingleInstances) {
+          // A queued manual run is an active reservation, even if its stored PID
+          // belongs to a previous execution.
+          if (
+            existingCron.status === CrontabStatus.queued &&
+            existingCron.pid
+          ) {
+            Logger.info(
+              '[schedule][Skip queued single-instance task] Task ID: %s, PID: %s',
+              cron.id,
+              existingCron.pid,
+            );
+            return;
+          }
+          if (
+            existingCron.status === CrontabStatus.running &&
+            existingCron.pid
+          ) {
+            let missing = false;
+            try {
+              process.kill(existingCron.pid, 0);
+            } catch (error) {
+              const code = (error as NodeJS.ErrnoException).code;
+              if (code === 'ESRCH') missing = true;
+              else if (code !== 'EPERM') throw error;
+            }
+            if (!missing) {
+              Logger.info(
+                '[schedule][Skip active single-instance task] Task ID: %s, PID: %s',
+                cron.id,
+                existingCron.pid,
+              );
+              return;
+            }
+
+            // Capture old instance IDs before releasing the stale cron state so
+            // a concurrent replacement cannot have its instance marked stopped.
+            const staleInstances = await RunningInstanceModel.findAll({
+              attributes: ['id'],
+              where: {
+                cron_id: Number(cron.id),
+                pid: existingCron.pid,
+                status: InstanceStatus.running,
+              },
+            });
+            if (!isCurrent()) return;
+            const [recovered] = await CrontabModel.update(
+              {
+                status: CrontabStatus.idle,
+                pid: null,
+                queued_token: null,
+              } as any,
+              {
+                where: {
+                  id: Number(cron.id),
+                  pid: existingCron.pid,
+                  status: CrontabStatus.running,
+                  ...(existingCron.log_path !== undefined
+                    ? { log_path: existingCron.log_path }
+                    : {}),
+                  ...(existingCron.queued_token !== undefined
+                    ? { queued_token: existingCron.queued_token }
+                    : {}),
+                  ...(existingCron.last_execution_time !== undefined
+                    ? { last_execution_time: existingCron.last_execution_time }
+                    : {}),
+                  ...(existingCron.isDisabled !== undefined
+                    ? { isDisabled: existingCron.isDisabled }
+                    : {}),
+                  allow_multiple_instances: 0,
+                },
+              },
+            );
+            if (recovered !== 1) return;
+            const staleIds = staleInstances.map((instance) => instance.id!);
+            if (staleIds.length) {
+              await RunningInstanceModel.update(
+                { status: InstanceStatus.stopped, finished_at: dayjs().unix() },
+                { where: { id: staleIds, status: InstanceStatus.running } },
+              );
+            }
+            Logger.info(
+              '[schedule][Recovered stale single-instance task] Task ID: %s, PID: %s',
+              cron.id,
+              existingCron.pid,
+            );
+          }
         }
       } catch (error) {
         Logger.error(
