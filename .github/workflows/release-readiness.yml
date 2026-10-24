@@ -133,7 +133,7 @@ jobs:
           docker run --rm --network none --entrypoint node \
             qinglong-readiness:${{ matrix.image }} \
             -e 'const assert=require("node:assert/strict"); const {createRequire}=require("node:module"); for(const [name,want] of Object.entries({"@grpc/grpc-js":"1.14.5",compression:"1.8.2",multer:"2.4.0",sequelize:"6.37.8"}))assert.equal(require(name+"/package.json").version,want); const expressRequire=createRequire(require.resolve("express")); assert.equal(expressRequire("proxy-addr/package.json").version,"2.0.8"); const sockRequire=createRequire(require.resolve("sockjs")); assert.equal(sockRequire("websocket-driver/package.json").version,"0.7.5"); require("sqlite3"); require("nodemailer"); require("undici"); console.log("Minimal production patches and runtime imports verified")'
-      - name: Export ARMv6 image layers for Node regression checks
+      - name: Load ARMv6 image for SQLite and Node regression checks
         if: startsWith(matrix.image, 'alpine')
         uses: docker/build-push-action@v7
         with:
@@ -144,14 +144,23 @@ jobs:
             QL_URL=${{ steps.source.outputs.url }}
             QL_BRANCH=${{ steps.source.outputs.branch }}
             SOURCE_COMMIT=${{ steps.source.outputs.sha }}
-          outputs: type=docker,dest=${{ runner.temp }}/node-layers-arm.tar
+          tags: qinglong-readiness:${{ matrix.image }}-armv6
+          load: true
           push: false
           provenance: false
           sbom: false
+      - name: Verify ARMv6 SQLite on an ARM1176 CPU without networking
+        if: startsWith(matrix.image, 'alpine')
+        run: |
+          docker run --rm --network none --platform linux/arm/v6 \
+            -e QEMU_CPU=arm1176 --entrypoint node \
+            qinglong-readiness:${{ matrix.image }}-armv6 --jitless \
+            -e 'const assert=require("node:assert/strict"); const sqlite3=require("sqlite3"); const db=new sqlite3.Database(":memory:"); db.get("SELECT 42 AS n",(error,row)=>{assert.ifError(error); assert.equal(row.n,42); db.close()});'
       - name: Check Node binaries in every serialized image layer
         if: startsWith(matrix.image, 'alpine')
         run: |
           docker save qinglong-readiness:${{ matrix.image }} -o "$RUNNER_TEMP/node-layers-amd64.tar"
+          docker save qinglong-readiness:${{ matrix.image }}-armv6 -o "$RUNNER_TEMP/node-layers-arm.tar"
           python3 scripts/verify-image-node-layers.py "$RUNNER_TEMP/node-layers-amd64.tar" amd64
           python3 scripts/verify-image-node-layers.py "$RUNNER_TEMP/node-layers-arm.tar" arm
           rm "$RUNNER_TEMP/node-layers-amd64.tar" "$RUNNER_TEMP/node-layers-arm.tar"
