@@ -1,5 +1,5 @@
-# Install one verified Node 24 release on every supported Debian architecture.
-FROM debian:bookworm-slim AS nodebuilder
+# Use the pinned Bookworm base that includes s390x for every stage.
+FROM python:3.10.19-slim-bookworm@sha256:23f63358922e79a794f71be8f3723c84e5ccca9638af3f74456dc73d6184499e AS nodebuilder
 ARG TARGETARCH
 COPY docker/install-node-debian.sh /tmp/install-node-debian.sh
 RUN apt-get update && \
