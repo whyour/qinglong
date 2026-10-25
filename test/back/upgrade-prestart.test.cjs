@@ -10,8 +10,12 @@ const {
   repairDependencies,
 } = require('../../cli/src/internal/maintenance/upgradePrestart.cjs');
 
-for (const exitCode of [0, 1])
-  test(`prestart exit ${exitCode} reaps children retaining output pipes before removing its workspace`, async (t) => {
+for (const [version, exitCode] of [
+  ['2.23.0', 0],
+  ['2.23.0', 1],
+  ['2.24.0-dev.0', 0],
+])
+  test(`prestart ${version} exit ${exitCode} reaps children retaining output pipes before removing its workspace`, async (t) => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-probe-exit-'));
     t.after(() => fs.rm(root, { recursive: true, force: true }));
     const source = path.join(root, 'source'),
@@ -19,7 +23,7 @@ for (const exitCode of [0, 1])
       survivor = path.join(root, 'survivor');
     await fs.mkdir(path.join(source, 'node_modules'), { recursive: true });
     await fs.mkdir(path.join(statics, 'build/bootstrap'), { recursive: true });
-    await fs.writeFile(path.join(source, 'version.yaml'), 'version: 2.23.0');
+    await fs.writeFile(path.join(source, 'version.yaml'), `version: ${version}`);
     await fs.writeFile(path.join(statics, 'build/app.js'), 'backend');
     await fs.writeFile(
       path.join(statics, 'build-info.json'),
@@ -36,7 +40,7 @@ for (const exitCode of [0, 1])
       )}],{stdio:'inherit'});
       process.send({type:'upgrade-probe',ok:${
         exitCode === 0
-      },message:'simulated prestart failure',build:{sourceCommit:'a'.repeat(40),version:'2.23.0',backendSha256:crypto.createHash('sha256').update('backend').digest('hex')}},()=>process.exit(${exitCode}));
+      },message:'simulated prestart failure',build:{sourceCommit:'a'.repeat(40),version:${JSON.stringify(version)},backendSha256:crypto.createHash('sha256').update('backend').digest('hex')}},()=>process.exit(${exitCode}));
     `,
     );
     const operation = prestartBackend(
