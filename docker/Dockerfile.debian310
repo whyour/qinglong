@@ -1,8 +1,12 @@
-# Node 20 Bookworm is the latest official Node image variant that covers the
-# full Debian build matrix, including arm/v7, ppc64le, and s390x.
-FROM node:20-bookworm-slim AS nodebuilder
+# Install one verified Node 24 release on every supported Debian architecture.
+FROM debian:bookworm-slim AS nodebuilder
+ARG TARGETARCH
+COPY docker/install-node-debian.sh /tmp/install-node-debian.sh
+RUN apt-get update && \
+  apt-get install --no-install-recommends -y ca-certificates curl xz-utils libatomic1 && \
+  sh /tmp/install-node-debian.sh "${TARGETARCH}"
 
-# Keep the full release matrix, including s390x, on the same immutable base.
+# Keep s390x on the same immutable Python base as the other Debian targets.
 # The floating 3.10-slim-bookworm tag no longer includes s390x.
 FROM python:3.10.19-slim-bookworm@sha256:23f63358922e79a794f71be8f3723c84e5ccca9638af3f74456dc73d6184499e AS builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
@@ -13,6 +17,7 @@ RUN set -x && \
   apt-get update && \
   apt-get install --no-install-recommends -y libatomic1 && \
   npm i -g pnpm@8.3.1 && \
+  test "$(node --version)" = "v24.18.1" && \
   cd /tmp/build && \
   pnpm install --prod --frozen-lockfile
 
@@ -71,6 +76,7 @@ RUN set -x && \
   git config --global user.name "qinglong" && \
   git config --global http.postBuffer 524288000 && \
   npm install -g pnpm@8.3.1 pm2 ts-node typescript@5 && \
+  test "$(node --version)" = "v24.18.1" && \
   npm cache clean --force && \
   rm -rf /root/.cache && \
   rm -rf /root/.npm && \
