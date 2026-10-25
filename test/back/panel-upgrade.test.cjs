@@ -19,7 +19,7 @@ const {
   sourceCommit,
 } = require('../helpers/upgrade-fixture.cjs');
 
-async function fixture(t) {
+async function fixture(t, targetVersion = '2.24.0') {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-panel-job-'));
   const root = path.join(base, 'panel'),
     tmp = path.join(root, '.tmp');
@@ -30,7 +30,10 @@ async function fixture(t) {
     await fs.writeFile(name, contents);
   };
   for (const dir of [root, source]) {
-    await write(path.join(dir, 'package.json'), '{"version":"2.24.0"}');
+    await write(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ version: targetVersion }),
+    );
     await write(path.join(dir, 'pnpm-lock.yaml'), 'lock');
     await write(path.join(dir, 'sample/config.sample.sh'), '# config');
   }
@@ -39,7 +42,7 @@ async function fixture(t) {
     'installed dependency',
   );
   await write(path.join(root, 'version.yaml'), 'version: 2.23.0');
-  await write(path.join(source, 'version.yaml'), 'version: 2.24.0');
+  await write(path.join(source, 'version.yaml'), `version: ${targetVersion}`);
   await write(path.join(staticRoot, 'build/app.js'), 'new backend');
   writeManifest(source, staticRoot);
   for (const repo of ['qinglong', 'qinglong-static'])
@@ -81,7 +84,7 @@ fs.writeFileSync(args[args.indexOf('--output') + 1], buffer);
   );
   await fs.chmod(path.join(base, 'bin/curl'), 0o700);
   const runtime = {
-    version: '2.24.0',
+    version: targetVersion,
     sourceCommit,
     instanceId: 'after-restart',
     parentPid: 100002,
@@ -183,6 +186,21 @@ test('detached download survives its initiating request and is idempotent; apply
   assert.equal(
     await fs.readFile(path.join(f.root, 'node_modules/dependency'), 'utf8'),
     'installed dependency',
+  );
+});
+
+test('prerelease version is retained through download and restart verification', async (t) => {
+  const f = await fixture(t, '2.24.0-dev.0');
+  await startJob(f, 'download');
+  const ready = await finished(f.tmp);
+  assert.equal(ready.status, 'ready', ready.log);
+  assert.equal(ready.version, '2.24.0-dev.0');
+  await startJob(f, 'apply');
+  const complete = await finished(f.tmp);
+  assert.equal(complete.status, 'completed', complete.log);
+  assert.equal(
+    await fs.readFile(path.join(f.root, 'version.yaml'), 'utf8'),
+    'version: 2.24.0-dev.0',
   );
 });
 

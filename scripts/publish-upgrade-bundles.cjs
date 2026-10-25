@@ -113,7 +113,7 @@ function publishBundles({
     }
   };
   const notes =
-    `Verified platform bundles for v${version}, source ${commit}, build ${buildId}. Existing Node runtime is retained.\n\n` +
+    `${development ? 'Development' : 'Verified'} platform bundles for v${version}, source ${commit}, build ${buildId}. Existing Node runtime is retained.\n\n` +
     Object.entries(index.packages)
       .map(([target, entry]) => `- [${target}](${entry.url})`)
       .join('\n') +
@@ -147,7 +147,10 @@ function publishBundles({
     console.log('Newer source exists; leaving version and channel unchanged');
     return false;
   }
-  ensureRelease(tag, `Platform upgrade v${version} (${buildId})`);
+  ensureRelease(
+    tag,
+    `${development ? 'Development platform upgrade' : 'Platform upgrade'} v${version} (${buildId})`,
+  );
   const assets = platforms
     .flatMap((target) => {
       const archive = path.join(
