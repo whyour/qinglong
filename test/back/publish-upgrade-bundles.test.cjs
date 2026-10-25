@@ -366,22 +366,22 @@ test('automatic development publication keeps its prerelease version separate fr
     ...Object.values(development.packages),
     development.installer,
   ])
-    assert.ok(entry.url.includes('/upgrade-build-develop-v2.24.0-dev.0-100-1/'));
+    assert.ok(entry.url.includes('/upgrade-build-develop-100-1/'));
   assert.ok(
     f.state.calls.some(
       (args) =>
         args[0] === 'release' &&
         args[1] === 'create' &&
-        args[2] === 'upgrade-build-develop-v2.24.0-dev.0-100-1' &&
+        args[2] === 'upgrade-build-develop-100-1' &&
         args[args.indexOf('--title') + 1] ===
-          'Development platform upgrade v2.24.0-dev.0 (100-1)',
+          'Development platform upgrade (100-1)',
     ),
   );
   assert.deepEqual(f.index(), production);
   assert.deepEqual(f.index('upgrade-v2.24.0'), production);
   assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 24);
   assert.equal(
-    f.state.releases.get('upgrade-build-develop-v2.24.0-dev.0-100-1').size,
+    f.state.releases.get('upgrade-build-develop-100-1').size,
     24,
   );
 });
@@ -433,14 +433,16 @@ for (const fault of [
     const options = { branch: 'develop', commit: f.state.developHead };
     f.write(options.commit, 'development');
     f.publish(options);
-    const oldTag = 'upgrade-build-develop-v2.24.0-100-1';
+    const oldTag = 'upgrade-build-develop-100-1';
+    const legacyTag = 'upgrade-build-develop-v2.24.0-99-1';
+    f.state.releases.set(legacyTag, new Map());
     // Never prune production, channel aliases, legacy/unclassified releases,
     // drafts or a non-prerelease even when its name resembles a dev build.
     const protectedTags = [
       'upgrade-86c37f426a5ba9945d6af1910a7885a26f77e4bc',
       'v2.24.0',
-      'upgrade-build-develop-v2.24.0-10-1',
-      'upgrade-build-develop-v2.24.0-11-1',
+      'upgrade-build-develop-10-1',
+      'upgrade-build-develop-11-1',
     ];
     for (const tag of protectedTags) f.state.releases.set(tag, new Map());
     f.state.releaseMetadata = {
@@ -472,9 +474,10 @@ for (const fault of [
               a[0] === 'api' && a[1].includes('/releases/tags/upgrade-develop'),
           ),
       );
-      assert.ok(f.state.releases.has('upgrade-build-develop-v2.24.0-101-1'));
+      assert.ok(f.state.releases.has('upgrade-build-develop-101-1'));
     }
     assert.equal(f.state.releases.has(oldTag), Boolean(fault));
+    assert.equal(f.state.releases.has(legacyTag), Boolean(fault));
     for (const tag of protectedTags) assert.ok(f.state.releases.has(tag));
     assert.deepEqual(f.index(), production);
     assert.deepEqual(f.index('upgrade-v2.24.0'), production);
@@ -491,11 +494,11 @@ test('failed development cleanup is retryable without overwriting immutable asse
     /Delete unavailable/,
   );
   assert.equal(f.index('upgrade-develop').buildId, '101-1');
-  assert.ok(f.state.releases.has('upgrade-build-develop-v2.24.0-100-1'));
+  assert.ok(f.state.releases.has('upgrade-build-develop-100-1'));
   f.state.failDelete = false;
   f.publish({ ...options, buildId: '101-1' });
-  assert.ok(!f.state.releases.has('upgrade-build-develop-v2.24.0-100-1'));
-  assert.ok(f.state.releases.has('upgrade-build-develop-v2.24.0-101-1'));
+  assert.ok(!f.state.releases.has('upgrade-build-develop-100-1'));
+  assert.ok(f.state.releases.has('upgrade-build-develop-101-1'));
 });
 
 test('a newer development commit during upload preserves the published channel and its old package', (t) => {
@@ -507,7 +510,7 @@ test('a newer development commit during upload preserves the published channel a
   f.state.changeDevelopHeadAfterUpload = true;
   assert.equal(f.publish({ ...options, buildId: '101-1' }), false);
   assert.deepEqual(f.index('upgrade-develop'), before);
-  assert.ok(f.state.releases.has('upgrade-build-develop-v2.24.0-100-1'));
+  assert.ok(f.state.releases.has('upgrade-build-develop-100-1'));
   assert.ok(
     !f.state.calls.some((a) => a[0] === 'release' && a[1] === 'delete'),
   );

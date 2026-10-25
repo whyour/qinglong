@@ -75,9 +75,9 @@ function publishBundles({
   // unchanged. Only the version/channel pointer is overwritten, never bytes
   // that an in-flight download has already selected by hash.
   const development = branch === 'develop';
-  const tag = `upgrade-build-${
-    development ? 'develop-' : ''
-  }v${version}-${buildId}`;
+  const tag = development
+    ? `upgrade-build-develop-${buildId}`
+    : `upgrade-build-v${version}-${buildId}`;
   const index = {
     ...releaseIndex(directory, commit, repository, {
       version,
@@ -149,7 +149,9 @@ function publishBundles({
   }
   ensureRelease(
     tag,
-    `${development ? 'Development platform upgrade' : 'Platform upgrade'} v${version} (${buildId})`,
+    development
+      ? `Development platform upgrade (${buildId})`
+      : `Platform upgrade v${version} (${buildId})`,
   );
   const assets = platforms
     .flatMap((target) => {
@@ -243,7 +245,7 @@ function publishBundles({
     for (const release of pages.flat()) {
       if (
         release.tag_name !== tag &&
-        /^upgrade-build-develop-v\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?-\d+-\d+$/.test(
+        /^upgrade-build-develop-(?:v\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?-)?\d+-\d+$/.test(
           release.tag_name,
         ) &&
         release.prerelease === true &&
