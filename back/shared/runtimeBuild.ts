@@ -28,7 +28,7 @@ const backend = read(path.resolve(__dirname, '../app.js'));
 const root = process.env.QL_DIR || path.resolve(__dirname, '../../..');
 const version = read(path.join(root, 'version.yaml'))
   ?.toString()
-  .match(/^\uFEFF?version:\s*["']?(\d+\.\d+\.\d+)/m)?.[1];
+  .match(/^\uFEFF?version:\s*["']?(\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?)/m)?.[1];
 
 export const runtimeBuild = Object.freeze({
   instanceId: randomUUID(),

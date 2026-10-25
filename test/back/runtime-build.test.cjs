@@ -32,7 +32,7 @@ test('a running process retains its own build identity when installed files chan
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-runtime-build-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'static/build'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'version.yaml'), 'version: 2.24.0');
+  fs.writeFileSync(path.join(root, 'version.yaml'), 'version: 2.24.0-dev.0');
   fs.writeFileSync(path.join(root, 'static/build/app.js'), 'old backend');
   fs.writeFileSync(
     path.join(root, 'static/build-info.json'),
@@ -45,7 +45,7 @@ test('a running process retains its own build identity when installed files chan
     JSON.stringify({ sourceCommit: 'b'.repeat(40) }),
   );
   fs.writeFileSync(path.join(root, 'version.yaml'), 'version: 2.25.0');
-  assert.equal(running.version, '2.24.0');
+  assert.equal(running.version, '2.24.0-dev.0');
   assert.equal(running.sourceCommit, 'a'.repeat(40));
   assert.equal(
     running.backendSha256,
