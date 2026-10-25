@@ -662,7 +662,8 @@ jobs:
     # Both channels publish packages from this run's immutable image digests.
     if: ${{ !inputs.static_sync_only && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') }}
     needs: [build-alpine, build-debian]
-    runs-on: ubuntu-22.04
+    # Node 24 can SIGILL while archiving ARM64 musl under x64 QEMU.
+    runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
     timeout-minutes: 90
     permissions:
       contents: read
@@ -685,6 +686,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-qemu-action@v4
+        if: ${{ matrix.platform != 'linux/arm64' }}
         with:
           cache-image: false
       - uses: docker/setup-buildx-action@v4
