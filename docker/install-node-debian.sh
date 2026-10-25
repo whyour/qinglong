@@ -18,4 +18,5 @@ curl --fail --location --silent --show-error --retry 3 \
 printf '%s  %s\n' "${checksum}" "/tmp/${archive}" | sha256sum --check --status
 tar -xJf "/tmp/${archive}" -C /usr/local --strip-components=1 --no-same-owner
 rm "/tmp/${archive}"
-test "$(node --version)" = "v${version}"
+# The target binary is executed and version-checked in the target builder/runtime stages.
+test -x /usr/local/bin/node

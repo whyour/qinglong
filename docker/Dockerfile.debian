@@ -1,9 +1,9 @@
-# Use the same Bookworm base as the build and runtime stages, including s390x.
-FROM python:3.11.14-slim-bookworm AS nodebuilder
+# Download and verify the target Node archive without running under QEMU.
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS nodebuilder
 ARG TARGETARCH
 COPY docker/install-node-debian.sh /tmp/install-node-debian.sh
 RUN apt-get update && \
-  apt-get install --no-install-recommends -y ca-certificates curl xz-utils libatomic1 && \
+  apt-get install --no-install-recommends -y ca-certificates curl xz-utils && \
   sh /tmp/install-node-debian.sh "${TARGETARCH}"
 
 FROM python:3.11.14-slim-bookworm AS builder
