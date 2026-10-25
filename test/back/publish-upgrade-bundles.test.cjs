@@ -162,10 +162,12 @@ test('publishes every platform and installer before advancing version and legacy
   assert.equal(index.version, '2.24.0');
   assert.equal(index.buildId, '100-1');
   assert.equal(index.sourceCommit, f.options.commit);
-  assert.equal(Object.keys(index.packages).length, 12);
+  assert.equal(Object.keys(index.packages).length, 11);
+  assert.ok(index.packages['linux-armv7-musl']);
+  assert.equal(index.packages['linux-armv7-glibc'], undefined);
   assert.deepEqual(index, f.index('upgrade-v2.24.0'));
   const tag = 'upgrade-build-v2.24.0-100-1';
-  assert.equal(f.state.releases.get(tag).size, 26);
+  assert.equal(f.state.releases.get(tag).size, 24);
   for (const entry of [...Object.values(index.packages), index.installer]) {
     const url = new URL(entry.url),
       filename = path.basename(url.pathname);
@@ -350,11 +352,13 @@ test('automatic development publication shares musl/glibc packages without chang
   const development = f.index('upgrade-develop');
   assert.equal(development.channel, 'develop');
   assert.equal(development.sourceCommit, f.state.developHead);
-  assert.equal(Object.keys(development.packages).length, 12);
+  assert.equal(Object.keys(development.packages).length, 11);
   assert.ok(development.packages['linux-x64-musl']);
   assert.ok(development.packages['linux-x64-glibc']);
   assert.ok(development.packages['linux-armv6-musl']);
   assert.equal(development.packages['linux-armv6-glibc'], undefined);
+  assert.ok(development.packages['linux-armv7-musl']);
+  assert.equal(development.packages['linux-armv7-glibc'], undefined);
   for (const entry of [
     ...Object.values(development.packages),
     development.installer,
@@ -362,10 +366,10 @@ test('automatic development publication shares musl/glibc packages without chang
     assert.ok(entry.url.includes('/upgrade-build-develop-v2.24.0-100-1/'));
   assert.deepEqual(f.index(), production);
   assert.deepEqual(f.index('upgrade-v2.24.0'), production);
-  assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 26);
+  assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 24);
   assert.equal(
     f.state.releases.get('upgrade-build-develop-v2.24.0-100-1').size,
-    26,
+    24,
   );
 });
 

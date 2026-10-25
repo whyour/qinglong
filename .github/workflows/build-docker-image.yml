@@ -247,7 +247,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -336,7 +336,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -394,7 +394,7 @@ jobs:
             SOURCE_COMMIT=${{ github.sha }}
           network: host
           # Keep s390x on Debian: npm can hang under QEMU with Alpine (nodejs/docker-node#1973).
-          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
+          platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
           context: .
           file: ./docker/Dockerfile.debian
           push: true
@@ -423,7 +423,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -495,7 +495,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -538,7 +538,7 @@ jobs:
             SOURCE_COMMIT=${{ github.sha }}
           network: host
           # Keep s390x on Debian: npm can hang under QEMU with Alpine (nodejs/docker-node#1973).
-          platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
+          platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
           context: .
           file: ./docker/Dockerfile.debian310
           push: true
@@ -679,7 +679,6 @@ jobs:
           - { platform: linux/s390x, libc: musl, name: s390x-musl }
           - { platform: linux/386, libc: musl, name: ia32-musl }
           - { platform: linux/amd64, libc: glibc, name: x64-glibc }
-          - { platform: linux/arm/v7, libc: glibc, name: armv7-glibc }
           - { platform: linux/arm64, libc: glibc, name: arm64-glibc }
           - { platform: linux/ppc64le, libc: glibc, name: ppc64-glibc }
           - { platform: linux/s390x, libc: glibc, name: s390x-glibc }
@@ -721,7 +720,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
       - uses: pnpm/action-setup@v6
         with:
           version: '8.3.1'

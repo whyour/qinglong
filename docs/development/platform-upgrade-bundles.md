@@ -18,7 +18,7 @@ gh workflow run build-docker-image.yml --ref develop
 
 开发包只保留最新一个已验证批次：所有平台资产和渠道索引的大小、SHA256 校验成功后，删除其他名称匹配的开发构建 prerelease；不删除正式包、渠道索引或无法分类的旧 release。构建或上传失败不会删除上一套可用包。旧批次被删除后，已选中旧索引但尚未下载完的客户端可能需要重新发起下载；准备失败仍保留旧服务和数据。
 
-开发和正式包都必须在 12 个平台完成归档、解包后复验及依赖试运行，并且全部上传资产的大小和 SHA256 复验通过后，才更新各自索引。平台范围与现有 Alpine/Debian 镜像一致：ARMv6 仅提供 musl 包，不提供 ARMv6 glibc 包。
+开发和正式包都必须在 11 个平台完成归档、解包后复验及依赖试运行，并且全部上传资产的大小和 SHA256 复验通过后，才更新各自索引。平台范围与现有 Alpine/Debian 镜像一致：ARMv6 和 ARMv7 仅提供 musl 包，Debian 不再发布 ARMv7 镜像或 glibc 平台包。
 
 版本入口为 GitHub prerelease `upgrade-v<version>` 下的 `latest.json`；在线正式渠道保留 `upgrade-master/latest.json`，兼容现有客户端。二者指向同一套完整包，指定版本与 latest 不重复生成产物。索引记录渠道、版本、源码提交、构建批次、准确字节数、SHA256，以及 `upgrade-build-v<version>-<run-id>-<run-attempt>` 下的固定下载 URL。相同版本的镜像 tag 重新发布时，完整包也重新生成，版本和正式渠道索引同步覆盖到新批次；同一提交重跑也允许产生新内容。已选中旧索引的下载继续使用旧批次资产，避免覆盖文件导致哈希不匹配。master 的镜像构建和完整包发布整条流水线串行执行，避免镜像 tag 与完整包被并发重发交错覆盖；旧工作流明确重跑时也允许同版本、同提交重新发布。过期源码提交不能推进对应渠道或版本索引；平台包上传失败时不切换索引。
 
@@ -64,7 +64,7 @@ QL_DIR=/opt/qinglong QL_DATA_DIR=/opt/qinglong/data bash /opt/qinglong/shell/sta
 
 `--install` 拒绝非空目录，不覆盖既有配置。该包安装青龙及其 Node 生产依赖；首次启动仍需已有 Python、Bash、OpenSSL、PM2、nginx 等相应运行环境，不会在线安装或替换它们。手动启动脚本会在启动工作进程前完成首次 gRPC 证书准备，避免慢设备生成密钥耗尽工作进程的就绪期限；已有证书继续复用。服务启动和系统自启按原手动安装流程配置。
 
-ARMv6 小设备使用 `linux-armv6-musl.tar.gz`，要求已有兼容的 musl 系统及硬浮点 Node。ARMv6 glibc（例如 Raspbian/Raspberry Pi OS 32 位系统）不在平台包支持范围内，不能使用 ARMv7 或 musl 包替代；安装器仍会检查实际架构和 libc，拒绝不匹配的包。
+ARMv6 小设备使用 `linux-armv6-musl.tar.gz`，要求已有兼容的 musl 系统及硬浮点 Node。ARMv6 glibc（例如 Raspbian/Raspberry Pi OS 32 位系统）不在平台包支持范围内，不能使用其他架构或 musl 包替代；安装器仍会检查实际架构和 libc，拒绝不匹配的包。
 
 ## npm 面板包
 
@@ -89,7 +89,7 @@ master 发布任务等待上述测试通过，直接发布已验证的 `.tgz`，
 - 最低 Node 为 20.18.1，Node-API 至少 6；安装器只检查，不替换 Node。
 - 以 Node 实际运行架构、ARM 指令集和 libc 类型/版本选择包；不依据 Docker 架构别名猜测。
 - glibc、musl 分包，并记录构建系统 libc 下限。系统库仍以目标设备加载测试作为最后检查。
-- ARMv6 与 ARMv7 使用不同包名。ARMv6 在目标镜像中从源码编译 SQLite，禁止复用 generic `arm` 的 ARMv7 预编译件；构建需通过加载和内存库读写，失败则不发布渠道。
+- ARMv6 保留独立包名。ARMv6 在目标镜像中从源码编译 SQLite，禁止复用 generic `arm` 的 ARMv7 预编译件；构建需通过加载和内存库读写，失败则不发布渠道。
 - ARMv6 的归档构建、在线更新工作进程及独立离线安装器使用 `--jitless`，避开 ARM1176 上 V8 的优化编译崩溃；保留现有 Node 二进制，Node 24 及以上的 ARMv6 面板进程通过共享 `nodeRuntime` 使用 `--no-opt --no-sparkplug --no-maglev`，其他架构和较低 Node 版本保持原启动参数。ARMv6 的 gRPC 工作进程首次启动及重建最多等待 2 分钟；升级后的整体健康检查最多等待 5 分钟，覆盖慢设备按顺序启动数据库、调度与 HTTP 工作进程的耗时；其他平台仍为 60 秒，超时或版本校验失败仍执行回退。依赖加载与后端预启动使用现有 Node 的正常模式，使 Node 20.18.1 的内置 HTTP/WebAssembly 组件保持可用。预启动只有一个后端进程，按顺序初始化数据库、gRPC、HTTP，不启动 PM2/cluster；ARMv6 V8 堆上限 128 MiB、期限 5 分钟，其他平台为 192 MiB/60 秒。堆上限不是 RSS 总内存上限，系统仍需为现有服务和 OpenSSL 留出内存。依赖修复的包管理器及编译使用单并发、低网络并发和有界时长；ARMv6 包管理器采用 `--jitless`、256 MiB 堆上限，并优先复用版本匹配的现有 Node 头文件与实际运行时编译配置；超时、中断会终止整个进程组并清理临时目录。
 - tar 中允许 pnpm 的包内符号链接；拒绝绝对路径、越界路径、包外链接、硬链接、设备条目和经符号链接写入的条目。重启前再次校验依赖，暂存失败保留上一次可用的就绪包。
 
