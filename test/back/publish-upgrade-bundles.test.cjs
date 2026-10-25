@@ -66,6 +66,17 @@ function fixture(t) {
   const gh = (...args) => {
     state.calls.push(args);
     if (args[0] === 'api') {
+      if (args[1] === '-X' && args[2] === 'DELETE') {
+        if (state.failDelete) throw new Error('Delete unavailable');
+        const id = Number(args[3].split('/').at(-1));
+        for (const release of state.releases.values())
+          for (const asset of release.values())
+            if (asset.id === id) {
+              release.delete(asset.name);
+              return '';
+            }
+        return notFound();
+      }
       const route = args[1];
       if (route.endsWith('/git/ref/heads/master')) return state.head;
       if (route.endsWith('/git/ref/heads/develop')) return state.developHead;
@@ -366,24 +377,29 @@ test('automatic development publication keeps its prerelease version separate fr
     ...Object.values(development.packages),
     development.installer,
   ])
-    assert.ok(entry.url.includes('/upgrade-build-develop-100-1/'));
+    assert.ok(entry.url.includes('/upgrade-develop/'));
+  for (const entry of Object.values(development.packages))
+    assert.ok(entry.url.endsWith('-100-1.tar.gz'));
+  assert.ok(development.installer.url.endsWith('/install-bundle-100-1.cjs'));
   assert.ok(
     f.state.calls.some(
       (args) =>
         args[0] === 'release' &&
         args[1] === 'create' &&
-        args[2] === 'upgrade-build-develop-100-1' &&
-        args[args.indexOf('--title') + 1] ===
-          'Development platform upgrade (100-1)',
+        args[2] === 'upgrade-develop' &&
+        args[args.indexOf('--title') + 1] === 'Upgrade channel develop',
     ),
   );
   assert.deepEqual(f.index(), production);
   assert.deepEqual(f.index('upgrade-v2.24.0'), production);
   assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 24);
-  assert.equal(
-    f.state.releases.get('upgrade-build-develop-100-1').size,
-    24,
+  assert.equal(f.state.releases.get('upgrade-develop').size, 24);
+  assert.ok(!f.state.releases.has('upgrade-build-develop-100-1'));
+  const archiveName = path.basename(development.packages['linux-x64-musl'].url);
+  const sidecar = JSON.parse(
+    f.state.releases.get('upgrade-develop').get(`${archiveName}.json`).bytes,
   );
+  assert.equal(sidecar.filename, archiveName);
 });
 
 test('development builds cannot publish obsolete development source', (t) => {
@@ -435,7 +451,12 @@ for (const fault of [
     f.publish(options);
     const oldTag = 'upgrade-build-develop-100-1';
     const legacyTag = 'upgrade-build-develop-v2.24.0-99-1';
+    f.state.releases.set(oldTag, new Map());
     f.state.releases.set(legacyTag, new Map());
+    const oldAsset = Array.from(
+      f.state.releases.get('upgrade-develop').keys(),
+    ).find((name) => name.endsWith('-100-1.tar.gz'));
+    assert.ok(oldAsset);
     // Never prune production, channel aliases, legacy/unclassified releases,
     // drafts or a non-prerelease even when its name resembles a dev build.
     const protectedTags = [
@@ -460,7 +481,7 @@ for (const fault of [
       assert.equal(f.publish({ ...options, buildId: '101-1' }), true);
       assert.equal(f.index('upgrade-develop').buildId, '101-1');
       const deletion = f.state.calls.findIndex(
-        (a) => a[0] === 'release' && a[1] === 'delete',
+        (a) => a[0] === 'api' && a[1] === '-X' && a[2] === 'DELETE',
       );
       const aliasEdit = f.state.calls.findLastIndex(
         (a) => a[0] === 'release' && a[1] === 'edit',
@@ -474,10 +495,15 @@ for (const fault of [
               a[0] === 'api' && a[1].includes('/releases/tags/upgrade-develop'),
           ),
       );
-      assert.ok(f.state.releases.has('upgrade-build-develop-101-1'));
+      assert.ok(f.state.releases.has('upgrade-develop'));
+      assert.ok(!f.state.releases.has('upgrade-build-develop-101-1'));
     }
     assert.equal(f.state.releases.has(oldTag), Boolean(fault));
     assert.equal(f.state.releases.has(legacyTag), Boolean(fault));
+    assert.equal(
+      f.state.releases.get('upgrade-develop').has(oldAsset),
+      Boolean(fault),
+    );
     for (const tag of protectedTags) assert.ok(f.state.releases.has(tag));
     assert.deepEqual(f.index(), production);
     assert.deepEqual(f.index('upgrade-v2.24.0'), production);
@@ -488,17 +514,21 @@ test('failed development cleanup is retryable without overwriting immutable asse
   const options = { branch: 'develop', commit: f.state.developHead };
   f.write(options.commit, 'development');
   f.publish(options);
+  const oldAsset = Array.from(
+    f.state.releases.get('upgrade-develop').keys(),
+  ).find((name) => name.endsWith('-100-1.tar.gz'));
+  assert.ok(oldAsset);
   f.state.failDelete = true;
   assert.throws(
     () => f.publish({ ...options, buildId: '101-1' }),
     /Delete unavailable/,
   );
   assert.equal(f.index('upgrade-develop').buildId, '101-1');
-  assert.ok(f.state.releases.has('upgrade-build-develop-100-1'));
+  assert.ok(f.state.releases.get('upgrade-develop').has(oldAsset));
   f.state.failDelete = false;
   f.publish({ ...options, buildId: '101-1' });
-  assert.ok(!f.state.releases.has('upgrade-build-develop-100-1'));
-  assert.ok(f.state.releases.has('upgrade-build-develop-101-1'));
+  assert.ok(!f.state.releases.get('upgrade-develop').has(oldAsset));
+  assert.equal(f.state.releases.get('upgrade-develop').size, 24);
 });
 
 test('a newer development commit during upload preserves the published channel and its old package', (t) => {
@@ -507,10 +537,14 @@ test('a newer development commit during upload preserves the published channel a
   f.write(options.commit, 'development');
   f.publish(options);
   const before = f.index('upgrade-develop');
+  const oldAsset = Array.from(
+    f.state.releases.get('upgrade-develop').keys(),
+  ).find((name) => name.endsWith('-100-1.tar.gz'));
+  assert.ok(oldAsset);
   f.state.changeDevelopHeadAfterUpload = true;
   assert.equal(f.publish({ ...options, buildId: '101-1' }), false);
   assert.deepEqual(f.index('upgrade-develop'), before);
-  assert.ok(f.state.releases.has('upgrade-build-develop-100-1'));
+  assert.ok(f.state.releases.get('upgrade-develop').has(oldAsset));
   assert.ok(
     !f.state.calls.some((a) => a[0] === 'release' && a[1] === 'delete'),
   );

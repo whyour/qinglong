@@ -14,9 +14,9 @@ CI 从同次构建的不可变镜像摘要导出完整 tar.gz，包含源码中�
 gh workflow run build-docker-image.yml --ref develop
 ```
 
-开发包更新共用的 `upgrade-develop/latest.json`。`develop` 和 `debian-dev` 镜像都使用该索引，按实际 Node 架构和 musl/glibc 选择包，无需设置测试专用下载源。开发批次位于 `upgrade-build-develop-<run-id>-<run-attempt>`，tag 不带版本号；索引中仍保留开发版本供客户端判断更新。开发批次不会改写正式版本或 `upgrade-master`。同一开发渠道的镜像构建和包发布串行执行，与 master 独立。
+开发包只使用 `upgrade-develop` 这一个 prerelease。`develop` 和 `debian-dev` 镜像读取其中的 `latest.json`，按实际 Node 架构和 musl/glibc 选择包，无需设置测试专用下载源。新批次先以带构建 ID 的文件名上传并校验，再切换 `latest.json`；索引仍保留开发版本供客户端判断更新。开发渠道不会改写正式版本或 `upgrade-master`。同一开发渠道的镜像构建和包发布串行执行，与 master 独立。
 
-开发包只保留最新一个已验证批次：所有平台资产和渠道索引的大小、SHA256 校验成功后，删除其他名称匹配的开发构建 prerelease；不删除正式包、渠道索引或无法分类的旧 release。构建或上传失败不会删除上一套可用包。旧批次被删除后，已选中旧索引但尚未下载完的客户端可能需要重新发起下载；准备失败仍保留旧服务和数据。
+开发包只保留最新一个已验证批次：所有平台资产和渠道索引的大小、SHA256 校验成功后，清理 `upgrade-develop` 中旧批次资产及旧命名的开发构建 prerelease；不删除正式包或无法分类的 release。构建或上传失败不会删除上一套可用包。旧资产被删除后，已选中旧索引但尚未下载完的客户端可能需要重新发起下载；准备失败仍保留旧服务和数据。
 
 开发和正式包都必须在 11 个平台完成归档、解包后复验及依赖试运行，并且全部上传资产的大小和 SHA256 复验通过后，才更新各自索引。平台范围与现有 Alpine/Debian 镜像一致：ARMv6 和 ARMv7 仅提供 musl 包，Debian 不再发布 ARMv7 镜像或 glibc 平台包。
 
