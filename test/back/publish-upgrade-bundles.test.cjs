@@ -337,20 +337,23 @@ test('existing master clients can migrate from indexes without version/build met
   assert.equal(f.index().buildId, '100-2');
 });
 
-test('automatic development publication shares musl/glibc packages without changing version or latest production assets', (t) => {
+test('automatic development publication keeps its prerelease version separate from production assets', (t) => {
   const f = fixture(t);
   f.publish();
   const production = f.index();
-  f.write(f.state.developHead, 'development');
+  const developmentVersion = '2.24.0-dev.0';
+  f.write(f.state.developHead, 'development', developmentVersion);
   assert.equal(
     f.publish({
       branch: 'develop',
       commit: f.state.developHead,
+      version: developmentVersion,
     }),
     true,
   );
   const development = f.index('upgrade-develop');
   assert.equal(development.channel, 'develop');
+  assert.equal(development.version, developmentVersion);
   assert.equal(development.sourceCommit, f.state.developHead);
   assert.equal(Object.keys(development.packages).length, 11);
   assert.ok(development.packages['linux-x64-musl']);
@@ -363,12 +366,22 @@ test('automatic development publication shares musl/glibc packages without chang
     ...Object.values(development.packages),
     development.installer,
   ])
-    assert.ok(entry.url.includes('/upgrade-build-develop-v2.24.0-100-1/'));
+    assert.ok(entry.url.includes('/upgrade-build-develop-v2.24.0-dev.0-100-1/'));
+  assert.ok(
+    f.state.calls.some(
+      (args) =>
+        args[0] === 'release' &&
+        args[1] === 'create' &&
+        args[2] === 'upgrade-build-develop-v2.24.0-dev.0-100-1' &&
+        args[args.indexOf('--title') + 1] ===
+          'Development platform upgrade v2.24.0-dev.0 (100-1)',
+    ),
+  );
   assert.deepEqual(f.index(), production);
   assert.deepEqual(f.index('upgrade-v2.24.0'), production);
   assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 24);
   assert.equal(
-    f.state.releases.get('upgrade-build-develop-v2.24.0-100-1').size,
+    f.state.releases.get('upgrade-build-develop-v2.24.0-dev.0-100-1').size,
     24,
   );
 });

@@ -92,7 +92,9 @@ async function prestartBackend(
       .digest('hex');
     const version = (
       await fs.readFile(path.join(selected.source, 'version.yaml'), 'utf8')
-    ).match(/^\uFEFF?version:\s*["']?(\d+\.\d+\.\d+)/m)?.[1];
+    ).match(
+      /^\uFEFF?version:\s*["']?(\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?)/m,
+    )?.[1];
     // An allowlist prevents NODE_OPTIONS, startup hooks, real data paths and
     // package-manager settings from escaping into the disposable backend.
     const env = {

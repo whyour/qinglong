@@ -61,7 +61,9 @@ async function withPanelLifecycle(root, tmp, env, operation, signal) {
 
 async function targetVersion(source) {
   const text = await fs.readFile(path.join(source, 'version.yaml'), 'utf8');
-  const version = text.match(/^\uFEFF?version:\s*["']?(\d+\.\d+\.\d+)/m)?.[1];
+  const version = text.match(
+    /^\uFEFF?version:\s*["']?(\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?)/m,
+  )?.[1];
   if (!version) throw new Error('Invalid update version');
   return version;
 }
