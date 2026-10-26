@@ -57,8 +57,8 @@ function releaseIndex(directory, commit, repository, options = {}) {
   }
   return { format: 2, sourceCommit: commit, packages };
 }
-function stageDevelopmentAssets(directory, commit, buildId) {
-  const staged = fs.mkdtempSync(path.join(directory, '.upgrade-develop-'));
+function stageReleaseAssets(directory, commit, buildId, channel) {
+  const staged = fs.mkdtempSync(path.join(directory, `.upgrade-${channel}-`));
   const assets = [];
   try {
     for (const target of platforms) {
@@ -87,6 +87,9 @@ function stageDevelopmentAssets(directory, commit, buildId) {
     throw error;
   }
 }
+function stageDevelopmentAssets(directory, commit, buildId) {
+  return stageReleaseAssets(directory, commit, buildId, 'develop');
+}
 function publishBundles({
   directory,
   commit,
@@ -110,14 +113,12 @@ function publishBundles({
   // unchanged. Only the version/channel pointer is overwritten, never bytes
   // that an in-flight download has already selected by hash.
   const development = branch === 'develop';
-  const tag = development
-    ? 'upgrade-develop'
-    : `upgrade-build-v${version}-${buildId}`;
+  const tag = development ? 'upgrade-develop' : `upgrade-v${version}`;
   const index = {
     ...releaseIndex(directory, commit, repository, {
       version,
       releaseTag: tag,
-      assetBuildId: development ? buildId : undefined,
+      assetBuildId: buildId,
     }),
     version,
     buildId,
@@ -129,7 +130,7 @@ function publishBundles({
     sha256: sha256(installer),
     url: `https://github.com/${repository}/releases/download/${encodeURIComponent(
       tag,
-    )}/${development ? `install-bundle-${buildId}.cjs` : 'install-bundle.cjs'}`,
+    )}/install-bundle-${buildId}.cjs`,
   };
   fs.writeFileSync(
     path.join(directory, 'latest.json'),
@@ -187,28 +188,13 @@ function publishBundles({
   }
   const staged = development
     ? stageDevelopmentAssets(directory, commit, buildId)
-    : null;
+    : stageReleaseAssets(directory, commit, buildId, `v${version}`);
   try {
     ensureRelease(
       tag,
-      development
-        ? 'Upgrade channel develop'
-        : `Platform upgrade v${version} (${buildId})`,
+      development ? 'Upgrade channel develop' : `Platform upgrade v${version}`,
     );
-    const assets =
-      staged?.assets ||
-      platforms
-        .flatMap((target) => {
-          const archive = path.join(
-            directory,
-            `qinglong-${commit}-${target}.tar.gz`,
-          );
-          return [archive, archive + '.json'];
-        })
-        .concat(
-          path.join(directory, 'install-bundle.cjs'),
-          path.join(directory, 'latest.json'),
-        );
+    const assets = staged.assets;
     const published = lookup(tag);
     const missing = [];
     const matches = (asset, file) => {
@@ -244,9 +230,7 @@ function publishBundles({
     // Each channel serializes its image builds and pointer writes as one release.
     // A rerun of an earlier workflow is allowed to replace the same
     // version/commit; an obsolete source commit must never advance either alias.
-    const aliases = development
-      ? ['upgrade-develop']
-      : [`upgrade-v${version}`, 'upgrade-master'];
+    const aliases = development ? ['upgrade-develop'] : [tag, 'upgrade-master'];
     for (const ref of aliases) {
       if (!currentSource()) {
         console.log(
@@ -330,7 +314,7 @@ function publishBundles({
     }
     return true;
   } finally {
-    if (staged) fs.rmSync(staged.staged, { recursive: true, force: true });
+    fs.rmSync(staged.staged, { recursive: true, force: true });
   }
 }
 module.exports = { releaseIndex, platforms, publishBundles };

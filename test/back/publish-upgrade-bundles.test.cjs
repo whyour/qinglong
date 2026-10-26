@@ -138,7 +138,11 @@ function fixture(t) {
           digest: `sha256:${sha256(bytes)}`,
         });
       }
-      if (tag === 'upgrade-develop' && state.corruptChannel)
+      if (
+        files.some((file) => path.basename(file) === 'latest.json') &&
+        ((tag === 'upgrade-develop' && state.corruptChannel) ||
+          tag === state.corruptIndexTag)
+      )
         release.get('latest.json').digest = 'sha256:wrong';
       if (files.length > 1) {
         if (state.corruptUploadedBatch)
@@ -177,12 +181,15 @@ test('publishes every platform and installer before advancing version and legacy
   assert.ok(index.packages['linux-armv7-musl']);
   assert.equal(index.packages['linux-armv7-glibc'], undefined);
   assert.deepEqual(index, f.index('upgrade-v2.24.0'));
-  const tag = 'upgrade-build-v2.24.0-100-1';
+  const tag = 'upgrade-v2.24.0';
   assert.equal(f.state.releases.get(tag).size, 24);
+  assert.equal(f.state.releases.get('upgrade-master').size, 1);
+  assert.ok(!f.state.releases.has('upgrade-build-v2.24.0-100-1'));
   for (const entry of [...Object.values(index.packages), index.installer]) {
     const url = new URL(entry.url),
       filename = path.basename(url.pathname);
     assert.ok(url.pathname.includes(`/releases/download/${tag}/`));
+    assert.ok(filename.includes('-100-1.'));
     const bytes = f.state.releases.get(tag).get(filename).bytes;
     assert.equal(bytes.length, entry.size);
     assert.equal(sha256(bytes), entry.sha256);
@@ -192,7 +199,7 @@ test('publishes every platform and installer before advancing version and legacy
   );
   assert.deepEqual(
     writes.map((a) => a[2]),
-    [tag, 'upgrade-v2.24.0', 'upgrade-master'],
+    [tag, tag, 'upgrade-master'],
   );
   assert.ok(writes.slice(1).every((a) => a.includes('--clobber')));
 });
@@ -205,10 +212,10 @@ for (const sameCommit of [false, true])
     f.publish();
     const before = f.index();
     const oldAssets = new Map(
-      Array.from(
-        f.state.releases.get('upgrade-build-v2.24.0-100-1'),
-        ([name, a]) => [name, a.bytes.toString('base64')],
-      ),
+      Array.from(f.state.releases.get('upgrade-v2.24.0'), ([name, a]) => [
+        name,
+        a.bytes.toString('base64'),
+      ]).filter(([name]) => name !== 'latest.json'),
     );
     const commit = sameCommit ? f.options.commit : 'b'.repeat(40);
     f.state.head = commit;
@@ -230,13 +237,14 @@ for (const sameCommit of [false, true])
     assert.notEqual(after.installer.sha256, before.installer.sha256);
     assert.deepEqual(
       new Map(
-        Array.from(
-          f.state.releases.get('upgrade-build-v2.24.0-100-1'),
-          ([name, a]) => [name, a.bytes.toString('base64')],
-        ),
+        Array.from(f.state.releases.get('upgrade-v2.24.0'), ([name, a]) => [
+          name,
+          a.bytes.toString('base64'),
+        ]).filter(([name]) => oldAssets.has(name)),
       ),
       oldAssets,
     );
+    assert.equal(f.state.releases.get('upgrade-v2.24.0').size, 47);
   });
 
 test('retrying a publication is idempotent, but changed bytes require a new build ID', (t) => {
@@ -247,7 +255,8 @@ test('retrying a publication is idempotent, but changed bytes require a new buil
       (a) =>
         a[0] === 'release' &&
         a[1] === 'upload' &&
-        a[2] === 'upgrade-build-v2.24.0-100-1',
+        a[2] === 'upgrade-v2.24.0' &&
+        !a.includes('--clobber'),
     ).length;
   assert.equal(count(), 1);
   f.publish();
@@ -255,6 +264,41 @@ test('retrying a publication is idempotent, but changed bytes require a new buil
   f.write(f.options.commit, 'changed within the same attempt');
   assert.throws(() => f.publish(), /Immutable release asset differs/);
   assert.equal(f.index().buildId, '100-1');
+});
+
+test('a new version keeps the previous version release while master advances', (t) => {
+  const f = fixture(t);
+  f.publish();
+  const previous = f.index('upgrade-v2.24.0');
+  const commit = 'b'.repeat(40);
+  f.state.head = commit;
+  f.write(commit, 'next version', '2.25.0');
+  assert.equal(
+    f.publish({ commit, version: '2.25.0', buildId: '101-1' }),
+    true,
+  );
+  assert.deepEqual(f.index('upgrade-v2.24.0'), previous);
+  assert.equal(f.state.releases.get('upgrade-v2.24.0').size, 24);
+  assert.equal(f.state.releases.get('upgrade-v2.25.0').size, 24);
+  assert.equal(f.state.releases.get('upgrade-master').size, 1);
+  assert.equal(f.index().version, '2.25.0');
+  assert.ok(!f.state.releases.has('upgrade-build-v2.25.0-101-1'));
+});
+
+test('a failed version index verification leaves master on the previous version', (t) => {
+  const f = fixture(t);
+  f.publish();
+  const previous = f.index();
+  const commit = 'b'.repeat(40);
+  f.state.head = commit;
+  f.write(commit, 'next version', '2.25.0');
+  f.state.corruptIndexTag = 'upgrade-v2.25.0';
+  assert.throws(
+    () => f.publish({ commit, version: '2.25.0', buildId: '101-1' }),
+    /Published channel index verification failed/,
+  );
+  assert.deepEqual(f.index(), previous);
+  assert.deepEqual(f.index('upgrade-v2.24.0'), previous);
 });
 
 for (const fault of ['missing', 'corrupt', 'wrong-version'])
@@ -296,7 +340,7 @@ test('stale commits do not publish; a source change during upload cannot advance
   const before = f.index();
   f.state.head = 'b'.repeat(40);
   assert.equal(f.publish({ buildId: '101-1' }), false);
-  assert.ok(!f.state.releases.has('upgrade-build-v2.24.0-101-1'));
+  assert.equal(f.state.releases.get('upgrade-v2.24.0').size, 24);
   f.state.head = f.options.commit;
   f.state.changeHeadAfterUpload = true;
   assert.equal(f.publish({ buildId: '102-1' }), false);
@@ -392,7 +436,7 @@ test('automatic development publication keeps its prerelease version separate fr
   );
   assert.deepEqual(f.index(), production);
   assert.deepEqual(f.index('upgrade-v2.24.0'), production);
-  assert.equal(f.state.releases.get('upgrade-build-v2.24.0-100-1').size, 24);
+  assert.equal(f.state.releases.get('upgrade-v2.24.0').size, 24);
   assert.equal(f.state.releases.get('upgrade-develop').size, 24);
   assert.ok(!f.state.releases.has('upgrade-build-develop-100-1'));
   const archiveName = path.basename(development.packages['linux-x64-musl'].url);

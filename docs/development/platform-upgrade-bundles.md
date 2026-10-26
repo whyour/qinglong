@@ -20,29 +20,29 @@ gh workflow run build-docker-image.yml --ref develop
 
 开发和正式包都必须在 11 个平台完成归档、解包后复验及依赖试运行，并且全部上传资产的大小和 SHA256 复验通过后，才更新各自索引。平台范围与现有 Alpine/Debian 镜像一致：ARMv6 和 ARMv7 仅提供 musl 包，Debian 不再发布 ARMv7 镜像或 glibc 平台包。
 
-版本入口为 GitHub prerelease `upgrade-v<version>` 下的 `latest.json`；在线正式渠道保留 `upgrade-master/latest.json`，兼容现有客户端。二者指向同一套完整包，指定版本与 latest 不重复生成产物。索引记录渠道、版本、源码提交、构建批次、准确字节数、SHA256，以及 `upgrade-build-v<version>-<run-id>-<run-attempt>` 下的固定下载 URL。相同版本的镜像 tag 重新发布时，完整包也重新生成，版本和正式渠道索引同步覆盖到新批次；同一提交重跑也允许产生新内容。已选中旧索引的下载继续使用旧批次资产，避免覆盖文件导致哈希不匹配。master 的镜像构建和完整包发布整条流水线串行执行，避免镜像 tag 与完整包被并发重发交错覆盖；旧工作流明确重跑时也允许同版本、同提交重新发布。过期源码提交不能推进对应渠道或版本索引；平台包上传失败时不切换索引。
+每个正式版本只使用一个 GitHub prerelease `upgrade-v<version>`，其中存放完整平台包、校验文件、安装器和 `latest.json`；在线正式渠道 `upgrade-master` 只保留指向最新版本的 `latest.json`，兼容现有客户端。不再创建 `upgrade-build-v<version>-<run-id>-<run-attempt>` 构建批次 release。索引记录渠道、版本、源码提交、构建批次、准确字节数、SHA256，以及该版本 release 中带构建 ID 的固定资产 URL。相同版本的镜像 tag 重新发布时，先上传并校验新资产，再更新版本索引和正式渠道索引；同一提交重跑也允许产生新内容。旧批次资产保留在同一版本 release，已选中旧索引的下载可继续完成，避免覆盖文件导致哈希不匹配。master 的镜像构建和完整包发布整条流水线串行执行，避免镜像 tag 与完整包被并发重发交错覆盖；旧工作流明确重跑时也允许同版本、同提交重新发布。过期源码提交不能推进对应渠道或版本索引；平台包上传失败时不切换索引。
 
 ## 手动离线安装和升级
 
-从 `upgrade-v<version>` 的说明或 `latest.json` 中取得当前批次的下载链接，下载匹配设备的 `.tar.gz` 和独立 `install-bundle.cjs`；两者都来自同一个 `upgrade-build-v<version>-<run-id>-<run-attempt>` release。独立安装器已内置解析依赖，在目标设备正常情况无需 npm、pnpm 或重新安装 SQLite。离线准备和预启动默认不联网；依赖不符合要求时直接报错。可对照同批次 release 的 `latest.json` 核对归档 SHA256。
+从 `upgrade-v<version>` 的说明或 `latest.json` 中取得当前批次的下载链接，下载匹配设备的 `.tar.gz` 和带构建 ID 的独立安装器；两者都来自该版本 release。独立安装器已内置解析依赖，在目标设备正常情况无需 npm、pnpm 或重新安装 SQLite。离线准备和预启动默认不联网；依赖不符合要求时直接报错。可对照同一 release 的 `latest.json` 核对归档 SHA256。
 
 已有安装（默认应用并重启）：
 
 ```sh
-node install-bundle.cjs --root /ql --file /absolute/path/qinglong-<commit>-linux-arm64-musl.tar.gz
+node install-bundle-<build-id>.cjs --root /ql --file /absolute/path/qinglong-<commit>-linux-arm64-musl-<build-id>.tar.gz
 ```
 
 只准备，稍后手动重启：
 
 ```sh
-node install-bundle.cjs --root /ql --file /absolute/path/package.tar.gz --download-only
+node install-bundle-<build-id>.cjs --root /ql --file /absolute/path/package.tar.gz --download-only
 ql reload system
 ```
 
 仅在明确允许联网修复时添加 `--repair-deps`（安装和升级均支持），例如：
 
 ```sh
-node install-bundle.cjs --root /ql --file /absolute/path/package.tar.gz --download-only --repair-deps
+node install-bundle-<build-id>.cjs --root /ql --file /absolute/path/package.tar.gz --download-only --repair-deps
 ```
 
 修复需要已有 pnpm 8.3.1 及必要编译工具。依赖在私有目录按 `--prod --frozen-lockfile` 重装，仅重建 SQLite；ARMv6 强制源码编译和 ARMv6 硬浮点指令，禁止下载 generic ARM 的 ARMv7 二进制。修复仅执行一次；不安装或替换 Node、不改锁文件、不改已校验源码和静态产物。应用前以原包校验清单和独立记录的修复依赖摘要复验。
@@ -58,7 +58,7 @@ node install-bundle.cjs --root /ql --file /absolute/path/package.tar.gz --downlo
 安装到空目录：
 
 ```sh
-node install-bundle.cjs --root /opt/qinglong --file /absolute/path/package.tar.gz --install
+node install-bundle-<build-id>.cjs --root /opt/qinglong --file /absolute/path/package.tar.gz --install
 QL_DIR=/opt/qinglong QL_DATA_DIR=/opt/qinglong/data bash /opt/qinglong/shell/start-simplify.sh
 ```
 
