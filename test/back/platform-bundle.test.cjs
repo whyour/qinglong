@@ -591,7 +591,9 @@ test('publishing requires every platform and validates all immutable archive has
     );
   }
   const index = releaseIndex(f.directory, sourceCommit, repository);
-  assert.equal(Object.keys(index.packages).length, 12);
+  assert.equal(Object.keys(index.packages).length, 11);
+  assert.ok(index.packages['linux-armv7-musl']);
+  assert.equal(index.packages['linux-armv7-glibc'], undefined);
   const armv6 = path.join(
     f.directory,
     `qinglong-${sourceCommit}-linux-armv6-musl.tar.gz`,
