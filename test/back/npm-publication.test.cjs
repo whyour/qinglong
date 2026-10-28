@@ -12,12 +12,10 @@ const publication = workflow.jobs.publish.steps.find(
   (step) => step.name === 'Publish npm package with OIDC',
 ).run;
 
-test('npm publication waits for every release image, including Python 3.10', () => {
+test('npm publication waits for every supported release image', () => {
   for (const name of [
     'build-alpine',
     'build-debian',
-    'build-alpine310',
-    'build-debian310',
   ])
     assert.ok(workflow.jobs.publish.needs.includes(name), name);
 });

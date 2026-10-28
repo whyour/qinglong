@@ -51,8 +51,6 @@ test('release images receive the same-run artifact and verify it before use', ()
   for (const name of [
     'build-alpine',
     'build-debian',
-    'build-alpine310',
-    'build-debian310',
   ]) {
     const job = workflow.jobs[name];
     assert.equal(job.needs, 'build-static');
