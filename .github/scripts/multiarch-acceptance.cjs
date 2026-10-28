@@ -108,7 +108,7 @@ async function multiarchRunTask(extension, source, command, expectedMarker, name
 
 async function multiarchRunUi() {
   const { chromium } = require(process.env.PLAYWRIGHT_CORE);
-  const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || undefined, headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   const pages = [
     ['dashboard', '仪表盘'], ['crontab', '定时任务'], ['subscription', '订阅管理'],

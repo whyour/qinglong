@@ -56,7 +56,9 @@ jobs:
           tar -xzf cli-package/whyour-qinglong-cli-0.1.3.tgz -C "$RUNNER_TEMP/cli"
           test -f "$RUNNER_TEMP/cli/package/dist/npm/ql.js"
           npm install --no-save --prefix "$RUNNER_TEMP/browser" playwright-core@1.55.0
-          command -v google-chrome || command -v chromium || command -v chromium-browser
+          if ! command -v google-chrome && ! command -v chromium && ! command -v chromium-browser; then
+            node "$RUNNER_TEMP/browser/node_modules/playwright-core/cli.js" install --with-deps chromium
+          fi
       - name: Pull and start exact platform image
         shell: bash
         env:
@@ -94,7 +96,7 @@ jobs:
           set -euo pipefail
           export QL_CLI="$RUNNER_TEMP/cli/package/dist/npm/ql.js"
           export PLAYWRIGHT_CORE="$RUNNER_TEMP/browser/node_modules/playwright-core"
-          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
           node .github/scripts/multiarch-acceptance.cjs 2>&1 | tee "evidence/${QL_ARCH_SLUG}/acceptance.log"
       - name: Save container logs
         if: always()
