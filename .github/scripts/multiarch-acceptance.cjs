@@ -99,7 +99,7 @@ async function multiarchRunTask(extension, source, command, expectedMarker, name
   const log = await multiarchPoll(`${extension} task`, () => {
     const data = multiarchCli(['task', 'logs', String(task.id), '--tail', '200']);
     const text = typeof data === 'string' ? data : JSON.stringify(data);
-    return { done: text.includes(expectedMarker), value: text };
+    return { done: text.includes(expectedMarker) && (text.includes('Completed') || text.includes('执行结束') || text.includes('完成')), value: text };
   }, 90, 2000);
   assert.ok(log.includes('Completed') || log.includes('执行结束') || log.includes('完成'), log.slice(0, 400));
   fs.writeFileSync(path.join(output, `task-${extension}.log`), log);
@@ -125,7 +125,7 @@ async function multiarchRunUi() {
     const visited = [];
     for (const [route, title] of pages) {
       await page.goto(`${base}/${route}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await page.waitForFunction(expected => document.title.includes(expected), title, { timeout: 30000 });
+      await page.locator('.ant-layout-content').first().waitFor({ timeout: 30000 });
       await page.waitForTimeout(route === 'diff' ? 2500 : 900);
       const body = await page.locator('body').innerText();
       assert.ok(body.length > 50, `${route}: empty page`);

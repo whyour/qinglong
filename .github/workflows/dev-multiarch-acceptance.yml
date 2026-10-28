@@ -56,13 +56,13 @@ jobs:
         run: |
           set -euo pipefail
           image="whyour/qinglong@${IMAGE_DIGEST}"
-          mkdir -p "evidence/${SLUG}/data"
+          mkdir -p "evidence/${SLUG}" "$RUNNER_TEMP/qinglong-data-${SLUG}"
           docker pull --platform "$PLATFORM" "$image"
           docker image inspect "$image" > "evidence/${SLUG}/image-inspect.json"
           docker run --detach --name qinglong-acceptance --platform "$PLATFORM" \
             --add-host=host.docker.internal:host-gateway \
             --publish 127.0.0.1:5700:5700 \
-            --volume "$PWD/evidence/${SLUG}/data:/ql/data" \
+            --volume "$RUNNER_TEMP/qinglong-data-${SLUG}:/ql/data" \
             "$image"
           for attempt in $(seq 1 120); do
             if curl --fail --silent http://127.0.0.1:5700/api/health > "evidence/${SLUG}/health.json"; then exit 0; fi
