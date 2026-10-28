@@ -1,6 +1,6 @@
 version: 2.24.0
 changeLogLink: https://github.com/whyour/qinglong/blob/v2.24.0/docs/releases/2.24.0.md
-publishTime: "2026-10-29 01:24:46"
+publishTime: "2026-10-29 02:14:58"
 changeLog: |
   1. Alpine 与 Debian 默认镜像统一使用 Node.js 24，SQLite 依赖升级至 1.1.4
   2. 新增 Node.js 原生部署的 Python venv 隔离支持，以及 Python Git URL、requirements、pyproject 依赖源
