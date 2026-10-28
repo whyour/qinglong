@@ -1,9 +1,12 @@
-version: 2.24.0-dev.0
-changeLogLink: https://github.com/whyour/qinglong/blob/develop/docs/releases/2.24.0-dev.0.md
-publishTime: "2026-10-25 19:22:54"
+version: 2.24.0
+changeLogLink: https://github.com/whyour/qinglong/blob/v2.24.0/docs/releases/2.24.0.md
+publishTime: "2026-10-29 01:24:46"
 changeLog: |
-  1. 开发候选 2.24.0-dev.0，尚未正式发布；以 2.23.0 为上一正式版本
-  2. Alpine 与 Debian 镜像统一使用 Node.js 24，升级 sqlite3 至 1.1.4
-  3. Alpine 保留 arm/v6 和 arm/v7；Debian 暂不提供 arm/v7 镜像
-  4. ARM64 升级包在原生 runner 构建，避免 x64 QEMU 下的归档异常
-  5. 升级前备份完整数据，并在目标设备验证脚本、依赖和通知
+  1. Alpine 与 Debian 默认镜像统一使用 Node.js 24，SQLite 依赖升级至 1.1.4
+  2. 新增 Node.js 原生部署的 Python venv 隔离支持，以及 Python Git URL、requirements、pyproject 依赖源
+  3. 新增通知审计日志，完善通知失败记录与配置提示
+  4. 升级包按平台构建并校验；支持在线暂存、离线安装、失败回退及保留数据迁移
+  5. 修复任务调度、额外规则、依赖安装、脚本发现和订阅同步等问题
+  6. 独立远程 CLI 更新至 0.1.3，最低 Node.js 版本为 22.12.0
+  7. Alpine 保留 arm/v6 和 arm/v7；Debian 暂不提供 arm/v7，Python 3.10 兼容镜像停止更新
+  8. 升级前备份完整数据，并在目标设备验证脚本、依赖、订阅和通知
