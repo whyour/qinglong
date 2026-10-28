@@ -70,7 +70,7 @@ async function multiarchCase(name, action) {
   const started = Date.now();
   try {
     const details = await action();
-    result.cases.push({ name, status: 'PASS', elapsedMs: Date.now() - started, ...(details || {}) });
+    result.cases.push({ name, elapsedMs: Date.now() - started, ...(details || {}), status: 'PASS' });
     process.stdout.write(`PASS ${name}\n`);
   } catch (error) {
     result.cases.push({ name, status: 'FAIL', elapsedMs: Date.now() - started, error: String(error.stack || error).slice(0, 2000) });
@@ -136,7 +136,7 @@ async function multiarchRunUi() {
     await page.goto(`${base}/crontab`, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.getByText(state.taskName, { exact: true }).first().waitFor({ timeout: 30000 });
     const row = page.locator('tr').filter({ hasText: state.taskName }).first();
-    await row.getByText('日志', { exact: true }).click();
+    await row.getByText(/^(Log|日志)$/).click();
     await page.getByText(marker, { exact: false }).first().waitFor({ timeout: 30000 });
     await page.screenshot({ path: path.join(output, 'ui-task-log.png'), fullPage: true });
     return { visited };
