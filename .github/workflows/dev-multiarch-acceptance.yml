@@ -19,10 +19,20 @@ jobs:
     timeout-minutes: 65
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 1
       matrix:
         include:
           - { slug: develop-amd64, channel: develop, platform: linux/amd64, digest: 'sha256:1dbee7a5228cd854c14e3d726cdff501c2dec09f96fc32070331faee8953b11c' }
+          - { slug: develop-armv6, channel: develop, platform: linux/arm/v6, digest: 'sha256:1dbee7a5228cd854c14e3d726cdff501c2dec09f96fc32070331faee8953b11c' }
+          - { slug: develop-armv7, channel: develop, platform: linux/arm/v7, digest: 'sha256:1dbee7a5228cd854c14e3d726cdff501c2dec09f96fc32070331faee8953b11c' }
+          - { slug: develop-arm64, channel: develop, platform: linux/arm64, digest: 'sha256:1dbee7a5228cd854c14e3d726cdff501c2dec09f96fc32070331faee8953b11c' }
+          - { slug: develop-ppc64le, channel: develop, platform: linux/ppc64le, digest: 'sha256:1dbee7a5228cd854c14e3d726cdff501c2dec09f96fc32070331faee8953b11c' }
+          - { slug: develop-s390x, channel: develop, platform: linux/s390x, digest: 'sha256:1dbee7a5228cd854c14e3d726cdff501c2dec09f96fc32070331faee8953b11c' }
+          - { slug: develop-386, channel: develop, platform: linux/386, digest: 'sha256:1dbee7a5228cd854c14e3d726cdff501c2dec09f96fc32070331faee8953b11c' }
+          - { slug: debian-dev-amd64, channel: debian-dev, platform: linux/amd64, digest: 'sha256:e3d2f52b8d8f06e4d4a58994ec2af2081d415601bc2076bb7eae23a5bee69f6a' }
+          - { slug: debian-dev-arm64, channel: debian-dev, platform: linux/arm64, digest: 'sha256:e3d2f52b8d8f06e4d4a58994ec2af2081d415601bc2076bb7eae23a5bee69f6a' }
+          - { slug: debian-dev-ppc64le, channel: debian-dev, platform: linux/ppc64le, digest: 'sha256:e3d2f52b8d8f06e4d4a58994ec2af2081d415601bc2076bb7eae23a5bee69f6a' }
+          - { slug: debian-dev-s390x, channel: debian-dev, platform: linux/s390x, digest: 'sha256:e3d2f52b8d8f06e4d4a58994ec2af2081d415601bc2076bb7eae23a5bee69f6a' }
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -59,7 +69,9 @@ jobs:
           mkdir -p "evidence/${SLUG}" "$RUNNER_TEMP/qinglong-data-${SLUG}"
           docker pull --platform "$PLATFORM" "$image"
           docker image inspect "$image" > "evidence/${SLUG}/image-inspect.json"
-          docker run --detach --name qinglong-acceptance --platform "$PLATFORM" \
+          qemu_env=()
+          if [ "$PLATFORM" = linux/arm/v6 ]; then qemu_env=(--env QEMU_CPU=arm1176); fi
+          docker run --detach --name qinglong-acceptance --platform "$PLATFORM" "${qemu_env[@]}" \
             --add-host=host.docker.internal:host-gateway \
             --publish 127.0.0.1:5700:5700 \
             --volume "$RUNNER_TEMP/qinglong-data-${SLUG}:/ql/data" \
