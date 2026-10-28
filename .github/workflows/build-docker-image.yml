@@ -507,7 +507,7 @@ jobs:
             jq -e --arg version "$version" '. == $version' "$RUNNER_TEMP/npm-version.json" > /dev/null
             echo "::notice::$name@$version is already published; skipping npm publication for this image rebuild."
           elif jq -e '.error.code == "E404"' "$RUNNER_TEMP/npm-version.json" > /dev/null; then
-            npm publish "$archive" --ignore-scripts --access public --registry=https://registry.npmjs.org
+            npm publish "./$archive" --ignore-scripts --access public --registry=https://registry.npmjs.org
           else
             echo '::error::Could not check the published npm version; refusing to publish.'
             exit 1

@@ -75,7 +75,7 @@ case 'network': console.log('upstream unavailable'); process.exit(1);
     assert.equal(fs.existsSync(path.join(root, 'published')), published);
     if (published)
       assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'published'), 'utf8')), [
-        'npm-panel/verified.tgz', '--ignore-scripts', '--access', 'public', '--registry=https://registry.npmjs.org',
+        './npm-panel/verified.tgz', '--ignore-scripts', '--access', 'public', '--registry=https://registry.npmjs.org',
       ]);
   });
 }
