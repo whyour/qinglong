@@ -220,7 +220,7 @@ test('npm publication consumes the exact archive whose isolated installation pas
   const download = workflow.jobs.publish.steps.find((step) => step.uses?.startsWith('actions/download-artifact@'));
   assert.equal(download.with.name, 'qinglong-npm-${{ github.sha }}');
   const publication = workflow.jobs.publish.steps.find((step) => step.name === 'Publish npm package with OIDC');
-  assert.match(publication.run, /npm publish "\$archive" --ignore-scripts/);
+  assert.match(publication.run, /npm publish "\.\/\$archive" --ignore-scripts/);
   assert.ok(!workflow.jobs.publish.steps.some((step) => /pnpm build/.test(step.run || '')));
 });
 

@@ -12,12 +12,10 @@ const publication = workflow.jobs.publish.steps.find(
   (step) => step.name === 'Publish npm package with OIDC',
 ).run;
 
-test('npm publication waits for every release image, including Python 3.10', () => {
+test('npm publication waits for every supported release image', () => {
   for (const name of [
     'build-alpine',
     'build-debian',
-    'build-alpine310',
-    'build-debian310',
   ])
     assert.ok(workflow.jobs.publish.needs.includes(name), name);
 });
@@ -77,7 +75,7 @@ case 'network': console.log('upstream unavailable'); process.exit(1);
     assert.equal(fs.existsSync(path.join(root, 'published')), published);
     if (published)
       assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'published'), 'utf8')), [
-        'npm-panel/verified.tgz', '--ignore-scripts', '--access', 'public', '--registry=https://registry.npmjs.org',
+        './npm-panel/verified.tgz', '--ignore-scripts', '--access', 'public', '--registry=https://registry.npmjs.org',
       ]);
   });
 }

@@ -273,8 +273,6 @@ test('Gitee workflows verify both mirrors and do not gate image publication', ()
   for (const name of [
     'build-alpine',
     'build-debian',
-    'build-alpine310',
-    'build-debian310',
   ]) {
     assert.equal(workflow.jobs[name].needs, 'build-static');
   }

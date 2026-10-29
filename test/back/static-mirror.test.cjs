@@ -225,8 +225,6 @@ test('static backfill uses existing snapshots and skips all source, build and im
     'verify-gitee-mirrors',
     'build-alpine',
     'build-debian',
-    'build-alpine310',
-    'build-debian310',
   ]) {
     assert.equal(workflow.jobs[name].needs, 'build-static');
     assert.doesNotMatch(workflow.jobs[name].if || '', /always\(/);
