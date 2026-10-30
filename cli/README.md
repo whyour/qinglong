@@ -76,7 +76,7 @@ ql auth status --scope crons --json
 # 自动化环境事先注入 QL_CLIENT_ID 和 QL_CLIENT_SECRET，再运行同一 login 命令
 ```
 
-凭据和 token 保存到 `~/.config/qinglong/cli.json`，为当前用户所有的 0600 明文文件。`QL_CLI_CONFIG` 可选择其他配置文件。登录只验证应用凭据，不意味着具备所有资源权限。
+凭据和 token 保存到 `~/.config/qinglong/cli.json` 明文文件。CLI 创建文件时会请求 `0600` 权限，并在读取时拒绝符号链接和非普通文件；由于 Windows、WSL 挂载盘及部分网络或设备文件系统不能可靠提供 POSIX 权限位，读取时不以权限位或 UID 为准。请将配置保存在仅当前用户可访问的位置，并按实际文件系统的权限或 ACL 保护它；无法保证时可使用下述环境令牌方式。`QL_CLI_CONFIG` 可选择其他配置文件。登录只验证应用凭据，不意味着具备所有资源权限。
 
 ### 直接使用访问令牌
 
@@ -128,11 +128,11 @@ npm run test:cli
 node cli/scripts/verify-package.cjs
 ```
 
-测试覆盖请求格式、认证刷新、输出、错误、禁止自动重试、权限和独立安装。打包验证会离线安装 tgz，并确认唯一入口是 `ql`，本机命令不可调用。
+测试覆盖请求格式、认证刷新、输出、错误、禁止自动重试、配置文件类型和独立安装。打包验证会离线安装 tgz，并确认唯一入口是 `ql`，本机命令不可调用。
 
-CLI package 工作流在相关 PR、develop/master 推送和手动触发时执行 Node 22.12/24 类型检查、构建及测试。Node 24 上传通过离线安装验证的 `qinglong-cli-<commit>` artifact。两个矩阵任务成功后，master 推送会将这份已验证的 tgz 发布到 npm 的 latest 标签，通过 GitHub Actions OIDC 可信发布，无需 `NPM_TOKEN` Secret。手动运行需选择 master 并勾选 publish；PR、develop 和 fork 不发布。npm 的 Trusted Publisher 需绑定仓库 `whyour/qinglong` 和工作流 `cli-package.yml`，允许 `npm publish`；面板包 `@whyour/qinglong` 单独绑定 `build-docker-image.yml`。发布 job 使用 Node 24，并仅在该 job 授予 `id-token: write`。新包需先完成首次发布，再配置对应包的可信发布关系。
+CLI package 工作流在相关 PR、develop/master 推送和手动触发时执行 Node 22.12/24 类型检查、构建及测试，并在 Windows 与 Linux ARM64 上用真实文件系统验证登录和命令读取。Node 24 上传通过离线安装验证的 `qinglong-cli-<commit>` artifact。全部验证成功后，master 推送会将这份 tgz 发布到 npm 的 `latest` 标签；手动在 master 勾选 `publish` 也可发布稳定版。develop 推送只验证；手动在 develop 勾选 `publish` 并填写 `prerelease_version`（例如 `0.1.5-beta.0`）可发布到对应的 `alpha`、`beta` 或 `rc` 标签。PR 和 fork 不发布。CLI 专属改动不会触发主镜像构建，少数被镜像使用的 CLI 内部升级文件除外。npm 的 Trusted Publisher 需绑定仓库 `whyour/qinglong` 和工作流 `cli-package.yml`，允许 `npm publish`；面板包 `@whyour/qinglong` 单独绑定 `build-docker-image.yml`。发布 job 使用 Node 24 和 GitHub Actions OIDC，无需 `NPM_TOKEN` Secret，仅该 job 授予 `id-token: write`。新包需先完成首次发布，再配置对应包的可信发布关系。
 
-CLI 版本独立维护在 cli/package.json 和 cli/package-lock.json。发布改动前执行 `npm version patch --prefix cli --no-git-tag-version`（也可用 minor/major），提交这两个文件。已发布的版本会提示并跳过；registry 查询失败则停止发布。该流程仅发布 X.Y.Z 稳定版本，不重新构建产物或执行包生命周期脚本。
+CLI 稳定版版本号独立维护在 cli/package.json 和 cli/package-lock.json。发布改动前执行 `npm version patch --prefix cli --no-git-tag-version`（也可用 minor/major），提交这两个文件。develop 预发布版版本号仅在工作流运行时设置，不写回仓库。已发布的稳定版版本号会提示并跳过；重复的预发布版版本号会报错，registry 查询失败也会停止发布。发布 job 不重新构建产物或执行包生命周期脚本。
 
 ## 面板内部工具
 

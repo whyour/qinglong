@@ -175,8 +175,8 @@ export const english: Record<string, string> = {
     'Request failed or returned invalid JSON. Check the instance URL, network and TLS certificate.',
   'API 请求被拒绝（code %s），请检查%s。':
     'API request rejected (code %s). Check %s.',
-  'CLI 配置必须是当前用户拥有的私有普通文件（0600）。':
-    'CLI config must be an owned private regular file (0600).',
+  'CLI 配置必须是普通文件，且不能是符号链接。':
+    'CLI config must be a regular file, not a symbolic link.',
   'CLI 配置无效，请运行 ql login。': 'Invalid CLI config. Run ql login.',
   '尚未登录，请运行 ql login。': 'Not logged in. Run ql login.',
   '无法读取 CLI 配置，请检查文件权限并运行 ql login。':

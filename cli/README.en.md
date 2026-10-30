@@ -76,7 +76,7 @@ ql auth status --scope crons --json
 # For automation, inject QL_CLIENT_ID and QL_CLIENT_SECRET before the same login command
 ```
 
-Credentials/token are stored in `~/.config/qinglong/cli.json`, a plaintext file owned by the current user with mode 0600. `QL_CLI_CONFIG` selects another file. Login validates application credentials, not every resource permission.
+Credentials/token are stored in `~/.config/qinglong/cli.json` as plaintext. The CLI requests mode `0600` when creating the file and rejects symlinks and non-regular files when reading it. Windows, WSL mounts, and some network or device filesystems do not reliably report POSIX permissions, so reads do not depend on mode bits or UID. Keep the config in a location accessible only to your user and protect it with the filesystem's actual permissions or ACLs; use the direct-token environment variables below if that cannot be guaranteed. `QL_CLI_CONFIG` selects another file. Login validates application credentials, not every resource permission.
 
 ### Direct access token
 
@@ -128,11 +128,11 @@ npm run test:cli
 node cli/scripts/verify-package.cjs
 ```
 
-Tests cover requests, token refresh, output, errors, no automatic retries, permissions and isolated installation. Package verification installs the archive offline, verifies the sole ql executable and rejects local commands.
+Tests cover requests, token refresh, output, errors, no automatic retries, config file type and isolated installation. Package verification installs the archive offline, verifies the sole ql executable and rejects local commands.
 
-The CLI package workflow checks, builds and tests Node 22.12/24 on relevant PRs, develop/master pushes and manual runs. Node 24 uploads the archive verified by offline installation as `qinglong-cli-<commit>`. After both matrix jobs succeed, master pushes publish that exact archive to npm as latest, using GitHub Actions OIDC trusted publishing without an NPM_TOKEN secret. Manual runs publish only when run on master with publish enabled; PRs, develop and forks never publish. Configure the npm Trusted Publisher for repository `whyour/qinglong`, workflow `cli-package.yml`, with `npm publish` allowed. The panel package `@whyour/qinglong` separately trusts `build-docker-image.yml`. Publishing uses Node 24 with `id-token: write` granted only to the publish job. New packages need an initial publication before configuring their trusted publisher.
+The CLI package workflow checks, builds and tests Node 22.12/24 on relevant PRs, develop/master pushes and manual runs, and verifies saved login and command reads on real Windows and Linux ARM64 filesystems. Node 24 uploads the archive verified by offline installation as `qinglong-cli-<commit>`. After all validation jobs succeed, master pushes publish that exact archive to npm as `latest`; a manual run on master with `publish` enabled can also publish a stable release. Develop pushes only verify. A manual run on develop with `publish` enabled and `prerelease_version` set (for example `0.1.5-beta.0`) publishes under the matching `alpha`, `beta` or `rc` tag. PRs and forks never publish. CLI-only changes do not trigger the main image build, except for the few internal CLI upgrade files used by the image. Configure the npm Trusted Publisher for repository `whyour/qinglong`, workflow `cli-package.yml`, with `npm publish` allowed. The panel package `@whyour/qinglong` separately trusts `build-docker-image.yml`. The publish job uses Node 24 and GitHub Actions OIDC without an `NPM_TOKEN` secret, with `id-token: write` granted only to that job. New packages need an initial publication before configuring their trusted publisher.
 
-The CLI has an independent stable version in cli/package.json and cli/package-lock.json. Before releasing changes, run `npm version patch --prefix cli --no-git-tag-version` (or minor/major) and commit both files. Existing versions are skipped with a notice; registry failures stop publication. Only stable X.Y.Z versions are published by this workflow. Publication does not rebuild the verified archive or run package lifecycle scripts.
+The CLI stable version is maintained independently in cli/package.json and cli/package-lock.json. Before releasing changes, run `npm version patch --prefix cli --no-git-tag-version` (or minor/major) and commit both files. A develop prerelease version is set only in the workflow run and is not written back to the repository. An existing stable version is skipped with a notice; a duplicate prerelease version fails, as does a registry lookup error. The publish job does not rebuild the verified archive or run package lifecycle scripts.
 
 ## Panel-internal tools
 
