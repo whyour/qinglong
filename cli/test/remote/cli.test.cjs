@@ -296,11 +296,13 @@ test('malformed successful responses are rejected, including expired authenticat
   failure(await f.invoke(['login', '--url', f.url, '--json']), 1);
 });
 
-test('config permissions, malformed content and symlinks fail closed', async (t) => {
+test('config content and symlinks are checked independently of permission bits', async (t) => {
   const f = await fixture(t);
   await f.login();
   fs.chmodSync(f.file, 0o644);
-  failure(await f.invoke(['task', 'list', '--json']), 1);
+  const sharedMode = await f.invoke(['task', 'list', '--json']);
+  assert.equal(sharedMode.code, 0, sharedMode.err);
+  assert.equal(JSON.parse(sharedMode.out).data.total, 1);
   fs.chmodSync(f.file, 0o600);
   fs.writeFileSync(f.file, '{broken');
   failure(await f.invoke(['task', 'list', '--json']), 1);
@@ -312,10 +314,71 @@ test('config permissions, malformed content and symlinks fail closed', async (t)
   const target = path.join(f.dir, 'target');
   fs.renameSync(f.file, target);
   fs.symlinkSync(target, f.file);
-  failure(await f.invoke(['task', 'list', '--json']), 1);
+  const linked = await f.invoke(['task', 'list', '--json'], { QL_LANG: 'en' });
+  failure(linked, 1);
+  assert.match(JSON.parse(linked.err).message, /regular file, not a symbolic link/);
   await f.login();
   assert.equal(fs.lstatSync(f.file).isSymbolicLink(), false);
   assert.equal(JSON.parse(fs.readFileSync(target)).clientId, 123);
+});
+
+test('Windows accepts a saved config despite synthetic 0666 mode bits', async (t) => {
+  const f = await fixture(t);
+  await f.login();
+  const preload = path.join(f.dir, 'windows-mode.cjs');
+  fs.writeFileSync(
+    preload,
+    `Object.defineProperty(process, 'platform', { value: 'win32' });
+const fs = require('node:fs');
+const originalFstatSync = fs.fstatSync;
+const originalOpenSync = fs.openSync;
+fs.openSync = function (file, flags, ...args) {
+  return originalOpenSync(file, typeof flags === 'number'
+    ? flags & ~fs.constants.O_NOFOLLOW : flags, ...args);
+};
+fs.fstatSync = function (...args) {
+  const stat = originalFstatSync(...args);
+  stat.mode = (stat.mode & ~0o777) | 0o666;
+  return stat;
+};\n`,
+  );
+  const env = { NODE_OPTIONS: `--require=${preload}` };
+  const status = await f.invoke(['auth', 'status', '--json'], env);
+  assert.equal(status.code, 0, status.err);
+  assert.equal(JSON.parse(status.out).data.scopeChecked, 'crons');
+  const list = await f.invoke(['task', 'list', '--json'], env);
+  assert.equal(list.code, 0, list.err);
+  assert.equal(JSON.parse(list.out).data.total, 1);
+  const target = path.join(f.dir, 'target');
+  fs.renameSync(f.file, target);
+  fs.symlinkSync(target, f.file);
+  failure(await f.invoke(['task', 'list', '--json'], env), 1);
+});
+
+test('Linux ARM accepts a saved config with synthetic mode and owner', async (t) => {
+  const f = await fixture(t);
+  await f.login();
+  const preload = path.join(f.dir, 'arm-mode.cjs');
+  fs.writeFileSync(
+    preload,
+    `Object.defineProperty(process, 'platform', { value: 'linux' });
+Object.defineProperty(process, 'arch', { value: 'arm' });
+const fs = require('node:fs');
+const originalFstatSync = fs.fstatSync;
+fs.fstatSync = function (...args) {
+  const stat = originalFstatSync(...args);
+  stat.mode = (stat.mode & ~0o777) | 0o666;
+  stat.uid = 999999;
+  return stat;
+};\n`,
+  );
+  const env = { NODE_OPTIONS: `--require=${preload}` };
+  const status = await f.invoke(['auth', 'status', '--json'], env);
+  assert.equal(status.code, 0, status.err);
+  assert.equal(JSON.parse(status.out).data.scopeChecked, 'crons');
+  const list = await f.invoke(['task', 'list', '--json'], env);
+  assert.equal(list.code, 0, list.err);
+  assert.equal(JSON.parse(list.out).data.total, 1);
 });
 
 test('standalone compiled artifact and symlink run without repo runtime dependencies', async (t) => {

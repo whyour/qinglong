@@ -25,7 +25,7 @@ on:
         type: boolean
         default: false
       prerelease_version:
-        description: Develop only, e.g. 0.1.2-beta.0 (alpha/beta/rc)
+        description: Develop only, e.g. 0.1.5-beta.0 (alpha/beta/rc)
         type: string
         default: ''
 
@@ -93,8 +93,26 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  platform-smoke:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: cli/package-lock.json
+      - run: npm ci --prefix cli --no-audit --no-fund
+      - run: npm run build:cli
+      - run: node --test cli/test/remote/platformSmoke.test.cjs
+
   publish:
-    needs: package
+    needs: [package, platform-smoke]
     if: >-
       github.repository == 'whyour/qinglong' &&
       ((github.ref == 'refs/heads/master' &&

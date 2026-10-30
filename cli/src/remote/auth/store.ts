@@ -17,20 +17,28 @@ export function configPath(): string {
 export function readConfig(): StoredConfig {
   let fd: number | undefined;
   try {
-    fd = fs.openSync(
-      configPath(),
-      fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW,
-    );
+    const file = configPath();
+    const pathStat = fs.lstatSync(file);
+    if (!pathStat.isFile())
+      fail(
+        translate(
+          process.env,
+          'CLI 配置必须是普通文件，且不能是符号链接。',
+        ),
+      );
+    // Not every platform or filesystem implements POSIX mode bits or O_NOFOLLOW.
+    const noFollow = fs.constants.O_NOFOLLOW ?? 0;
+    fd = fs.openSync(file, fs.constants.O_RDONLY | noFollow);
     const stat = fs.fstatSync(fd);
     if (
       !stat.isFile() ||
-      stat.mode & 0o077 ||
-      (process.getuid && stat.uid !== process.getuid())
+      pathStat.dev !== stat.dev ||
+      pathStat.ino !== stat.ino
     ) {
       fail(
         translate(
           process.env,
-          'CLI 配置必须是当前用户拥有的私有普通文件（0600）。',
+          'CLI 配置必须是普通文件，且不能是符号链接。',
         ),
       );
     }
