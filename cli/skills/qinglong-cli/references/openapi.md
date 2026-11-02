@@ -8,9 +8,9 @@ The catalogue covers 146 active routes in the current backend. `ql api routes --
 
 常规使用 `ql login` 的应用凭据。scope 通常对应 /open 后首个路径段：crons、subscriptions、envs、configs、scripts、logs、dependencies、system、dashboard 等。旧 scope 保留原有权限；上述资源除 system 外可选用对应的 `:read` scope。`crons:read` 不包含会写入任务的 `GET /crons/import`；`scripts:read`、`logs:read` 包含使用 POST 的下载，不包含写入、删除或执行。`dashboard:read` 不允许 POST 统计上报。外部应用的 `system` scope 仅允许读取系统状态和发送通知。应用管理需要 apps；`GET /apps` 会返回 Client Secret，因此不提供 `apps:read`。user、health、update 等路由同样接受服务端权限校验。路由存在不代表现有应用已获授权。
 
-认证步骤、环境变量优先级、应用登录、面板会话与双因素验证、退出行为，统一见 [认证参考](panel.md#authentication)。应用管理可用 apps 权限的应用或授权面板会话；QL_URL/QL_ACCESS_TOKEN 不保存、不刷新，不自动退回应用配置。
+认证步骤、环境变量优先级、应用登录、面板会话与双因素验证、退出行为，统一见 [认证参考](panel.md#authentication)。应用管理可用已有 apps 权限的应用或授权面板会话；后端创建和更新应用时拒绝授予 apps 权限。QL_URL/QL_ACCESS_TOKEN 不保存、不刷新，不自动退回应用配置。
 
-See the [authentication reference](panel.md#authentication) for application login, direct-token precedence, owner sessions/2FA and logout. App management accepts apps-scoped credentials or an authorized owner session. Direct tokens are not saved/refreshed and never fall back to application configuration.
+See the [authentication reference](panel.md#authentication) for application login, direct-token precedence, owner sessions/2FA and logout. App management accepts existing apps-scoped credentials or an authorized owner session; the backend rejects granting apps scope when creating or updating an application. Direct tokens are not saved/refreshed and never fall back to application configuration.
 
 Existing scopes retain their original access. Use the resource's `:read` scope for read-only access to crons, subscriptions, envs, configs, scripts, dependencies, logs, or dashboard. `crons:read` excludes the mutating `GET /crons/import`; `scripts:read` and `logs:read` include downloads (POST), but exclude writes, deletion, and execution. `dashboard:read` excludes statistics reporting (POST). External `system` applications may only read system status and send notifications. `GET /apps` returns Client Secrets, so there is no `apps:read` scope.
 

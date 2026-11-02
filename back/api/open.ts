@@ -27,7 +27,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         name: Joi.string().optional().allow('').disallow('system'),
-        scopes: Joi.array().items(Joi.string().required()),
+        scopes: Joi.array().items(Joi.string().required().invalid('apps')),
       }),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
@@ -47,7 +47,7 @@ export default (app: Router) => {
     celebrate({
       body: Joi.object({
         name: Joi.string().optional().allow(''),
-        scopes: Joi.array().items(Joi.string()),
+        scopes: Joi.array().items(Joi.string().invalid('apps')),
         id: Joi.number().required(),
       }),
     }),
