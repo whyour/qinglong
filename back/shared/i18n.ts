@@ -23,6 +23,7 @@ const messages: Record<string, Record<string, string>> = {
     '代理层数不能超过 20': 'Proxy hop count cannot exceed 20',
     '环境变量 QL_TRUST_PROXY 已生效，系统设置不可覆盖':
       'QL_TRUST_PROXY is active and cannot be overridden by system settings',
+    环境变量名称不可使用: 'Environment variable name is reserved or invalid',
     系统配置不存在: 'System configuration does not exist',
     '历史版本仅支持不超过 1 MiB 的 UTF-8 文本脚本':
       'Version history only supports UTF-8 text scripts up to 1 MiB',

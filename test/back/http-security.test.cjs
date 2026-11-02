@@ -13,6 +13,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     fs.mkdirSync(path.join(tmp, dir), { recursive: true });
   fs.writeFileSync(path.join(tmp, 'config/grpc/client.key'), 'SENTINEL');
   fs.writeFileSync(path.join(tmp, 'config/normal.txt'), 'normal');
+  fs.writeFileSync(path.join(tmp, 'config/config.sh'), 'original');
   const secret = 'http-security-test';
   const valid = jwt.sign({}, secret, { algorithm: 'HS384', expiresIn: '1h' });
   const expired = jwt.sign({}, secret, { algorithm: 'HS384', expiresIn: -1 });
@@ -65,7 +66,24 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       scopes: ['envs'],
       tokens: [{ value: 'env-app', expiration: Date.now() / 1000 + 3600 }],
     },
+    {
+      scopes: ['envs:write'],
+      tokens: [{ value: 'env-write-app', expiration: Date.now() / 1000 + 3600 }],
+    },
+    {
+      name: 'external-system',
+      scopes: ['system'],
+      tokens: [{ value: 'system-app', expiration: Date.now() / 1000 + 3600 }],
+    },
+    {
+      name: 'system',
+      scopes: ['system'],
+      tokens: [{ value: 'internal-system', expiration: Date.now() / 1000 + 3600 }],
+    },
   ];
+  let resetCalls = 0;
+  let commandCalls = 0;
+  let envWriteCalls = 0;
   let initialized = 0;
   const User = class {};
   const user = {
@@ -126,6 +144,20 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       historyCache,
     ).default(router);
     router.get('/envs', (_req, res) => res.json({ code: 200 }));
+    router.post('/envs', (_req, res) => {
+      envWriteCalls++;
+      res.json({ code: 200 });
+    });
+    router.get('/system', (_req, res) => res.json({ code: 200 }));
+    router.put('/system/notify', (_req, res) => res.json({ code: 200 }));
+    router.put('/system/auth/reset', (_req, res) => {
+      resetCalls++;
+      res.json({ code: 200 });
+    });
+    router.put('/system/command-run', (_req, res) => {
+      commandCalls++;
+      res.json({ code: 200 });
+    });
     return router;
   };
   const app = express();
@@ -203,6 +235,23 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     assert.equal((await request(`${prefix}/envs`)).status, 401, prefix);
   }
   assert.equal((await request('/open/envs', 'env-app')).body.code, 200);
+  assert.equal((await request('/open/envs', 'env-write-app')).body.code, 200);
+  for (const prefix of ['/open', '/panel/open']) {
+    assert.equal(
+      (await request(`${prefix}/envs`, 'env-app', 'POST', [
+        { name: 'SAFE_VALUE', value: 'kept' },
+      ])).status,
+      401,
+    );
+  }
+  assert.equal(envWriteCalls, 0);
+  assert.equal(
+    (await request('/open/envs', 'env-write-app', 'POST', [
+      { name: 'SAFE_VALUE', value: 'kept' },
+    ])).body.code,
+    200,
+  );
+  assert.equal(envWriteCalls, 1);
   assert.equal(
     (await request('/open/configs/detail?path=normal.txt', 'env-app')).status,
     401,
@@ -212,6 +261,53 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       .data,
     'normal',
   );
+  for (const prefix of ['/open', '/panel/open']) {
+    for (const name of ['normal.txt', 'config.sh', 'task_before.sh']) {
+      assert.equal(
+        (await request(`${prefix}/configs/save`, 'config-app', 'POST', {
+          name,
+          content: 'untrusted',
+        })).status,
+        401,
+      );
+    }
+  }
+  assert.equal(fs.readFileSync(path.join(tmp, 'config/config.sh'), 'utf8'), 'original');
+  assert.equal((await request('/open/system', 'system-app')).body.code, 200);
+  assert.equal(
+    (await request('/open/system/notify', 'system-app', 'PUT', {
+      title: 'title',
+      content: 'content',
+    })).body.code,
+    200,
+  );
+  for (const prefix of ['/open', '/panel/open']) {
+    assert.equal(
+      (await request(`${prefix}/system/auth/reset`, 'system-app', 'PUT', {
+        password: 'changed',
+      })).status,
+      401,
+    );
+    assert.equal(
+      (await request(`${prefix}/system/command-run`, 'system-app', 'PUT', {
+        command: 'id',
+      })).status,
+      401,
+    );
+  }
+  assert.equal(resetCalls, 0);
+  assert.equal(commandCalls, 0);
+  assert.equal(
+    (await request('/open/system/auth/reset', 'internal-system', 'PUT', {
+      retries: 0,
+    })).body.code,
+    200,
+  );
+  assert.equal(
+    (await request('/api/system/auth/reset', valid, 'PUT', { retries: 0 })).body.code,
+    200,
+  );
+  assert.equal(resetCalls, 2);
   assert.equal(
     (await request('/open/configs/detail?path=grpc/client.key', 'config-app'))
       .body.code,
@@ -223,8 +319,8 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         name: 'grpc/client.key',
         content: 'changed',
       })
-    ).body.code,
-    403,
+    ).status,
+    401,
   );
   assert.equal(
     fs.readFileSync(path.join(tmp, 'config/grpc/client.key'), 'utf8'),
@@ -250,7 +346,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         content: 'overwrite',
       },
     );
-    assert.equal(denied.body.code, 403);
+    assert.equal(denied.status, 401);
     assert.equal(fs.existsSync(path.join(tmp, 'scripts/test.js')), false);
   }
   assert.equal(
@@ -259,8 +355,8 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         name: scriptName,
         content: 'authorized script',
       })
-    ).body.code,
-    403,
+    ).status,
+    401,
   );
   assert.equal(fs.existsSync(path.join(tmp, 'scripts/test.js')), false);
   assert.equal(
@@ -274,9 +370,17 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         name: 'normal.txt',
         content: 'normal config',
       })
-    ).body.code,
+    ).status,
+    401,
+  );
+  assert.equal(
+    (await request('/api/configs/save', valid, 'POST', {
+      name: 'config.sh',
+      content: 'owner config',
+    })).body.code,
     200,
   );
+  assert.equal(fs.readFileSync(path.join(tmp, 'config/config.sh'), 'utf8'), 'owner config');
   assert.equal(
     (
       await request('/api/configs/save', valid, 'POST', {

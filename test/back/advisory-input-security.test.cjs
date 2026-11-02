@@ -43,6 +43,84 @@ test('environment values remain literal when the generated JavaScript loads', as
   );
 });
 
+test('environment API rejects execution controls and legacy rows stay out of task files', async () => {
+  const output = {};
+  let writes = 0;
+  const warnings = [];
+  const legacy = [
+    { id: 1, name: 'task_before', value: 'touch /tmp/untrusted' },
+    { id: 2, name: 'NODE_OPTIONS', value: '--require /tmp/untrusted.js' },
+    { id: 3, name: 'PREV_NODE_OPTIONS', value: '--import=data:text/javascript,bad' },
+    { id: 4, name: 'GIT_SSH_COMMAND', value: 'sh -c bad' },
+    { id: 5, name: 'PATH', value: '/tmp/untrusted' },
+    { id: 6, name: 'file_task_before', value: '/tmp/untrusted.sh' },
+    { id: 7, name: 'SAFE_VALUE', value: 'kept' },
+    { id: 8, name: 'bad\nname', value: 'untrusted' },
+  ];
+  const Env = load(path.resolve('back/services/env.ts'), {
+    typedi: decorators,
+    '../config': { envFile: 'sh', jsEnvFile: 'js', pyEnvFile: 'py' },
+    '../data/env': {
+      Env: class { constructor(value) { Object.assign(this, value); } },
+      EnvModel: {
+        update: async (value, query) => {
+          writes++;
+        },
+        findAll: async () => [legacy[0]],
+      },
+      EnvStatus: { normal: 0, disabled: 1 },
+    },
+    '../data': { sequelize: { literal: (value) => value } },
+    '../shared/utils': {
+      writeFileWithLock: async (file, value) => { output[file] = value; },
+    },
+  }).default;
+  const service = new Env({
+    ...logger,
+    warn: (...args) => warnings.push(args),
+  });
+  service.envs = async () => legacy;
+  service.insert = async () => { writes++; return []; };
+  service.getDb = async () => ({ id: 1, name: 'SAFE_VALUE', value: 'kept' });
+  service.updateDb = async () => { writes++; return {}; };
+
+  for (const name of ['task_before', 'PREV_NODE_OPTIONS', 'GIT_SSH_COMMAND']) {
+    await assert.rejects(
+      service.create([
+        { name: 'SAFE_VALUE', value: 'ok' },
+        { name, value: 'untrusted' },
+      ]),
+      /环境变量名称不可使用/,
+    );
+  }
+  await assert.rejects(
+    service.update({ id: 1, name: 'BASH_ENV', value: '/tmp/untrusted.sh' }),
+    /环境变量名称不可使用/,
+  );
+  await assert.rejects(
+    service.updateNames({ ids: [1], name: 'PYTHONPATH' }),
+    /环境变量名称不可使用/,
+  );
+  assert.equal(writes, 0);
+
+  await service.set_envs();
+  assert.equal(writes, 0);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0][1], /GIT_SSH_COMMAND/);
+  assert.equal(warnings[0][1].includes('\n'), false);
+  await assert.rejects(service.enabled([1]), /环境变量名称不可使用/);
+  assert.equal(writes, 0);
+  delete service.envs;
+  service.find = async () => legacy;
+  const listed = await service.envs();
+  assert.equal(listed[0].securityBlocked, true);
+  assert.equal(listed[6].securityBlocked, false);
+  for (const contents of Object.values(output)) {
+    assert.doesNotMatch(contents, /task_before|NODE_OPTIONS|GIT_SSH_COMMAND|PATH/);
+    assert.match(contents, /SAFE_VALUE/);
+  }
+});
+
 test('subscription shell parameters round trip without expansion or command substitution', () => {
   const { formatCommand } = load(path.resolve('back/config/subscription.ts'));
   const payload =

@@ -174,7 +174,7 @@ const Env = () => {
       title: intl.get('状态'),
       key: 'status',
       dataIndex: 'status',
-      width: 100,
+      width: 170,
       filters: [
         {
           text: intl.get('已启用'),
@@ -192,6 +192,13 @@ const Env = () => {
             <Tag color={StatusColor[record.status]} style={{ marginRight: 0 }}>
               {intl.get(Status[record.status])}
             </Tag>
+            {record.securityBlocked && (
+              <Tooltip title={intl.get('名称受限，未注入任务')}>
+                <Tag color="warning" style={{ marginRight: 0 }}>
+                  {intl.get('名称受限')}
+                </Tag>
+              </Tooltip>
+            )}
           </Space>
         );
       },
@@ -202,6 +209,8 @@ const Env = () => {
       width: 160,
       render: (text: string, record: any, index: number) => {
         const isPc = !isPhone;
+        const isBlockedEnable =
+          record.status === Status.已禁用 && record.securityBlocked;
         return (
           <Space size="middle">
             <Tooltip title={isPc ? intl.get('编辑') : ''}>
@@ -212,7 +221,9 @@ const Env = () => {
             <Tooltip
               title={
                 isPc
-                  ? record.status === Status.已禁用
+                  ? isBlockedEnable
+                    ? intl.get('请先修改环境变量名称')
+                    : record.status === Status.已禁用
                     ? intl.get('启用')
                     : intl.get('禁用')
                   : ''
@@ -278,6 +289,10 @@ const Env = () => {
   };
 
   const enabledOrDisabledEnv = (record: any, index: number) => {
+    if (record.status === Status.已禁用 && record.securityBlocked) {
+      message.error(intl.get('请先修改环境变量名称'));
+      return;
+    }
     Modal.confirm({
       title: intl.get('确认操作', {
         operation:
@@ -538,6 +553,13 @@ const Env = () => {
   };
 
   const operateEnvs = (operationStatus: number) => {
+    if (
+      operationStatus === 0 &&
+      value.some((env) => selectedRowIds.includes(env.id) && env.securityBlocked)
+    ) {
+      message.error(intl.get('请先修改环境变量名称'));
+      return;
+    }
     Modal.confirm({
       title: intl.get('确认操作', {
         operation: intl.get(OperationName[operationStatus]),

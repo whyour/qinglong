@@ -24,8 +24,9 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     { id: 4, status: 3, started_at: 100, finished_at: 130, exit_code: 7 },
   ]);
   const systemConfig = { info: { lang: 'en-US' } };
+  const startupEvents = [];
   const service = {
-    set_envs: async () => {},
+    set_envs: async () => { startupEvents.push('environment'); },
     getAuthInfo: async () => ({}),
     initializeSystemApp: async () => {},
     refreshApps: async () => {},
@@ -70,7 +71,10 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     '../shared/i18n': { setLang() {} },
     './logger': {},
     '../schedule/client': {
-      readiness: { configure() {}, recover: async () => {} },
+      readiness: {
+        configure() {},
+        recover: async () => { startupEvents.push('scheduler'); },
+      },
     },
   }).default;
   // Dependency installation is unrelated to startup reconciliation.
@@ -82,6 +86,7 @@ test('startup closes interrupted instances without inventing exit codes or rewri
   } finally {
     global.setTimeout = originalTimeout;
   }
+  assert.deepEqual(startupEvents, ['environment', 'scheduler']);
   const rows = await instances.findAll({ order: [['id', 'ASC']], raw: true });
   assert.equal(rows[0].status, 2);
   assert.ok(
@@ -109,6 +114,9 @@ test('startup closes interrupted instances without inventing exit codes or rewri
   } finally {
     global.setTimeout = originalTimeout;
   }
+  assert.deepEqual(startupEvents, [
+    'environment', 'scheduler', 'environment', 'scheduler',
+  ]);
   assert.deepEqual(
     await instances.findAll({ order: [['id', 'ASC']], raw: true }),
     rows,

@@ -21,15 +21,19 @@ export default {
       value: 'crons',
     },
     {
-      name: intl.get('环境变量'),
+      name: intl.get('环境变量（只读）'),
       value: 'envs',
+    },
+    {
+      name: intl.get('环境变量写入（含读取，可影响任务执行）'),
+      value: 'envs:write',
     },
     {
       name: intl.get('订阅管理'),
       value: 'subscriptions',
     },
     {
-      name: intl.get('配置文件'),
+      name: intl.get('配置文件（只读）'),
       value: 'configs',
     },
     {
@@ -55,9 +59,10 @@ export default {
   ],
   scopesMap: {
     crons: intl.get('定时任务'),
-    envs: intl.get('环境变量'),
+    envs: intl.get('环境变量（只读）'),
+    'envs:write': intl.get('环境变量写入（含读取，可影响任务执行）'),
     subscriptions: intl.get('订阅管理'),
-    configs: intl.get('配置文件'),
+    configs: intl.get('配置文件（只读）'),
     scripts: intl.get('脚本管理'),
     logs: intl.get('日志管理'),
     dependencies: intl.get('依赖管理'),
