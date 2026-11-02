@@ -49,12 +49,19 @@ async function input(value: string | boolean | undefined): Promise<unknown> {
   }
 }
 
+const UUID_PATTERN =
+  '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+
 function route(method: string, path: string): OpenOperation {
   const match = openOperations.find(
     (op) =>
       op.method === method &&
       new RegExp(
-        '^' + op.path.replace(/:[A-Za-z]+/g, '[1-9][0-9]*') + '$',
+        '^' +
+          op.path.replace(/:([A-Za-z]+)/g, (_match, name) =>
+            op.uuidParams?.includes(name) ? UUID_PATTERN : '[1-9][0-9]*',
+          ) +
+          '$',
       ).test(path),
   );
   if (!match)
@@ -63,7 +70,8 @@ function route(method: string, path: string): OpenOperation {
       'Method/path is not a supported OpenAPI route.',
     );
   for (const [index, part] of match.path.split('/').entries())
-    if (part.startsWith(':')) integer(path.split('/')[index]!);
+    if (part.startsWith(':') && !match.uuidParams?.includes(part.slice(1)))
+      integer(path.split('/')[index]!);
   return match;
 }
 
@@ -107,7 +115,11 @@ export async function openCommand(
   if (!generic) {
     endpoint = op.path;
     for (const [index, name] of (op.params ?? []).entries()) {
-      const value = integer(command.positionals[index]!);
+      const positional = command.positionals[index]!;
+      const isUuid = op.uuidParams?.includes(name);
+      if (isUuid && !new RegExp(`^${UUID_PATTERN}$`).test(positional))
+        usage('任务 ID 必须为 UUID。', 'Job ID must be a UUID.');
+      const value = isUuid ? positional : integer(positional);
       endpoint = endpoint.replace(`:${name}`, String(value));
       if (op.body === 'object-id') {
         if (body !== undefined && !isRecord(body))
