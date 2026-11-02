@@ -6,13 +6,13 @@ The catalogue covers 146 active routes in the current backend. `ql api routes --
 
 ## 认证与权限 / Authentication and permissions
 
-常规使用 `ql login` 的应用凭据。scope 通常对应 /open 后首个路径段：crons、subscriptions、envs、configs、scripts、logs、dependencies、system、dashboard 等。旧的 `envs`、`configs`、`scripts` 保留原有完整权限；仅读取时分别使用 `envs:read`、`configs:read`、`scripts:read`。`scripts:read` 包含使用 POST 的脚本下载，不包含保存、上传、删除、历史恢复、运行或停止。外部应用的 `system` scope 仅允许读取系统状态和发送通知。应用管理需要 apps；user、health、update 等路由同样接受服务端权限校验。面板 UI 当前没有列出全部这些 scope，不能把路由存在理解成现有应用已获授权。
+常规使用 `ql login` 的应用凭据。scope 通常对应 /open 后首个路径段：crons、subscriptions、envs、configs、scripts、logs、dependencies、system、dashboard 等。旧 scope 保留原有权限；上述资源除 system 外可选用对应的 `:read` scope。`crons:read` 不包含会写入任务的 `GET /crons/import`；`scripts:read`、`logs:read` 包含使用 POST 的下载，不包含写入、删除或执行。`dashboard:read` 不允许 POST 统计上报。外部应用的 `system` scope 仅允许读取系统状态和发送通知。应用管理需要 apps；`GET /apps` 会返回 Client Secret，因此不提供 `apps:read`。user、health、update 等路由同样接受服务端权限校验。路由存在不代表现有应用已获授权。
 
 认证步骤、环境变量优先级、应用登录、面板会话与双因素验证、退出行为，统一见 [认证参考](panel.md#authentication)。应用管理可用 apps 权限的应用或授权面板会话；QL_URL/QL_ACCESS_TOKEN 不保存、不刷新，不自动退回应用配置。
 
 See the [authentication reference](panel.md#authentication) for application login, direct-token precedence, owner sessions/2FA and logout. App management accepts apps-scoped credentials or an authorized owner session. Direct tokens are not saved/refreshed and never fall back to application configuration.
 
-Existing `envs`, `configs`, and `scripts` scopes retain full access. Use `envs:read`, `configs:read`, or `scripts:read` for read-only access. `scripts:read` includes script download (POST), but excludes saves, uploads, deletion, history restore, run, and stop. External `system` applications may only read system status and send notifications.
+Existing scopes retain their original access. Use the resource's `:read` scope for read-only access to crons, subscriptions, envs, configs, scripts, dependencies, logs, or dashboard. `crons:read` excludes the mutating `GET /crons/import`; `scripts:read` and `logs:read` include downloads (POST), but exclude writes, deletion, and execution. `dashboard:read` excludes statistics reporting (POST). External `system` applications may only read system status and send notifications. `GET /apps` returns Client Secrets, so there is no `apps:read` scope.
 
 `auth status --scope <scope>` tests a representative read; update has no read endpoint and is not offered by status. This does not prove permission for every write. `app list/create/update/reset-secret` 默认隐藏 client_secret/tokens；只有明确需要凭据时才加 --show-secrets，并避免把输出记录到共享日志。其他资源/通用请求可能含环境值、配置、脚本、订阅凭据和会话，按敏感数据处理。
 

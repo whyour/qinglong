@@ -21,6 +21,10 @@ export default {
       value: 'crons',
     },
     {
+      name: intl.get('定时任务（只读）'),
+      value: 'crons:read',
+    },
+    {
       name: intl.get('环境变量'),
       value: 'envs',
     },
@@ -31,6 +35,10 @@ export default {
     {
       name: intl.get('订阅管理'),
       value: 'subscriptions',
+    },
+    {
+      name: intl.get('订阅管理（只读）'),
+      value: 'subscriptions:read',
     },
     {
       name: intl.get('配置文件'),
@@ -53,8 +61,16 @@ export default {
       value: 'logs',
     },
     {
+      name: intl.get('日志管理（只读）'),
+      value: 'logs:read',
+    },
+    {
       name: intl.get('依赖管理'),
       value: 'dependencies',
+    },
+    {
+      name: intl.get('依赖管理（只读）'),
+      value: 'dependencies:read',
     },
     {
       name: intl.get('系统信息'),
@@ -64,20 +80,29 @@ export default {
       name: intl.get('仪表盘'),
       value: 'dashboard',
     },
+    {
+      name: intl.get('仪表盘（只读）'),
+      value: 'dashboard:read',
+    },
   ],
   scopesMap: {
     crons: intl.get('定时任务'),
+    'crons:read': intl.get('定时任务（只读）'),
     envs: intl.get('环境变量'),
     'envs:read': intl.get('环境变量（只读）'),
     subscriptions: intl.get('订阅管理'),
+    'subscriptions:read': intl.get('订阅管理（只读）'),
     configs: intl.get('配置文件'),
     'configs:read': intl.get('配置文件（只读）'),
     scripts: intl.get('脚本管理'),
     'scripts:read': intl.get('脚本（只读）'),
     logs: intl.get('日志管理'),
+    'logs:read': intl.get('日志管理（只读）'),
     dependencies: intl.get('依赖管理'),
+    'dependencies:read': intl.get('依赖管理（只读）'),
     system: intl.get('系统信息'),
     dashboard: intl.get('仪表盘'),
+    'dashboard:read': intl.get('仪表盘（只读）'),
   },
   notificationModes: [
     { value: 'gotify', label: 'Gotify' },

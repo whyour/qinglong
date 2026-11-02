@@ -89,9 +89,21 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       tokens: [{ value: 'internal-system', expiration: Date.now() / 1000 + 3600 }],
     },
   ];
+  for (const scope of ['crons', 'subscriptions', 'dependencies', 'logs', 'dashboard']) {
+    for (const suffix of ['', ':read']) {
+      apps.push({
+        scopes: [`${scope}${suffix}`],
+        tokens: [{
+          value: `${scope}${suffix}-app`,
+          expiration: Date.now() / 1000 + 3600,
+        }],
+      });
+    }
+  }
   let resetCalls = 0;
   let commandCalls = 0;
   let envWriteCalls = 0;
+  let scopedMutationCalls = 0;
   let initialized = 0;
   const User = class {};
   const Script = class {
@@ -166,6 +178,27 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       envWriteCalls++;
       res.json({ code: 200 });
     });
+    for (const route of [
+      '/crons', '/subscriptions', '/dependencies', '/logs', '/dashboard/overview',
+    ]) {
+      router.get(route, (_req, res) => res.json({ code: 200 }));
+    }
+    for (const [method, route] of [
+      ['put', '/crons/run'],
+      ['put', '/subscriptions/run'],
+      ['post', '/dependencies'],
+      ['delete', '/logs'],
+      ['post', '/dashboard/record'],
+      ['get', '/crons/import'],
+    ]) {
+      router[method](route, (_req, res) => {
+        scopedMutationCalls++;
+        res.json({ code: 200 });
+      });
+    }
+    router.post('/logs/download', (_req, res) =>
+      res.json({ code: 200, data: 'downloaded' }),
+    );
     router.get('/system', (_req, res) => res.json({ code: 200 }));
     router.put('/system/notify', (_req, res) => res.json({ code: 200 }));
     router.put('/system/auth/reset', (_req, res) => {
@@ -270,6 +303,51 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     200,
   );
   assert.equal(envWriteCalls, 1);
+  for (const [scope, readPath, method, writePath] of [
+    ['crons', '/crons', 'PUT', '/crons/run'],
+    ['subscriptions', '/subscriptions', 'PUT', '/subscriptions/run'],
+    ['dependencies', '/dependencies', 'POST', '/dependencies'],
+    ['logs', '/logs', 'DELETE', '/logs'],
+    ['dashboard', '/dashboard/overview', 'POST', '/dashboard/record'],
+  ]) {
+    for (const prefix of ['/open', '/panel/open']) {
+      assert.equal(
+        (await request(`${prefix}${readPath}`, `${scope}:read-app`)).body.code,
+        200,
+      );
+      assert.equal(
+        (await request(`${prefix}${writePath}`, `${scope}:read-app`, method))
+          .status,
+        401,
+      );
+    }
+    assert.equal(
+      (await request(`/open${writePath}`, `${scope}-app`, method)).body.code,
+      200,
+    );
+  }
+  assert.equal(scopedMutationCalls, 5);
+  for (const prefix of ['/open', '/panel/open']) {
+    assert.equal(
+      (await request(`${prefix}/crons/import`, 'crons:read-app')).status,
+      401,
+    );
+    assert.equal(
+      (await request(`${prefix}/logs/download`, 'logs:read-app', 'POST'))
+        .body.data,
+      'downloaded',
+    );
+  }
+  const importedWithHead = await fetch(
+    `http://127.0.0.1:${server.address().port}/open/crons/import`,
+    { method: 'HEAD', headers: { Authorization: 'Bearer crons:read-app' } },
+  );
+  assert.equal(importedWithHead.status, 401);
+  assert.equal(
+    (await request('/open/crons/import', 'crons-app')).body.code,
+    200,
+  );
+  assert.equal(scopedMutationCalls, 6);
   assert.equal(
     (await request('/open/configs/detail?path=normal.txt', 'env-app')).status,
     401,

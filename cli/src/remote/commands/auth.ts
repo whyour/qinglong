@@ -110,6 +110,11 @@ export async function auth(
         'envs:read': 'envs',
         'configs:read': 'configs/files',
         'scripts:read': 'scripts',
+        'crons:read': 'crons?page=1&size=1',
+        'subscriptions:read': 'subscriptions',
+        'dependencies:read': 'dependencies',
+        'logs:read': 'logs',
+        'dashboard:read': 'dashboard/overview',
         dashboard: 'dashboard/overview',
       } as Record<string, string>
     )[scope] ?? scope,

@@ -82,7 +82,9 @@ async function fixture(t) {
           data: { data: [{ id: 12, name: 'example' }], total: 1 },
         });
       else if (
-        ['/panel/open/envs', '/panel/open/configs/files', '/panel/open/scripts']
+        ['/panel/open/envs', '/panel/open/configs/files', '/panel/open/scripts',
+          '/panel/open/subscriptions', '/panel/open/dependencies',
+          '/panel/open/logs', '/panel/open/dashboard/overview']
           .includes(url.pathname)
       )
         json({ code: 200, data: [] });
@@ -164,6 +166,11 @@ test('compiled entry: login aliases, private storage, status, refresh and local 
     ['envs:read', '/panel/open/envs'],
     ['configs:read', '/panel/open/configs/files'],
     ['scripts:read', '/panel/open/scripts'],
+    ['crons:read', '/panel/open/crons'],
+    ['subscriptions:read', '/panel/open/subscriptions'],
+    ['dependencies:read', '/panel/open/dependencies'],
+    ['logs:read', '/panel/open/logs'],
+    ['dashboard:read', '/panel/open/dashboard/overview'],
   ]) {
     const checked = await f.invoke(['auth', 'status', '--scope', scope, '--json']);
     assert.equal(checked.code, 0, checked.err);

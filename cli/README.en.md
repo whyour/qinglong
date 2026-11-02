@@ -68,7 +68,7 @@ Protected requests use `Authorization: Bearer <token>`. Two credential sources a
 
 ### Application login
 
-Create a dedicated panel application with the required scopes, such as crons or subscriptions. Existing `envs`, `configs`, and `scripts` scopes retain read and write access; `scripts` also permits running and stopping scripts. For read-only access, use `envs:read`, `configs:read`, or `scripts:read` respectively. Script download uses POST but is available to `scripts:read`. `login` and `auth login` are equivalent. Interactive login hides the Client Secret; secret command-line arguments are not supported.
+Create a dedicated panel application with the required scopes. Existing scopes retain their original permissions. For read-only access, use `crons:read`, `subscriptions:read`, `envs:read`, `configs:read`, `scripts:read`, `dependencies:read`, `logs:read`, or `dashboard:read`. Script and log downloads use POST but are available to their read-only scopes. `GET /crons/import` writes tasks and is excluded from `crons:read`. `login` and `auth login` are equivalent. Interactive login hides the Client Secret; secret command-line arguments are not supported.
 
 ```sh
 ql login --url https://ql.example.com

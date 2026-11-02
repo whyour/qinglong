@@ -113,13 +113,25 @@ export default ({ app }: { app: Application }) => {
         const key = keyMatch && keyMatch[1];
 
         const isReadRequest =
-          ['GET', 'HEAD'].includes(req.method) ||
-          (key === 'scripts' &&
+          (['GET', 'HEAD'].includes(req.method) &&
+            !(
+              key === 'crons' && /^\/open\/crons\/import\/?$/.test(pathLower)
+            )) ||
+          (['scripts', 'logs'].includes(key || '') &&
             req.method === 'POST' &&
-            /^\/open\/scripts\/download\/?$/.test(pathLower));
+            /^\/open\/(?:scripts|logs)\/download\/?$/.test(pathLower));
         const hasNamespaceScope =
           doc.scopes.includes(key as AppScope) ||
-          (['envs', 'configs', 'scripts'].includes(key || '') &&
+          ([
+            'crons',
+            'subscriptions',
+            'envs',
+            'configs',
+            'scripts',
+            'logs',
+            'dependencies',
+            'dashboard',
+          ].includes(key || '') &&
             doc.scopes.includes(`${key}:read` as AppScope) &&
             isReadRequest);
         if (!hasNamespaceScope) {
@@ -131,11 +143,11 @@ export default ({ app }: { app: Application }) => {
 
         // The built-in system app still needs its local CLI maintenance API.
         const appRouteAllowed =
-          (key !== 'system' ||
-            doc.name === 'system' ||
-            ((req.method === 'GET' || req.method === 'HEAD') &&
-              (pathLower === '/open/system' || pathLower === '/open/system/')) ||
-            (req.method === 'PUT' && pathLower === '/open/system/notify'));
+          key !== 'system' ||
+          doc.name === 'system' ||
+          ((req.method === 'GET' || req.method === 'HEAD') &&
+            (pathLower === '/open/system' || pathLower === '/open/system/')) ||
+          (req.method === 'PUT' && pathLower === '/open/system/notify');
         if (!appRouteAllowed) {
           const err = new UnauthorizedError('credentials_bad_scheme', {
             message: t('暂无权限'),

@@ -68,7 +68,7 @@ ql api request PUT /open/crons/run --data '[12,13]' --json
 
 ### 应用凭据登录
 
-在面板创建专用应用，按需授予 crons、subscriptions 等权限。现有 `envs`、`configs`、`scripts` scope 保留读写能力，`scripts` 还可运行和停止脚本；仅读取时分别选用 `envs:read`、`configs:read`、`scripts:read`。脚本下载虽然使用 POST，也允许 `scripts:read`。`login` 与 `auth login` 等价；交互输入 Client ID 和不回显的 Client Secret，密钥不支持命令行参数。
+在面板创建专用应用，按需授予 crons、subscriptions 等权限。旧 scope 保留原有权限；仅读取时可选用 `crons:read`、`subscriptions:read`、`envs:read`、`configs:read`、`scripts:read`、`dependencies:read`、`logs:read`、`dashboard:read`。脚本和日志下载虽使用 POST，也允许对应只读权限；`GET /crons/import` 会写入任务，不属于只读操作。`login` 与 `auth login` 等价；交互输入 Client ID 和不回显的 Client Secret，密钥不支持命令行参数。
 
 ```sh
 ql login --url https://ql.example.com
