@@ -35,8 +35,15 @@ function serviceFor(docs) {
               (!where.id || where.id.includes(d.id)),
           ),
         update: async (values, { where }) => {
+          const ids = Array.isArray(where.id) ? where.id : [where.id];
           docs
-            .filter((d) => where.id.includes(d.id))
+            .filter(
+              (d) =>
+                ids.includes(d.id) &&
+                (where.status === undefined || d.status === where.status) &&
+                (where.updatedAt === undefined ||
+                  d.updatedAt === where.updatedAt),
+            )
             .forEach((d) => Object.assign(d, values));
         },
         destroy: async ({ where }) => removed.push(...where.id),
@@ -63,7 +70,7 @@ function serviceFor(docs) {
   return { service, probes, removed, uninstalls };
 }
 
-test('listing preserves Python source results and still detects missing named packages', async () => {
+test('explicit refresh preserves Python sources and detects missing named packages', async () => {
   const docs = [
     ' requirements with spaces/requirements.txt ',
     'requirements-dev.in',
@@ -71,7 +78,13 @@ test('listing preserves Python source results and still detects missing named pa
     'git+https://example.invalid/repo.git',
     'https://example.invalid/pkg.whl',
     'missing-package',
-  ].map((name, i) => ({ id: i + 1, name, type: 1, status: 1 }));
+  ].map((name, i) => ({
+    id: i + 1,
+    name,
+    type: 1,
+    status: 1,
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+  }));
   const { service, probes } = serviceFor(docs);
   for (let i = 0; i < 2; i++) {
     await service.dependencies({
@@ -80,6 +93,10 @@ test('listing preserves Python source results and still detects missing named pa
       status: '',
     });
   }
+  assert.deepEqual(probes, []);
+  const { job } = service.startRefresh('python3');
+  await new Promise(setImmediate);
+  assert.equal(job.state, 'completed');
   assert.deepEqual(
     docs.map((d) => d.status),
     [1, 1, 1, 1, 1, 2],

@@ -87,6 +87,7 @@ const StatusMap: Record<number, { icon: React.ReactNode; color: string }> = {
 
 const Dependence = () => {
   const { headerStyle, isPhone } = useOutletContext<SharedContext>();
+  const [statusFilter, setStatusFilter] = useState<number[]>([]);
   const columns: any = [
     {
       title: intl.get('序号'),
@@ -106,6 +107,7 @@ const Dependence = () => {
       key: 'status',
       width: 120,
       dataIndex: 'status',
+      filteredValue: statusFilter.length ? statusFilter : null,
       filters: [
         {
           text: intl.get('队列中'),
@@ -233,6 +235,9 @@ const Dependence = () => {
   ];
   const [value, setValue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshingType, setRefreshingType] = useState<string | null>(null);
+  const [refreshGeneration, setRefreshGeneration] = useState(0);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editedDependence, setEditedDependence] = useState();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -240,8 +245,25 @@ const Dependence = () => {
   const [logDependence, setLogDependence] = useState<any>();
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [type, setType] = useState('nodejs');
+  const listQuery = useRef({ type, searchText, statusFilter });
+  listQuery.current = { type, searchText, statusFilter };
   const tableRef = useRef<HTMLDivElement>(null);
+  const latestListRequest = useRef(0);
+  const refreshTimer = useRef<ReturnType<typeof setTimeout>>();
+  const activeRefreshId = useRef<string | null>(null);
+  const refreshRequestVersion = useRef(0);
+  const alive = useRef(true);
   const [height, setHeight] = useState<number>(0);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      latestListRequest.current += 1;
+      refreshRequestVersion.current += 1;
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    };
+  }, []);
 
   useResizeObserver(tableRef, (entry) => {
     const _height =
@@ -256,22 +278,145 @@ const Dependence = () => {
   });
 
   const getDependencies = (status?: number[]) => {
+    const query = listQuery.current;
+    const requestId = ++latestListRequest.current;
     setLoading(true);
     request
       .get(
-        `${
-          config.apiPrefix
-        }dependencies?searchValue=${searchText}&type=${type}&status=${
-          status || ''
-        }`,
+        `${config.apiPrefix}dependencies?searchValue=${query.searchText}&type=${
+          query.type
+        }&status=${status ?? query.statusFilter}`,
       )
       .then(({ code, data }) => {
-        if (code === 200) {
+        if (
+          alive.current &&
+          requestId === latestListRequest.current &&
+          code === 200
+        ) {
           setValue(data);
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (alive.current && requestId === latestListRequest.current) {
+          setLoading(false);
+        }
+      });
   };
+
+  const scheduleRefresh = (callback: () => void, delay: number) => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(callback, delay);
+  };
+
+  const finishRefresh = (id: string, completed: boolean) => {
+    if (activeRefreshId.current !== id) return;
+    refreshRequestVersion.current += 1;
+    activeRefreshId.current = null;
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    setRefreshing(false);
+    setRefreshingType(null);
+    setRefreshGeneration((generation) => generation + 1);
+    if (!completed) {
+      message.error(intl.get('依赖检查失败'));
+    }
+  };
+
+  const attachRefresh = (job: { id: string; type: string }) => {
+    if (!alive.current) return;
+    refreshRequestVersion.current += 1;
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    activeRefreshId.current = job.id;
+    setRefreshing(true);
+    setRefreshingType(job.type);
+    scheduleRefresh(() => pollRefresh(job.id), 0);
+  };
+
+  const recoverRefresh = (
+    reloadWhenIdle = false,
+    retryOnError = false,
+    notifyWhenIdle = false,
+  ) => {
+    const version = ++refreshRequestVersion.current;
+    request
+      .get(`${config.apiPrefix}dependencies/refresh/active`)
+      .then(({ code, data }) => {
+        if (!alive.current || version !== refreshRequestVersion.current) return;
+        if (code === 200 && data) {
+          attachRefresh(data);
+        } else if (reloadWhenIdle) {
+          activeRefreshId.current = null;
+          setRefreshing(false);
+          setRefreshingType(null);
+          setRefreshGeneration((generation) => generation + 1);
+          if (notifyWhenIdle) message.warning(intl.get('依赖检查状态已中断'));
+        }
+      })
+      .catch(() => {
+        if (
+          alive.current &&
+          version === refreshRequestVersion.current &&
+          retryOnError
+        ) {
+          scheduleRefresh(() => {
+            if (alive.current && version === refreshRequestVersion.current) {
+              recoverRefresh(reloadWhenIdle, true, notifyWhenIdle);
+            }
+          }, 5000);
+        }
+      });
+  };
+
+  const pollRefresh = (id: string) => {
+    request
+      .get(`${config.apiPrefix}dependencies/refresh/${id}`)
+      .then(({ code, data }) => {
+        if (!alive.current || activeRefreshId.current !== id) return;
+        if (code !== 200) {
+          scheduleRefresh(() => pollRefresh(id), 5000);
+          return;
+        }
+        if (data.state === 'running') {
+          scheduleRefresh(() => pollRefresh(id), 2000);
+        } else {
+          finishRefresh(id, data.state === 'completed');
+        }
+      })
+      .catch((error) => {
+        if (!alive.current || activeRefreshId.current !== id) return;
+        if (error?.response?.status === 404) {
+          activeRefreshId.current = null;
+          recoverRefresh(true, true, true);
+        } else {
+          scheduleRefresh(() => pollRefresh(id), 5000);
+        }
+      });
+  };
+
+  const startRefresh = () => {
+    if (activeRefreshId.current) return;
+    const version = ++refreshRequestVersion.current;
+    setRefreshing(true);
+    setRefreshingType(type);
+    request
+      .post(`${config.apiPrefix}dependencies/refresh`, { type })
+      .then(({ code, data }) => {
+        if (!alive.current || version !== refreshRequestVersion.current) return;
+        if (code === 200) {
+          attachRefresh(data);
+        } else {
+          recoverRefresh(true, true);
+        }
+      })
+      .catch(() => {
+        if (alive.current && version === refreshRequestVersion.current) {
+          recoverRefresh(true, true);
+        }
+      });
+  };
+
+  useEffect(() => {
+    recoverRefresh(false, true);
+  }, []);
 
   const addDependence = () => {
     setEditedDependence(null as any);
@@ -450,12 +595,16 @@ const Dependence = () => {
   };
 
   const onSearch = (value: string) => {
-    setSearchText(value.trim());
+    const trimmed = value.trim();
+    if (trimmed !== searchText) {
+      latestListRequest.current += 1;
+      setSearchText(trimmed);
+    }
   };
 
   useEffect(() => {
     getDependencies();
-  }, [searchText, type]);
+  }, [searchText, type, refreshGeneration]);
 
   useEffect(() => {
     if (logDependence) {
@@ -506,6 +655,7 @@ const Dependence = () => {
   }, []);
 
   const onTabChange = (activeKey: string) => {
+    latestListRequest.current += 1;
     setSelectedRowIds([]);
     setType(activeKey);
   };
@@ -551,7 +701,9 @@ const Dependence = () => {
           scroll={{ x: 768, y: height }}
           loading={loading}
           onChange={(pagination, filters) => {
-            getDependencies(filters?.status as number[]);
+            const status = (filters?.status as number[]) || [];
+            setStatusFilter(status);
+            getDependencies(status);
           }}
         />
       </DndProvider>
@@ -563,6 +715,19 @@ const Dependence = () => {
       className="ql-container-wrapper dependence-wrapper ql-container-wrapper-has-tab"
       title={intl.get('依赖管理')}
       extra={[
+        <Button
+          key="refresh"
+          icon={<SyncOutlined />}
+          loading={refreshing}
+          disabled={type === 'linux' || loading}
+          onClick={startRefresh}
+        >
+          {refreshingType
+            ? intl.get('正在检查依赖', {
+                type: refreshingType === 'nodejs' ? 'Node' : 'Python',
+              })
+            : intl.get('重新检查依赖')}
+        </Button>,
         <Search
           placeholder={intl.get('请输入名称')}
           style={{ width: 'auto' }}

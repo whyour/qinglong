@@ -27,9 +27,20 @@ import taskLimit from '../shared/pLimit';
 import { detectOS } from '../config/util';
 import { LINUX_DEPENDENCE_COMMAND } from '../config/const';
 import { t, tf } from '../shared/i18n';
+import { randomUUID } from 'crypto';
+
+type RefreshType = 'nodejs' | 'python3';
+type RefreshJob = {
+  id: string;
+  type: RefreshType;
+  state: 'running' | 'completed' | 'failed';
+};
 
 @Service()
 export default class DependenceService {
+  private activeRefreshJob?: RefreshJob;
+  private refreshJobs = new Map<string, RefreshJob>();
+
   constructor(
     @Inject('logger') private logger: winston.Logger,
     private sockService: SockService,
@@ -118,11 +129,6 @@ export default class DependenceService {
     query: any = {},
   ): Promise<Dependence[]> {
     let condition = query;
-    const dependenceType =
-      type && DependenceTypes[type] !== undefined
-        ? DependenceTypes[type]
-        : undefined;
-    await this.refreshInstalledStatuses(dependenceType);
     if (type && DependenceTypes[type] !== undefined) {
       condition.type = DependenceTypes[type];
     }
@@ -145,6 +151,52 @@ export default class DependenceService {
     }
   }
 
+  public startRefresh(type: RefreshType): {
+    job: RefreshJob;
+    accepted: boolean;
+  } {
+    if (this.activeRefreshJob) {
+      return {
+        job: this.activeRefreshJob,
+        accepted: this.activeRefreshJob.type === type,
+      };
+    }
+
+    const job: RefreshJob = { id: randomUUID(), type, state: 'running' };
+    this.activeRefreshJob = job;
+    this.refreshJobs.set(job.id, job);
+    while (this.refreshJobs.size > 20) {
+      const oldestId = this.refreshJobs.keys().next().value;
+      this.refreshJobs.delete(oldestId);
+    }
+
+    void this.refreshInstalledStatuses(DependenceTypes[type])
+      .then(() => {
+        job.state = 'completed';
+      })
+      .catch((error) => {
+        this.logger.error('Dependency refresh failed: %o', error);
+        job.state = 'failed';
+      })
+      .finally(() => {
+        if (this.activeRefreshJob === job) {
+          this.activeRefreshJob = undefined;
+        }
+      });
+
+    return { job, accepted: true };
+  }
+
+  public getRefreshJob(id: string): RefreshJob | undefined {
+    return this.refreshJobs.get(id);
+  }
+
+  public getActiveRefreshJob(): RefreshJob | undefined {
+    return this.activeRefreshJob?.state === 'running'
+      ? this.activeRefreshJob
+      : undefined;
+  }
+
   private async refreshInstalledStatuses(type?: DependenceTypes) {
     const cacheDependenceTypes = [
       DependenceTypes.nodejs,
@@ -160,26 +212,31 @@ export default class DependenceService {
         type: type === undefined ? { [Op.in]: cacheDependenceTypes } : type,
       },
     });
+    const checkableDocs = docs.filter(
+      (doc) =>
+        doc.type !== DependenceTypes.python3 ||
+        !isPythonSourceDependency(doc.name),
+    );
     const checks = await concurrentRun(
-      docs
-        .filter(
-          (doc) =>
-            doc.type !== DependenceTypes.python3 ||
-            !isPythonSourceDependency(doc.name),
-        )
-        .map((doc) => async () => {
-          return (await this.isDependenceInstalled(doc)) ? undefined : doc.id;
-        }),
+      checkableDocs.map((doc) => async () => this.isDependenceInstalled(doc)),
       5,
     );
-    const missingIds = (checks || []).filter(
-      (id): id is number => id !== undefined,
-    );
 
-    if (missingIds.length) {
+    for (const [index, installed] of (checks || []).entries()) {
+      if (installed) continue;
+      const doc = checkableDocs[index];
       await DependenceModel.update(
         { status: DependenceStatus.installFailed },
-        { where: { id: missingIds } },
+        {
+          where: {
+            id: doc.id,
+            status: DependenceStatus.installed,
+            name: doc.name,
+            type: doc.type,
+            updatedAt: (doc as typeof doc & { updatedAt: Date }).updatedAt,
+            // Sequelize's automatic timestamp is absent from Dependence's attribute type.
+          } as any,
+        },
       );
     }
   }
