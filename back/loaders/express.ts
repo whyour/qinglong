@@ -112,9 +112,16 @@ export default ({ app }: { app: Application }) => {
         const keyMatch = pathLower.match(/\/open\/([a-z]+)\/*/);
         const key = keyMatch && keyMatch[1];
 
+        const isReadRequest =
+          ['GET', 'HEAD'].includes(req.method) ||
+          (key === 'scripts' &&
+            req.method === 'POST' &&
+            /^\/open\/scripts\/download\/?$/.test(pathLower));
         const hasNamespaceScope =
           doc.scopes.includes(key as AppScope) ||
-          (key === 'envs' && doc.scopes.includes('envs:write'));
+          (['envs', 'configs', 'scripts'].includes(key || '') &&
+            doc.scopes.includes(`${key}:read` as AppScope) &&
+            isReadRequest);
         if (!hasNamespaceScope) {
           const err = new UnauthorizedError('credentials_bad_scheme', {
             message: t('暂无权限'),
@@ -122,14 +129,8 @@ export default ({ app }: { app: Application }) => {
           return next(err);
         }
 
-        // Config files can contain task hooks and shell code. External app
-        // tokens may read them, but only panel credentials may write them.
         // The built-in system app still needs its local CLI maintenance API.
         const appRouteAllowed =
-          (key !== 'envs' ||
-            ['GET', 'HEAD'].includes(req.method) ||
-            doc.scopes.includes('envs:write')) &&
-          (key !== 'configs' || ['GET', 'HEAD'].includes(req.method)) &&
           (key !== 'system' ||
             doc.name === 'system' ||
             ((req.method === 'GET' || req.method === 'HEAD') &&

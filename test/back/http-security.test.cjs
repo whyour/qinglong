@@ -53,6 +53,10 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       tokens: [{ value: 'config-app', expiration: Date.now() / 1000 + 3600 }],
     },
     {
+      scopes: ['configs:read'],
+      tokens: [{ value: 'config-read-app', expiration: Date.now() / 1000 + 3600 }],
+    },
+    {
       scopes: ['configs', 'scripts'],
       tokens: [
         { value: 'script-config-app', expiration: Date.now() / 1000 + 3600 },
@@ -63,12 +67,16 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       tokens: [{ value: 'script-app', expiration: Date.now() / 1000 + 3600 }],
     },
     {
+      scopes: ['scripts:read'],
+      tokens: [{ value: 'script-read-app', expiration: Date.now() / 1000 + 3600 }],
+    },
+    {
       scopes: ['envs'],
       tokens: [{ value: 'env-app', expiration: Date.now() / 1000 + 3600 }],
     },
     {
-      scopes: ['envs:write'],
-      tokens: [{ value: 'env-write-app', expiration: Date.now() / 1000 + 3600 }],
+      scopes: ['envs:read'],
+      tokens: [{ value: 'env-read-app', expiration: Date.now() / 1000 + 3600 }],
     },
     {
       name: 'external-system',
@@ -86,6 +94,15 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
   let envWriteCalls = 0;
   let initialized = 0;
   const User = class {};
+  const Script = class {
+    getFile(folder, filename) {
+      return fs.promises.readFile(path.join(config.scriptPath, folder, filename), 'utf8');
+    }
+    checkFilePath(folder, filename) {
+      return path.join(config.scriptPath, folder || '', filename);
+    }
+  };
+  const script = new Script();
   const user = {
     initializeUser: async () => {
       initialized++;
@@ -108,7 +125,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     },
     '../config/serverEnv': { serveEnv: (_req, res) => res.end() },
     '../services/user': User,
-    '../services/script': class {},
+    '../services/script': Script,
     '../data/open': {},
     '../data/system': {},
     typedi: { Service: () => (x) => x },
@@ -129,7 +146,8 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
   mocks.typedi = {
     ...mocks.typedi,
     Container: {
-      get: (x) => (x === User ? user : x === History ? history : configService),
+      get: (x) =>
+        x === User ? user : x === History ? history : x === Script ? script : configService,
     },
   };
   mocks['../api'] = () => {
@@ -235,10 +253,10 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     assert.equal((await request(`${prefix}/envs`)).status, 401, prefix);
   }
   assert.equal((await request('/open/envs', 'env-app')).body.code, 200);
-  assert.equal((await request('/open/envs', 'env-write-app')).body.code, 200);
+  assert.equal((await request('/open/envs', 'env-read-app')).body.code, 200);
   for (const prefix of ['/open', '/panel/open']) {
     assert.equal(
-      (await request(`${prefix}/envs`, 'env-app', 'POST', [
+      (await request(`${prefix}/envs`, 'env-read-app', 'POST', [
         { name: 'SAFE_VALUE', value: 'kept' },
       ])).status,
       401,
@@ -246,7 +264,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
   }
   assert.equal(envWriteCalls, 0);
   assert.equal(
-    (await request('/open/envs', 'env-write-app', 'POST', [
+    (await request('/open/envs', 'env-app', 'POST', [
       { name: 'SAFE_VALUE', value: 'kept' },
     ])).body.code,
     200,
@@ -261,10 +279,15 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       .data,
     'normal',
   );
+  assert.equal(
+    (await request('/open/configs/detail?path=normal.txt', 'config-read-app'))
+      .body.data,
+    'normal',
+  );
   for (const prefix of ['/open', '/panel/open']) {
     for (const name of ['normal.txt', 'config.sh', 'task_before.sh']) {
       assert.equal(
-        (await request(`${prefix}/configs/save`, 'config-app', 'POST', {
+        (await request(`${prefix}/configs/save`, 'config-read-app', 'POST', {
           name,
           content: 'untrusted',
         })).status,
@@ -319,8 +342,8 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         name: 'grpc/client.key',
         content: 'changed',
       })
-    ).status,
-    401,
+    ).body.code,
+    403,
   );
   assert.equal(
     fs.readFileSync(path.join(tmp, 'config/grpc/client.key'), 'utf8'),
@@ -346,7 +369,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         content: 'overwrite',
       },
     );
-    assert.equal(denied.status, 401);
+    assert.equal(denied.body.code, 403);
     assert.equal(fs.existsSync(path.join(tmp, 'scripts/test.js')), false);
   }
   assert.equal(
@@ -355,8 +378,8 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         name: scriptName,
         content: 'authorized script',
       })
-    ).status,
-    401,
+    ).body.code,
+    403,
   );
   assert.equal(fs.existsSync(path.join(tmp, 'scripts/test.js')), false);
   assert.equal(
@@ -370,8 +393,8 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         name: 'normal.txt',
         content: 'normal config',
       })
-    ).status,
-    401,
+    ).body.code,
+    200,
   );
   assert.equal(
     (await request('/api/configs/save', valid, 'POST', {
@@ -402,6 +425,15 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     );
     assert.equal(
       (
+        await request(`${prefix}/scripts`, 'script-read-app', 'POST', {
+          filename: 'test.js',
+          content: 'unauthorized',
+        })
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
         await request(`${prefix}/scripts`, 'script-app', 'POST', {
           filename: 'test.js',
           content: 'authorized script',
@@ -412,6 +444,40 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     assert.equal(
       fs.readFileSync(path.join(tmp, 'scripts/test.js'), 'utf8'),
       'authorized script',
+    );
+  }
+  assert.equal(
+    (await request('/open/scripts/detail?file=test.js', 'script-read-app')).body
+      .data,
+    'authorized script',
+  );
+  const downloaded = await fetch(
+    `http://127.0.0.1:${server.address().port}/open/scripts/download`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer script-read-app',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filename: 'test.js' }),
+    },
+  );
+  assert.equal(downloaded.status, 200);
+  assert.equal(await downloaded.text(), 'authorized script');
+  for (const method of ['PUT', 'DELETE']) {
+    assert.equal(
+      (await request('/open/scripts', 'script-read-app', method, {
+        filename: 'test.js', content: 'unauthorized',
+      })).status,
+      401,
+    );
+  }
+  for (const path of ['run', 'stop', 'rename', 'history/restore']) {
+    assert.equal(
+      (await request(`/open/scripts/${path}`, 'script-read-app', 'PUT', {
+        filename: 'test.js', content: 'unauthorized',
+      })).status,
+      401,
     );
   }
 });

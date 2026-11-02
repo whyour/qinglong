@@ -21,24 +21,32 @@ export default {
       value: 'crons',
     },
     {
-      name: intl.get('环境变量（只读）'),
+      name: intl.get('环境变量'),
       value: 'envs',
     },
     {
-      name: intl.get('环境变量写入（含读取，可影响任务执行）'),
-      value: 'envs:write',
+      name: intl.get('环境变量（只读）'),
+      value: 'envs:read',
     },
     {
       name: intl.get('订阅管理'),
       value: 'subscriptions',
     },
     {
-      name: intl.get('配置文件（只读）'),
+      name: intl.get('配置文件'),
       value: 'configs',
+    },
+    {
+      name: intl.get('配置文件（只读）'),
+      value: 'configs:read',
     },
     {
       name: intl.get('脚本管理'),
       value: 'scripts',
+    },
+    {
+      name: intl.get('脚本（只读）'),
+      value: 'scripts:read',
     },
     {
       name: intl.get('日志管理'),
@@ -59,11 +67,13 @@ export default {
   ],
   scopesMap: {
     crons: intl.get('定时任务'),
-    envs: intl.get('环境变量（只读）'),
-    'envs:write': intl.get('环境变量写入（含读取，可影响任务执行）'),
+    envs: intl.get('环境变量'),
+    'envs:read': intl.get('环境变量（只读）'),
     subscriptions: intl.get('订阅管理'),
-    configs: intl.get('配置文件（只读）'),
+    configs: intl.get('配置文件'),
+    'configs:read': intl.get('配置文件（只读）'),
     scripts: intl.get('脚本管理'),
+    'scripts:read': intl.get('脚本（只读）'),
     logs: intl.get('日志管理'),
     dependencies: intl.get('依赖管理'),
     system: intl.get('系统信息'),

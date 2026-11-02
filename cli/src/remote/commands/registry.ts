@@ -26,6 +26,9 @@ export const commands: readonly CommandSpec[] = [
         default: 'crons',
         choices: [
           ...new Set(openOperations.map((op) => op.path.split('/')[0]!)),
+          'envs:read',
+          'configs:read',
+          'scripts:read',
         ].filter((scope) => !['auth', 'update'].includes(scope)),
       },
     },

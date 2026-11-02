@@ -48,7 +48,7 @@ ql auth logout --json
 ```sh
 ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
 ql subscription create --type public-repo --url https://example.com/repo.git --alias demo --schedule-type crontab --schedule '0 0 * * *' --json
-ql app create --name agent --scopes crons,subscriptions,envs:write --show-secrets --json
+ql app create --name agent --scopes crons,subscriptions,envs --show-secrets --json
 ql env create --data @envs.json --json
 ql api request PUT /open/crons/run --data '[12,13]' --json
 ```
@@ -68,7 +68,7 @@ ql api request PUT /open/crons/run --data '[12,13]' --json
 
 ### 应用凭据登录
 
-在面板创建专用应用，按需授予 crons、subscriptions 等权限。`envs` 仅允许读取环境变量；创建、修改、导入或启用环境变量需要 `envs:write`，该权限可影响任务执行。`configs` 仅允许读取配置文件。`login` 与 `auth login` 等价；交互输入 Client ID 和不回显的 Client Secret，密钥不支持命令行参数。
+在面板创建专用应用，按需授予 crons、subscriptions 等权限。现有 `envs`、`configs`、`scripts` scope 保留读写能力，`scripts` 还可运行和停止脚本；仅读取时分别选用 `envs:read`、`configs:read`、`scripts:read`。脚本下载虽然使用 POST，也允许 `scripts:read`。`login` 与 `auth login` 等价；交互输入 Client ID 和不回显的 Client Secret，密钥不支持命令行参数。
 
 ```sh
 ql login --url https://ql.example.com

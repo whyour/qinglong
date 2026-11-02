@@ -107,6 +107,9 @@ export async function auth(
       {
         crons: 'crons?page=1&size=1',
         configs: 'configs/files',
+        'envs:read': 'envs',
+        'configs:read': 'configs/files',
+        'scripts:read': 'scripts',
         dashboard: 'dashboard/overview',
       } as Record<string, string>
     )[scope] ?? scope,

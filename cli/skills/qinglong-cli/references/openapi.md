@@ -6,13 +6,13 @@ The catalogue covers 146 active routes in the current backend. `ql api routes --
 
 ## 认证与权限 / Authentication and permissions
 
-常规使用 `ql login` 的应用凭据。scope 通常对应 /open 后首个路径段：crons、subscriptions、envs、configs、scripts、logs、dependencies、system、dashboard 等。`envs` 仅允许读取；写入须授予 `envs:write`，它同时包含读取能力且可影响任务执行。`configs` 对应用令牌仅允许读取，保存配置需要面板会话。外部应用的 `system` scope 仅允许读取系统状态和发送通知。应用管理需要 apps；user、health、update 等路由同样接受服务端权限校验。面板 UI 当前没有列出全部这些 scope，不能把路由存在理解成现有应用已获授权。
+常规使用 `ql login` 的应用凭据。scope 通常对应 /open 后首个路径段：crons、subscriptions、envs、configs、scripts、logs、dependencies、system、dashboard 等。旧的 `envs`、`configs`、`scripts` 保留原有完整权限；仅读取时分别使用 `envs:read`、`configs:read`、`scripts:read`。`scripts:read` 包含使用 POST 的脚本下载，不包含保存、上传、删除、历史恢复、运行或停止。外部应用的 `system` scope 仅允许读取系统状态和发送通知。应用管理需要 apps；user、health、update 等路由同样接受服务端权限校验。面板 UI 当前没有列出全部这些 scope，不能把路由存在理解成现有应用已获授权。
 
 认证步骤、环境变量优先级、应用登录、面板会话与双因素验证、退出行为，统一见 [认证参考](panel.md#authentication)。应用管理可用 apps 权限的应用或授权面板会话；QL_URL/QL_ACCESS_TOKEN 不保存、不刷新，不自动退回应用配置。
 
 See the [authentication reference](panel.md#authentication) for application login, direct-token precedence, owner sessions/2FA and logout. App management accepts apps-scoped credentials or an authorized owner session. Direct tokens are not saved/refreshed and never fall back to application configuration.
 
-The `envs` scope is read only. Grant `envs:write` for environment changes; it also permits reads and can affect task execution. Application tokens with `configs` may read configuration, while saving requires a panel session. External `system` applications may only read system status and send notifications.
+Existing `envs`, `configs`, and `scripts` scopes retain full access. Use `envs:read`, `configs:read`, or `scripts:read` for read-only access. `scripts:read` includes script download (POST), but excludes saves, uploads, deletion, history restore, run, and stop. External `system` applications may only read system status and send notifications.
 
 `auth status --scope <scope>` tests a representative read; update has no read endpoint and is not offered by status. This does not prove permission for every write. `app list/create/update/reset-secret` 默认隐藏 client_secret/tokens；只有明确需要凭据时才加 --show-secrets，并避免把输出记录到共享日志。其他资源/通用请求可能含环境值、配置、脚本、订阅凭据和会话，按敏感数据处理。
 
@@ -42,7 +42,7 @@ ql subscription create --type public-repo --url https://example.com/repo.git --a
 ql subscription update 5 --data @subscription.json --json
 ql subscription delete 5 --query '{"force":true}' --json
 ql app create --name agent --scopes crons,subscriptions --show-secrets --json
-ql app update 3 --name agent --scopes crons,subscriptions,envs:write --json
+ql app update 3 --name agent --scopes crons,subscriptions,envs --json
 ql app reset-secret 3 --show-secrets --json
 ql env create --data @envs.json --json
 ql env update 8 --data '{"name":"EXAMPLE","value":"value"}' --json
@@ -51,7 +51,7 @@ ql script get --query '{"file":"demo.js","path":""}' --json
 ql script history-list --query '{"filename":"demo.js","path":""}' --json
 ql script history-detail --query '{"filename":"demo.js","path":"","id":"VERSION_UUID"}' --json
 ql script history-restore --data '{"filename":"demo.js","path":"","id":"VERSION_UUID","expectedHash":"CURRENT_SHA256"}' --json
-# Requires a panel session token.
+# Requires the full configs scope or a panel session token.
 ql config save --data '{"name":"example.sh","content":"# example"}' --json
 ql config get --query '{"path":"example.sh"}' --json
 ql log download --data '{"filename":"example.log","path":"example"}' --output ./example.log --json
