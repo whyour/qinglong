@@ -57,6 +57,16 @@ test('environment API rejects execution controls and legacy rows stay out of tas
     { id: 7, name: 'SAFE_VALUE', value: 'kept' },
     { id: 8, name: 'bad\nname', value: 'untrusted' },
     { id: 9, name: 'work_dir', value: '/tmp/untrusted' },
+    { id: 10, name: 'task_shell_params', value: 'other.sh' },
+    { id: 11, name: 'which_program', value: 'bash' },
+    { id: 12, name: 'script_params', value: 'other.sh' },
+    { id: 13, name: 'LOG_DIR', value: '../../config' },
+    { id: 14, name: 'EXPORTED_VARIABLES', value: 'PATH' },
+    { id: 15, name: 'begin_timestamp', value: 'a[$(printf BAD)]' },
+    { id: 16, name: 'is_macos', value: 'a[$(printf BAD)]' },
+    { id: 17, name: 'RandomDelayIgnoredMinutes', value: 'a[$(printf BAD)]' },
+    { id: 18, name: 'ID', value: '999' },
+    { id: 19, name: 'BASH_XTRACEFD', value: '2' },
   ];
   const Env = load(path.resolve('back/services/env.ts'), {
     typedi: decorators,
@@ -87,6 +97,10 @@ test('environment API rejects execution controls and legacy rows stay out of tas
 
   for (const name of [
     'task_before', 'PREV_NODE_OPTIONS', 'GIT_SSH_COMMAND', 'work_dir',
+    'task_shell_params', 'which_program', 'script_params', 'LOG_DIR',
+    'EXPORTED_VARIABLES',
+    'begin_timestamp', 'is_macos', 'RandomDelayIgnoredMinutes', 'ID',
+    'BASH_XTRACEFD',
   ]) {
     await assert.rejects(
       service.create([
@@ -121,7 +135,7 @@ test('environment API rejects execution controls and legacy rows stay out of tas
   for (const contents of Object.values(output)) {
     assert.doesNotMatch(
       contents,
-      /task_before|NODE_OPTIONS|GIT_SSH_COMMAND|PATH|work_dir/,
+      /task_before|NODE_OPTIONS|GIT_SSH_COMMAND|PATH|work_dir|task_shell_params|which_program|script_params|LOG_DIR|EXPORTED_VARIABLES|begin_timestamp|is_macos|RandomDelayIgnoredMinutes|ID|BASH_XTRACEFD/,
     );
     assert.match(contents, /SAFE_VALUE/);
   }

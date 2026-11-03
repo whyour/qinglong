@@ -7,6 +7,25 @@ const reservedNames = new Set([
   'TASK_BEFORE',
   'TASK_AFTER',
   'WORK_DIR',
+  'TASK_SHELL_PARAMS',
+  'SCRIPT_PARAMS',
+  'WHICH_PROGRAM',
+  'ISJSORPYTHONFILE',
+  'EXPORTED_VARIABLES',
+  'FOUND_DOUBLE_DASH',
+  'LOG_DIR',
+  'LOG_PATH',
+  'ID',
+  'BEGIN_TIMESTAMP',
+  'TIME_FORMAT',
+  'MTIME_FORMAT',
+  'IS_MACOS',
+  'RANDOMDELAY',
+  'RANDOMDELAYFILEEXTENSIONS',
+  'RANDOMDELAYIGNOREDMINUTES',
+  'COMMAND_TIMEOUT_TIME',
+  'SET_U_ON',
+  '_TASK_EXIT_CODE',
   'PATH',
   'HOME',
   'SHELL',
@@ -40,6 +59,7 @@ export function isAllowedTaskEnvName(name: unknown): name is string {
   const upper = name.toUpperCase();
   return (
     !reservedNames.has(upper) &&
+    !upper.startsWith('BASH_') &&
     !upper.startsWith('QL') &&
     !upper.startsWith('FILE_') &&
     !upper.startsWith('DIR_') &&

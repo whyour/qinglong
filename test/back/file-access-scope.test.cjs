@@ -115,7 +115,9 @@ for (const customData of [false, true]) {
       );
     for (const name of [
       'token.json',
+      'TOKEN.JSON',
       'grpc/client.key',
+      'Grpc/client.key',
       'secret-link',
       'data/scripts/secret-link',
       'data/scripts/../config/token.json',
@@ -181,7 +183,9 @@ test('log APIs allow configuration-like names while retaining directory boundari
   fs.writeFileSync(hidden, 'hidden task command');
   for (const values of [
     { path: '.tmp', file: 'own_user.list', filename: 'own_user.list' },
+    { path: '.TMP', file: 'own_user.list', filename: 'own_user.list' },
     { path: '', file: '.tmp/own_user.list', filename: '.tmp/own_user.list' },
+    { path: '', file: '.Tmp/own_user.list', filename: '.Tmp/own_user.list' },
   ]) {
     for (const [method, route] of [
       ['get', '/detail'],
