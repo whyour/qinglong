@@ -56,6 +56,7 @@ test('environment API rejects execution controls and legacy rows stay out of tas
     { id: 6, name: 'file_task_before', value: '/tmp/untrusted.sh' },
     { id: 7, name: 'SAFE_VALUE', value: 'kept' },
     { id: 8, name: 'bad\nname', value: 'untrusted' },
+    { id: 9, name: 'work_dir', value: '/tmp/untrusted' },
   ];
   const Env = load(path.resolve('back/services/env.ts'), {
     typedi: decorators,
@@ -84,7 +85,9 @@ test('environment API rejects execution controls and legacy rows stay out of tas
   service.getDb = async () => ({ id: 1, name: 'SAFE_VALUE', value: 'kept' });
   service.updateDb = async () => { writes++; return {}; };
 
-  for (const name of ['task_before', 'PREV_NODE_OPTIONS', 'GIT_SSH_COMMAND']) {
+  for (const name of [
+    'task_before', 'PREV_NODE_OPTIONS', 'GIT_SSH_COMMAND', 'work_dir',
+  ]) {
     await assert.rejects(
       service.create([
         { name: 'SAFE_VALUE', value: 'ok' },
@@ -116,7 +119,10 @@ test('environment API rejects execution controls and legacy rows stay out of tas
   assert.equal(listed[0].securityBlocked, true);
   assert.equal(listed[6].securityBlocked, false);
   for (const contents of Object.values(output)) {
-    assert.doesNotMatch(contents, /task_before|NODE_OPTIONS|GIT_SSH_COMMAND|PATH/);
+    assert.doesNotMatch(
+      contents,
+      /task_before|NODE_OPTIONS|GIT_SSH_COMMAND|PATH|work_dir/,
+    );
     assert.match(contents, /SAFE_VALUE/);
   }
 });

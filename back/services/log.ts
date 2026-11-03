@@ -8,6 +8,6 @@ export default class LogService {
   constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public checkFilePath(filePath: string, fileName: string) {
-    return resolveFileAccess(config.logPath, [filePath || '', fileName]);
+    return resolveFileAccess(config.logPath, [filePath || '', fileName], ['.tmp']);
   }
 }

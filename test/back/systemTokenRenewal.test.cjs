@@ -397,6 +397,22 @@ for (const mutation of ['resetSecret', 'remove', 'update', 'create']) {
   });
 }
 
+test('application mutations cannot change or expose the built-in system app', async (t) => {
+  const state = appsFixture(t);
+  for (const change of [
+    () => state.service.resetSecret(1),
+    () => state.service.update({ id: 1, name: 'system', scopes: ['crons'] }),
+    () => state.service.update({ id: 2, name: 'system', scopes: ['crons'] }),
+    () => state.service.remove([1, 2]),
+  ]) {
+    await assert.rejects(change(), (error) => error.status === 403);
+  }
+  assert.equal(state.apps().length, 2);
+  assert.equal(state.apps()[0].client_secret, 'system-secret');
+  assert.equal(state.apps()[0].tokens[0].value, 'system-token');
+  assert.deepEqual(state.cached(), state.apps());
+});
+
 test('system initialization preserves active tokens while migrating dashboard scope', async (t) => {
   const state = appsFixture(t);
   await AppModel.update({ scopes: ['crons', 'system'] }, { where: { id: 1 } });

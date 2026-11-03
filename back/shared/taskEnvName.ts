@@ -6,6 +6,7 @@ import { t } from './i18n';
 const reservedNames = new Set([
   'TASK_BEFORE',
   'TASK_AFTER',
+  'WORK_DIR',
   'PATH',
   'HOME',
   'SHELL',
