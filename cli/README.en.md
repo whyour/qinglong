@@ -48,7 +48,7 @@ The CLI also supports task/subscription CRUD, application and secret management,
 ```sh
 ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
 ql subscription create --type public-repo --url https://example.com/repo.git --alias demo --schedule-type crontab --schedule '0 0 * * *' --json
-ql app create --name agent --scopes crons,subscriptions --show-secrets --json
+ql app create --name agent --scopes crons,subscriptions,envs --show-secrets --json
 ql env create --data @envs.json --json
 ql api request PUT /open/crons/run --data '[12,13]' --json
 ```
@@ -68,7 +68,7 @@ Protected requests use `Authorization: Bearer <token>`. Two credential sources a
 
 ### Application login
 
-Create a dedicated panel application with the required scopes, such as crons, subscriptions or envs. `login` and `auth login` are equivalent. Interactive login hides the Client Secret; secret command-line arguments are not supported.
+Create a dedicated panel application with the required scopes. Existing scopes retain their original permissions. For read-only access, use `crons:read`, `subscriptions:read`, `envs:read`, `configs:read`, `scripts:read`, `dependencies:read`, `logs:read`, or `dashboard:read`. Script and log downloads use POST but are available to their read-only scopes. `GET /crons/import` writes tasks and is excluded from `crons:read`. `login` and `auth login` are equivalent. Interactive login hides the Client Secret; secret command-line arguments are not supported.
 
 ```sh
 ql login --url https://ql.example.com

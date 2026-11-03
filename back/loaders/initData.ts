@@ -222,14 +222,15 @@ export default async () => {
     }
   } catch { }
 
+  // Replace legacy task environment files before recovered tasks can run.
+  await envService.set_envs();
+
   // 初始化保存一次ck和定时任务数据
   cronClient.readiness.configure(async () => {
     await cronService.autosave_crontab(true);
     await systemService.restoreCronConcurrency();
   });
   await cronClient.readiness.recover();
-
-  await envService.set_envs();
 
   const authInfo = await userService.getAuthInfo();
   await shareStore.updateAuthInfo(authInfo);

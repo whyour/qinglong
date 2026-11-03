@@ -92,6 +92,10 @@ export default class OpenService {
 
   private async updateDb(payload: Partial<App>): Promise<App> {
     return this.withAppsLock(async () => {
+      const target = await AppModel.findOne({ where: { id: payload.id } });
+      if (target?.name === 'system' || payload.name === 'system') {
+        throw Object.assign(new Error(t('暂无权限')), { status: 403 });
+      }
       await AppModel.update(payload, { where: { id: payload.id } });
       const apps = await this.find({});
       await shareStore.updateApps(apps);
@@ -109,6 +113,12 @@ export default class OpenService {
 
   public async remove(ids: number[]) {
     return this.withAppsLock(async () => {
+      const systemApp = await AppModel.findOne({
+        where: { id: ids, name: 'system' },
+      });
+      if (systemApp) {
+        throw Object.assign(new Error(t('暂无权限')), { status: 403 });
+      }
       await AppModel.destroy({ where: { id: ids } });
       const apps = await this.find({});
       await shareStore.updateApps(apps);

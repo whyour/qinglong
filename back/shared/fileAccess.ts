@@ -24,8 +24,11 @@ export function resolveFileAccess(
   const resolvedRoot = path.resolve(root);
   const target = path.resolve(resolvedRoot, ...parts);
   if (target === resolvedRoot || !isWithin(resolvedRoot, target)) return '';
+  // File systems such as default APFS can resolve a differently cased spelling
+  // of the same entry. Check every protected name without case sensitivity.
+  const blockedNames = new Set(blacklist.map((part) => part.toLowerCase()));
   const isBlocked = (relative: string) =>
-    relative.split(path.sep).some((part) => blacklist.includes(part));
+    relative.split(path.sep).some((part) => blockedNames.has(part.toLowerCase()));
   if (isBlocked(path.relative(resolvedRoot, target))) return '';
   try {
     const realRoot = fs.realpathSync(resolvedRoot);

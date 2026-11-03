@@ -14,12 +14,17 @@ import {
 } from '../data/env';
 import { writeFileWithLock } from '../shared/utils';
 import { sequelize } from '../data';
+import {
+  assertAllowedTaskEnvName,
+  isAllowedTaskEnvName,
+} from '../shared/taskEnvName';
 
 @Service()
 export default class EnvService {
   constructor(@Inject('logger') private logger: winston.Logger) { }
 
   public async create(payloads: Env[]): Promise<Env[]> {
+    payloads.forEach((payload) => assertAllowedTaskEnvName(payload.name));
     const envs = await this.envs();
     let position = initPosition;
     if (
@@ -52,6 +57,7 @@ export default class EnvService {
   public async update(payload: Env): Promise<Env> {
     const doc = await this.getDb({ id: payload.id });
     const tab = new Env({ ...doc, ...payload });
+    assertAllowedTaskEnvName(tab.name);
     const newDoc = await this.updateDb(tab);
     await this.set_envs();
     return newDoc;
@@ -151,7 +157,10 @@ export default class EnvService {
         ['position', 'DESC'],
         ['createdAt', 'ASC'],
       ]);
-      return result;
+      return result.map((env) => ({
+        ...env,
+        securityBlocked: !isAllowedTaskEnvName(env.name),
+      }));
     } catch (error) {
       throw error;
     }
@@ -182,11 +191,14 @@ export default class EnvService {
   }
 
   public async enabled(ids: number[]) {
+    const docs = await EnvModel.findAll({ where: { id: ids } });
+    docs.forEach((doc) => assertAllowedTaskEnvName(doc.name));
     await EnvModel.update({ status: EnvStatus.normal }, { where: { id: ids } });
     await this.set_envs();
   }
 
   public async updateNames({ ids, name }: { ids: number[]; name: string }) {
+    assertAllowedTaskEnvName(name);
     await EnvModel.update({ name }, { where: { id: ids } });
     await this.set_envs();
   }
@@ -242,6 +254,13 @@ export default class EnvService {
       name: { [Op.not]: null },
       status: EnvStatus.normal,
     });
+    const invalid = envs.filter((env) => !isAllowedTaskEnvName(env.name));
+    if (invalid.length > 0) {
+      this.logger.warn(
+        'Skipped reserved environment variables in task files: %s',
+        JSON.stringify(invalid.map((env) => ({ id: env.id, name: env.name }))),
+      );
+    }
     const groups = groupBy(envs, 'name');
     let env_string = '';
     let js_env_string = '';
@@ -250,8 +269,8 @@ export default class EnvService {
       if (Object.prototype.hasOwnProperty.call(groups, key)) {
         const group = groups[key];
 
-        // 忽略不符合bash要求的环境变量名称
-        if (/^[a-zA-Z_][0-9a-zA-Z_]*$/.test(key)) {
+        // Ignore invalid and reserved names, including legacy database rows.
+        if (isAllowedTaskEnvName(key)) {
           let value = group
             .map((x) => x.value)
             .join('&')

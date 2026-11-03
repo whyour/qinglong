@@ -24,11 +24,14 @@ test('file access enforces directory boundaries, blacklist descendants and symli
     '../config-other/secret',
     '/etc/passwd',
     'grpc/client.key',
+    'GRPC/client.key',
     'alias/client.key',
     'outside/new.txt',
     'dangling',
     'auth.json',
+    'AUTH.JSON',
     'nested/auth.json',
+    'nested/Auth.Json',
     '',
   ]) {
     assert.equal(

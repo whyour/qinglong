@@ -112,7 +112,43 @@ export default ({ app }: { app: Application }) => {
         const keyMatch = pathLower.match(/\/open\/([a-z]+)\/*/);
         const key = keyMatch && keyMatch[1];
 
-        if (!doc.scopes.includes(key as AppScope)) {
+        const isReadRequest =
+          (['GET', 'HEAD'].includes(req.method) &&
+            !(
+              key === 'crons' && /^\/open\/crons\/import\/?$/.test(pathLower)
+            )) ||
+          (['scripts', 'logs'].includes(key || '') &&
+            req.method === 'POST' &&
+            /^\/open\/(?:scripts|logs)\/download\/?$/.test(pathLower));
+        const hasNamespaceScope =
+          doc.scopes.includes(key as AppScope) ||
+          ([
+            'crons',
+            'subscriptions',
+            'envs',
+            'configs',
+            'scripts',
+            'logs',
+            'dependencies',
+            'dashboard',
+          ].includes(key || '') &&
+            doc.scopes.includes(`${key}:read` as AppScope) &&
+            isReadRequest);
+        if (!hasNamespaceScope) {
+          const err = new UnauthorizedError('credentials_bad_scheme', {
+            message: t('暂无权限'),
+          });
+          return next(err);
+        }
+
+        // The built-in system app still needs its local CLI maintenance API.
+        const appRouteAllowed =
+          key !== 'system' ||
+          doc.name === 'system' ||
+          ((req.method === 'GET' || req.method === 'HEAD') &&
+            (pathLower === '/open/system' || pathLower === '/open/system/')) ||
+          (req.method === 'PUT' && pathLower === '/open/system/notify');
+        if (!appRouteAllowed) {
           const err = new UnauthorizedError('credentials_bad_scheme', {
             message: t('暂无权限'),
           });
