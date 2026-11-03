@@ -11,12 +11,11 @@ export default (app: Router) => {
   route.get(
     '/',
     celebrate({
-      query: 
-        Joi.object({
-          searchValue: Joi.string().optional().allow(''),
-          type: Joi.string().optional().allow(''),
-          status: Joi.string().optional().allow(''),
-        }).unknown(true),
+      query: Joi.object({
+        searchValue: Joi.string().optional().allow(''),
+        type: Joi.string().optional().allow(''),
+        status: Joi.string().optional().allow(''),
+      }).unknown(true),
     }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
@@ -26,6 +25,69 @@ export default (app: Router) => {
         return res.send({ code: 200, data });
       } catch (e) {
         logger.error('🔥 error: %o', e);
+        return next(e);
+      }
+    },
+  );
+
+  route.post(
+    '/refresh',
+    celebrate({
+      body: Joi.object({
+        type: Joi.string().valid('nodejs', 'python3').required(),
+      }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const dependenceService = Container.get(DependenceService);
+        const { job, accepted } = dependenceService.startRefresh(req.body.type);
+        if (!accepted) {
+          return res.status(409).send({
+            code: 409,
+            message: 'Another dependency refresh is already running',
+          });
+        }
+        return res.send({ code: 200, data: job });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/refresh/active',
+    async (_req: Request, res: Response, next: NextFunction) => {
+      try {
+        const dependenceService = Container.get(DependenceService);
+        res.set('Cache-Control', 'no-store');
+        return res.send({
+          code: 200,
+          data: dependenceService.getActiveRefreshJob() || null,
+        });
+      } catch (e) {
+        return next(e);
+      }
+    },
+  );
+
+  route.get(
+    '/refresh/:id',
+    celebrate({
+      params: Joi.object({ id: Joi.string().uuid().required() }),
+    }),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const dependenceService = Container.get(DependenceService);
+        const job = dependenceService.getRefreshJob(req.params.id);
+        if (!job) {
+          return res.status(404).send({
+            code: 404,
+            message: 'Dependency refresh job not found',
+          });
+        }
+        res.set('Cache-Control', 'no-store');
+        return res.send({ code: 200, data: job });
+      } catch (e) {
         return next(e);
       }
     },

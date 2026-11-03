@@ -1,8 +1,8 @@
 # OpenAPI 全量参考 / Complete OpenAPI reference
 
-CLI 对应本版本后端的 146 条有效路由。通过 `ql api routes --json` 查看方法、路径、对应命令、位置参数、请求体与上传字段；CLI 测试与 back/api 路由逐项核对。GET configs/:file、scripts/:file、logs/:file 已返回 410，改用 detail 命令，不再暴露旧入口。旧版面板可能没有新路由，以服务端响应为准。
+CLI 对应本版本后端的 151 条有效路由。通过 `ql api routes --json` 查看方法、路径、对应命令、位置参数、请求体与上传字段；CLI 测试与 back/api 路由逐项核对。GET configs/:file、scripts/:file、logs/:file 已返回 410，改用 detail 命令，不再暴露旧入口。旧版面板可能没有新路由，以服务端响应为准。
 
-The catalogue covers 146 active routes in the current backend. `ql api routes --json` lists methods, paths, commands, positional parameters, bodies and upload fields. A route-coverage test detects drift. Three retired GET :file routes return 410; use detail-based commands. Older panel versions may not implement newer routes.
+The catalogue covers 151 active routes in the current backend. `ql api routes --json` lists methods, paths, commands, positional parameters, bodies and upload fields. A route-coverage test detects drift. Three retired GET :file routes return 410; use detail-based commands. Older panel versions may not implement newer routes.
 
 ## 认证与权限 / Authentication and permissions
 
@@ -56,11 +56,18 @@ ql config save --data '{"name":"example.sh","content":"# example"}' --json
 ql config get --query '{"path":"example.sh"}' --json
 ql log download --data '{"filename":"example.log","path":"example"}' --output ./example.log --json
 ql dependency create --data '[{"name":"example-package","type":0}]' --json
+ql dependency refresh --data '{"type":"python3"}' --json
+ql dependency refresh-active --json
+ql dependency refresh-status <JOB_UUID> --json
 ql system data-export --data '{}'  --output ./panel.tgz --json
 ql system data-import --file ./panel.tgz --json
 ql api request PUT /open/crons/run --data '[12,13]' --json
 ql api request GET /open/crons --query '{"page":1,"size":100,"searchValue":"demo"}' --json
 ```
+
+依赖 refresh 的 type 为 nodejs 或 python3，立即返回后台任务 id 与 state；用 refresh-status 查询该 UUID，直到 completed 或 failed。refresh-active 返回运行中的任务或 null，普通 list 不触发检查。
+
+Dependency refresh accepts type nodejs or python3 and immediately returns a background job id and state. Poll refresh-status with that UUID until completed or failed. refresh-active returns the running job or null; listing dependencies does not trigger checks.
 
 任务 create/update 需要 command/schedule；name、labels、sub_id、extra_schedules、task_before/after、log_name、allow_multiple_instances、work_dir 等字段可通过 --data 提交。订阅 create 需要 type/url/alias/schedule_type，update 需要 id/type/url/alias；interval_schedule、pull_option、dependences、extensions、sub_before/after、proxy、autoAddCron/autoDelCron 等用 --data。private-repo 凭据仅通过受保护文件或 stdin 提供。环境变量与依赖 create 接受对象数组，应用 scopes 为字符串数组。其余准确字段/枚举由当前后端 Joi schema 校验：见 [back/api](https://github.com/whyour/qinglong/tree/develop/back/api) 和 [定时规则 schema](https://github.com/whyour/qinglong/blob/develop/back/validation/schedule.ts)。
 
@@ -154,6 +161,9 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql log delete ` | DELETE | `logs` | --data, --query |
 | `ql log download ` | POST | `logs/download` | --data, --output, --query |
 | `ql dependency list ` | GET | `dependencies` | --query |
+| `ql dependency refresh ` | POST | `dependencies/refresh` | --data, --query |
+| `ql dependency refresh-active ` | GET | `dependencies/refresh/active` | --query |
+| `ql dependency refresh-status <id>` | GET | `dependencies/refresh/:id` | --query |
 | `ql dependency create ` | POST | `dependencies` | --data, --query |
 | `ql dependency update <id>` | PUT | `dependencies` | --data, --query |
 | `ql dependency delete <id...>` | DELETE | `dependencies` | --query |

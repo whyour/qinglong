@@ -1,5 +1,9 @@
 {
   "选中条数": "Selected {count} items",
+  "重新检查依赖": "Recheck dependencies",
+  "依赖检查失败": "Dependency check failed",
+  "正在检查依赖": "Checking {type} dependencies",
+  "依赖检查状态已中断": "Dependency check status was lost. Please retry.",
   "登录失败次数": "Failed {count} time(s)",
   "间隔定时规则": "Every {value} {unit}",
   "SOCK5代理，例如 IP:PORT": "SOCKS5 proxy, e.g. IP:PORT",

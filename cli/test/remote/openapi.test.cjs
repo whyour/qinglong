@@ -83,6 +83,27 @@ test('script history commands send exact query parameters and restore payloads',
   assert.equal(f.requests.length, count, 'missing restore payload must not issue a request');
 });
 
+test('dependency refresh commands send the dependency type and address background jobs', async t => {
+  const f = await fixture(t);
+  success(await f.run(['dependency', 'refresh', '--data', '{"type":"python3"}']));
+  assert.equal(f.requests[0].method, 'POST');
+  assert.equal(f.requests[0].url, '/panel/open/dependencies/refresh');
+  assert.deepEqual(JSON.parse(f.requests[0].body), { type: 'python3' });
+  const id = '32ec8b22-2c48-4bcf-85d4-b394198417ba';
+  success(await f.run(['dependency', 'refresh-status', id]));
+  assert.equal(f.requests[1].method, 'GET');
+  assert.equal(f.requests[1].url, `/panel/open/dependencies/refresh/${id}`);
+  success(await f.run(['dependency', 'refresh-active']));
+  assert.equal(f.requests[2].method, 'GET');
+  assert.equal(f.requests[2].url, '/panel/open/dependencies/refresh/active');
+  success(await f.run(['api', 'request', 'GET', `/open/dependencies/refresh/${id}`]));
+  assert.equal(f.requests[3].url, `/panel/open/dependencies/refresh/${id}`);
+  assert.equal((await f.run(['dependency', 'refresh-status', '7'])).code, 2);
+  assert.equal((await f.run(['api', 'request', 'GET', '/open/dependencies/refresh/7'])).code, 2);
+  assert.equal((await f.run(['dependency', 'refresh'])).code, 2);
+  assert.equal(f.requests.length, 4, 'invalid arguments must not issue a request');
+});
+
 test('OpenAPI catalogue covers every active registered backend route; retired 410 routes are explicit', async () => {
   const root = path.resolve(__dirname, '../../../back/api');
   const expected = [];
@@ -132,7 +153,8 @@ test('all added named operations reach their registered method/path, including u
   const file = path.join(f.root, 'fixture.json'); await fs.writeFile(file, '{}');
   for (const op of openOperations.filter(op => !op.existing)) {
     const args = op.name.split(' ');
-    for (const _ of op.params ?? []) args.push('7');
+    const parameter = name => op.uuidParams?.includes(name) ? '32ec8b22-2c48-4bcf-85d4-b394198417ba' : '7';
+    for (const name of op.params ?? []) args.push(parameter(name));
     if (op.body === 'ids') args.push('7', '8');
     else if (op.body) {
       const data = op.name.startsWith('task ') ? { command: 'echo fixture', schedule: '0 0 * * *' }
@@ -144,7 +166,7 @@ test('all added named operations reach their registered method/path, including u
     success(await f.run(args));
     const last = f.requests.at(-1);
     assert.equal(last.method, op.method, op.name);
-    assert.equal(last.url, '/panel/open/' + op.path.replace(/:[A-Za-z]+/g, '7'), op.name);
+    assert.equal(last.url, '/panel/open/' + op.path.replace(/:([A-Za-z]+)/g, (_match, name) => parameter(name)), op.name);
     assert.equal(last.headers.authorization, op.anonymous ? undefined : 'Bearer fixture-token', op.name);
     if (op.upload) assert.ok(last.body.includes(`name="${op.upload}"; filename="fixture.json"`), op.name);
   }

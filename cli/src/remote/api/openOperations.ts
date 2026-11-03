@@ -5,6 +5,7 @@ export interface OpenOperation {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
   params?: string[];
+  uuidParams?: string[];
   body?: 'ids' | 'json' | 'object-id';
   upload?: string;
   download?: boolean;
@@ -334,6 +335,24 @@ export const openOperations: readonly OpenOperation[] = [
     download: true,
   },
   { name: 'dependency list', method: 'GET', path: 'dependencies' },
+  {
+    name: 'dependency refresh',
+    method: 'POST',
+    path: 'dependencies/refresh',
+    body: 'json',
+  },
+  {
+    name: 'dependency refresh-active',
+    method: 'GET',
+    path: 'dependencies/refresh/active',
+  },
+  {
+    name: 'dependency refresh-status',
+    method: 'GET',
+    path: 'dependencies/refresh/:id',
+    params: ['id'],
+    uuidParams: ['id'],
+  },
   {
     name: 'dependency create',
     method: 'POST',
