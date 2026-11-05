@@ -145,11 +145,11 @@
     "http-proxy-middleware": "^3.0.3",
     "iconv-lite": "^0.6.3",
     "ip2region": "2.3.0",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^5.5.0",
     "jsonwebtoken": "^9.0.2",
     "keyv": "^5.2.3",
     "lodash": "^4.17.21",
-    "multer": "2.4.0",
+    "multer": "2.5.0",
     "node-cron": "4.6.0",
     "nodemailer": "^10.0.9",
     "p-queue-cjs": "7.3.4",
@@ -166,7 +166,7 @@
     "uuid": "^11.0.3",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0",
-    "tar": "7.5.20"
+    "tar": "7.5.22"
   },
   "devDependencies": {
     "@ant-design/icons": "^5.0.1",
