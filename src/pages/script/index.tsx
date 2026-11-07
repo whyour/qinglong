@@ -15,6 +15,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-layout';
+import { EditorView } from '@codemirror/view';
 import Editor from '@monaco-editor/react';
 import CodeMirror from '@uiw/react-codemirror';
 import { history, useOutletContext } from '@umijs/max';
@@ -26,6 +27,8 @@ import {
   MenuProps,
   message,
   Modal,
+  Space,
+  Switch,
   Tooltip,
   Tree,
   TreeSelect,
@@ -70,6 +73,11 @@ const Script = () => {
   const [showMonaco, setShowMonaco] = useState(true);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [wordWrap, setWordWrap] = useState(
+    () =>
+      (localStorage.getItem('qinglong_editor_word_wrap') ??
+        localStorage.getItem('qinglong_config_word_wrap')) === 'true',
+  );
   const savingRef = useRef(false);
   const savedContentRef = useRef('');
   const currentKeyRef = useRef(currentNode?.key);
@@ -544,6 +552,11 @@ const Script = () => {
     });
   };
 
+  const changeWordWrap = (checked: boolean) => {
+    setWordWrap(checked);
+    localStorage.setItem('qinglong_editor_word_wrap', String(checked));
+  };
+
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
@@ -567,6 +580,14 @@ const Script = () => {
       }
       loading={loading}
       extra={[
+        <Space key="word-wrap" size={8}>
+          <span>{intl.get('自动换行')}</span>
+          <Switch
+            aria-label={intl.get('自动换行')}
+            checked={wordWrap}
+            onChange={changeWordWrap}
+          />
+        </Space>,
         ...(currentNode?.type === 'file' && showMonaco
           ? [
               <Button
@@ -734,6 +755,7 @@ const Script = () => {
                   lineNumbersMinChars: 3,
                   glyphMargin: false,
                   accessibilitySupport: 'off',
+                  wordWrap: wordWrap ? 'on' : 'off',
                 }}
                 onMount={(editor) => {
                   editorRef.current = editor;
@@ -747,7 +769,10 @@ const Script = () => {
         {isPhone && (
           <CodeMirror
             value={value}
-            extensions={getCodeMirrorExtensions(mode)}
+            extensions={[
+              ...getCodeMirrorExtensions(mode),
+              ...(wordWrap ? [EditorView.lineWrapping] : []),
+            ]}
             theme={theme.includes('dark') ? 'dark' : 'light'}
             readOnly={!isEditing || saving}
             onChange={(value) => {
@@ -760,6 +785,8 @@ const Script = () => {
             treeData={data}
             currentNode={currentNode}
             content={value}
+            wordWrap={wordWrap}
+            onWordWrapChange={changeWordWrap}
             handleCancel={() => {
               setIsLogModalVisible(false);
             }}

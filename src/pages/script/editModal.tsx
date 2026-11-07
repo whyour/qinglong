@@ -6,7 +6,16 @@ import React, {
   useCallback,
   useReducer,
 } from 'react';
-import { Drawer, Button, Tabs, Badge, Select, TreeSelect } from 'antd';
+import {
+  Drawer,
+  Button,
+  Tabs,
+  Badge,
+  Select,
+  Space,
+  Switch,
+  TreeSelect,
+} from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import SplitPane from 'react-split-pane';
@@ -24,11 +33,15 @@ const EditModal = ({
   treeData,
   currentNode,
   content,
+  wordWrap,
+  onWordWrapChange,
   handleCancel,
 }: {
   treeData?: any;
   content?: string;
   currentNode: any;
+  wordWrap: boolean;
+  onWordWrapChange: (checked: boolean) => void;
   handleCancel: () => void;
 }) => {
   const [value, setValue] = useState('');
@@ -219,6 +232,16 @@ const EditModal = ({
         </>
       }
       width={'100%'}
+      extra={
+        <Space size={8}>
+          <span>{intl.get('自动换行')}</span>
+          <Switch
+            aria-label={intl.get('自动换行')}
+            checked={wordWrap}
+            onChange={onWordWrapChange}
+          />
+        </Space>
+      }
       headerStyle={{ padding: '11px 24px' }}
       onClose={cancel}
       open={true}
@@ -241,6 +264,7 @@ const EditModal = ({
             lineNumbersMinChars: 3,
             glyphMargin: false,
             accessibilitySupport: 'off',
+            wordWrap: wordWrap ? 'on' : 'off',
           }}
           onMount={(editor) => {
             editorRef.current = editor;

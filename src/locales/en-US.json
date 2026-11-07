@@ -508,6 +508,7 @@
   "脚本（只读）": "Scripts (read only)",
   "自动删除任务": "Automatically Delete Tasks",
   "自动拆分": "Auto Split",
+  "自动换行": "Word wrap",
   "自动添加任务": "Automatically Add Tasks",
   "自动生成": "Auto-generated",
   "自定义日志文件夹名称，用于区分不同任务的日志，留空则自动生成": "Custom log folder name to distinguish logs from different tasks. Leave blank to auto-generate",

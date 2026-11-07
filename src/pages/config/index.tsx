@@ -6,7 +6,7 @@ import React, {
   useEffect,
   useRef,
 } from 'react';
-import { Button, message, Modal, TreeSelect } from 'antd';
+import { Button, message, Modal, Space, Switch, TreeSelect } from 'antd';
 import config from '@/utils/config';
 import { PageContainer } from '@ant-design/pro-layout';
 import { request } from '@/utils/http';
@@ -15,6 +15,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { useOutletContext } from '@umijs/max';
 import { SharedContext } from '@/layouts';
 import { langs } from '@uiw/codemirror-extensions-langs';
+import { EditorView } from '@codemirror/view';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { getEditorMode } from '@/utils';
 
@@ -28,6 +29,11 @@ const Config = () => {
   const editorRef = useRef<any>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [language, setLanguage] = useState<string>('shell');
+  const [wordWrap, setWordWrap] = useState(
+    () =>
+      (localStorage.getItem('qinglong_editor_word_wrap') ??
+        localStorage.getItem('qinglong_config_word_wrap')) === 'true',
+  );
 
   const getConfig = (name: string) => {
     request
@@ -104,6 +110,20 @@ const Config = () => {
           defaultValue="config.sh"
           onSelect={onSelect}
         />,
+        <Space key="word-wrap" size={8}>
+          <span>{intl.get('自动换行')}</span>
+          <Switch
+            aria-label={intl.get('自动换行')}
+            checked={wordWrap}
+            onChange={(checked) => {
+              setWordWrap(checked);
+              localStorage.setItem(
+                'qinglong_editor_word_wrap',
+                String(checked),
+              );
+            }}
+          />
+        </Space>,
         <Button
           key="1"
           loading={confirmLoading}
@@ -121,7 +141,10 @@ const Config = () => {
         <CodeMirror
           value={value}
           theme={theme.includes('dark') ? 'dark' : 'light'}
-          extensions={[langs.shell()]}
+          extensions={[
+            langs.shell(),
+            ...(wordWrap ? [EditorView.lineWrapping] : []),
+          ]}
           onChange={(value) => {
             setValue(value);
           }}
@@ -136,7 +159,8 @@ const Config = () => {
             lineNumbersMinChars: 3,
             folding: false,
             glyphMargin: false,
-            accessibilitySupport: 'off'
+            accessibilitySupport: 'off',
+            wordWrap: wordWrap ? 'on' : 'off',
           }}
           onMount={(editor) => {
             editorRef.current = editor;
