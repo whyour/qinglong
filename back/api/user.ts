@@ -311,20 +311,6 @@ export default (app: Router) => {
   );
 
   route.put(
-    '/notification/init',
-    async (req: Request, res: Response, next: NextFunction) => {
-      const logger: Logger = Container.get('logger');
-      try {
-        const userService = Container.get(UserService);
-        const result = await userService.updateNotificationMode(req.body);
-        res.send(result);
-      } catch (e) {
-        return next(e);
-      }
-    },
-  );
-
-  route.put(
     '/avatar',
     upload.single('avatar'),
     async (req: Request, res: Response, next: NextFunction) => {

@@ -224,7 +224,6 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql user notification-get ` | GET | `user/notification` | --query |
 | `ql user notification-set ` | PUT | `user/notification` | --data, --query |
 | `ql user init ` | PUT | `user/init` | --data, --query |
-| `ql user notification-init ` | PUT | `user/notification/init` | --data, --query |
 | `ql user avatar ` | PUT | `user/avatar` | --data, --file (avatar), --query |
 | `ql system apply-reload ` | PUT | `update/reload` | --query |
 | `ql system apply-system ` | PUT | `update/system` | --query |

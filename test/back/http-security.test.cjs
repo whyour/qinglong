@@ -46,6 +46,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     writePathList: [path.join(tmp, 'scripts')],
     blackFileList: ['auth.json', 'grpc'],
     baseUrl: '/panel',
+    isProduction: true,
   };
   const apps = [
     {
@@ -105,6 +106,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
   let envWriteCalls = 0;
   let scopedMutationCalls = 0;
   let initialized = 0;
+  let notificationCalls = 0;
   const User = class {};
   const Script = class {
     getFile(folder, filename) {
@@ -121,6 +123,10 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       return { code: 200 };
     },
     getAuthInfo: async () => auth,
+    updateNotificationMode: async () => {
+      notificationCalls++;
+      return { code: 200 };
+    },
   };
   const mocks = {
     '../config': config,
@@ -209,6 +215,15 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       commandCalls++;
       res.json({ code: 200 });
     });
+    router.get('/security-test/error', (_req, _res, next) =>
+      next(new Error('sensitive server detail')),
+    );
+    router.get('/security-test/db-error', (_req, _res, next) => {
+      const error = new Error('sensitive database detail');
+      error.name = 'SequelizeDatabaseError';
+      error.errors = [{ message: 'sensitive row value' }];
+      next(error);
+    });
     return router;
   };
   const app = express();
@@ -238,6 +253,36 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     );
     return { status: response.status, body: await response.json() };
   };
+  auth.username = 'admin';
+  auth.password = 'admin';
+  for (const prefix of ['/api', '/open', '/panel/api', '/panel/open']) {
+    const response = await request(
+      `${prefix}/user/notification/init`,
+      undefined,
+      'PUT',
+      { type: 'webhook', webhookUrl: 'http://127.0.0.1/?title=$title' },
+    );
+    assert.equal(response.status, 401, prefix);
+  }
+  assert.equal(notificationCalls, 0);
+  auth.username = 'owner';
+  auth.password = 'configured';
+  assert.equal(
+    (await request('/api/user/notification', valid, 'PUT', {})).body.code,
+    200,
+  );
+  assert.equal(notificationCalls, 1);
+  for (const route of ['/security-test/error', '/security-test/db-error']) {
+    const response = await request(`/api${route}`, valid);
+    assert.equal(response.status, 500);
+    assert.deepEqual(response.body, { code: 500, message: '未知错误' });
+  }
+  const malformedToken = await request('/api/envs', 'not-a-jwt');
+  assert.equal(malformedToken.status, 401);
+  assert.deepEqual(malformedToken.body, {
+    code: 401,
+    message: 'Token 已失效',
+  });
   for (const url of [
     '/api/user/init',
     '/open/user/init',

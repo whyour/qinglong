@@ -90,7 +90,6 @@ const apiWhiteList = [
   `${config.baseUrl}api/user/two-factor/login`,
   `${config.baseUrl}api/system`,
   `${config.baseUrl}api/user/init`,
-  `${config.baseUrl}api/user/notification/init`,
 ];
 
 _request.interceptors.request.use((_config) => {

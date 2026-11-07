@@ -609,13 +609,6 @@ export const openOperations: readonly OpenOperation[] = [
     anonymous: true,
   },
   {
-    name: 'user notification-init',
-    method: 'PUT',
-    path: 'user/notification/init',
-    body: 'json',
-    anonymous: true,
-  },
-  {
     name: 'user avatar',
     method: 'PUT',
     path: 'user/avatar',

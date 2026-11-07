@@ -191,14 +191,7 @@ export default ({ app }: { app: Application }) => {
 
   app.use(async (req, res, next) => {
     const pathLower = req.path.toLowerCase();
-    if (
-      ![
-        '/api/user/init',
-        '/api/user/notification/init',
-        '/open/user/init',
-        '/open/user/notification/init',
-      ].includes(pathLower)
-    ) {
+    if (!['/api/user/init', '/open/user/init'].includes(pathLower)) {
       return next();
     }
     const authInfo = (await shareStore.getAuthInfo()) || ({} as AuthInfo);
@@ -238,37 +231,23 @@ export default ({ app }: { app: Application }) => {
 
   app.use(
     (
-      err: Error & { status: number },
+      err: Error & { status: number; code?: string },
       req: Request,
       res: Response,
       next: NextFunction,
     ) => {
       if (err.name === 'UnauthorizedError') {
-        return res
-          .status(err.status)
-          .send({ code: 401, message: err.message })
-          .end();
-      }
-      return next(err);
-    },
-  );
-
-  app.use(
-    (
-      err: Error & { errors: any[] },
-      req: Request,
-      res: Response,
-      next: NextFunction,
-    ) => {
-      if (err.name.includes('Sequelize')) {
-        return res
-          .status(500)
-          .send({
-            code: 400,
-            message: `${err.message}`,
-            errors: err.errors,
-          })
-          .end();
+        let message = err.message;
+        if (config.isProduction) {
+          if (err.code === 'credentials_bad_scheme') {
+            message = t('暂无权限');
+          } else if (err.code === 'credentials_required') {
+            message = t('请先登录');
+          } else {
+            message = t('Token 已失效');
+          }
+        }
+        return res.status(401).send({ code: 401, message }).end();
       }
       return next(err);
     },
@@ -281,10 +260,18 @@ export default ({ app }: { app: Application }) => {
       res: Response,
       next: NextFunction,
     ) => {
-      res.status(err.status || 500);
+      const status =
+        Number.isInteger(err.status) && err.status >= 400 && err.status < 600
+          ? err.status
+          : 500;
+      if (status >= 500) {
+        console.error('HTTP request failed:', err);
+      }
+      res.status(status);
       res.json({
-        code: err.status || 500,
-        message: err.message,
+        code: status,
+        message:
+          config.isProduction && status >= 500 ? t('未知错误') : err.message,
       });
     },
   );
