@@ -18,6 +18,11 @@ from email.utils import formataddr
 
 import requests
 
+# 单次 HTTP 请求的默认超时（秒），避免推送服务无响应时永久阻塞
+REQUEST_TIMEOUT = 10
+# 等待推送线程结束的最长时间（秒），超时后跳过并继续退出
+NOTIFY_JOIN_TIMEOUT = 30
+
 # 原先的 print 函数和主线程的锁
 _print = print
 mutex = threading.Lock()
@@ -199,7 +204,7 @@ def bark(title: str, content: str) -> Optional[bool]:
         data[bark_params.get(pair[0])] = pair[1]
     headers = {"Content-Type": "application/json;charset=utf-8"}
     response = requests.post(
-        url=url, data=json.dumps(data), headers=headers, timeout=15
+        url=url, data=json.dumps(data), headers=headers, timeout=REQUEST_TIMEOUT
     ).json()
 
     if response["code"] == 200:
@@ -241,7 +246,7 @@ def dingding_bot(title: str, content: str) -> Optional[bool]:
     headers = {"Content-Type": "application/json;charset=utf-8"}
     data = {"msgtype": "text", "text": {"content": f"{title}\n\n{content}"}}
     response = requests.post(
-        url=url, data=json.dumps(data), headers=headers, timeout=15
+        url=url, data=json.dumps(data), headers=headers, timeout=REQUEST_TIMEOUT
     ).json()
 
     if not response["errcode"]:
@@ -278,7 +283,9 @@ def feishu_bot(title: str, content: str) -> Optional[bool]:
         data["timestamp"] = timestamp
         data["sign"] = sign
 
-    response = requests.post(url, data=json.dumps(data)).json()
+    response = requests.post(
+        url, data=json.dumps(data), timeout=REQUEST_TIMEOUT
+    ).json()
 
     if response.get("StatusCode") == 0 or response.get("code") == 0:
         audit_results.append(True)
@@ -299,7 +306,7 @@ def go_cqhttp(title: str, content: str) -> Optional[bool]:
     print("go-cqhttp 服务启动")
 
     url = f'{push_config.get("GOBOT_URL")}?access_token={push_config.get("GOBOT_TOKEN")}&{push_config.get("GOBOT_QQ")}&message=标题:{title}\n内容:{content}'
-    response = requests.get(url).json()
+    response = requests.get(url, timeout=REQUEST_TIMEOUT).json()
 
     if response["status"] == "ok":
         audit_results.append(True)
@@ -325,7 +332,7 @@ def gotify(title: str, content: str) -> Optional[bool]:
         "message": content,
         "priority": push_config.get("GOTIFY_PRIORITY"),
     }
-    response = requests.post(url, data=data).json()
+    response = requests.post(url, data=data, timeout=REQUEST_TIMEOUT).json()
 
     if response.get("id"):
         audit_results.append(True)
@@ -348,7 +355,9 @@ def iGot(title: str, content: str) -> Optional[bool]:
     url = f'https://push.hellyw.com/{push_config.get("IGOT_PUSH_KEY")}'
     data = {"title": title, "content": content}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    response = requests.post(url, data=data, headers=headers).json()
+    response = requests.post(
+        url, data=data, headers=headers, timeout=REQUEST_TIMEOUT
+    ).json()
 
     if response["ret"] == 0:
         audit_results.append(True)
@@ -377,7 +386,7 @@ def serverJ(title: str, content: str) -> Optional[bool]:
     else:
         url = f'https://sctapi.ftqq.com/{push_config.get("PUSH_KEY")}.send'
 
-    response = requests.post(url, data=data).json()
+    response = requests.post(url, data=data, timeout=REQUEST_TIMEOUT).json()
 
     if response.get("errno") == 0 or response.get("code") == 0:
         audit_results.append(True)
@@ -406,7 +415,7 @@ def pushdeer(title: str, content: str) -> Optional[bool]:
     if push_config.get("DEER_URL"):
         url = push_config.get("DEER_URL")
 
-    response = requests.post(url, data=data).json()
+    response = requests.post(url, data=data, timeout=REQUEST_TIMEOUT).json()
 
     if len(response.get("content").get("result")) > 0:
         audit_results.append(True)
@@ -427,7 +436,7 @@ def chat(title: str, content: str) -> Optional[bool]:
     print("chat 服务启动")
     data = "payload=" + json.dumps({"text": title + "\n" + content})
     url = push_config.get("CHAT_URL") + push_config.get("CHAT_TOKEN")
-    response = requests.post(url, data=data)
+    response = requests.post(url, data=data, timeout=REQUEST_TIMEOUT)
 
     if response.status_code == 200:
         audit_results.append(True)
@@ -461,7 +470,9 @@ def pushplus_bot(title: str, content: str) -> Optional[bool]:
     }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, data=body, headers=headers).json()
+    response = requests.post(
+        url=url, data=body, headers=headers, timeout=REQUEST_TIMEOUT
+    ).json()
 
     code = response["code"]
     if code == 200:
@@ -477,7 +488,9 @@ def pushplus_bot(title: str, content: str) -> Optional[bool]:
     else:
         url_old = "http://pushplus.hxtrip.com/send"
         headers["Accept"] = "application/json"
-        response = requests.post(url=url_old, data=body, headers=headers).json()
+        response = requests.post(
+            url=url_old, data=body, headers=headers, timeout=REQUEST_TIMEOUT
+        ).json()
 
         if response["code"] == 200:
             audit_results.append(True)
@@ -513,7 +526,9 @@ def weplus_bot(title: str, content: str) -> Optional[bool]:
     }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, data=body, headers=headers).json()
+    response = requests.post(
+        url=url, data=body, headers=headers, timeout=REQUEST_TIMEOUT
+    ).json()
 
     if response["code"] == 200:
         audit_results.append(True)
@@ -535,7 +550,9 @@ def qmsg_bot(title: str, content: str) -> Optional[bool]:
 
     url = f'https://qmsg.zendee.cn/{push_config.get("QMSG_TYPE")}/{push_config.get("QMSG_KEY")}'
     payload = {"msg": f'{title}\n\n{content.replace("----", "-")}'.encode("utf-8")}
-    response = requests.post(url=url, params=payload).json()
+    response = requests.post(
+        url=url, params=payload, timeout=REQUEST_TIMEOUT
+    ).json()
 
     if response["code"] == 0:
         audit_results.append(True)
@@ -599,7 +616,7 @@ class WeCom:
             "corpid": self.CORPID,
             "corpsecret": self.CORPSECRET,
         }
-        req = requests.post(url, params=values)
+        req = requests.post(url, params=values, timeout=REQUEST_TIMEOUT)
         data = json.loads(req.text)
         return data["access_token"]
 
@@ -615,7 +632,9 @@ class WeCom:
             "safe": "0",
         }
         send_msges = bytes(json.dumps(send_values), "utf-8")
-        respone = requests.post(send_url, send_msges)
+        respone = requests.post(
+            send_url, send_msges, timeout=REQUEST_TIMEOUT
+        )
         respone = respone.json()
         return respone["errmsg"]
 
@@ -641,7 +660,9 @@ class WeCom:
             },
         }
         send_msges = bytes(json.dumps(send_values), "utf-8")
-        respone = requests.post(send_url, send_msges)
+        respone = requests.post(
+            send_url, send_msges, timeout=REQUEST_TIMEOUT
+        )
         respone = respone.json()
         return respone["errmsg"]
 
@@ -663,7 +684,7 @@ def wecom_bot(title: str, content: str) -> Optional[bool]:
     headers = {"Content-Type": "application/json;charset=utf-8"}
     data = {"msgtype": "text", "text": {"content": f"{title}\n\n{content}"}}
     response = requests.post(
-        url=url, data=json.dumps(data), headers=headers, timeout=15
+        url=url, data=json.dumps(data), headers=headers, timeout=REQUEST_TIMEOUT
     ).json()
 
     if response["errcode"] == 0:
@@ -711,7 +732,11 @@ def telegram_bot(title: str, content: str) -> Optional[bool]:
         )
         proxies = {"http": proxyStr, "https": proxyStr}
     response = requests.post(
-        url=url, headers=headers, params=payload, proxies=proxies
+        url=url,
+        headers=headers,
+        params=payload,
+        proxies=proxies,
+        timeout=REQUEST_TIMEOUT,
     ).json()
 
     if response["ok"]:
@@ -752,7 +777,9 @@ def aibotk(title: str, content: str) -> Optional[bool]:
         }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, data=body, headers=headers).json()
+    response = requests.post(
+        url=url, data=body, headers=headers, timeout=REQUEST_TIMEOUT
+    ).json()
     print(response)
     if response["code"] == 0:
         audit_results.append(True)
@@ -836,7 +863,7 @@ def pushme(title: str, content: str) -> Optional[bool]:
         "date": push_config.get("date") if push_config.get("date") else "",
         "type": push_config.get("type") if push_config.get("type") else "",
     }
-    response = requests.post(url, data=data)
+    response = requests.post(url, data=data, timeout=REQUEST_TIMEOUT)
 
     if response.status_code == 200 and response.text == "success":
         audit_results.append(True)
@@ -883,7 +910,9 @@ def chronocat(title: str, content: str) -> Optional[bool]:
                     }
                 ],
             }
-            response = requests.post(url, headers=headers, data=json.dumps(data))
+            response = requests.post(
+                url, headers=headers, data=json.dumps(data), timeout=REQUEST_TIMEOUT
+            )
             if response.status_code == 200:
                 if chat_type == 1:
                     audit_results.append(True)
@@ -936,7 +965,9 @@ def ntfy(title: str, content: str) -> Optional[bool]:
         headers['Actions'] = encode_rfc2047(push_config.get("NTFY_ACTIONS"))
 
     url = push_config.get("NTFY_URL") + "/" + push_config.get("NTFY_TOPIC")
-    response = requests.post(url, data=data, headers=headers)
+    response = requests.post(
+        url, data=data, headers=headers, timeout=REQUEST_TIMEOUT
+    )
     if response.status_code == 200:  # 使用 response.status_code 进行检查
         audit_results.append(True)
         print("Ntfy 推送成功！")
@@ -995,7 +1026,9 @@ def wxpusher_bot(title: str, content: str) -> Optional[bool]:
     }
 
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, json=data, headers=headers).json()
+    response = requests.post(
+        url=url, json=data, headers=headers, timeout=REQUEST_TIMEOUT
+    ).json()
 
     if response.get("code") == 1000:
         audit_results.append(True)
@@ -1046,7 +1079,9 @@ def wxpusher_spt(title: str, content: str) -> Optional[bool]:
         data["sptList"] = spts
 
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, json=data, headers=headers).json()
+    response = requests.post(
+        url=url, json=data, headers=headers, timeout=REQUEST_TIMEOUT
+    ).json()
 
     if response.get("code") == 1000:
         audit_results.append(True)
@@ -1080,7 +1115,9 @@ def wpush(title: str, content: str) -> Optional[bool]:
         data["topic_code"] = push_config.get("WPUSH_TOPIC_CODE")
 
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, json=data, headers=headers, timeout=15).json()
+    response = requests.post(
+        url=url, json=data, headers=headers, timeout=REQUEST_TIMEOUT
+    ).json()
 
     if response.get("code") == 0:
         audit_results.append(True)
@@ -1121,7 +1158,9 @@ def openilink(title: str, content: str) -> Optional[bool]:
     if push_config.get("OPENILINK_CONTEXT_TOKEN"):
         data["context_token"] = push_config.get("OPENILINK_CONTEXT_TOKEN")
 
-    response = requests.post(url=url, json=data, headers=headers).json()
+    response = requests.post(
+        url=url, json=data, headers=headers, timeout=REQUEST_TIMEOUT
+    ).json()
 
     if response.get("ok"):
         audit_results.append(True)
@@ -1215,7 +1254,7 @@ def custom_notify(title: str, content: str) -> Optional[bool]:
         "$title", urllib.parse.quote_plus(title)
     ).replace("$content", urllib.parse.quote_plus(content))
     response = requests.request(
-        method=WEBHOOK_METHOD, url=formatted_url, headers=headers, timeout=15, data=body
+        method=WEBHOOK_METHOD, url=formatted_url, headers=headers, timeout=REQUEST_TIMEOUT, data=body
     )
 
     if response.status_code == 200:
@@ -1233,7 +1272,7 @@ def one() -> str:
     :return:
     """
     url = "https://v1.hitokoto.cn/"
-    res = requests.get(url).json()
+    res = requests.get(url, timeout=REQUEST_TIMEOUT).json()
     return res["hitokoto"] + "    ----" + res["from"]
 
 
@@ -1374,11 +1413,20 @@ def send(title: str, content: str, ignore_default_config: bool = False, **kwargs
     notify_function = add_notify_function()
     results = []
     ts = [
-        threading.Thread(target=audited_notification, args=(mode, title, content, results), name=mode.__name__)
+        threading.Thread(
+            target=audited_notification,
+            args=(mode, title, content, results),
+            name=mode.__name__,
+            daemon=True,
+        )
         for mode in notify_function
     ]
     [t.start() for t in ts]
-    [t.join() for t in ts]
+    for t in ts:
+        t.join(timeout=NOTIFY_JOIN_TIMEOUT)
+        if t.is_alive():
+            results.append((t.name, False))
+            print(f"{t.name} 推送超时（>{NOTIFY_JOIN_TIMEOUT}s），已跳过，任务继续结束")
     report_notifications(results, title, content)
 
 
