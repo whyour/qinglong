@@ -141,6 +141,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       shareStore: { getAuthInfo: async () => auth, getApps: async () => apps },
     },
     '../config/serverEnv': { serveEnv: (_req, res) => res.end() },
+    './logger': { error() {} },
     '../services/user': User,
     '../services/script': Script,
     '../data/open': {},

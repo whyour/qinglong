@@ -16,6 +16,7 @@ import { t } from '../shared/i18n';
 import { AppScope } from '../data/open';
 import uniqueConstraintError from '../middlewares/uniqueConstraintError';
 import protectedPathCase from '../middlewares/protectedPathCase';
+import Logger from './logger';
 
 function resolveTrustProxy(value = process.env.QL_TRUST_PROXY) {
   const setting = value?.trim();
@@ -265,7 +266,7 @@ export default ({ app }: { app: Application }) => {
           ? err.status
           : 500;
       if (status >= 500) {
-        console.error('HTTP request failed:', err);
+        Logger.error('HTTP request failed: %o', err);
       }
       res.status(status);
       res.json({
