@@ -3,7 +3,7 @@ const test = require('node:test');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const { Sequelize, QueryTypes } = require('sequelize');
+const { Sequelize, DataTypes, QueryTypes } = require('sequelize');
 const { migrateSchema } = require('../../back/shared/schemaMigrations');
 const load = require('../helpers/load-security-module.cjs');
 
@@ -44,6 +44,39 @@ test('legacy database upgrades without losing rows and repeated migration is ide
     type: QueryTypes.SELECT,
   });
   assert.equal(applied.length, 15);
+});
+
+test('migration repairs malformed environment labels before ORM reads', async (t) => {
+  const database = await createLegacy();
+  t.after(() => database.close());
+  await migrateSchema(database);
+  for (const [id, labels] of [
+    [1, ''],
+    [2, null],
+    [3, '{invalid'],
+    [4, '{}'],
+    [5, '["keep"]'],
+  ]) {
+    await database.query('INSERT INTO "Envs" (id, name, labels) VALUES (?, ?, ?)', {
+      replacements: [id, `env-${id}`, labels],
+    });
+  }
+
+  const EnvModel = database.define('Env', {
+    name: DataTypes.STRING,
+    labels: DataTypes.JSON,
+  }, { timestamps: false });
+  await assert.rejects(EnvModel.findAll(), /Unexpected end of JSON input/);
+  await migrateSchema(database);
+  const rows = await EnvModel.findAll({ order: [['id', 'ASC']] });
+  assert.deepEqual(rows.map((row) => row.labels), [[], [], [], [], ['keep']]);
+  await migrateSchema(database);
+  const repaired = await database.query('SELECT id, labels FROM "Envs" ORDER BY id', {
+    type: QueryTypes.SELECT,
+  });
+  assert.deepEqual(repaired.map(({ labels }) => labels), [
+    '[]', '[]', '[]', '[]', '["keep"]',
+  ]);
 });
 
 test('migration failure rolls back added columns and can be retried after repair', async (t) => {

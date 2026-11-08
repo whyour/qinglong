@@ -66,5 +66,16 @@ export async function migrateSchema(database: Sequelize): Promise<void> {
         );
       }
     }
+
+    // Older databases can contain non-JSON values in Envs.labels. Sequelize
+    // parses this column on every environment read, including HTTP startup.
+    await database.query(
+      `UPDATE "Envs" SET "labels" = '[]'
+       WHERE CASE WHEN json_valid("labels")
+         THEN json_type("labels") <> 'array'
+         ELSE 1
+       END`,
+      { transaction },
+    );
   });
 }
