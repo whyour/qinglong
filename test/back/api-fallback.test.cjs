@@ -13,6 +13,7 @@ test('unknown API requests return JSON 404 while env.js and SPA deep links work'
   const app = express();
   load('back/loaders/express.ts', {
     '../api': () => express.Router(),
+    './logger': { error() {} },
     '../config': {
       rootPath: dir,
       uploadPath: dir,
