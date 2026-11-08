@@ -20,7 +20,6 @@ export default (app: Router) => {
       res.status(500).send({
         code: 500,
         message: 'Health check failed',
-        error: err.message,
       });
     }
   });

@@ -238,7 +238,7 @@ export default ({ app }: { app: Application }) => {
     ) => {
       if (err.name === 'UnauthorizedError') {
         let message = err.message;
-        if (config.isProduction) {
+        if (!config.isDevelopment) {
           if (err.code === 'credentials_bad_scheme') {
             message = t('暂无权限');
           } else if (err.code === 'credentials_required') {
@@ -271,7 +271,7 @@ export default ({ app }: { app: Application }) => {
       res.json({
         code: status,
         message:
-          config.isProduction && status >= 500 ? t('未知错误') : err.message,
+          !config.isDevelopment && status >= 500 ? t('未知错误') : err.message,
       });
     },
   );

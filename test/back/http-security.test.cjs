@@ -46,7 +46,6 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     writePathList: [path.join(tmp, 'scripts')],
     blackFileList: ['auth.json', 'grpc'],
     baseUrl: '/panel',
-    isProduction: true,
   };
   const apps = [
     {
