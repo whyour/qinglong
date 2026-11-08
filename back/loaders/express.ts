@@ -266,7 +266,18 @@ export default ({ app }: { app: Application }) => {
           ? err.status
           : 500;
       if (status >= 500) {
-        Logger.error('HTTP request failed: %o', err);
+        const route =
+          typeof req.route?.path === 'string' ? req.route.path : '?';
+        const errorName = /^[A-Za-z][A-Za-z0-9]{0,63}$/.test(err.name)
+          ? err.name
+          : 'Error';
+        Logger.error(
+          'HTTP request failed: status=%d method=%s route=%s type=%s',
+          status,
+          req.method,
+          route,
+          errorName,
+        );
       }
       res.status(status);
       res.json({

@@ -3,6 +3,7 @@ const test = require('node:test');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const util = require('node:util');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const load = require('../helpers/load-security-module.cjs');
@@ -106,6 +107,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
   let scopedMutationCalls = 0;
   let initialized = 0;
   let notificationCalls = 0;
+  const loggedErrors = [];
   const User = class {};
   const Script = class {
     getFile(folder, filename) {
@@ -141,7 +143,7 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       shareStore: { getAuthInfo: async () => auth, getApps: async () => apps },
     },
     '../config/serverEnv': { serveEnv: (_req, res) => res.end() },
-    './logger': { error() {} },
+    './logger': { error: (...args) => loggedErrors.push(util.format(...args)) },
     '../services/user': User,
     '../services/script': Script,
     '../data/open': {},
@@ -222,6 +224,8 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
       const error = new Error('sensitive database detail');
       error.name = 'SequelizeDatabaseError';
       error.errors = [{ message: 'sensitive row value' }];
+      error.sql = "SELECT * FROM users WHERE password = 'sensitive password'";
+      error.parameters = ['sensitive parameter'];
       next(error);
     });
     return router;
@@ -277,6 +281,9 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     assert.equal(response.status, 500);
     assert.deepEqual(response.body, { code: 500, message: '未知错误' });
   }
+  assert.equal(loggedErrors.length, 2);
+  assert.match(loggedErrors[1], /type=SequelizeDatabaseError/);
+  assert.ok(loggedErrors.every((line) => !line.includes('sensitive')));
   const malformedToken = await request('/api/envs', 'not-a-jwt');
   assert.equal(malformedToken.status, 401);
   assert.deepEqual(malformedToken.body, {
