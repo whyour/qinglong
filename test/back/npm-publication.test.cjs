@@ -66,6 +66,9 @@ case 'network': console.log('upstream unavailable'); process.exit(1);
       encoding: 'utf8',
       env: {
         ...process.env,
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/master',
+        NPM_RC_VERSION: '',
         PATH: `${bin}${path.delimiter}${process.env.PATH}`,
         RUNNER_TEMP: root,
         QL_PUBLISH_SCENARIO: scenario,
