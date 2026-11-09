@@ -509,7 +509,7 @@ jobs:
           metadata=$(tar -xOf "$archive" package/package.json)
           name=$(jq -er '.name | select(. == "@whyour/qinglong")' <<< "$metadata")
           version=$(jq -er '.version | select(type == "string")' <<< "$metadata")
-          if [[ "${GITHUB_REF:-}" == refs/heads/develop ]]; then
+          if [[ "${GITHUB_REF:-}" == refs/heads/develop && -n "${NPM_RC_VERSION:-}" ]]; then
             if [[ ! "$NPM_RC_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ || "$version" != "$NPM_RC_VERSION" ]]; then
               echo '::error::Develop npm publication requires the exact requested RC archive version.'
               exit 1
@@ -519,7 +519,7 @@ jobs:
             jq -e --arg version "$version" '. == $version' "$RUNNER_TEMP/npm-version.json" > /dev/null
             echo "::notice::$name@$version is already published; skipping npm publication for this image rebuild."
           elif jq -e '.error.code == "E404"' "$RUNNER_TEMP/npm-version.json" > /dev/null; then
-            if [[ "${GITHUB_REF:-}" == refs/heads/develop ]]; then
+            if [[ "${GITHUB_REF:-}" == refs/heads/develop && -n "${NPM_RC_VERSION:-}" ]]; then
               npm publish "./$archive" --ignore-scripts --access public --tag rc --registry=https://registry.npmjs.org
             else
               npm publish "./$archive" --ignore-scripts --access public --registry=https://registry.npmjs.org
