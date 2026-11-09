@@ -1,12 +1,10 @@
-version: 2.24.0
-changeLogLink: https://github.com/whyour/qinglong/blob/v2.24.0/docs/releases/2.24.0.md
-publishTime: "2026-10-29 02:14:58"
+version: 2.25.0-rc.0
+changeLogLink: https://github.com/whyour/qinglong/blob/develop/docs/releases/2.25.0-rc.0.md
+publishTime: "2026-11-10 01:16:12"
 changeLog: |
-  1. Alpine 与 Debian 默认镜像统一使用 Node.js 24，SQLite 依赖升级至 1.1.4
-  2. 新增 Node.js 原生部署的 Python venv 隔离支持，以及 Python Git URL、requirements、pyproject 依赖源
-  3. 新增通知审计日志，完善通知失败记录与配置提示
-  4. 升级包按平台构建并校验；支持在线暂存、离线安装、失败回退及保留数据迁移
-  5. 修复任务调度、额外规则、依赖安装、脚本发现和订阅同步等问题
-  6. 独立远程 CLI 更新至 0.1.3，最低 Node.js 版本为 22.12.0
-  7. Alpine 保留 arm/v6 和 arm/v7；Debian 暂不提供 arm/v7，Python 3.10 兼容镜像停止更新
-  8. 升级前备份完整数据，并在目标设备验证脚本、依赖、订阅和通知
+  1. 收紧应用权限、首次通知配置与任务环境变量边界；启动前修复不安全的环境变量标签
+  2. 依赖管理改为按需复查状态，配置与脚本编辑器新增自动换行开关
+  3. 通知请求及线程等待增加超时，避免无响应渠道阻塞任务
+  4. 修复挂载空数据卷后 Python 通知缺少 requests 依赖的问题
+  5. 独立远程 CLI 候选版本为 0.1.5-rc.1，改善跨平台配置与 OpenAPI 命令
+  6. 此版本为开发候选；升级前备份数据并在目标设备验证任务、依赖、通知和应用权限

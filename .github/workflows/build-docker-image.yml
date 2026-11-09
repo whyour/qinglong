@@ -33,6 +33,10 @@ on:
         type: choice
         options: [branch, tag]
         default: branch
+      npm_rc_version:
+        description: Publish the verified main npm RC from develop, for example 2.25.0-rc.0
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -470,7 +474,7 @@ jobs:
           retention-days: 14
 
   publish:
-    if: ${{ github.repository == 'whyour/qinglong' && github.ref == 'refs/heads/master' }}
+    if: ${{ github.repository == 'whyour/qinglong' && (github.ref == 'refs/heads/master' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop' && inputs.npm_rc_version != '')) }}
     needs: [build-alpine, build-debian, verify-npm-package]
     runs-on: ubuntu-latest
     permissions:
@@ -491,6 +495,8 @@ jobs:
 
       - name: Publish npm package with OIDC
         shell: bash
+        env:
+          NPM_RC_VERSION: ${{ inputs.npm_rc_version }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -503,11 +509,21 @@ jobs:
           metadata=$(tar -xOf "$archive" package/package.json)
           name=$(jq -er '.name | select(. == "@whyour/qinglong")' <<< "$metadata")
           version=$(jq -er '.version | select(type == "string")' <<< "$metadata")
+          if [[ "${GITHUB_REF:-}" == refs/heads/develop ]]; then
+            if [[ ! "$NPM_RC_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ || "$version" != "$NPM_RC_VERSION" ]]; then
+              echo '::error::Develop npm publication requires the exact requested RC archive version.'
+              exit 1
+            fi
+          fi
           if npm view "$name@$version" version --json --registry=https://registry.npmjs.org > "$RUNNER_TEMP/npm-version.json" 2> "$RUNNER_TEMP/npm-version-error.log"; then
             jq -e --arg version "$version" '. == $version' "$RUNNER_TEMP/npm-version.json" > /dev/null
             echo "::notice::$name@$version is already published; skipping npm publication for this image rebuild."
           elif jq -e '.error.code == "E404"' "$RUNNER_TEMP/npm-version.json" > /dev/null; then
-            npm publish "./$archive" --ignore-scripts --access public --registry=https://registry.npmjs.org
+            if [[ "${GITHUB_REF:-}" == refs/heads/develop ]]; then
+              npm publish "./$archive" --ignore-scripts --access public --tag rc --registry=https://registry.npmjs.org
+            else
+              npm publish "./$archive" --ignore-scripts --access public --registry=https://registry.npmjs.org
+            fi
           else
             echo '::error::Could not check the published npm version; refusing to publish.'
             exit 1
