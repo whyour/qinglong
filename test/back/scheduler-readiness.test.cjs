@@ -52,6 +52,19 @@ test('health uses actual readiness and returns HTTP 503 until recovery',async(t)
   assert.equal(r.status,expected);assert.equal(b.code,expected);assert.equal(b.data.services.grpc,ready);
  }
 });
+test('health failure does not reveal internal error details',async(t)=>{
+ const express=require('express');
+ const HealthService=class{};
+ const app=express();load('back/api/health.ts',{
+  typedi:{get:()=>({check:async()=>{throw Error('sensitive health detail');}})},
+  '../services/health':{HealthService},'../loaders/logger':{error(){}},
+ }).default(app);
+ const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ t.after(()=>new Promise(r=>{server.close(r);server.closeAllConnections();}));
+ const response=await fetch(`http://127.0.0.1:${server.address().port}/health`);
+ assert.equal(response.status,500);
+ assert.deepEqual(await response.json(),{code:500,message:'Health check failed'});
+});
 test('recovery registration errors propagate while ordinary autosave retains file synchronization',async()=>{
  const source=fs.readFileSync('back/services/cron.ts','utf8');const a=source.indexOf('  public async autosave_crontab('),z=source.indexOf('  public async bootTask',a);
  const js=ts.transpileModule('class Fixture {\n'+source.slice(a,z)+'}\nmodule.exports=Fixture;', {compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
