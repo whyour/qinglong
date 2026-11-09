@@ -118,9 +118,9 @@ ENV PNPM_HOME=${QL_DIR}/data/dep_cache/node \
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PNPM_HOME}:${PYTHON_HOME}/bin:${HOME}/bin \
   NODE_PATH=/usr/local/bin:/usr/local/lib/node_modules \
   PIP_CACHE_DIR=${PYTHON_HOME}/pip \
-  PYTHONPATH=${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages
+  PYTHONPATH=${PYTHON_HOME}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}:${PYTHON_HOME}/lib/python${PYTHON_SHORT_VERSION}/site-packages:${QL_DIR}/python-base/lib/python${PYTHON_SHORT_VERSION}/site-packages
 
-RUN pip3 install --prefix ${PYTHON_HOME} requests
+RUN pip3 install --ignore-installed --prefix ${QL_DIR}/python-base requests
 
 COPY --from=builder /tmp/build/node_modules/. /ql/node_modules/
 
