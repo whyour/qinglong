@@ -81,7 +81,7 @@ test('scheduler probe uses the cron channel and failed writes are not replayed',
   addCron(request,metadata,options,cb){calls.push(['add',request,options]);cb(Object.assign(Error('invalid'),{code:3}));},
  };
  const client=load('back/schedule/client.ts',{
-  '../protos/cron':{CronClient:class{constructor(){return fake;}}},
+  '../protos/cron':{...require('../../back/protos/cron'),CronClient:class{constructor(){return fake;}}},
   '../config':{grpcPort:5500},'../config/grpcCerts':{getGrpcCerts:()=>({caCert:'ca',clientKey:'key',clientCert:'cert'})},
   '@grpc/grpc-js':{...require('@grpc/grpc-js'),credentials:{createSsl:()=>({})},status:{UNAVAILABLE:14},Metadata:class{}},
  }).default;

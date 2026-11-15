@@ -94,7 +94,7 @@ class Client {
     const registrationTimeoutMs = Math.min(120000, 5000 + ruleCount * 5);
     return new Promise((resolve, reject) => {
       this.client.addCron(
-        { crons: request, replace },
+        AddCronRequest.fromPartial({ crons: request, replace }),
         new Metadata(),
         { deadline: Date.now() + registrationTimeoutMs },
         (err, res) => {

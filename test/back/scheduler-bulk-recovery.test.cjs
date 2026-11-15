@@ -19,7 +19,7 @@ for (const [name, rows, delay, succeeds] of [
       setTimeout(()=>cb(delay<=budget ? null : Object.assign(Error('deadline'),{code:grpc.status.DEADLINE_EXCEEDED}), {}), Math.min(delay,budget));
     }};
     const client=load('back/schedule/client.ts', {
-      '../protos/cron':{CronClient:class{constructor(){return fake}}},
+      '../protos/cron':{...require('../../back/protos/cron'),CronClient:class{constructor(){return fake}}},
       '../config':{grpcPort:5500},
       '../config/grpcCerts':{getGrpcCerts:()=>({caCert:'ca',clientKey:'key',clientCert:'cert'})},
       '@grpc/grpc-js':{...grpc,credentials:{createSsl:()=>({})}},
