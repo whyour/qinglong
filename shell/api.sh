@@ -38,7 +38,7 @@ ql_api_request() {
       -H "Authorization: Bearer ${__ql_token__}" \
       -H "Content-Type: application/json;charset=UTF-8" \
       "$@" \
-      --compressed)
+      --compressed) || return $?
     if [[ "$attempt" == 2 || "$api" == '{"code":200}' ]] ||
       [[ "$(jq -r '.code' <<< "$api" 2>/dev/null)" != 401 ]]; then
       break
@@ -99,6 +99,7 @@ add_cron_api() {
     t '%s -> 添加成功' "$name"
   else
     t '%s -> 添加失败(%s)' "$name" "$message"
+    return 1
   fi
 }
 
@@ -165,14 +166,41 @@ del_cron_api() {
   local api=$(ql_api_request \
     "http://localhost:${ql_port}/open/crons?t=$currentTimeStamp" \
     -X DELETE \
-    --data-raw "[$ids]")
+    --data-raw "${2:-[$ids]}")
   code=$(echo "$api" | jq -r .code)
   message=$(echo "$api" | jq -r .message)
   if [[ $code == 200 ]]; then
     t '成功'
   else
     t '失败(%s)' "$message"
+    return 1
   fi
+}
+
+# Initialize once in the wrapper, before any pipeline, signal handler or receipt.
+init_execution_id() {
+  ql_execution_id=""
+  [[ -n ${QL_TRIGGER_ID:-} || ! ${ID:-} =~ ^[1-9][0-9]*$ ]] && return 0
+  local uuid
+  if [[ -r /proc/sys/kernel/random/uuid ]]; then
+    IFS= read -r uuid < /proc/sys/kernel/random/uuid || return 1
+  else
+    uuid=$(node -p "require('crypto').randomUUID()") || return 1
+  fi
+  ql_execution_id="client-$uuid"
+}
+
+# Only an identified receipt can safely repeat a write after curl times out.
+ql_receipt_request() {
+  if [[ -z ${QL_TRIGGER_ID:-}${ql_execution_id:-} ]]; then
+    ql_api_request "$@"
+    return
+  fi
+  local response status
+  response=$(ql_api_request --max-time 30 "$@") && { printf '%s' "$response"; return; }
+  status=$?
+  [[ $status == 28 ]] || return "$status"
+  ql_api_request --max-time 30 "$@"
 }
 
 update_cron() {
@@ -183,15 +211,31 @@ update_cron() {
   local lastExecutingTime="${5:-0}"
   local runningTime="${6:-0}"
   local exitCode="${7:-}"
+  local finish_header=()
+  if [[ ${8:-} =~ ^[0-9]{1,10}$ ]]; then finish_header=(-H "X-QL-Finished-At: ${8}000"); fi
+  local trigger_id=${QL_TRIGGER_ID:-}
   local currentTimeStamp=${EPOCHSECONDS:-$(date +%s)}
-  local dataRaw="{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":\"$logPath\",\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime"
+  # Preserve the no-fork fast path for generated names; legacy paths may need JSON escaping.
+  local jsonLog
+  if [[ $logPath =~ ^[a-zA-Z0-9_./-]+$ ]]; then
+    jsonLog="\"$logPath\""
+  else
+    jsonLog=$(jq -Rn --arg path "$logPath" '$path') || return 1
+  fi
+  local dataRaw="{\"ids\":[$ids],\"status\":\"$status\",\"pid\":\"$pid\",\"log_path\":$jsonLog,\"last_execution_time\":$lastExecutingTime,\"last_running_time\":$runningTime"
   if [[ -n $exitCode ]]; then
     dataRaw="${dataRaw},\"exit_code\":$exitCode"
   fi
+  if [[ $trigger_id =~ ^[a-z0-9-]{1,120}$ ]]; then
+    dataRaw="${dataRaw},\"trigger_id\":\"$trigger_id\""
+  elif [[ -n ${ql_execution_id:-} ]]; then
+    dataRaw="${dataRaw},\"execution_id\":\"$ql_execution_id\""
+  fi
+  if [[ ${MANUAL:-} == true && -n $trigger_id${ql_execution_id:-} ]]; then dataRaw="${dataRaw},\"trigger_stopped\":true"; fi
   dataRaw="${dataRaw}}"
-  local api=$(ql_api_request \
+  local api=$(ql_receipt_request \
     "http://localhost:${ql_port}/open/crons/status?t=$currentTimeStamp" \
-    -X PUT \
+    ${finish_header[@]+"${finish_header[@]}"} -X PUT \
     --data-raw "$dataRaw")
   ql_parse_status_response "$api" || true
   if [[ $code != 200 ]]; then
@@ -257,10 +301,16 @@ record_cron_stat() {
   local elapsed="${3:-0}"
   [[ $ref_id ]] && [[ $ref_id -gt 0 ]] 2>/dev/null || return
 
-  local api=$(ql_api_request \
+  local finish_header=()
+  if [[ ${4:-} =~ ^[0-9]{1,10}$ ]]; then finish_header=(-H "X-QL-Finished-At: ${4}000"); fi
+  local trigger_id=${QL_TRIGGER_ID:-}
+  local extra=""
+  if [[ $trigger_id =~ ^[a-z0-9-]{1,120}$ ]]; then extra=",\"trigger_id\":\"$trigger_id\""
+  elif [[ -n ${ql_execution_id:-} ]]; then extra=",\"execution_id\":\"$ql_execution_id\""; fi
+  local api=$(ql_receipt_request \
     "http://localhost:${ql_port:-5700}/open/dashboard/record" \
-    -X POST \
-    --data-raw "{\"ref_id\":$ref_id,\"code\":$exit_code,\"elapsed\":$elapsed}")
+    ${finish_header[@]+"${finish_header[@]}"} -X POST \
+    --data-raw "{\"ref_id\":$ref_id,\"code\":$exit_code,\"elapsed\":$elapsed$extra}")
   ql_parse_status_response "$api" || true
   if [[ $code != 200 ]]; then
     if [[ ! $message ]]; then

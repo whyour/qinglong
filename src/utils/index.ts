@@ -1,7 +1,5 @@
 import intl from 'react-intl-universal';
 import { LANG_MAP, LOG_END_SYMBOL } from './const';
-import CronExpressionParser from 'cron-parser';
-import { ICrontab } from '@/pages/crontab/type';
 
 export default function browserType() {
   // 权重：系统 + 系统版本 > 平台 > 内核 + 载体 + 内核版本 + 载体版本 > 外壳 + 外壳版本
@@ -333,33 +331,6 @@ export function getCommandScript(
     p = '';
   }
   return [s, p];
-}
-
-export function parseCrontab(schedule: string): Date | null {
-  try {
-    const time = CronExpressionParser.parse(schedule);
-    if (time) {
-      return time.next().toDate();
-    }
-  } catch (error) {}
-
-  return null;
-}
-
-export function getCrontabsNextDate(
-  schedule: string,
-  extra_schedules: ICrontab['extra_schedules'],
-): Date | null {
-  let date = parseCrontab(schedule);
-  if (extra_schedules?.length) {
-    extra_schedules.forEach((x) => {
-      const _date = parseCrontab(x.schedule);
-      if (_date && (!date || _date < date)) {
-        date = _date;
-      }
-    });
-  }
-  return date;
 }
 
 export function getExtension(filename: string) {

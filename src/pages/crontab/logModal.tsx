@@ -37,52 +37,84 @@ const CronLogModal = ({
   const [value, setValue] = useState<string>(intl.get("启动中..."));
   const [loading, setLoading] = useState<any>(true);
   const [executing, setExecuting] = useState<any>(true);
+  const [readFailed, setReadFailed] = useState(false);
   const [isPhone, setIsPhone] = useState(false);
   const scrollInfoRef = useRef({ value: 0, down: true });
   const logOffsetRef = useRef<number>();
   const valueRef = useRef(value);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const uniqPath = logUrl ? logUrl : String(cron?.id);
+  const session = useRef<AbortController>();
+  const reading = useRef(false);
+  const pinnedTrigger = useRef<string>();
+  const lastPath = useRef<string>();
+  const drained = useRef(false);
+  const lastCursor = useRef<string>();
+  const scrollTimer = useRef<ReturnType<typeof setTimeout>>();
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   const getCronLog = (isFirst?: boolean) => {
+    const signal = session.current?.signal;
+    if (!signal || signal.aborted || reading.current) return;
+    reading.current = true;
+    drained.current = false;
     if (isFirst) {
       setLoading(true);
     }
     const baseUrl = logUrl ? logUrl : `${config.apiPrefix}crons/${cron.id}/log`;
+    const triggerParam = !logUrl && pinnedTrigger.current
+      ? "&triggerId=" + encodeURIComponent(pinnedTrigger.current) : "";
     const separator = baseUrl.includes("?") ? "&" : "?";
     const offset = isFirst ? undefined : logOffsetRef.current;
     const pagination = `${separator}limit=${LOG_CHUNK_BYTES}${
       isFirst ? "&tail=true" : offset !== undefined ? `&offset=${offset}` : ""
     }`;
+    const pathParam = offset !== undefined && lastPath.current
+      ? "&previousPath=" + encodeURIComponent(lastPath.current) : "";
+    const cursorParam = offset !== undefined && lastCursor.current ? "&cursor=" + lastCursor.current : "";
     request
-      .get(`${baseUrl}${pagination}`)
-      .then(({ code, data, logStatus, nextOffset, total }) => {
-        if (code !== 200 || localStorage.getItem("logCron") !== uniqPath) {
+      .get(`${baseUrl}${pagination}${pathParam}${cursorParam}${triggerParam}&follow=true`, { signal, retryInPlace: true })
+      .then(({ code, data, logStatus, logPath, triggerId, cursor, reset, nextOffset, total }) => {
+        if (signal.aborted) {
           return;
         }
 
+        if (code !== 200) throw new Error("Log read failed");
+        setReadFailed(false);
         const isRunning = logStatus === "running";
         // A completed process can still have multiple unread chunks. Drain
         // them before stopping, without presenting it as a running task.
+        if (triggerId) pinnedTrigger.current = triggerId;
+        const changedFile = reset === true || lastPath.current !== logPath;
         const hasUnread =
           typeof nextOffset === "number" &&
           typeof total === "number" &&
-          nextOffset > (offset ?? 0) &&
+          nextOffset > (changedFile ? 0 : offset ?? 0) &&
           nextOffset < total;
         const hasNext = isRunning || hasUnread;
         const chunk = (data as string) || "";
-        let log = isFirst ? chunk : `${valueRef.current}${chunk}`;
+        lastPath.current = logPath;
+        lastCursor.current = cursor;
+        // A missing file can return a localized status message with zero bytes.
+        // Keep that message out of the buffer used for subsequent appends.
+        const noBytes = total === 0;
+        if (!isFirst && !changedFile && offset !== undefined && total > 0 && total < offset) {
+          logOffsetRef.current = undefined;
+          pollTimerRef.current = setTimeout(() => getCronLog(true), 0);
+          return;
+        }
+        let log = isFirst || changedFile || noBytes || offset === undefined ? chunk : valueRef.current + chunk;
         if (!log && !hasNext) {
           log = intl.get("暂无日志");
         }
         if (log.length > MAX_LOG_VIEW_CHARS) {
           log = log.slice(-MAX_LOG_VIEW_CHARS);
         }
-        valueRef.current = log;
+        valueRef.current = noBytes ? "" : log;
         setValue(log);
         if (typeof nextOffset === "number") {
           logOffsetRef.current = nextOffset;
         }
+        drained.current = !hasNext;
         setExecuting(isRunning);
 
         if (chunk || !hasNext) {
@@ -95,9 +127,13 @@ const CronLogModal = ({
           );
         }
       })
+      .catch(() => {
+        if (!signal.aborted) setReadFailed(true);
+      })
       .finally(() => {
-        if (isFirst) {
-          setLoading(false);
+        if (!signal.aborted) {
+          reading.current = false;
+          if (isFirst) setLoading(false);
         }
       });
   };
@@ -107,18 +143,20 @@ const CronLogModal = ({
       return;
     }
 
-    setTimeout(() => {
-      document
-        .querySelector("#log-flag")
-        ?.scrollIntoView({ behavior: "smooth" });
+    clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      logEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 600);
   };
 
+  const stopReading = () => {
+    session.current?.abort();
+    clearTimeout(pollTimerRef.current);
+    clearTimeout(scrollTimer.current);
+  };
+
   const cancel = () => {
-    if (pollTimerRef.current) {
-      clearTimeout(pollTimerRef.current);
-    }
-    localStorage.removeItem("logCron");
+    stopReading();
     handleCancel();
   };
 
@@ -135,25 +173,35 @@ const CronLogModal = ({
   const titleElement = () => {
     return (
       <div style={{ display: "flex", alignItems: "center" }}>
-        {(executing || loading) && <Loading3QuartersOutlined spin />}
-        {!executing && !loading && <CheckCircleOutlined />}
+        {!readFailed && (executing || loading) && <Loading3QuartersOutlined spin />}
+        {!readFailed && !executing && !loading && <CheckCircleOutlined />}
         <Typography.Text ellipsis={true} style={{ marginLeft: 5 }}>
           {cron && cron.name}
+          {pinnedTrigger.current && lastPath.current && ` · ${lastPath.current.split("/").pop()}`}
         </Typography.Text>
       </div>
     );
   };
 
   useEffect(() => {
-    if (cron && cron.id) {
-      logOffsetRef.current = undefined;
-      getCronLog(true);
+    session.current = new AbortController();
+    reading.current = false;
+    logOffsetRef.current = undefined;
+    pinnedTrigger.current = undefined;
+    lastPath.current = undefined;
+    lastCursor.current = undefined;
+    if (cron?.id) getCronLog(true);
+    return stopReading;
+  }, [cron?.id, logUrl]);
+
+  // The list already refreshes while the dialog is open. A later run can
+  // start (and finish) after this viewer drained the previous file.
+  useEffect(() => {
+    if (logUrl || pinnedTrigger.current || !cron || !drained.current) return;
+    if ((cron.log_path && cron.log_path !== lastPath.current) ||
+        cron.status === CrontabStatus.running || cron.status === CrontabStatus.queued) {
+      getCronLog();
     }
-    return () => {
-      if (pollTimerRef.current) {
-        clearTimeout(pollTimerRef.current);
-      }
-    };
   }, [cron]);
 
   useEffect(() => {
@@ -183,6 +231,13 @@ const CronLogModal = ({
       ]}
     >
       <div onScroll={handleScroll} className="log-container">
+        {readFailed && <div role="status">
+          {intl.get("加载失败")}
+          <Button type="link" onClick={() => {
+            setReadFailed(false);
+            getCronLog(logOffsetRef.current === undefined);
+          }}>{intl.get("重试")}</Button>
+        </div>}
         {loading ? (
           <PageLoading />
         ) : (
@@ -196,10 +251,10 @@ const CronLogModal = ({
                 : {}
             }
           >
-            <Ansi>{value}</Ansi>
+            <Ansi>{readFailed && logOffsetRef.current === undefined ? "" : value}</Ansi>
           </pre>
         )}
-        <div id="log-flag"></div>
+        <div ref={logEndRef} />
       </div>
     </Modal>
   );

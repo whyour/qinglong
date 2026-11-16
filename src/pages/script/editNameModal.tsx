@@ -1,3 +1,4 @@
+import { FilePicker } from '@/components/fileBrowser';
 import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import {
@@ -8,7 +9,6 @@ import {
   Select,
   Upload,
   Radio,
-  TreeSelect,
 } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
@@ -18,9 +18,7 @@ const { Option } = Select;
 
 const EditScriptNameModal = ({
   handleCancel,
-  treeData,
 }: {
-  treeData: any[];
   handleCancel: (file?: {
     filename: string;
     path: string;
@@ -30,7 +28,6 @@ const EditScriptNameModal = ({
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [dirs, setDirs] = useState<any[]>([]);
   const [file, setFile] = useState<File>();
   const [type, setType] = useState<'blank' | 'upload' | 'directory'>('blank');
 
@@ -72,26 +69,6 @@ const EditScriptNameModal = ({
   const typeChange = (e) => {
     setType(e.target.value);
   };
-
-  const getDirs = (data) => {
-    for (const item of data) {
-      if (item.children && item.children.length > 0) {
-        item.children = item.children
-          .filter((x) => x.type === 'directory')
-          .map((x) => ({ ...x, disabled: false }));
-        getDirs(item.children);
-      }
-    }
-    return data;
-  };
-
-  useEffect(() => {
-    const originDirs = treeData
-      .filter((x) => x.type === 'directory')
-      .map((x) => ({ ...x, disabled: false }));
-    const dirs = getDirs(originDirs);
-    setDirs(dirs);
-  }, [treeData]);
 
   return (
     <Modal
@@ -153,13 +130,7 @@ const EditScriptNameModal = ({
           </Form.Item>
         )}
         <Form.Item label={intl.get('父目录')} name="path">
-          <TreeSelect
-            allowClear
-            treeData={dirs}
-            fieldNames={{ value: 'key', label: 'title' }}
-            placeholder={intl.get('请选择父目录')}
-            treeDefaultExpandAll
-          />
+          <FilePicker source="scripts" folders />
         </Form.Item>
         {type === 'upload' && (
           <Form.Item label={intl.get('文件')} name="file">

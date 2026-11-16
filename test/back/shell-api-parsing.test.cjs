@@ -182,3 +182,50 @@ test('success-shaped invalid documents retain the raw-response error fallback', 
   }
   assert.equal(f.count(), cases.length * 2);
 });
+
+test('Shell retries the same identified receipt after a timeout and starts the next run with a fresh ID', t => {
+  const f = fixture(t);
+  const result = f.run(`
+    ID=7; unset QL_TRIGGER_ID
+    curl() {
+      while [[ $1 != --data-raw ]]; do shift; done
+      printf '%s\n' "$2" >> "$RESPONSE_FILE"
+      if [[ ! -e $RESPONSE_FILE.pending ]]; then touch "$RESPONSE_FILE.pending"; return 28; fi
+      rm "$RESPONSE_FILE.pending"; printf '{"code":200}'
+    }
+    for execution in 1 2; do
+      init_execution_id
+      update_cron 7 0 "$$" same.log 100
+      update_cron 7 1 "$$" same.log 100 1 5
+      record_cron_stat 7 5 1
+    done
+  `);
+  assert.equal(result.status, 0, result.stderr);
+  const lines = fs.readFileSync(f.response, 'utf8').trim().split('\n');
+  assert.equal(lines.length, 12);
+  for (let i = 0; i < lines.length; i += 2) assert.equal(lines[i], lines[i+1]);
+  const ids = lines.map(line => JSON.parse(line).execution_id);
+  assert.match(ids[0], /^client-[0-9a-f-]{36}$/);
+  assert.ok(ids.slice(0, 6).every(id => id === ids[0]));
+  assert.ok(ids.slice(6).every(id => id === ids[6]));
+  assert.notEqual(ids[0], ids[6]);
+});
+
+test('a standalone shell reuses the observed end for both receipts, including timeout retries', t => {
+  const f = fixture(t);
+  const result = f.run([
+    'ql_execution_id="client-123"; directory=$(dirname "$RESPONSE_FILE");',
+    'ql_api_request() {',
+    '  local arg; for arg in "$@"; do case "$arg" in "X-QL-Finished-At:"*) printf "%s\\n" "$arg" >> "$directory/headers";; esac; done;',
+    '  if [[ ! -e "$directory/retried" ]]; then touch "$directory/retried"; return 28; fi;',
+    '  printf \'{"code":200}\';',
+    '}',
+    'update_cron 5 0 501 task.log 1700000000;',
+    'rm -f "$directory/retried";',
+    'update_cron 5 1 501 task.log 1700000000 60 17 1700000060;',
+    'record_cron_stat 5 17 60 1700000060;',
+    'cat "$directory/headers";',
+  ].join('\n'));
+  assert.equal(result.status,0,result.stderr);
+  assert.deepEqual(result.stdout.trim().split('\n'),Array(3).fill('X-QL-Finished-At: 1700000060000'));
+});

@@ -1,0 +1,123 @@
+.schedule-overview {
+  margin-top: 16px;
+  container-type: inline-size;
+}
+
+.schedule-note {
+  margin: 12px 0 0;
+  color: var(--ant-color-text-secondary, inherit);
+}
+
+.schedule-details {
+  margin-top: 12px;
+
+  summary {
+    cursor: pointer;
+    width: fit-content;
+  }
+
+  &[open] > summary {
+    margin-bottom: 12px;
+  }
+}
+
+.schedule-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 24px;
+
+  .ant-statistic {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .ant-statistic-content {
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  .ant-statistic-content-suffix {
+    font-size: 14px;
+  }
+
+  small {
+    opacity: 0.7;
+    font-size: 13px;
+  }
+}
+
+@container (max-width: 800px) {
+  .schedule-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+  }
+}
+
+@container (max-width: 280px) {
+  .schedule-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.dashboard-totals.ant-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 12px;
+  margin: 0 !important;
+  > .ant-col { min-width: 0; max-width: none; padding: 0 !important; }
+  .ant-card { height: 100%; }
+  .ant-statistic-content { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.3; }
+  small { display: block; margin-top: 3px; }
+}
+
+.dashboard-wrapper { container-type: inline-size; }
+@container (min-width: 640px) {
+  .dashboard-totals.ant-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@container (min-width: 1280px) {
+  .dashboard-totals.ant-row { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
+
+.queue-entry { padding: 8px 0; border-bottom: 1px solid var(--ant-border-color-split); }
+.queue-reason ul { padding-inline-start: 22px; margin: 4px 0; }
+
+.schedule-group-title { margin-top: 16px; }
+
+.timing-samples {
+  margin: 0;
+  dd { margin: 0; }
+}
+
+.schedule-overview > .ant-card-head .ant-card-head-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.schedule-help-button.ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  .anticon {
+    display: inline-flex;
+    font-size: 13px;
+    transform: translateY(0.25px);
+  }
+}
+
+.schedule-help {
+  width: 390px;
+  max-width: calc(100vw - 48px);
+  max-height: 65vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+
+  h4 { margin: 12px 0 6px; }
+  p { margin: 8px 0 0; }
+  > :first-child { margin-top: 0; }
+  .timing-samples { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; }
+}

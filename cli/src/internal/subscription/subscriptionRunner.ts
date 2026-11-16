@@ -199,7 +199,8 @@ async function reconcile(
     await api.call(
       'crons',
       'DELETE',
-      obsolete.map((row) => row.id),
+      obsolete.map((row) => ({ id: row.id, command: row.command, script: taskPath(row.command), sub_id: row.sub_id ?? null,
+        ...(typeof row.recovery_from === 'number' && { revision: row.recovery_from }) })),
     );
     for (const row of obsolete) {
       await fs.rm(
@@ -236,6 +237,22 @@ async function reconcile(
   return { added, removed };
 }
 
+// Branches can contain slashes. Reject a linked namespace component before
+// reading an old checkout or moving the staged tree into place.
+async function checkNamespace(root: string, name: string, env: NodeJS.ProcessEnv) {
+  let current = root;
+  for (const part of name.split('/')) {
+    current = path.join(current, part);
+    try {
+      if ((await fs.lstat(current)).isSymbolicLink())
+        fail(translate(env, '路径必须位于其管理目录内部。'), 2);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
+  }
+}
+
 export async function syncRepository(
   context: LocalContext,
   input: SubscriptionInput,
@@ -243,6 +260,9 @@ export async function syncRepository(
   const name = repositoryName(input.url, input.branch, context.env);
   const destination = within(context.paths.dir_scripts!, name, context.env);
   const repoDestination = within(context.paths.dir_repo!, name, context.env);
+  const checkPaths = () => Promise.all([context.paths.dir_scripts!, context.paths.dir_repo!]
+    .map(root => checkNamespace(root, name, context.env)));
+  await checkPaths();
   const extensions = (
     input.extensions ||
     context.env.RepoFileExtensions ||
@@ -325,6 +345,7 @@ export async function syncRepository(
         path.join(checkout, file),
         within(scripts, file, context.env),
       );
+    await checkPaths();
     await replaceDirectory(scripts, destination);
     await replaceDirectory(checkout, repoDestination);
     const relativePaths = selected.map((file) =>

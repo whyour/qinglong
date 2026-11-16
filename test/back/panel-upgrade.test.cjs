@@ -241,6 +241,21 @@ test('failed download persists its failure without stopping the panel and can be
   assert.equal((await finished(f.tmp)).status, 'ready');
 });
 
+test('a terminal state published between the status read and PID probe wins', async (t) => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-finished-job-'));
+  t.after(() => fs.rm(tmp, { recursive: true, force: true }));
+  const file = path.join(tmp, 'panel-upgrade.json');
+  const running = { id: 'finishing', status: 'running', pid: 123456, startedAt: 1 };
+  await fs.writeFile(file, JSON.stringify(running));
+  const kill = process.kill;
+  t.mock.method(process, 'kill', (pid, signal) => {
+    if (pid !== running.pid || signal !== 0) return kill(pid, signal);
+    syncFs.writeFileSync(file, JSON.stringify({ ...running, status: 'ready' }));
+    throw Object.assign(new Error('worker exited'), { code: 'ESRCH' });
+  });
+  assert.equal((await getStatus(tmp)).status, 'ready');
+});
+
 test('orphaned jobs become retryable and status log reads are bounded', async (t) => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-orphan-job-'));
   t.after(() => fs.rm(tmp, { recursive: true, force: true }));

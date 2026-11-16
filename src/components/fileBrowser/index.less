@@ -1,0 +1,22 @@
+.file-browser { height: 100%; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.file-browser-location { display: flex; align-items: center; gap: 8px; min-width: 0; padding-bottom: 4px; border-bottom: 1px solid rgba(127,127,127,.24); }
+.file-browser-location > button { flex: none; min-height: 28px; }
+.file-browser-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9em; padding-inline-start: 8px; border-inline-start: 1px solid rgba(127,127,127,.3); }
+.file-picker-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.file-browser-entries { min-height: 0; overflow: auto; flex: 1; }
+.file-browser-pagination { display: flex; justify-content: center; align-items: center; min-height: 32px; }
+.file-browser-entries > button:not(.ant-btn) {
+  background: transparent; border: 0; color: inherit; cursor: pointer; display: flex;
+  align-items: flex-start; gap: 6px; padding: 4px; text-align: left; width: 100%; line-height: 1.5;
+}
+.file-browser-entries > button > .anticon { flex: none; margin-top: .25em; }
+.file-browser-label { display: block; min-width: 0; }
+.file-browser-name { display: flex; white-space: nowrap; }
+.file-browser-name > span:first-child,
+.file-browser-parent { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-browser-name > span:last-child { display: flex; justify-content: flex-end; flex: none; max-width: 100%; overflow: hidden; }
+.file-browser-name > span:first-child:not(:empty) + span { max-width: 70%; }
+.file-browser-parent { font-size: .85em; }
+.file-browser-entries > button:hover, .file-browser-entries > button[aria-pressed=true] { background: rgba(127,127,127,.14); }
+.file-picker { width: min(320px, 74vw); height: 320px; display: flex; flex-direction: column; }
+.file-picker-label { max-width: min(300px, 60vw); }

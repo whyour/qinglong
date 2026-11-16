@@ -1,51 +1,63 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type { LocalContext } from './context';
+import { LocalApi, ReceiptValidationError } from './api';
 
-// The released 2.20 API rejects unknown lifecycle fields and has no dashboard record API.
-// Read the installed panel version, never the independently versioned CLI package.
-export async function extendedLifecycle(
-  context: LocalContext,
-): Promise<boolean> {
-  if (context.env.QL_CLI_LIFECYCLE === 'legacy') return false;
-  if (context.env.QL_CLI_LIFECYCLE === 'extended') return true;
-  let version: string | undefined;
-  try {
-    const manifest: unknown = JSON.parse(
-      await fs.readFile(path.join(context.root, 'package.json'), 'utf8'),
-    );
-    if (
-      manifest &&
-      typeof manifest === 'object' &&
-      'version' in manifest &&
-      typeof manifest.version === 'string'
-    )
-      version = manifest.version;
-  } catch {}
-  if (version === undefined) {
-    try {
-      // Official 2.x images may omit package.version. Read only the top-level
-      // scalar release field; no YAML dependency or expression evaluation.
-      const release = await fs.readFile(
-        path.join(context.root, 'version.yaml'),
-        'utf8',
-      );
-      const entries = release
-        .replace(/^\uFEFF/, '')
-        .split(/\r?\n/)
-        .filter((line) => /^version:/.test(line));
-      if (entries.length !== 1) return false;
-      const scalar =
-        /^version:[ \t]*(?:"([^"]+)"|'([^']+)'|([^\s#]+))[ \t]*(?:#.*)?$/.exec(
-          entries[0]!,
-        );
-      version = scalar?.[1] ?? scalar?.[2] ?? scalar?.[3];
-    } catch {
-      return false;
+// Negotiate with the worker that validates the real receipt. Keep the agreed
+// wire format for this execution, even if the panel changes before it exits.
+export class LifecycleReceipt {
+  private readonly api: LocalApi;
+  private identity?: { trigger_id: string } | { execution_id: string };
+  private extended: boolean;
+  private startAttempted = false;
+  private acceptedStart = false;
+  private finishedAt?: number;
+  readonly triggerId?: string;
+
+  constructor(context: LocalContext, started: number) {
+    this.api = new LocalApi(context);
+    this.extended = context.env.QL_CLI_LIFECYCLE !== 'legacy';
+    const parent = context.env.QL_TRIGGER_ID;
+    if (!this.extended) return;
+    if (parent && /^[a-z0-9-]{1,120}$/.test(parent)) {
+      this.triggerId = parent;
+      this.identity = { trigger_id: parent };
+    } else {
+      const prefix = context.env.QL_EXECUTION_ORIGIN === 'scheduled_system'
+        ? `legacy-system:${started}:` : 'client-';
+      this.identity = { execution_id: prefix + randomUUID() };
     }
   }
-  const match = /^2\.(\d+)\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.exec(
-    version ?? '',
-  );
-  return !!match && Number(match[1]) >= 21;
+
+  get executionId() {
+    return this.identity && 'execution_id' in this.identity ? this.identity.execution_id : undefined;
+  }
+
+  async status(body: Record<string, unknown>, exitCode?: number) {
+    const starting = exitCode === undefined;
+    const firstStart = starting && !this.startAttempted;
+    if (starting) this.startAttempted = true;
+    if (!starting && this.identity) this.finishedAt ??= Date.now();
+    try {
+      await this.api.call('crons/status', 'PUT', {
+        ...body, ...this.identity, ...(!starting && this.extended && { exit_code: exitCode }),
+      }, starting ? undefined : this.finishedAt);
+    } catch (error) {
+      if (!(error instanceof ReceiptValidationError)) throw error;
+      if (firstStart && this.identity && error.field in this.identity) {
+        // The old schema rejected this start before its handler could write.
+        this.identity = undefined;
+      } else if (!starting && !this.identity && this.extended && error.field === 'exit_code') {
+        this.extended = false;
+      } else {
+        throw error;
+      }
+      await this.api.call('crons/status', 'PUT', body);
+    }
+    if (starting) this.acceptedStart = true;
+  }
+
+  async statistics(refId: number, code: number, elapsed: number) {
+    if (this.extended && (this.identity || this.acceptedStart))
+      await this.api.call('dashboard/record', 'POST', { ref_id: refId, code, elapsed, ...this.identity }, this.finishedAt);
+  }
 }

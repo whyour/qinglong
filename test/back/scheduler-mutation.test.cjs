@@ -42,6 +42,7 @@ async function fixture(t) {
   });
   const jobs = new Map();
   const client = {
+    readiness: { invalidate() {} },
     addCron: async (items, replace) => {
       if (replace) jobs.clear();
       items.forEach((item) => jobs.set(item.id, item.command));
@@ -178,12 +179,14 @@ for (const operation of ['create', 'update', 'enabled']) {
     await assert.rejects(
       mutation,
       (err) =>
-        err.status === 503 && err.cause === cause && /回滚/.test(err.message),
+        err.status === 503 && err.cause === cause &&
+        (operation === 'update' ? /原调度未能恢复/ : /回滚/).test(err.message),
     );
     if (operation === 'create') assert.equal(await crons.count(), 0);
     else {
       const row = await crons.findByPk(1);
       assert.equal(row.command, 'old');
+      if (operation === 'update') assert.equal(row.saved, false);
       assert.equal(row.isDisabled, operation === 'enabled' ? 1 : 0);
     }
     client.addCron = async () => {};
@@ -257,6 +260,8 @@ for (const operation of ['update', 'remove', 'disabled']) {
           id: 1, command: 'old', schedule: '* * * * *', isDisabled: 0,
         });
         jobs.set('1', 'old');
+        // Only a handoff out of Node needs a deletion RPC before the DB write.
+        if (operation === 'update') service.shouldUseCronClient = row => row.schedule !== '@once';
         const before = await crons.findAll({ raw: true });
         const failure = Object.assign(Error('uncertain deletion'), { code, status: 503 });
         let deletes = 0;
@@ -270,7 +275,7 @@ for (const operation of ['update', 'remove', 'disabled']) {
         service.setCrontab = async () => assert.fail('must not publish after failed deletion');
         await assert.rejects(
           operation === 'update'
-            ? service.update({ id: 1, command: 'new' })
+            ? service.update({ id: 1, command: 'new', schedule: '@once' })
             : service[operation]([1]),
           (error) => error === failure && error.status === 503,
         );

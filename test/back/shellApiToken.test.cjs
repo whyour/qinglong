@@ -112,7 +112,8 @@ function runCallback(endpoint, scenario) {
         ENDPOINT: endpoint, ql_port: '5700' },
       encoding: 'utf8', timeout: 10_000,
     });
-    assert.equal(child.status, 0, child.stderr);
+    const denied = ['persistent', 'forbidden', 'unavailable'].includes(scenario);
+    assert.equal(child.status, denied && ['add', 'delete'].includes(endpoint) ? 1 : 0, child.stderr);
     assert.equal(child.stderr, '');
     const lines = fs.readFileSync(path.join(directory, 'requests'), 'utf8').trim().split('\n');
     const refreshes = lines.filter((line) => line === 'refresh').length;

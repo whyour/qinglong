@@ -1,7 +1,7 @@
 import DependenceService from '../services/dependence';
 import { exec } from 'child_process';
 import { Container } from 'typedi';
-import { Crontab, CrontabModel, CrontabStatus } from '../data/cron';
+import { Crontab, CrontabModel } from '../data/cron';
 import CronService from '../services/cron';
 import EnvService from '../services/env';
 import { DependenceModel, DependenceStatus } from '../data/dependence';
@@ -18,7 +18,7 @@ import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
 import Logger from './logger';
 import cronClient from '../schedule/client';
-import { InstanceStatus, RunningInstanceModel } from '../data/runningInstance';
+import { TriggerHistory } from '../shared/triggerHistory';
 import { setLang, systemLang } from '../shared/i18n';
 
 export default async () => {
@@ -121,18 +121,11 @@ export default async () => {
     }
   });
 
-  // 初始化更新所有任务状态为空闲
-  await CrontabModel.update({ status: CrontabStatus.idle }, { where: {} });
-
-  // 清空所有运行中的实例记录（服务重启后进程已不存在）
-  await RunningInstanceModel.update(
-    {
-      status: InstanceStatus.stopped,
-      finished_at: Math.floor(Date.now() / 1000),
-      // The previous process's exit code cannot be recovered after a restart.
-    },
-    { where: { status: InstanceStatus.running } },
-  );
+  const history = new TriggerHistory(CrontabModel.sequelize!);
+  const pendingStops = await history.pendingStops();
+  const pendingBatches = await history.pendingStopBatches();
+  if (pendingStops.length || pendingBatches.length) await cronService.resumePendingStops(history, pendingStops, pendingBatches);
+  await history.reconcileInstances();
 
   // 初始化时执行一次所有的 ql repo 任务
   CrontabModel.findAll({

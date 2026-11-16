@@ -287,3 +287,122 @@ for (const language of ['zh', 'en', 'unsupported']) {
     assert.deepEqual(seen, ['/open/http', '/open/rejected']);
   });
 }
+
+test('a lifecycle timeout retries the identical payload once and other writes are not retried', async t => {
+  const context = await fixture(t, () => {});
+  await token(context);
+  const requests = [];
+  const timer = global.setTimeout;
+  t.mock.method(global, 'setTimeout', (fn, ms, ...args) => timer(fn, ms === 30000 ? 5 : ms, ...args));
+  t.mock.method(global, 'fetch', async (_, {body, signal}) => {
+    requests.push(body);
+    return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), {once:true}));
+  });
+  const api = new LocalApi(context);
+  for (const [endpoint, method, body, attempts] of [
+    ['crons/status','PUT',{ execution_id:'client-' + require('node:crypto').randomUUID(), status:'0' },2],
+    ['dashboard/record','POST',{ trigger_id:'managed-fixture', code:0 },2],
+    ['crons/status','PUT',{ status:'0' },1],
+    ['crons','POST',{ trigger_id:'unrelated' },1],
+  ]) {
+    requests.length = 0;
+    await assert.rejects(api.call(endpoint, method, body));
+    assert.deepEqual(requests, Array(attempts).fill(JSON.stringify(body)));
+  }
+});
+
+test('the live status schema selects every receipt on old, intermediate and upgraded panels', async t => {
+  const { executeTask } = require('../../dist/internal/execution/taskRunner');
+  const { loggedOperation } = require('../../dist/internal/runtime/commandLog');
+  let protocol;
+  const written = [], rejected = [];
+  const context = await fixture(t, async (req, res) => {
+    let raw = '';
+    for await (const chunk of req) raw += chunk;
+    const body = JSON.parse(raw);
+    const forbidden = req.url.endsWith('/status') && Object.keys(body).find(field =>
+      (protocol !== 'identified' && ['execution_id','trigger_id'].includes(field)) ||
+      (protocol === 'legacy' && field === 'exit_code'));
+    if (forbidden) {
+      rejected.push(forbidden);
+      res.writeHead(400).end(JSON.stringify({validation:{body:{source:'body',keys:[forbidden]}}}));
+      return;
+    }
+    written.push([req.url,body]);
+    res.end('{"code":200}');
+  });
+  await token(context);
+  Object.assign(context.env, { ID: '12', no_tee: 'true' });
+  await fs.mkdir(context.paths.dir_scripts, {recursive:true});
+  await fs.writeFile(path.join(context.paths.dir_scripts,'probe.sh'), 'return 7');
+  // Even a full newer installation on disk cannot speak on behalf of the old process.
+  await fs.mkdir(path.join(context.root,'static/build/shared'), {recursive:true});
+  await fs.writeFile(path.join(context.root,'static/build/shared/executionIdentity.js'), '');
+  for (protocol of ['legacy', 'exit-code', 'identified']) {
+    await fs.writeFile(path.join(context.root,'package.json'), JSON.stringify({version:protocol === 'identified' ? '2.20.1' : '2.25.0'}));
+    for (const managed of [false,true]) {
+      if (managed) context.env.QL_TRIGGER_ID = 'parent-123';
+      else delete context.env.QL_TRIGGER_ID;
+      for (const task of [true,false]) {
+        written.length = rejected.length = 0;
+        if (task) assert.equal((await executeTask(context,{argv:['probe.sh'],mode:'now'})).exitCode,7);
+        else await loggedOperation(context,'extra',async()=>{});
+        const [start,end] = written.map(r=>r[1]);
+        const key = managed ? 'trigger_id' : 'execution_id';
+        assert.deepEqual(rejected, protocol === 'legacy' ? [key,'exit_code'] : protocol === 'exit-code' ? [key] : []);
+        assert.equal(start.status,'0'); assert.equal(end.status,'1');
+        assert.equal(end.exit_code, protocol === 'legacy' ? undefined : task ? 7 : 0);
+        assert.equal(written.length, task && protocol !== 'legacy' ? 3 : 2);
+        for (const [,body] of written) assert.equal(body[key],start[key]);
+        if (protocol === 'identified') assert.ok(managed ? start[key] === 'parent-123' : /^client-/.test(start[key]));
+        else assert.equal(start[key],undefined);
+      }
+    }
+  }
+});
+
+test('a missing start response or a non-schema failure never switches a receipt to anonymous', async t => {
+  const { LifecycleReceipt } = require('../../dist/internal/runtime/lifecycle');
+  const calls = [];
+  let rejectedField;
+  const ctx = await fixture(t, async (req,res) => {
+    let raw=''; for await (const chunk of req) raw+=chunk;
+    calls.push(JSON.parse(raw));
+    if (!rejectedField) { res.destroy(); return; }
+    res.writeHead(400).end(JSON.stringify({ validation: {body: {source:'body',keys:[rejectedField]}} }));
+  });
+  await token(ctx);
+  const receipt = new LifecycleReceipt(ctx,10);
+  await assert.rejects(receipt.status({ids:[5],status:'0'}));
+  rejectedField = 'execution_id';
+  await assert.rejects(receipt.status({ids:[5],status:'1'},7));
+  assert.equal(calls.length,2);
+  assert.equal(calls[0].execution_id,calls[1].execution_id);
+  rejectedField = 'pid';
+  await assert.rejects(new LifecycleReceipt(ctx,11).status({ids:[5],status:'0'}));
+  assert.equal(calls.length,3);
+});
+
+test('dated status, statistics and retries share an exit instant without changing the identified body schema', async t => {
+  const { LifecycleReceipt } = require('../../dist/internal/runtime/lifecycle');
+  const writes=[];
+  const ctx=await fixture(t,async(req,res)=>{
+    let raw=''; for await(const chunk of req)raw+=chunk;
+    const body=JSON.parse(raw);
+    writes.push({body, time:req.headers['x-ql-finished-at']});
+    res.end(JSON.stringify({code:200}));
+  });
+  await token(ctx);
+  const receipt=new LifecycleReceipt(ctx,Math.floor(Date.now()/1000));
+  await receipt.status({status:'0'});
+  await receipt.status({status:'1'},17);
+  await receipt.status({status:'1'},17);
+  await receipt.statistics(1,17,2);
+  assert.equal(writes[0].time,undefined);
+  assert.match(writes[1].time,/^\d{13}$/);
+  for (const {body,time} of writes.slice(1)) {
+    assert.equal(time,writes[1].time);
+    assert.equal(body.execution_id,writes[0].body.execution_id);
+    assert.equal(body.finished_at,undefined);
+  }
+});

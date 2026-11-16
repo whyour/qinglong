@@ -1,6 +1,6 @@
-import useFilterTreeData from '@/hooks/useFilterTreeData';
+import { FileBrowser, FilePicker } from '@/components/fileBrowser';
+import { readableLogName } from '@/components/fileBrowser/name';
 import { SharedContext } from '@/layouts';
-import { depthFirstSearch } from '@/utils';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
 import { CloudDownloadOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -10,20 +10,14 @@ import CodeMirror from '@uiw/react-codemirror';
 import { useOutletContext } from '@umijs/max';
 import {
   Button,
-  Empty,
-  Input,
   message,
   Modal,
   Tooltip,
-  Tree,
-  TreeSelect,
   Typography,
 } from 'antd';
 import { saveAs } from 'file-saver';
-import debounce from 'lodash/debounce';
-import uniq from 'lodash/uniq';
 import prettyBytes from 'pretty-bytes';
-import { Key, useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import intl from 'react-intl-universal';
 import SplitPane from 'react-split-pane';
 import styles from './index.module.less';
@@ -34,38 +28,27 @@ const Log = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const [value, setValue] = useState(intl.get('请选择日志文件'));
   const [select, setSelect] = useState<string>(intl.get('请选择日志文件'));
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [height, setHeight] = useState<number>();
-  const treeDom = useRef<any>();
-  const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
+  const [revision, setRevision] = useState(0);
+  const selectedKey = useRef('');
+  const detailRequest = useRef<AbortController>();
+  const [readFailed, setReadFailed] = useState(false);
+  useEffect(() => () => detailRequest.current?.abort(), []);
   const [currentNode, setCurrentNode] = useState<any>();
-  const [searchValue, setSearchValue] = useState('');
-
-  const getLogs = () => {
-    setLoading(true);
-    request
-      .get(`${config.apiPrefix}logs`)
-      .then(({ code, data }) => {
-        if (code === 200) {
-          setData(data);
-        }
-      })
-      .finally(() => setLoading(false));
-  };
 
   const getLog = (node: any) => {
+    detailRequest.current?.abort();
+    const controller = new AbortController();
+    detailRequest.current = controller;
+    setReadFailed(false);
     request
       .get(
-        `${config.apiPrefix}logs/detail?file=${node.title}&path=${
-          node.parent || ''
-        }&tail=true&limit=${1024 * 1024}`,
+        `${config.apiPrefix}logs/detail`, { signal: controller.signal, retryInPlace: true, params: { file: node.title, path: node.parent || '', tail: true, limit: 1024 * 1024 } },
       )
       .then(({ code, data }) => {
-        if (code === 200) {
-          setValue(data);
-        }
-      });
+        if (controller.signal.aborted || selectedKey.current !== node.key) return;
+        if (code === 200) setValue(data);
+        else setReadFailed(true);
+      }).catch(() => { if (!controller.signal.aborted) setReadFailed(true); });
   };
 
   const downloadLog = () => {
@@ -88,6 +71,9 @@ const Log = () => {
       return;
     }
 
+    detailRequest.current?.abort();
+    setReadFailed(false);
+    selectedKey.current = node.key;
     setCurrentNode(node);
     setSelect(value);
 
@@ -99,35 +85,6 @@ const Log = () => {
     setValue(intl.get('加载中...'));
     getLog(node);
   };
-
-  const onTreeSelect = useCallback((keys: Key[], e: any) => {
-    onSelect(keys[0], e.node);
-  }, []);
-
-  const onSearch = useCallback(
-    (e) => {
-      const keyword = e.target.value;
-      debounceSearch(keyword);
-    },
-    [data],
-  );
-
-  const debounceSearch = useCallback(
-    debounce((keyword) => {
-      setSearchValue(keyword);
-    }, 300),
-    [data],
-  );
-
-  const { treeData: filterData, keys: searchExpandedKeys } = useFilterTreeData(
-    data,
-    searchValue,
-    { treeNodeFilterProp: 'title' },
-  );
-
-  useEffect(() => {
-    setExpandedKeys(uniq([...expandedKeys, ...searchExpandedKeys]));
-  }, [searchExpandedKeys]);
 
   const deleteFile = () => {
     Modal.confirm({
@@ -156,21 +113,7 @@ const Log = () => {
           .then(({ code }) => {
             if (code === 200) {
               message.success(intl.get('删除成功'));
-              let newData = [...data];
-              if (currentNode.parent) {
-                newData = depthFirstSearch(
-                  newData,
-                  (c) => c.key === currentNode.key,
-                );
-              } else {
-                const index = newData.findIndex(
-                  (x) => x.key === currentNode.key,
-                );
-                if (index !== -1) {
-                  newData.splice(index, 1);
-                }
-              }
-              setData(newData);
+              setRevision(n => n + 1);
               initState();
             }
           });
@@ -179,31 +122,20 @@ const Log = () => {
   };
 
   const initState = () => {
+    detailRequest.current?.abort();
+    selectedKey.current = '';
     setSelect('');
     setCurrentNode(null);
-    setValue(intl.get('请选择脚本文件'));
+    setValue(intl.get('请选择日志文件'));
   };
-
-  const onExpand = (expKeys: any) => {
-    setExpandedKeys(expKeys);
-  };
-
-  useEffect(() => {
-    getLogs();
-  }, []);
-
-  useEffect(() => {
-    if (treeDom.current) {
-      setHeight(treeDom.current.clientHeight);
-    }
-  }, [treeDom.current, data]);
 
   return (
     <PageContainer
       className="ql-container-wrapper log-wrapper"
       title={
         <>
-          {select}
+          {currentNode?.type === 'file' ? <span title={select}>{readableLogName(currentNode.title)}</span> : select}
+          {currentNode?.type === 'file' && readFailed && <Button type="link" onClick={() => getLog(currentNode)}>{intl.get('重试')}</Button>}
           {currentNode?.type === 'file' && (
             <span
               style={{
@@ -219,23 +151,10 @@ const Log = () => {
           )}
         </>
       }
-      loading={loading}
       extra={
         isPhone
           ? [
-              <TreeSelect
-                treeExpandAction="click"
-                className="log-select"
-                value={select}
-                dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
-                treeData={data}
-                placeholder={intl.get('请选择日志')}
-                fieldNames={{ value: 'key' }}
-                treeNodeFilterProp="title"
-                showSearch
-                allowClear
-                onSelect={onSelect}
-              />,
+              <FilePicker source="logs" value={select} revision={revision} onSelect={node => onSelect(node.key, node)} />,
             ]
           : [
               <Tooltip title={intl.get('下载')}>
@@ -265,44 +184,7 @@ const Log = () => {
           /*// @ts-ignore*/
           <SplitPane split="vertical" size={200} maxSize={-100}>
             <div className={styles['left-tree-container']}>
-              {data.length > 0 ? (
-                <>
-                  <Input.Search
-                    className={styles['left-tree-search']}
-                    onChange={onSearch}
-                    placeholder={intl.get('请输入日志名')}
-                    allowClear
-                  ></Input.Search>
-                  <div className={styles['left-tree-scroller']} ref={treeDom}>
-                    <Tree
-                      expandAction="click"
-                      className={styles['left-tree']}
-                      treeData={filterData}
-                      showIcon={true}
-                      height={height}
-                      selectedKeys={[select]}
-                      showLine={{ showLeafIcon: true }}
-                      onSelect={onTreeSelect}
-                      expandedKeys={expandedKeys}
-                      onExpand={onExpand}
-                    ></Tree>
-                  </div>
-                </>
-              ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '100%',
-                  }}
-                >
-                  <Empty
-                    description={intl.get('暂无日志')}
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  />
-                </div>
-              )}
+              <FileBrowser source="logs" value={select} revision={revision} onSelect={node => onSelect(node.key, node)} />
             </div>
             <Editor
               language="shell"

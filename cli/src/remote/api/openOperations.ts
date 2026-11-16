@@ -59,6 +59,7 @@ export const openOperations: readonly OpenOperation[] = [
   },
   { name: 'task list', method: 'GET', path: 'crons', existing: true },
   { name: 'task detail', method: 'GET', path: 'crons/detail' },
+  { name: 'task preview', method: 'GET', path: 'crons/preview' },
   { name: 'task create', method: 'POST', path: 'crons', body: 'json' },
   {
     name: 'task run',
@@ -114,6 +115,13 @@ export const openOperations: readonly OpenOperation[] = [
     existing: true,
   },
   { name: 'task status', method: 'PUT', path: 'crons/status', body: 'json' },
+  { name: 'task daily-results', method: 'GET', path: 'crons/:id/daily-results', params: ['id'] },
+  {
+    name: 'task triggers',
+    method: 'GET',
+    path: 'crons/:id/triggers',
+    params: ['id'],
+  },
   {
     name: 'task instances',
     method: 'GET',
@@ -282,6 +290,8 @@ export const openOperations: readonly OpenOperation[] = [
   { name: 'config save', method: 'POST', path: 'configs/save', body: 'json' },
   { name: 'script list', method: 'GET', path: 'scripts' },
   { name: 'script get', method: 'GET', path: 'scripts/detail' },
+  { name: 'script entries', method: 'GET', path: 'scripts/entries' },
+  { name: 'script entries-check', method: 'POST', path: 'scripts/entries/check', body: 'json' },
   { name: 'script history-list', method: 'GET', path: 'scripts/history' },
   {
     name: 'script history-detail',
@@ -326,6 +336,8 @@ export const openOperations: readonly OpenOperation[] = [
   },
   { name: 'log list', method: 'GET', path: 'logs' },
   { name: 'log get', method: 'GET', path: 'logs/detail' },
+  { name: 'log entries', method: 'GET', path: 'logs/entries' },
+  { name: 'log entries-check', method: 'POST', path: 'logs/entries/check', body: 'json' },
   { name: 'log delete', method: 'DELETE', path: 'logs', body: 'json' },
   {
     name: 'log download',

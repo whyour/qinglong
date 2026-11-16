@@ -38,7 +38,7 @@ check installs dependencies, repairs and reloads; inspect its before/after obser
 
 On a panel containing the selection loader, set `QL_CLI_ROOT=/absolute/path/to/built/cli` to the internal build directory containing the full dist tree, **not an npm installation**. Restart to create private ~/bin ql/task/cron wrappers and prioritize them for panel processes. Independent terminals should use the selected absolute path. Unset the variable and restart to restore Shell entries. Invalid paths report errors without silent fallback. Original Shell entries remain the default.
 
-dist/startup.js retains startup/reload compatibility; dist/compat.js and dist/subscription-worker.js are internal adapters, not npm commands. Lifecycle fields follow the installed panel version; customized versions may select QL_CLI_LIFECYCLE=legacy|extended.
+dist/startup.js retains startup/reload compatibility; dist/compat.js and dist/subscription-worker.js are internal adapters, not npm commands. The CLI negotiates receipt fields with the running panel. Set `QL_CLI_LIFECYCLE=legacy` to force the legacy format.
 
 The separate [qinglong-local skill](skills/qinglong-local/SKILL.md) covers execution and maintenance. Use qinglong-cli for remote API management. QL_LANG=en selects English help/messages while JSON fields remain stable.
 

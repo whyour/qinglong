@@ -70,14 +70,10 @@ export const commonCronSchema = {
         }
 
         // For other absolute paths, ensure they are within the safe log directory
-        const normalizedValue = path.normalize(value);
-        const normalizedLogPath = path.normalize(config.logPath);
-
-        if (!normalizedValue.startsWith(normalizedLogPath)) {
+        const relative = path.relative(config.logPath, value);
+        if (!relative || relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
           return helpers.error('string.unsafePath');
         }
-
-        return value;
       }
 
       if (
@@ -97,6 +93,9 @@ export const commonCronSchema = {
       'string.max': '日志名称不能超过100个字符',
       'string.unsafePath': '绝对路径必须在日志目录内或使用 /dev/null',
     }),
+  skip_if_pending: Joi.boolean().optional().allow(null),
+  max_queue_wait: Joi.number().integer().min(0).max(86400).allow(null),
+  catchup_seconds: Joi.number().integer().min(0).max(86400).allow(null),
   allow_multiple_instances: Joi.number().optional().valid(0, 1).allow(null),
   work_dir: Joi.string().optional().allow('').allow(null),
 };

@@ -207,6 +207,9 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
     router.post('/logs/download', (_req, res) =>
       res.json({ code: 200, data: 'downloaded' }),
     );
+    router.post('/logs/entries/check', (_req, res) =>
+      res.json({ code: 200, current: true }),
+    );
     router.get('/system', (_req, res) => res.json({ code: 200 }));
     router.put('/system/notify', (_req, res) => res.json({ code: 200 }));
     router.put('/system/auth/reset', (_req, res) => {
@@ -389,6 +392,15 @@ test('HTTP authentication protects init, scopes, expired sessions and config sec
         .body.data,
       'downloaded',
     );
+    for (const [namespace, ownToken, otherToken] of [
+      ['scripts', 'script-read-app', 'logs:read-app'],
+      ['logs', 'logs:read-app', 'script-read-app'],
+    ]) {
+      const url = `${prefix}/${namespace}/entries/check`;
+      const versions = [['absent-directory', null]];
+      assert.equal((await request(url, ownToken, 'POST', versions)).body.current, true);
+      assert.equal((await request(url, otherToken, 'POST', versions)).status, 401);
+    }
   }
   const importedWithHead = await fetch(
     `http://127.0.0.1:${server.address().port}/open/crons/import`,

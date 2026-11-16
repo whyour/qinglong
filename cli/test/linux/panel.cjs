@@ -16,12 +16,12 @@ let restoreEntrypoints;
   );
   const base = 'http://127.0.0.1:5700';
   let token;
-  async function api(endpoint, method = 'GET', body) {
+  async function api(endpoint, method = 'GET', body, sessionToken = token) {
     const response = await fetch(`${base}/api/${endpoint}`, {
       method,
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(10000),

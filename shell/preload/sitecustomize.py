@@ -141,3 +141,28 @@ try:
     builtins.QLAPI = QLAPI
 except Exception as error:
     print(f"run builtin code error: {error}\n")
+
+
+# A line event in the entry module occurs after interpreter startup, imports
+# performed by this preload, and the configured before hook.
+def observe_script_start(target, marker):
+    if sys.gettrace() is not None:
+        return
+    def first_line(frame, event, arg):
+        if event == 'line':
+            import time
+            try:
+                with open(marker, 'x') as receipt:
+                    receipt.write(str(time.time_ns() // 1000000))
+            except OSError:
+                pass
+            sys.settrace(None)
+        return first_line
+    def enter(frame, event, arg):
+        if event == 'call' and frame.f_code.co_name == '<module>' and os.path.realpath(frame.f_code.co_filename) == target:
+            return first_line
+        return None
+    sys.settrace(enter)
+
+if os.getenv('QL_SCRIPT_ENTRY') and os.getenv('QL_SCRIPT_START_FILE'):
+    observe_script_start(os.environ['QL_SCRIPT_ENTRY'], os.environ['QL_SCRIPT_START_FILE'])

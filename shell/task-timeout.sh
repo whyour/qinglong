@@ -3,6 +3,20 @@
 # Fork from the current Bash state: an external `bash -c` would lose private
 # before-hook variables, arrays and functions used by sourced Shell scripts.
 run_task_command() {
+  # Only the user command receives this identity. Helper interpreters started by
+  # before hooks or a package manager must not report their own startup.
+  local target=${2:-}
+  if [[ -n ${QL_TRIGGER_ID:-} && ${QL_TRIGGER_ID} =~ ^[a-z0-9-]{1,120}$ && -n ${dir_tmp:-} ]]; then
+    case "${1##*/}" in
+      run_shell_script|node|python3|ts-node-transpile-only)
+        if [[ -f $target ]]; then
+          local -x QL_SCRIPT_START_FILE="$dir_tmp/cron-start-$QL_TRIGGER_ID"
+          local -x QL_SCRIPT_ENTRY
+          QL_SCRIPT_ENTRY=$(realpath "$target" 2>/dev/null) || QL_SCRIPT_ENTRY=""
+        fi
+        ;;
+    esac
+  fi
   local timeout_seconds
   if [[ -z ${command_timeout_time:-} ]]; then
     "$@"
@@ -27,8 +41,12 @@ run_task_command() {
     timeout_worker=$!
     (
       set +m
+      # Start the timer before allowing cleanup to signal its process group.
+      # Otherwise a short task can finish while the watchdog is forking sleep.
+      sleep "$timeout_seconds" &
+      timeout_sleeper=$!
       : > "$timeout_dir/ready"
-      sleep "$timeout_seconds" || exit 125
+      wait "$timeout_sleeper" || exit 125
       : > "$timeout_dir/expired"
       kill -TERM -- "-$timeout_worker" 2>/dev/null || :
       sleep 0.5

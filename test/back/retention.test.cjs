@@ -47,6 +47,12 @@ test('cleanup previews first, protects running instances, and uses explicit opti
   await fs.writeFile(path.join(nodeCache, 'cache'), Buffer.alloc(13));
 
   const config = require('../../back/config').default;
+  const originalDataDir = process.env.QL_DATA_DIR;
+  process.env.QL_DATA_DIR = directory;
+  t.after(() => {
+    if (originalDataDir === undefined) delete process.env.QL_DATA_DIR;
+    else process.env.QL_DATA_DIR = originalDataDir;
+  });
   const originalCachePath = config.dependenceCachePath;
   const RunningInstanceModel = {};
   const CrontabStatModel = {};
@@ -101,6 +107,8 @@ test('cleanup previews first, protects running instances, and uses explicit opti
   CrontabStatModel.destroy = async () => 3;
   sequelize.transaction = async (callback) => callback({});
   sequelize.query = async (query) => {
+    if (query.startsWith('SELECT COUNT(*) AS count FROM CronTriggers')) return [{count: 4}];
+    if (query.startsWith('DELETE FROM CronTriggers')) return 4;
     vacuumed = query === 'VACUUM';
     return [];
   };
@@ -110,6 +118,7 @@ test('cleanup previews first, protects running instances, and uses explicit opti
     runningInstanceRetentionDays: 0,
     cronStatRetentionDays: 0,
   });
+  assert.equal(disabledPreview.triggers, 0);
   assert.equal(disabledPreview.runningInstances, 0);
   assert.equal(disabledPreview.cronStats, 0);
   assert.equal(instanceCountCalls, 0);
@@ -123,6 +132,7 @@ test('cleanup previews first, protects running instances, and uses explicit opti
   });
 
   assert.equal(instanceWhere.status[Op.ne], InstanceStatus.running);
+  assert.equal(result.deleted.triggers, 4);
   assert.equal(result.deleted.runningInstances, 2);
   assert.equal(result.deleted.cronStats, 3);
   assert.equal(result.deleted.dependenceCacheBytes, 13);

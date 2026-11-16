@@ -48,6 +48,31 @@ function fixture(t) {
   return { write, run };
 }
 
+test('managed task propagates the sourced script status through direct output, redirection and tee', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-wrapper-status-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const shellDir = path.join(root, 'shell');
+  fs.mkdirSync(shellDir);
+  // Exercise the real outer wrapper with deterministic paths and a failing payload.
+  fs.writeFileSync(path.join(shellDir, 'share.sh'), [
+    'is_macos=0; no_delay=true; dir_log=$QL_DIR; log_name=logs',
+    'import_config() { :; }', 'make_dir() { mkdir -p "$1"; }',
+    'format_timestamp() { echo 1; }', 'format_time() { echo now; }',
+  ].join('\n'));
+  fs.writeFileSync(path.join(shellDir, 'api.sh'), '');
+  fs.writeFileSync(path.join(shellDir, 'task-timeout.sh'), '');
+  fs.writeFileSync(path.join(shellDir, 'otask.sh'), 'echo payload; return 17\n');
+  for (const [direct, noTee] of [[true,false], [false,true], [false,false]]) {
+    const run = spawnSync('/bin/bash', [path.resolve('shell/task.sh'), 'probe.sh'], {
+      env: { ...process.env, QL_DIR: root, ID: '42', QL_TRIGGER_ID: 'shell-probe',
+        real_time: String(direct), no_tee: String(noTee) }, encoding: 'utf8',
+    });
+    assert.equal(run.status, 17, run.stderr);
+    if (noTee) assert.equal(run.stdout, '');
+    else assert.match(run.stdout, /payload/);
+  }
+});
+
 for (const [label, body, code] of [
   ['normal return', ':', 0],
   ['exit zero', 'exit 0', 0],

@@ -1,13 +1,12 @@
-import { extendedLifecycle } from '../runtime/lifecycle';
+import { LifecycleReceipt } from '../runtime/lifecycle';
 import fs from 'node:fs/promises';
 import { writeSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { LocalContext } from '../runtime/context';
 import { sourceEnvironment } from '../runtime/context';
-import { LocalApi } from '../runtime/api';
 import { cancellationExitCode, runProcess } from '../runtime/process';
 import { within } from '../runtime/files';
 import { fail } from '../../shared/errors';
@@ -207,11 +206,8 @@ export async function executeTask(
   const started = Math.floor(start / 1000);
   const first = options.argv[0]!;
   const taskId = await taskIdentity(context, first);
-  const extended = await extendedLifecycle(context);
-  const executionId =
-    extended && context.env.QL_EXECUTION_ORIGIN === 'scheduled_system'
-      ? `legacy-system:${started}:${randomUUID()}`
-      : undefined;
+  const receipt = new LifecycleReceipt(context, started);
+  const triggerId = receipt.triggerId;
   const fileName = path.basename(first, path.extname(first));
   const parent = first.includes('/') ? path.basename(path.dirname(first)) : '';
   const folder =
@@ -221,7 +217,7 @@ export async function executeTask(
     folder === '/dev/null'
       ? '/dev/null'
       : context.env.real_log_path ||
-        path.join(folder, `${timestamp(new Date(start))}.log`);
+        path.join(folder, `${timestamp(new Date(start))}${triggerId ? "-" + triggerId : ""}.log`);
   const fullLog =
     logPath === '/dev/null'
       ? logPath
@@ -245,20 +241,17 @@ export async function executeTask(
         process.stderr.write(value);
       })
     : undefined;
-  const api = new LocalApi(context);
   const report = async (final: boolean, code = 0, duration = 0) => {
     if (!taskId) return;
     try {
-      await api.call('crons/status', 'PUT', {
+      await receipt.status({
         ids: [taskId],
         status: final ? '1' : '0',
         pid: String(process.pid),
         log_path: logPath,
         last_execution_time: started,
         last_running_time: duration,
-        ...(final && extended ? { exit_code: code } : {}),
-        ...(executionId ? { execution_id: executionId } : {}),
-      });
+      }, final ? code : undefined);
     } catch {
       output(
         Buffer.from(
@@ -266,13 +259,9 @@ export async function executeTask(
         ),
       );
     }
-    if (final && extended) {
+    if (final) {
       try {
-        await api.call('dashboard/record', 'POST', {
-          ref_id: taskId,
-          code,
-          elapsed: duration,
-        });
+        await receipt.statistics(taskId, code, duration);
       } catch {
         output(
           Buffer.from(
@@ -282,6 +271,7 @@ export async function executeTask(
       }
     }
   };
+  let durationSeconds = 0;
   let exitCode = 1,
     timedOut = false;
   let languageDirectory: string | undefined;
@@ -504,7 +494,7 @@ export async function executeTask(
   } finally {
     if (languageDirectory)
       await fs.rm(languageDirectory, { recursive: true, force: true });
-    const durationSeconds = Math.max(
+    durationSeconds = Math.max(
       1,
       Math.floor((Date.now() - start) / 1000),
     );
@@ -534,8 +524,8 @@ export async function executeTask(
   return {
     exitCode,
     logPath,
-    durationSeconds: Math.max(1, Math.floor((Date.now() - start) / 1000)),
-    executionId,
+    durationSeconds,
+    executionId: taskId ? receipt.executionId : undefined,
     taskId,
     timedOut,
   };

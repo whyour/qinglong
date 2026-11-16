@@ -164,7 +164,7 @@ test('subscription reconciliation scopes removals to canonical paths and the cur
   });
   assert.equal(result.added, 1);
   assert.equal(result.removed, 1);
-  assert.deepEqual(requests.find((r) => r.method === 'DELETE').body, [1]);
+  assert.deepEqual(requests.find((r) => r.method === 'DELETE').body, [{ id: 1, script: 'owner_repository/old.js', command: rows[0].command, sub_id: 7 }]);
   assert.deepEqual(requests.find((r) => r.method === 'POST').body, {
     name: 'New task',
     schedule: '0 9 * * *',
@@ -359,6 +359,7 @@ test('subscription copy precedence preserves local dependencies while selected s
       env: {
         ...context.env,
         SOURCE: source,
+        dir_shell: path.resolve(__dirname, '../../../shell'),
         dir_scripts: legacyRoot,
         dir_list_tmp: context.paths.dir_list_tmp,
         dir_dep: context.paths.dir_dep,
@@ -429,5 +430,24 @@ test('cron metadata precedence agrees with unchanged legacy add_cron', (t) => {
       schedule,
       name,
     });
+  }
+});
+
+test('a slash in a branch cannot publish through a linked namespace parent', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-nested-namespace-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const context = createContext({ root }, { PATH: process.env.PATH });
+  const outside = path.join(root, 'outside');
+  fs.mkdirSync(outside);
+  fs.writeFileSync(path.join(outside, 'sentinel'), 'untouched');
+  for (const dir of [context.paths.dir_repo, context.paths.dir_scripts]) {
+    fs.mkdirSync(dir, { recursive: true });
+    const link = path.join(dir, 'owner_repo_feature');
+    fs.symlinkSync(outside, link);
+    await assert.rejects(syncRepository(context, {
+      url: 'https://example.invalid/owner/repo.git', branch: 'feature/branch',
+    }), /管理目录|managed directory/);
+    assert.deepEqual(fs.readdirSync(outside), ['sentinel']);
+    fs.unlinkSync(link);
   }
 });

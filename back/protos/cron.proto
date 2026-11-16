@@ -16,6 +16,10 @@ message ICron {
   string command = 3;
   repeated ISchedule extra_schedules = 4;
   string name = 5;
+  optional uint32 max_queue_wait = 6;
+  optional uint32 catchup_seconds = 7;
+  optional int64 recovery_from = 8;
+  optional bool skip_if_pending = 9;
 }
 
 message AddCronRequest {

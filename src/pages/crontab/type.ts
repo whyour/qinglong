@@ -32,9 +32,10 @@ export interface ICrontab {
   isDisabled?: 1 | 0;
   isPinned?: 1 | 0;
   labels?: string[];
-  last_running_time?: number;
+  last_running_time?: number | null;
   last_execution_time?: number;
-  nextRunTime: Date;
+  nextRunTime: number | null;
+  saved?: boolean;
   sub_id: number;
   extra_schedules?: Array<{ schedule: string }>;
   allow_multiple_instances?: 1 | 0;

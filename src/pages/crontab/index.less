@@ -1,3 +1,5 @@
+@import '~antd/es/style/themes/default.less';
+
 .ant-table-pagination.ant-pagination {
   margin-bottom: 0 !important;
 }
@@ -199,4 +201,94 @@ body[data-mode='desktop'] {
 
 .cron.pinned-cron > td {
   background: #f2f2f2;
+}
+
+.trigger-history {
+  container-type: inline-size;
+  font-variant-numeric: tabular-nums;
+
+  .trigger-history-entry {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .trigger-history-header,
+  .trigger-history-summary {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+  }
+
+  .trigger-history-header {
+    justify-content: space-between;
+
+    .ant-tag {
+      margin-right: 0;
+    }
+  }
+
+  .trigger-history-summary {
+    margin: 4px 0;
+  }
+
+  .trigger-history-timing {
+    summary {
+      width: fit-content;
+      color: @primary-color;
+      cursor: pointer;
+      padding: 3px 0;
+    }
+  }
+
+  .trigger-timestamps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 4px 12px;
+    margin: 10px 0;
+
+    dt {
+      opacity: 0.65;
+    }
+
+    dd {
+      margin: 0;
+      white-space: nowrap;
+    }
+  }
+
+  .trigger-history-summary b {
+    font-weight: 500;
+  }
+}
+
+.instance-history-pagination,
+.trigger-history-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 8px;
+}
+
+.instance-history-pagination .ant-space { justify-content: center; }
+
+@container (max-width: 800px) {
+  .trigger-history .trigger-timestamps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 8px;
+  }
+}
+
+@container (max-width: 420px) {
+  .trigger-history .trigger-timestamps {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 4px;
+
+    > div {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+  }
 }

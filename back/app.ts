@@ -138,7 +138,19 @@ class Application {
       workerEnv.pmx = 'false';
     }
     const worker = cluster.fork(workerEnv);
+    if (serviceType === 'grpc') worker.on('message', (msg) => {
+      if (msg === 'crontab-install-failed' && this.httpWorker?.isConnected()) {
+        this.httpWorker.send('reregister-crons');
+      }
+    });
 
+    if (serviceType === 'http') worker.on('message', (msg) => {
+      if (msg?.type !== 'cancel-queued-triggers') return;
+      for (const [id, meta] of this.workerMetadataMap) {
+        const target = cluster.workers?.[id];
+        if (meta.serviceType === 'grpc' && target?.isConnected()) target.send(msg);
+      }
+    });
     this.workerMetadataMap.set(worker.id, {
       id: worker.id,
       pid: worker.process.pid!,
@@ -217,8 +229,21 @@ class Application {
     Logger.info(`[boot] ${serviceType} worker started (PID: ${process.pid})`);
 
     try {
+      const { triggerHistory } = await import('./shared/triggerHistory');
+      const history = triggerHistory();
+      await history.interrupt(serviceType);
       if (serviceType === 'http') {
         await this.startHttpService();
+        const retryExits = async () => {
+          try {
+            await history.retryPendingExits();
+          } catch (error) {
+            Logger.error(`[scheduler] Exit receipt retry failed: ${errStack(error)}`);
+          } finally {
+            if (!this.isShuttingDown) setTimeout(retryExits, 15000).unref();
+          }
+        };
+        setTimeout(retryExits, 15000).unref();
       } else {
         await this.startGrpcService();
       }
@@ -265,6 +290,10 @@ class Application {
     process.on('message', async (msg) => {
       if (msg === 'shutdown') {
         this.gracefulShutdown(serviceType);
+      } else if (serviceType === 'grpc' && typeof msg === 'object' && msg &&
+        'type' in msg && msg.type === 'cancel-queued-triggers' && 'ids' in msg && Array.isArray(msg.ids)) {
+        const { cancelWaitingTriggers } = await import('./shared/runCron');
+        cancelWaitingTriggers(msg.ids);
       } else if (serviceType === 'http' &&
         (msg === 'reregister-crons' || msg === 'scheduler-unavailable')) {
         const { default: cronClient } = await import('./schedule/client');
@@ -282,6 +311,8 @@ class Application {
     this.isShuttingDown = true;
 
     try {
+      const { triggerHistory } = await import('./shared/triggerHistory');
+      await triggerHistory().interrupt(serviceType);
       if (serviceType === 'http') {
         await this.httpServerService?.shutdown();
       } else {

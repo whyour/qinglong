@@ -16,7 +16,8 @@ export class Crontab {
   queued_token?: string | null;
   isPinned?: 1 | 0;
   labels?: string[];
-  last_running_time?: number;
+  last_instance_id?: number;
+  last_running_time?: number | null;
   last_execution_time?: number;
   sub_id?: number;
   extra_schedules?: Array<{ schedule: string }>;
@@ -24,6 +25,10 @@ export class Crontab {
   task_after?: string;
   log_name?: string;
   allow_multiple_instances?: 1 | 0;
+  skip_if_pending?: boolean;
+  max_queue_wait?: number;
+  catchup_seconds?: number;
+  recovery_from?: number;
   work_dir?: string;
 
   constructor(options: Crontab) {
@@ -51,6 +56,10 @@ export class Crontab {
     this.task_after = options.task_after;
     this.log_name = options.log_name;
     this.allow_multiple_instances = options.allow_multiple_instances || 0;
+    this.skip_if_pending = Boolean(options.skip_if_pending);
+    this.max_queue_wait = options.max_queue_wait || 0;
+    this.catchup_seconds = options.catchup_seconds || 0;
+    this.recovery_from = options.recovery_from;
     this.work_dir = options.work_dir;
   }
 }
@@ -86,6 +95,7 @@ export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
   log_path: DataTypes.STRING,
   queued_token: DataTypes.STRING,
   labels: DataTypes.JSON,
+  last_instance_id: DataTypes.INTEGER,
   last_running_time: DataTypes.NUMBER,
   last_execution_time: DataTypes.NUMBER,
   sub_id: { type: DataTypes.NUMBER, allowNull: true },
@@ -94,5 +104,9 @@ export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
   task_after: DataTypes.STRING,
   log_name: DataTypes.STRING,
   allow_multiple_instances: DataTypes.NUMBER,
+  skip_if_pending: DataTypes.BOOLEAN,
+  max_queue_wait: DataTypes.INTEGER,
+  catchup_seconds: DataTypes.INTEGER,
+  recovery_from: DataTypes.BIGINT,
   work_dir: DataTypes.STRING,
 });

@@ -1,3 +1,5 @@
+import { cronOperand } from '../shared/cronOperand';
+import { finishStoppedTree, isProcessDescendant, systemOwner } from '../shared/cronProcess';
 import * as fs from 'fs/promises';
 import { statSync } from 'fs';
 import * as path from 'path';
@@ -6,7 +8,7 @@ import psTreeFun from 'ps-tree';
 import { promisify } from 'util';
 import { load } from 'js-yaml';
 import config from './index';
-import { PYTHON_INSTALL_DIR, PYTHON_VENV_DIR, TASK_COMMAND } from './const';
+import { PYTHON_INSTALL_DIR, PYTHON_VENV_DIR } from './const';
 import Logger from '../loaders/logger';
 import { writeFileWithLock } from '../shared/utils';
 import { DependenceTypes } from '../data/dependence';
@@ -496,13 +498,17 @@ export function psTree(pid: number): Promise<number[]> {
   });
 }
 
-export async function killTask(pid: number, waitForExit = false) {
+export async function killTask(pid: number, waitForExit = false, verifyOwner?: () => void,
+  withStopRequest?: (signalTree: () => Error | void, targets: string[]) => Promise<void | { targets: string[]; signalledAt: number | null }>) {
   const descendants = await psTree(pid);
+  verifyOwner?.();
   const signal = (target: number, sig: NodeJS.Signals) => {
     try {
       process.kill(target, sig);
+      return true;
     } catch (error: any) {
       if (error.code !== 'ESRCH') throw error;
+      return false;
     }
   };
   if (!waitForExit) {
@@ -515,8 +521,53 @@ export async function killTask(pid: number, waitForExit = false) {
     return;
   }
   const pids = [...descendants.reverse(), pid];
-  for (const target of pids) signal(target, 'SIGTERM');
+  const births = new Map<number, string>();
+  if (verifyOwner) {
+    for (const target of pids) {
+      try {
+        const birth = systemOwner(target);
+        if (target === pid || isProcessDescendant(target, pid)) births.set(target, birth);
+      } catch (error) {
+        if (!['ENOENT', 'ESRCH'].includes((error as NodeJS.ErrnoException).code!)) throw error;
+      }
+    }
+    verifyOwner();
+  }
+  const sameProcess = (target: number) => {
+    if (!verifyOwner) return true;
+    if (!births.has(target)) return false;
+    try { return births.get(target) === systemOwner(target); }
+    catch (error) {
+      if (['ENOENT', 'ESRCH'].includes((error as NodeJS.ErrnoException).code!)) return false;
+      throw error;
+    }
+  };
+  const signalTree = () => {
+    verifyOwner?.();
+    // The root owns the command's result. An ESRCH here must roll back the
+    // stop claim even if a descendant is still draining the output pipe.
+    if (verifyOwner && (!sameProcess(pid) || !signal(pid, 'SIGTERM'))) {
+      throw Object.assign(new Error('Command already exited'), { code: 'ESRCH' });
+    }
+    let deliveryError: Error | undefined;
+    for (const target of pids) {
+      if (verifyOwner && target === pid) continue;
+      try {
+        if (sameProcess(target)) signal(target, 'SIGTERM');
+      } catch (error) {
+        if (!withStopRequest || !verifyOwner) throw error;
+        // Root TERM succeeded. Commit that fact even if a child needs a retry.
+        deliveryError ??= error as Error;
+      }
+    }
+    return deliveryError;
+  };
+  if (withStopRequest) {
+    const claim = await withStopRequest(signalTree, [...births.values()]);
+    if (claim) return finishStoppedTree(claim.targets, claim.signalledAt);
+  } else signalTree();
   const alive = async (target: number) => {
+    if (!sameProcess(target)) return false;
     try {
       process.kill(target, 0);
     } catch (error: any) {
@@ -555,7 +606,9 @@ export async function killTask(pid: number, waitForExit = false) {
   };
   let remaining = await wait();
   if (!remaining.length) return;
-  for (const target of remaining) signal(target, 'SIGKILL');
+  for (const target of remaining) {
+    if (sameProcess(target)) signal(target, 'SIGKILL');
+  }
   remaining = await wait();
   if (remaining.length)
     throw new Error(`Task processes did not exit: ${remaining.join(', ')}`);
@@ -612,17 +665,7 @@ export async function getUniqPath(
     suffix = `_${id}`;
   }
 
-  let items = command.split(/ +/);
-
-  const maxTimeCommandIndex = items.findIndex((x) => x === '-m');
-  if (maxTimeCommandIndex !== -1) {
-    items = items.slice(maxTimeCommandIndex + 2);
-  }
-
-  let str = items[0];
-  if (items[0] === TASK_COMMAND) {
-    str = items[1];
-  }
+  let str = cronOperand(command) || 'task';
 
   const dotIndex = str.lastIndexOf('.');
 
@@ -642,7 +685,8 @@ export async function getUniqPath(
     str = `${tempStr}_${str.slice(slashIndex + 1)}`;
   }
 
-  return `${str}${suffix}`;
+  const base = str.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5.-]+/g, '_').slice(0, 100 - suffix.length);
+  return `${base && !/^\.+$/.test(base) ? base : 'task'}${suffix}`;
 }
 
 export function safeJSONParse(value?: string) {

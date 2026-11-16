@@ -167,7 +167,7 @@ async function readState(tmp) {
 }
 
 async function getStatus(tmp) {
-  const state = await readState(tmp);
+  let state = await readState(tmp);
   if (active.has(state.status)) {
     let alive = false;
     if (Number.isSafeInteger(state.pid) && state.pid > 0) {
@@ -179,8 +179,14 @@ async function getStatus(tmp) {
       }
     } else alive = Date.now() - state.startedAt < 10000;
     if (!alive) {
-      state.status = 'failed';
-      state.error = '升级任务意外中断，请重试';
+      // The worker can publish its terminal state and exit after our first read.
+      const previous = state;
+      state = await readState(tmp);
+      if (active.has(state.status) && state.id === previous.id &&
+          state.pid === previous.pid && state.startedAt === previous.startedAt) {
+        state.status = 'failed';
+        state.error = '升级任务意外中断，请重试';
+      }
     }
   }
   // Bound reads even when an installer produces a very large log.

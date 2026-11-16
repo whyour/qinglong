@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 dir_shell=$QL_DIR/shell
+if [[ ${QL_TRIGGER_SOURCE:-} == system && -z ${QL_TRIGGER_ID:-} && ${ID:-} =~ ^[0-9]+$ ]]; then
+  . "$dir_shell/system-cron.sh"
+fi
 . "$dir_shell/share.sh"
 . "$dir_shell/api.sh"
 load_ql_envs
@@ -14,17 +17,15 @@ diff_cron() {
   local list_task="$2"
   local list_add="$3"
   local list_drop="$4"
-  if [[ -s $list_task ]] && [[ -s $list_scripts ]]; then
-    grep -vwf $list_task $list_scripts >$list_add
-    grep -vwf $list_scripts $list_task >$list_drop
-  fi
-
-  if [[ ! -s $list_task ]] && [[ -s $list_scripts ]]; then
-    cp -f $list_scripts $list_add
-  fi
-
-  if [[ ! -s $list_scripts ]] && [[ -s $list_task ]]; then
-    cp -f $list_task $list_drop
+  : > "$list_add"
+  : > "$list_drop"
+  if [[ -s $list_task && -s $list_scripts ]]; then
+    grep -Fvx -f "$list_task" "$list_scripts" > "$list_add" || [[ $? == 1 ]] || return 1
+    grep -Fvx -f "$list_scripts" "$list_task" > "$list_drop" || [[ $? == 1 ]] || return 1
+  elif [[ -s $list_scripts ]]; then
+    cp -f "$list_scripts" "$list_add"
+  elif [[ -s $list_task ]]; then
+    cp -f "$list_task" "$list_drop"
   fi
 }
 
@@ -34,7 +35,7 @@ output_list_add_drop() {
   local type=$(t "$2")
   if [[ -s $list ]]; then
     t '检测到有%s的定时任务:' "$type"
-    cat $list
+    cat "$list"
   fi
 }
 
@@ -46,27 +47,36 @@ del_cron() {
   local detail=""
   local ids=""
   t '\n开始尝试自动删除失效的定时任务...'
-  for cron in $(cat $list_drop); do
-    local id=$(cat $list_crontab_user | grep -E "$cmd_task.* $cron" | perl -pe "s|.*ID=(.*) $cmd_task.* $cron\.*|\1|" | head -1 | awk -F " " '{print $1}')
-    if [[ $ids ]]; then
-      ids="$ids,\"$id\""
-    else
-      ids="\"$id\""
+  local script_root repo_root cron id file resolved revision result payload records=""
+  local -a removed=()
+  script_root=$(cd "$dir_scripts" && pwd -P) || return 1
+  repo_root="$script_root/$path"
+  while IFS=$'\t' read -r id cron revision; do
+    [[ $id =~ ^[1-9][0-9]*$ ]] || continue
+    grep -Fxq -e "$cron" "$list_drop" || continue
+    file="$script_root/$cron"
+    if [[ -e $file || -L $file ]]; then
+      resolved=$(realpath "$file") || continue
+      # Compare against the lexical subscription root too: a symlink in
+      # any directory component must not redirect cleanup to another repo.
+      case "$cron" in
+        "$path"/*) [[ $resolved == "$repo_root/"* ]] || continue ;;
+        "$path"_*) [[ $cron != */* && $resolved == "$file" ]] || continue ;;
+        *) continue ;;
+      esac
+      [[ -f $file ]] || continue
+      removed+=("$cron")
     fi
-    cron_file="$dir_scripts/${cron}"
-    if [[ -f $cron_file ]]; then
-      cron_name=$(grep "new Env" $cron_file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
-      rm -f $cron_file
-    fi
-    [[ -z $cron_name ]] && cron_name="$cron"
-    if [[ $detail ]]; then
-      detail="${detail}\n${cron_name}"
-    else
-      detail="${cron_name}"
-    fi
-  done
+    records+="$id"$'\t'"$cron"$'\t'"$revision"$'\n'
+    ids="${ids:+$ids,}$id"
+    detail="${detail:+$detail\n}$cron"
+  done < "$dir_list_tmp/${path}_registered.list"
   if [[ $ids ]]; then
-    result=$(del_cron_api "$ids")
+    payload=$(printf '%s' "$records" | jq -Rn '[inputs | split("\t") | {id:(.[0]|tonumber), script:.[1]} + (if .[2] != "" then {revision:(.[2]|tonumber)} else {} end)]') || return 1
+    result=$(del_cron_api "$ids" "$payload") || { printf '%s\n' "$result" >&2; return 1; }
+    for cron in "${removed[@]}"; do
+      python3 "${dir_shell:-$QL_DIR/shell}/subscription-files.py" unlink "$script_root" "$cron" || return 1
+    done
     notify_api "$(t '%s 删除任务%s' "$path" "$result")" "$detail"
   fi
 }
@@ -78,30 +88,31 @@ add_cron() {
   local path=$2
   t '\n开始尝试自动添加定时任务...'
   local detail=""
-  cd $dir_scripts
-  for file in $(cat $list_add); do
-    local file_name=${file/${path}\//}
-    file_name=${file_name/${path}\_/}
+  local file operand
+  cd "$dir_scripts" || return 1
+  while IFS= read -r file; do
+    local file_name=${file#"$path"/}
+    file_name=${file_name#"$path"_}
     if [[ -f $file ]]; then
       cron_line=$(
-        perl -ne "{
-                        print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$file_name/
-                    }" $file 2>/dev/null |
-          perl -pe "{
-                        s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$file_name.*|\1|g;
-                        s|\*([\d\*])(.*)|\1\2|g;
-                        s|  | |g;
-                    }" 2>/dev/null | sort -u | head -1
+        QL_SCRIPT_NAME="$file_name" perl -ne '
+          print "$1\n" if /((?:[\d*][\d*\/,\-]* ){4,5}[\d*][\d*\/,\-]*)(?: |,|").*\Q$ENV{QL_SCRIPT_NAME}\E/;
+        ' -- "$file" | sort -u | head -1
       )
-      [[ -z $cron_line ]] && cron_line=$(grep "cron:" $file | awk -F ":" '{print $2}' | head -1 | xargs)
-      [[ -z $cron_line ]] && cron_line=$(grep "cron " $file | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | head -1 | xargs)
+      [[ -z $cron_line ]] && cron_line=$(grep "cron:" "$file" | awk -F ":" '{print $2}' | head -1 | xargs)
+      [[ -z $cron_line ]] && cron_line=$(grep "cron " "$file" | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | head -1 | xargs)
       [[ -z $cron_line ]] && cron_line="$default_cron"
-      cron_name=$(grep "new Env" $file | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
-      [[ -z $cron_name ]] && cron_name=$(grep "name:" $file | awk -F ":" '{print $2}' | head -1 | xargs)
+      cron_name=$(grep "new Env" "$file" | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
+      [[ -z $cron_name ]] && cron_name=$(grep "name:" "$file" | awk -F ":" '{print $2}' | head -1 | xargs)
       [[ -z $cron_name ]] && cron_name=$(basename "$file_name")
       cron_name=${cron_name//$'\r'/}
       cron_line=${cron_line//$'\r'/}
-      result=$(add_cron_api "$cron_line" "${cmd_task} ${file}" "$cron_name" "$SUB_ID")
+      operand=$file
+      if [[ ! $file =~ ^[[:alnum:]_./-]+$ ]]; then
+        local escaped_quote="'\\''"
+        operand="'${file//\'/$escaped_quote}'"
+      fi
+      result=$(add_cron_api "$cron_line" "${cmd_task} ${operand}" "$cron_name" "$SUB_ID") || { printf '%s\n' "$result" >&2; return 1; }
       echo -e "$result"
       if [[ $detail ]]; then
         detail="${detail}${result}\n"
@@ -109,7 +120,7 @@ add_cron() {
         detail="${result}\n"
       fi
     fi
-  done
+  done < "$list_add"
   notify_api "$(t '%s 新增任务' "$path")" "$detail"
 }
 
@@ -131,17 +142,18 @@ update_repo() {
 
   local repo_path="${dir_repo}/${uniq_path}"
 
-  make_dir "${dir_scripts}/${uniq_path}"
+  python3 "${dir_shell:-$QL_DIR/shell}/subscription-files.py" parent "$dir_repo" "$uniq_path" || return 1
 
   local formatUrl="$url"
-  rm -rf ${repo_path} &>/dev/null
-  git_clone_scripts "${formatUrl}" ${repo_path} "${branch}" "${proxy}"
+  rm -rf -- "$repo_path" || return 1
+  git_clone_scripts "${formatUrl}" "$repo_path" "${branch}" "${proxy}"
 
   if [[ $exit_status -eq 0 ]]; then
     t '拉取 %s 成功...\n' "${uniq_path}"
     diff_scripts "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions" "$autoAddCron" "$autoDelCron"
   else
     t '拉取 %s 失败，请检查日志...\n' "${uniq_path}"
+    return 1
   fi
 }
 
@@ -164,8 +176,11 @@ update_raw() {
   local raw_file_name="${uniq_path}.${suffix}"
   t '开始下载：%s 保存路径：%s\n' "${raw_url}" "$dir_raw/${raw_file_name}"
 
+  [[ $raw_file_name != */* && $raw_file_name != .* ]] || return 1
+  local incoming
+  incoming=$(mktemp "$dir_raw/.ql-download.XXXXXXXX") || return 1
   set_proxy "$proxy"
-  if wget -q --no-check-certificate -O "$dir_raw/${raw_file_name}.new" "$raw_url"; then
+  if wget -q --no-check-certificate -O "$incoming" "$raw_url"; then
     exit_status=0
   else
     exit_status=$?
@@ -173,38 +188,30 @@ update_raw() {
   unset_proxy
 
   if [[ $exit_status -eq 0 ]]; then
-    mv "$dir_raw/${raw_file_name}.new" "$dir_raw/${raw_file_name}" || return $?
+    python3 "${dir_shell:-$QL_DIR/shell}/subscription-files.py" copy "$incoming" "$dir_raw" "$raw_file_name" || { rm -f -- "$incoming"; return 1; }
+    rm -f -- "$incoming"
     t '下载 %s 成功...\n' "${raw_file_name}"
     cd "$dir_raw" || return $?
     local filename="raw_${raw_file_name}"
-    local cron_id=$(cat "$list_crontab_user" | grep -E "$cmd_task.* $filename" | perl -pe "s|.*ID=(.*) $cmd_task.* $filename\.*|\1|" | head -1 | awk -F " " '{print $1}')
-    cp -f "$raw_file_name" "$dir_scripts/${filename}" || return $?
-    if [[ -z $cron_id ]] && [[ ${autoAddCron} == true ]]; then
-      cron_line=$(
-        perl -ne "{
-                      print if /.*([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*]( |,|\").*$raw_file_name/
-                  }" $raw_file_name |
-          perl -pe "{
-                      s|[^\d\*]*(([\d\*]*[\*-\/,\d]*[\d\*] ){4,5}[\d\*]*[\*-\/,\d]*[\d\*])( \|,\|\").*/?$raw_file_name.*|\1|g;
-                      s|\*([\d\*])(.*)|\1\2|g;
-                      s|  | |g;
-                  }" | sort -u | head -1
+    python3 "${dir_shell:-$QL_DIR/shell}/subscription-files.py" copy "$raw_file_name" "$dir_scripts" "$filename" || return 1
+    if [[ ${autoAddCron} == true ]]; then
+      local work
+      work=$(mktemp -d "$dir_raw/.ql-register.XXXXXXXX") || return 1
+      (
+        # Reuse the repository operand decoder and metadata extraction. Do not
+        # interpolate a filename into Perl, grep, or a shell command.
+        python3 "${dir_shell:-$QL_DIR/shell}/subscription-files.py" registered "$list_crontab_user" "$cmd_task" "$filename" raw > "$work/registered" || exit 1
+        [[ -s $work/registered ]] && exit 0
+        printf '%s\n' "$filename" > "$work/added" || exit 1
+        add_cron "$work/added" raw
       )
-      cron_name=$(grep "new Env" $raw_file_name | awk -F "\(" '{print $2}' | awk -F "\)" '{print $1}' | sed 's:.*\('\''\|"\)\([^"'\'']*\)\('\''\|"\).*:\2:' | sed 's:"::g' | sed "s:'::g" | head -1)
-      [[ -z $cron_name ]] && cron_name="$raw_file_name"
-      [[ -z $cron_line ]] && cron_line=$(grep "cron:" $raw_file_name | awk -F ":" '{print $2}' | head -1 | xargs)
-      [[ -z $cron_line ]] && cron_line=$(grep "cron " $raw_file_name | awk -F "cron \"" '{print $2}' | awk -F "\" " '{print $1}' | head -1 | xargs)
-      [[ -z $cron_line ]] && cron_line="$default_cron"
-      cron_name=${cron_name//$'\r'/}
-      cron_line=${cron_line//$'\r'/}
-      result=$(add_cron_api "$cron_line" "${cmd_task} ${filename}" "$cron_name" "$SUB_ID")
-      echo -e "$result\n"
-      notify_api "$(t '新增任务通知')" "\n$result"
-      # update_cron_api "$cron_line:$cmd_task $filename:$cron_name:$cron_id"
+      local status=$?
+      rm -r -- "$work"
+      return "$status"
     fi
   else
     t '下载 %s 失败，保留之前正常下载的版本...\n' "${raw_file_name}"
-    [[ -f "$dir_raw/${raw_file_name}.new" ]] && rm -f "$dir_raw/${raw_file_name}.new"
+    [[ -f "$incoming" ]] && rm -f "$incoming"
     return "$exit_status"
   fi
 
@@ -321,13 +328,15 @@ update_qinglong() {
 
 # Preserve the updater's status through both tee and the final timing output.
 run_update_logged() (
-  set -o pipefail
   if [[ "$real_time" == 'true' ]]; then
     "$@"
   elif [[ "$no_tee" == 'true' ]]; then
     "$@" >>"$file_path" 2>&1
   else
     "$@" 2>&1 | tee -a "$file_path"
+    local statuses=("${PIPESTATUS[@]}")
+    if [[ ${statuses[0]} -ne 0 ]]; then return "${statuses[0]}"; fi
+    return "${statuses[1]}"
   fi
 )
 
@@ -350,25 +359,25 @@ diff_scripts() {
     autoDelCron=${AutoDelCron}
   fi
 
-  gen_list_repo "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions"
+  gen_list_repo "$repo_path" "$author" "$path" "$blackword" "$dependence" "$extensions" || return 1
 
   local list_add="$dir_list_tmp/${uniq_path}_add.list"
   local list_drop="$dir_list_tmp/${uniq_path}_drop.list"
-  diff_cron "$dir_list_tmp/${uniq_path}_scripts.list" "$dir_list_tmp/${uniq_path}_user.list" $list_add $list_drop
+  diff_cron "$dir_list_tmp/${uniq_path}_scripts.list" "$dir_list_tmp/${uniq_path}_user.list" "$list_add" "$list_drop" || return 1
 
   if [[ -s $list_drop ]]; then
-    output_list_add_drop $list_drop "失效"
+    output_list_add_drop "$list_drop" "失效"
     if [[ ${autoDelCron} == true ]]; then
-      del_cron $list_drop $uniq_path
+      del_cron "$list_drop" "$uniq_path" || return 1
     fi
   fi
   if [[ -s $list_add ]]; then
-    output_list_add_drop $list_add "新"
+    output_list_add_drop "$list_add" "新"
     if [[ ${autoAddCron} == true ]]; then
-      add_cron $list_add $uniq_path
+      add_cron "$list_add" "$uniq_path" || return 1
     fi
   fi
-  cd $dir_current
+  cd "$dir_current"
 }
 
 ## 生成脚本的路径清单文件
@@ -380,64 +389,14 @@ gen_list_repo() {
   local blackword="$4"
   local dependence="$5"
 
-  rm -f $dir_list_tmp/${uniq_path}*.list &>/dev/null
-
-  cd ${repo_path}
-
-  local extension_string="${6:-$file_extensions}"
-  extension_string="${extension_string//|/ }"
-  extension_string="${extension_string//$'\n'/ }"
-  local -a extensions=() find_args=()
-  IFS=$' \t\n' read -r -a extensions <<< "$extension_string"
-  local extension
-  for extension in "${extensions[@]}"; do
-    if [[ ${#find_args[@]} -gt 0 ]]; then
-      find_args+=(-o)
-    fi
-    find_args+=(-name "*.${extension}")
-  done
-  files=$(find . "${find_args[@]}" | sed 's/^..//')
-  if [[ $path ]]; then
-    files=$(echo "$files" | egrep "$path")
-  fi
-  if [[ $blackword ]]; then
-    files=$(echo "$files" | egrep -v "$blackword")
-  fi
-
-  cp -f $file_notify_js "${dir_scripts}/${uniq_path}"
-  cp -f $file_notify_py "${dir_scripts}/${uniq_path}"
-
-  if [[ $dependence ]]; then
-    cd ${repo_path}
-    results=$(find . "${find_args[@]}" | sed 's/^..//' | egrep "$dependence")
-    for _file in ${results}; do
-      file_path=$(dirname $_file)
-      make_dir "${dir_scripts}/${uniq_path}/${file_path}"
-      cp -f $_file "${dir_scripts}/${uniq_path}/${file_path}"
-    done
-  fi
-
-  if [[ -d $dir_dep ]]; then
-    cp -rf $dir_dep/* "${dir_scripts}/${uniq_path}" &>/dev/null
-  fi
-
-  for file in ${files}; do
-    dirPath=$(dirname "$file")
-    filename=$(basename "$file")
-    filePath="${uniq_path}/${filename}"
-    if [[ $dirPath ]] && [[ $dirPath != '.' ]]; then
-      mkdir -p "${dir_scripts}/${uniq_path}/${dirPath}"
-      filePath="${uniq_path}/${dirPath}/${filename}"
-    fi
-    cp -f $file "${dir_scripts}/$filePath"
-    echo "$filePath" >>"$dir_list_tmp/${uniq_path}_scripts.list"
-    # cron_id=$(cat $list_crontab_user | grep -E "$cmd_task.* ${uniq_path}_${filename}" | perl -pe "s|.*ID=(.*) $cmd_task.* ${uniq_path}_${filename}\.*|\1|" | head -1 | awk -F " " '{print $1}')
-    # if [[ $cron_id ]]; then
-    #   result=$(update_cron_command_api "$cmd_task ${uniq_path}/${filename}:$cron_id")
-    # fi
-  done
-  grep -E "${cmd_task}.* ${uniq_path}" ${list_crontab_user} | perl -pe "s|.*ID=(.*) ${cmd_task}.* (${uniq_path}.*)\.*|\2|" | awk -F " " '{print $1}' | sort -u >"$dir_list_tmp/${uniq_path}_user.list"
-  cd $dir_current
+  local scripts_list="$dir_list_tmp/${uniq_path}_scripts.list"
+  mkdir -p "$(dirname "$scripts_list")" || return 1
+  python3 "${dir_shell:-$QL_DIR/shell}/subscription-files.py" repo "$repo_path" "$dir_scripts" "$uniq_path" "$scripts_list" \
+    "$dir_dep" "$file_notify_js" "$file_notify_py" "$path" "$blackword" "$dependence" "${6:-$file_extensions}" || return 1
+  python3 "${dir_shell:-$QL_DIR/shell}/subscription-files.py" registered "$list_crontab_user" "$cmd_task" "$uniq_path" repo \
+    > "$dir_list_tmp/${uniq_path}_registered.list" || return 1
+  cut -f2 "$dir_list_tmp/${uniq_path}_registered.list" | sort -u > "$dir_list_tmp/${uniq_path}_user.list" || return 1
+  cd "$dir_current"
 }
 
 get_uniq_path() {
@@ -486,7 +445,9 @@ main() {
   local log_dir="${p1}"
   make_dir "$dir_log/$log_dir"
   local log_time=$(date "+%Y-%m-%d-%H-%M-%S")
-  local log_path="${log_dir}/${log_time}.log"
+  local run_suffix=""
+  [[ ${QL_TRIGGER_ID:-} =~ ^[a-z0-9-]{1,120}$ ]] && run_suffix="-$QL_TRIGGER_ID"
+  local log_path="${real_log_path:-${log_dir}/${log_time}${run_suffix}.log}"
   local file_path="$dir_log/$log_path"
 
   printf -v cmd '2>&1 | tee -a %q' "$file_path"
@@ -509,6 +470,8 @@ main() {
     eval "printf '%s\n' $start_message $cmd"
   fi
 
+  local ql_execution_id=""
+  if [[ -n $ID && -z ${QL_TRIGGER_ID:-} ]]; then init_execution_id || return 1; fi
   [[ $ID ]] && update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp"
 
   local command_status=0
@@ -524,12 +487,14 @@ main() {
     command_status=$?
     ;;
   extra)
-    eval run_extra_shell $cmd
+    run_update_logged run_extra_shell
+    command_status=$?
     ;;
   repo)
     get_uniq_path "$p2" "$p6"
     if [[ -n $p2 ]]; then
       update_repo "$p2" "$p3" "$p4" "$p5" "$p6" "$p7" "$p8" "$p9" "$p10"
+      command_status=$?
     else
       t '命令输入错误...\n'
       eval usage $cmd
@@ -576,7 +541,10 @@ main() {
   local end_time=$(format_time "$time_format" "$etime")
   local end_timestamp=$(format_timestamp "$time_format" "$etime")
   local diff_time=$(($end_timestamp - $begin_timestamp))
-  [[ $ID ]] && update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time"
+  if [[ $ID ]]; then
+    update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time" "$command_status" "$end_timestamp"
+    record_cron_stat "$ID" "$command_status" "$diff_time" "$end_timestamp"
+  fi
 
   if [[ "$p1" != "repo" ]] && [[ "$p1" != "raw" ]]; then
     local end_message

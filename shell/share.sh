@@ -274,7 +274,7 @@ git_clone_scripts() {
 
   set_proxy "$proxy"
 
-  git clone -q --depth=1 "${branch_args[@]}" "$url" "$dir"
+  git clone -q --depth=1 "${branch_args[@]}" -- "$url" "$dir"
   exit_status=$?
 
   unset_proxy
@@ -448,13 +448,13 @@ handle_task_end() {
   [[ "$diff_time" == 0 ]] && diff_time=1
 
   if [[ $ID ]]; then
-    local error=$(update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time" "$exit_code")
+    local error=$(update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time" "$exit_code" "$end_timestamp")
     if [[ $error ]]; then
       error_message=$(t ', 状态更新失败(%s)' "$error")
     fi
   fi
 
-  record_cron_stat "$ID" "${exit_code:-0}" "$diff_time"
+  record_cron_stat "$ID" "${exit_code:-0}" "$diff_time" "$end_timestamp"
 
   if [[ "${MANUAL:=}" == "true" ]]; then
     t '\n## 已停止 🛑... %s  耗时 %s 秒%s' "$end_time" "$diff_time" "${error_message:=}　　　　　"

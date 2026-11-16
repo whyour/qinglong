@@ -1,6 +1,7 @@
+import { createStopRequest } from './stopRequest';
 import useTableScrollHeight from '@/hooks/useTableScrollHeight';
 import { SharedContext } from '@/layouts';
-import { getCommandScript, getCrontabsNextDate } from '@/utils';
+import { getCommandScript } from '@/utils';
 import config from '@/utils/config';
 import { diffTime } from '@/utils/date';
 import { request } from '@/utils/http';
@@ -41,11 +42,10 @@ import {
 import { ColumnProps } from 'antd/lib/table';
 import { FilterValue, SorterResult } from 'antd/lib/table/interface';
 import dayjs from 'dayjs';
-import { noop, omit } from 'lodash';
+import { omit } from 'lodash';
 import React, { useEffect, useRef, useState } from 'react';
 import intl from 'react-intl-universal';
 import { useVT } from 'virtualizedtableforantd4';
-import { getScheduleType } from './const';
 import CronDetailModal from './detail';
 import './index.less';
 import CronLogModal from './logModal';
@@ -55,7 +55,6 @@ import {
   ICrontab,
   OperationName,
   OperationPath,
-  ScheduleType,
 } from './type';
 import ViewCreateModal from './viewCreateModal';
 import ViewManageModal from './viewManageModal';
@@ -170,7 +169,8 @@ const Crontab = () => {
               )}
             </>
           )}
-          {record.isDisabled === 1 && record.status === CrontabStatus.idle && (
+          {record.saved === false && <Tag color="warning">{intl.get('规则待同步')}</Tag>}
+          {record.saved !== false && record.isDisabled === 1 && record.status === CrontabStatus.idle && (
             <Tag icon={<CloseCircleOutlined />} color="error">
               {intl.get('已禁用')}
             </Tag>
@@ -224,7 +224,7 @@ const Crontab = () => {
         },
       },
       render: (text, record) => {
-        return record.last_running_time
+        return record.last_execution_time && record.last_running_time != null
           ? diffTime(record.last_running_time)
           : '-';
       },
@@ -260,7 +260,7 @@ const Crontab = () => {
       width: 144,
       sorter: {
         compare: (a: any, b: any) => {
-          return a.nextRunTime - b.nextRunTime;
+          return (a.nextRunTime ?? Infinity) - (b.nextRunTime ?? Infinity);
         },
       },
       render: (text, record) => {
@@ -312,7 +312,7 @@ const Crontab = () => {
             <a
               onClick={(e) => {
                 e.stopPropagation();
-                setLogCron({ ...record, timestamp: Date.now() });
+                setLogCron(record);
               }}
             >
               {intl.get('日志')}
@@ -330,7 +330,6 @@ const Crontab = () => {
   const [isLabelModalVisible, setIsLabelModalVisible] = useState(false);
   const [editedCron, setEditedCron] = useState();
   const [searchText, setSearchText] = useState('');
-  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const [logCron, setLogCron] = useState<any>();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [pageConf, setPageConf] = useState<{
@@ -365,77 +364,57 @@ const Crontab = () => {
     }
   };
 
-  const getCrons = async (silent?: boolean) => {
-    if (!silent) setLoading(true);
-    const { page = 1, size = 20, sorter, filters = {} } = pageConf;
-    let url = `${config.apiPrefix
-      }crons?searchValue=${searchText}&page=${page}&size=${size}&filters=${JSON.stringify(
-        filters,
-      )}`;
-    if (sorter && sorter.column && sorter.order) {
-      url += `&sorter=${JSON.stringify({
-        field: sorter.column.key,
-        type: sorter.order === 'ascend' ? 'ASC' : 'DESC',
-      })}`;
-    }
-    if (viewConf) {
-      url += `&queryString=${JSON.stringify({
-        filters: viewConf.filters,
-        sorts: viewConf.sorts,
-        filterRelation: viewConf.filterRelation || 'and',
-      })}`;
-    }
-    return request
-      .get(url)
-      .then(async ({ code, data: _data }) => {
-        if (code === 200) {
-          const { data, total } = _data;
-          const subscriptions = await request.get(
-            `${config.apiPrefix}subscriptions?ids=${JSON.stringify([
-              ...new Set(data.map((x) => x.sub_id).filter(Boolean)),
-            ])}`,
-            {
-              onError: noop,
-            },
-          );
-          const subscriptionMap = Object.fromEntries(
-            subscriptions?.data?.map((x) => [x.id, x]),
-          );
-
-          setValue(
-            data.map((x) => {
-              const scheduleType = getScheduleType(x.schedule);
-              const nextRunTime =
-                scheduleType === ScheduleType.Normal
-                  ? getCrontabsNextDate(x.schedule, x.extra_schedules)
-                  : null;
-              return {
-                ...x,
-                nextRunTime,
-                subscription: subscriptionMap?.[x.sub_id],
-              };
-            }),
-          );
-          setTotal(total);
-        }
-      })
-      .finally(() => !silent && setLoading(false));
-  };
+  const [reload, setReload] = useState(0);
+  const [listFailed, setListFailed] = useState(false);
+  const getCrons = () => setReload(n => n + 1);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    let cancelled = false;
-    const poll = async () => {
-      await getCrons(true);
-      if (cancelled) return;
-      timer = setTimeout(poll, 10000);
+    if (!pageConf.size) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    const { page, size, sorter, filters = {} } = pageConf;
+    const params = {
+      searchValue: searchText, page, size, filters: JSON.stringify(filters),
+      ...(sorter?.column && sorter.order && { sorter: JSON.stringify({
+        field: sorter.column.key, type: sorter.order === 'ascend' ? 'ASC' : 'DESC',
+      }) }),
+      ...(viewConf && { queryString: JSON.stringify({
+        filters: viewConf.filters, sorts: viewConf.sorts,
+        filterRelation: viewConf.filterRelation || 'and',
+      }) }),
     };
-    poll();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const { code, data } = await request.get(`${config.apiPrefix}crons`, { params, signal, retryInPlace: true });
+        if (signal.aborted) return;
+        if (code !== 200) throw new Error('Task list read failed');
+        const { data: rows, total } = data;
+        const ids = [...new Set(rows.map(row => row.sub_id).filter(Boolean))];
+        const subscriptions = ids.length ? await request.get(`${config.apiPrefix}subscriptions`, {
+          params: { ids: JSON.stringify(ids) }, signal, retryInPlace: true,
+        }).catch(() => undefined) : undefined;
+        if (signal.aborted) return;
+        const byId = new Map(subscriptions?.data?.map(row => [row.id, row]));
+        setValue(rows.map(row => ({ ...row, subscription: byId.get(row.sub_id) })));
+        setTotal(total);
+        setListFailed(false);
+      } catch {
+        if (!signal.aborted) setListFailed(true);
+      } finally {
+        if (!signal.aborted) {
+          setLoading(false);
+          timer = setTimeout(poll, 10000);
+        }
+      }
+    }
+    setLoading(true);
+    void poll();
     return () => {
-      cancelled = true;
+      controller.abort();
       clearTimeout(timer);
     };
-  }, [pageConf, viewConf, searchText]);
+  }, [pageConf, viewConf, searchText, reload]);
 
   const addCron = () => {
     setEditedCron(null as any);
@@ -465,12 +444,7 @@ const Crontab = () => {
           .then(({ code, data }) => {
             if (code === 200) {
               message.success(intl.get('删除成功'));
-              const result = [...value];
-              const i = result.findIndex((x) => x.id === record.id);
-              if (i !== -1) {
-                result.splice(i, 1);
-                setValue(result);
-              }
+              getCrons();
             }
           });
       },
@@ -494,15 +468,7 @@ const Crontab = () => {
           .put(`${config.apiPrefix}crons/run`, [record.id])
           .then(({ code, data }) => {
             if (code === 200) {
-              const result = [...value];
-              const i = result.findIndex((x) => x.id === record.id);
-              if (i !== -1) {
-                result.splice(i, 1, {
-                  ...record,
-                  status: CrontabStatus.running,
-                });
-                setValue(result);
-              }
+              getCrons();
             }
           });
       },
@@ -510,6 +476,7 @@ const Crontab = () => {
   };
 
   const stopCron = (record: any, index: number) => {
+    const stop = createStopRequest([record.id]);
     Modal.confirm({
       title: intl.get('确认停止'),
       content: (
@@ -522,20 +489,10 @@ const Crontab = () => {
         </>
       ),
       onOk() {
-        request
-          .put(`${config.apiPrefix}crons/stop`, [record.id])
+        return stop()
           .then(({ code, data }) => {
             if (code === 200) {
-              const result = [...value];
-              const i = result.findIndex((x) => x.id === record.id);
-              if (i !== -1) {
-                result.splice(i, 1, {
-                  ...record,
-                  pid: null,
-                  status: CrontabStatus.idle,
-                });
-                setValue(result);
-              }
+              getCrons();
             }
           });
       },
@@ -566,16 +523,7 @@ const Crontab = () => {
           )
           .then(({ code, data }) => {
             if (code === 200) {
-              const newStatus = record.isDisabled === 1 ? 0 : 1;
-              const result = [...value];
-              const i = result.findIndex((x) => x.id === record.id);
-              if (i !== -1) {
-                result.splice(i, 1, {
-                  ...record,
-                  isDisabled: newStatus,
-                });
-                setValue(result);
-              }
+              getCrons();
             }
           });
       },
@@ -606,16 +554,7 @@ const Crontab = () => {
           )
           .then(({ code, data }) => {
             if (code === 200) {
-              const newStatus = record.isPinned === 1 ? 0 : 1;
-              const result = [...value];
-              const i = result.findIndex((x) => x.id === record.id);
-              if (i !== -1) {
-                result.splice(i, 1, {
-                  ...record,
-                  isPinned: newStatus,
-                });
-                setValue(result);
-              }
+              getCrons();
             }
           });
       },
@@ -690,30 +629,11 @@ const Crontab = () => {
   };
 
   const onSearch = (value: string) => {
-    setSearchText(value.trim());
-  };
-
-  const getCronDetail = (cron: any) => {
-    request
-      .get(`${config.apiPrefix}crons/${cron.id}`)
-      .then(({ code, data }) => {
-        if (code === 200) {
-          const index = value.findIndex((x) => x.id === cron.id);
-          const result = [...value];
-          data.nextRunTime = getCrontabsNextDate(
-            data.schedule,
-            data.extra_schedules,
-          );
-          if (index !== -1) {
-            result.splice(index, 1, {
-              ...cron,
-              ...data,
-            });
-            setValue(result);
-          }
-        }
-      })
-      .finally(() => setLoading(false));
+    const text = value.trim();
+    if (text !== searchText) {
+      setPageConf(previous => ({ ...previous, page: 1 }));
+      setSearchText(text);
+    }
   };
 
   const onSelectChange = (selectedIds: any[]) => {
@@ -744,6 +664,7 @@ const Crontab = () => {
   };
 
   const operateCrons = (operationStatus: number) => {
+    const stop = operationStatus === OperationPath.stop ? createStopRequest(selectedRowIds) : undefined;
     Modal.confirm({
       title: intl.get('确认操作', {
         operation: intl.get(OperationName[operationStatus]),
@@ -754,6 +675,7 @@ const Crontab = () => {
         </>
       ),
       onOk() {
+        if (stop) return stop().then(() => getCrons());
         request
           .put(
             `${config.apiPrefix}crons/${OperationPath[operationStatus]}`,
@@ -788,24 +710,10 @@ const Crontab = () => {
   };
 
   useEffect(() => {
-    if (logCron) {
-      localStorage.setItem('logCron', logCron.id);
-      setIsLogModalVisible(true);
-    }
-  }, [logCron]);
-
-  useEffect(() => {
-    setPageConf({ ...pageConf, page: 1 });
-  }, [searchText]);
-
-  useEffect(() => {
-    if (pageConf.page && pageConf.size) {
-      getCrons();
-    }
     if (viewConf && viewConf.id) {
       setActiveKey(viewConf.id);
     }
-  }, [pageConf, viewConf]);
+  }, [viewConf]);
 
   useEffect(() => {
     if (viewConf && enabledCronViews && enabledCronViews.length > 0) {
@@ -890,27 +798,29 @@ const Crontab = () => {
     request
       .get(`${config.apiPrefix}crons/views`)
       .then(({ code, data }) => {
-        if (code === 200) {
-          setCronViews(data);
-          const firstEnableView = data
-            .filter((x) => !x.isDisabled)
-            .map((x) => ({
-              ...x,
-              name: x.name === '全部任务' ? intl.get('全部任务') : x.name,
-            }));
-          setEnabledCronViews(firstEnableView);
-          setPageConf({
-            page: 1,
-            size: parseInt(localStorage.getItem('pageSize') || '20'),
-            sorter: {},
-            filters: {},
-          });
-          setViewConf({
-            ...firstEnableView[0],
-          });
+        if (code !== 200) {
+          setLoading(false);
+          return;
         }
+        setCronViews(data);
+        const firstEnableView = data
+          .filter((x) => !x.isDisabled)
+          .map((x) => ({
+            ...x,
+            name: x.name === '全部任务' ? intl.get('全部任务') : x.name,
+          }));
+        setEnabledCronViews(firstEnableView);
+        setPageConf({
+          page: 1,
+          size: parseInt(localStorage.getItem('pageSize') || '20'),
+          sorter: {},
+          filters: {},
+        });
+        setViewConf({
+          ...firstEnableView[0],
+        });
       })
-      .finally(() => {
+      .catch(() => {
         setLoading(false);
       });
   };
@@ -937,7 +847,6 @@ const Crontab = () => {
           style={{ width: 'auto' }}
           enterButton
           allowClear
-          loading={loading}
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
           onSearch={onSearch}
@@ -1039,6 +948,10 @@ const Crontab = () => {
             </span>
           </div>
         )}
+        {listFailed && <div role="status">
+          {intl.get('任务列表刷新失败')}
+          <Button type="link" loading={loading} onClick={getCrons}>{intl.get('重试')}</Button>
+        </div>}
         <Table
           columns={columns}
           sortDirections={['descend', 'ascend']}
@@ -1065,13 +978,14 @@ const Crontab = () => {
           components={isPhone || pageConf.size < 50 ? undefined : vt}
         />
       </div>
-      {isLogModalVisible && (
+      {logCron && (
         <CronLogModal
           handleCancel={() => {
-            getCronDetail(logCron);
-            setIsLogModalVisible(false);
+            setLogCron(null);
+            getCrons();
           }}
-          cron={logCron}
+          key={logCron.id}
+          cron={value.find(row => row.id === logCron.id) ?? logCron}
         />
       )}
       {isModalVisible && (
@@ -1096,6 +1010,7 @@ const Crontab = () => {
               getCrons();
             }
           }}
+          key={detailCron.id}
           cron={detailCron}
           theme={theme}
           isPhone={isPhone}

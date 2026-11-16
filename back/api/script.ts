@@ -1,3 +1,4 @@
+import { directoryCheckHandler, directoryPageHandler } from '../shared/directoryPageRoute';
 import { randomUUID } from 'crypto';
 import { resolveFileAccess } from '../shared/fileAccess';
 import { fileExist, readDirs, readDir, rmPath, IFile } from '../config/util';
@@ -18,6 +19,14 @@ import {
   HistoryUnavailableError,
 } from '../shared/scriptHistory';
 const route = Router();
+const blacklist = [
+          'node_modules',
+          '.git',
+          '.pnpm',
+          'pnpm-lock.yaml',
+          'yarn.lock',
+          'package-lock.json',
+        ];
 
 function isPathAllowed(targetPath: string): boolean {
   const resolved = path.resolve(targetPath);
@@ -75,6 +84,8 @@ const upload = multer({ storage: storage });
 
 export default (app: Router) => {
   app.use('/scripts', route);
+  route.get('/entries', ...directoryPageHandler(() => config.scriptPath, blacklist, false));
+  route.post('/entries/check', ...directoryCheckHandler(() => config.scriptPath, blacklist));
 
   route.get(
     '/',
@@ -87,14 +98,7 @@ export default (app: Router) => {
       const logger: Logger = Container.get('logger');
       try {
         let result: IFile[] = [];
-        const blacklist = [
-          'node_modules',
-          '.git',
-          '.pnpm',
-          'pnpm-lock.yaml',
-          'yarn.lock',
-          'package-lock.json',
-        ];
+
         if (req.query.path) {
           if (
             !resolveFileAccess(config.scriptPath, [req.query.path as string])

@@ -1,7 +1,7 @@
 import IconFont from '@/components/iconfont';
-import useFilterTreeData from '@/hooks/useFilterTreeData';
+import { FileBrowser, FilePicker } from '@/components/fileBrowser';
 import { SharedContext } from '@/layouts';
-import { depthFirstSearch, findNode, getEditorMode } from '@/utils';
+import { getEditorMode } from '@/utils';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
 import { getCodeMirrorExtensions } from '@/utils/codemirror/language';
@@ -22,21 +22,15 @@ import { history, useOutletContext } from '@umijs/max';
 import {
   Button,
   Dropdown,
-  Empty,
-  Input,
   MenuProps,
   message,
   Modal,
   Space,
   Switch,
   Tooltip,
-  Tree,
-  TreeSelect,
   Typography,
 } from 'antd';
 import { saveAs } from 'file-saver';
-import debounce from 'lodash/debounce';
-import uniq from 'lodash/uniq';
 import prettyBytes from 'pretty-bytes';
 import { parse } from 'query-string';
 import { Key, useCallback, useEffect, useRef, useState } from 'react';
@@ -56,20 +50,16 @@ const Script = () => {
   const { headerStyle, isPhone, theme } = useOutletContext<SharedContext>();
   const [value, setValue] = useState(intl.get('请选择脚本文件'));
   const [select, setSelect] = useState<string>(intl.get('请选择脚本文件'));
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [revision, setRevision] = useState(0);
   const [mode, setMode] = useState('');
-  const [height, setHeight] = useState<number>();
-  const treeDom = useRef<any>();
+  const [directory, setDirectory] = useState('');
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
-  const [searchValue, setSearchValue] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const editorRef = useRef<any>(null);
   const [isAddFileModalVisible, setIsAddFileModalVisible] = useState(false);
   const [isRenameFileModalVisible, setIsRenameFileModalVisible] =
     useState(false);
   const [currentNode, setCurrentNode] = useState<any>();
-  const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const [showMonaco, setShowMonaco] = useState(true);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -81,6 +71,9 @@ const Script = () => {
   const savingRef = useRef(false);
   const savedContentRef = useRef('');
   const currentKeyRef = useRef(currentNode?.key);
+  const detailRequest = useRef<AbortController>();
+  const [readState, setReadState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  useEffect(() => () => detailRequest.current?.abort(), []);
   currentKeyRef.current = currentNode?.key;
 
   useEffect(() => {
@@ -91,7 +84,7 @@ const Script = () => {
     const content =
       !isPhone && editorRef.current ? editorRef.current.getValue() : value;
     return (
-      isEditing &&
+      isEditing && readState === 'ready' &&
       content.replace(/\r\n/g, '\n') !==
         savedContentRef.current.replace(/\r\n/g, '\n')
     );
@@ -101,36 +94,28 @@ const Script = () => {
     setIsEditing(value && canPreviewInMonaco(filename));
   };
 
-  const getScripts = (needLoading: boolean = true) => {
-    needLoading && setLoading(true);
-    request
-      .get(`${config.apiPrefix}scripts`)
-      .then(({ code, data }) => {
-        if (code === 200) {
-          setData(data);
-          initState();
-          initGetScript(data);
-        }
-      })
-      .finally(() => needLoading && setLoading(false));
-  };
-
   const getDetail = (node: any, options: any = {}) => {
+    detailRequest.current?.abort();
+    const controller = new AbortController();
+    detailRequest.current = controller;
+    setReadState('loading');
     request
       .get(
         `${config.apiPrefix}scripts/detail?file=${encodeURIComponent(
           node.title,
-        )}&path=${encodeURIComponent(node.parent || '')}`,
+        )}&path=${encodeURIComponent(node.parent || '')}`, { signal: controller.signal, retryInPlace: true },
       )
       .then(({ code, data }) => {
-        if (code === 200 && currentKeyRef.current === node.key) {
+        if (controller.signal.aborted || currentKeyRef.current !== node.key) return;
+        if (code === 200) {
+          setReadState('ready');
           savedContentRef.current = data;
           setValue(data);
           if (options.callback) {
             options.callback();
           }
-        }
-      });
+        } else setReadState('failed');
+      }).catch(() => { if (!controller.signal.aborted) setReadState('failed'); });
   };
 
   const downloadScript = () => {
@@ -148,31 +133,14 @@ const Script = () => {
       });
   };
 
-  const initGetScript = (_data: any) => {
-    const { p, s } = parse(history.location.search);
-    if (s) {
-      const vkey = `${p}/${s}`;
-      const obj = {
-        node: {
-          title: s,
-          key: p ? vkey : s,
-          parent: p,
-        },
-      };
-      const item = findNode(_data, (c) => c.key === obj.node.key);
-      if (item) {
-        obj.node = item;
-        setExpandedKeys([p as string]);
-        onTreeSelect([vkey], obj);
-      }
-    }
-  };
-
   const onSelect = (value: any, node: any) => {
     if (node.key === select || !value) {
       return;
     }
 
+    detailRequest.current?.abort();
+    setReadState('loading');
+    currentKeyRef.current = node.key;
     setSelect(node.key);
     setCurrentNode(node);
 
@@ -192,13 +160,7 @@ const Script = () => {
     setMode(isPhone && newMode === 'typescript' ? 'javascript' : newMode);
     setValue(intl.get('加载中...'));
 
-    getDetail(node, {
-      callback: () => {
-        if (isEditing) {
-          setIsEditing(true);
-        }
-      },
-    });
+    getDetail(node);
   };
 
   const onTreeSelect = useCallback(
@@ -213,7 +175,7 @@ const Script = () => {
         : value;
       const originalContent = savedContentRef.current.replace(/\r\n/g, '\n');
 
-      if (currentContent !== originalContent && isEditing) {
+      if (currentContent !== originalContent && isEditing && readState === 'ready') {
         Modal.confirm({
           title: intl.get('确认离开'),
           content: <>{intl.get('当前文件未保存，确认离开吗')}</>,
@@ -227,50 +189,17 @@ const Script = () => {
         onSelect(keys[0], e.node);
       }
     },
-    [value, select, isEditing],
+    [value, select, isEditing, readState],
   );
-
-  const onSearch = useCallback(
-    (e) => {
-      const keyword = e.target.value;
-      debounceSearch(keyword);
-    },
-    [data],
-  );
-
-  const debounceSearch = useCallback(
-    debounce((keyword) => {
-      setSearchValue(keyword);
-    }, 300),
-    [data],
-  );
-
-  const { treeData: filterData, keys: searchExpandedKeys } = useFilterTreeData(
-    data,
-    searchValue,
-    { treeNodeFilterProp: 'title' },
-  );
-
-  useEffect(() => {
-    setExpandedKeys(uniq([...expandedKeys, ...searchExpandedKeys]));
-  }, [searchExpandedKeys]);
-
-  const onExpand = (expKeys: any) => {
-    setExpandedKeys(expKeys);
-  };
 
   const onDoubleClick = (e: any, node: any) => {
-    if (node.type === 'file') {
-      setSelect(node.key);
-      setCurrentNode(node);
+    if (node.type === 'file' && node.key === currentKeyRef.current) {
       handleIsEditing(node.title, true);
     }
   };
 
   const editFile = () => {
-    setTimeout(() => {
-      handleIsEditing(currentNode.title, true);
-    }, 300);
+    handleIsEditing(currentNode.title, true);
   };
 
   const cancelEdit = () => {
@@ -280,8 +209,9 @@ const Script = () => {
   };
 
   const saveFile = async () => {
-    if (savingRef.current || !currentNode) return;
+    if (savingRef.current || !currentNode || readState !== 'ready') return;
     const node = currentNode;
+    const selection = detailRequest.current;
     const content =
       !isPhone && editorRef.current
         ? editorRef.current.getValue().replace(/\r\n/g, '\n')
@@ -298,7 +228,7 @@ const Script = () => {
           content,
         },
       );
-      if (result?.code === 200 && currentKeyRef.current === node.key) {
+      if (result?.code === 200 && currentKeyRef.current === node.key && selection === detailRequest.current && !selection?.signal.aborted) {
         savedContentRef.current = content;
         setValue(content);
         handleIsEditing(node.title, false);
@@ -338,21 +268,7 @@ const Script = () => {
           .then(({ code }) => {
             if (code === 200) {
               message.success(intl.get('删除成功'));
-              let newData = [...data];
-              if (currentNode.parent) {
-                newData = depthFirstSearch(
-                  newData,
-                  (c) => c.key === currentNode.key,
-                );
-              } else {
-                const index = newData.findIndex(
-                  (x) => x.key === currentNode.key,
-                );
-                if (index !== -1) {
-                  newData.splice(index, 1);
-                }
-              }
-              setData(newData);
+              setRevision(n => n + 1);
               initState();
             }
           });
@@ -366,7 +282,8 @@ const Script = () => {
 
   const handleRenameFileCancel = () => {
     setIsRenameFileModalVisible(false);
-    getScripts(false);
+    setRevision(n => n + 1);
+    initState();
   };
 
   const addFile = () => {
@@ -386,46 +303,32 @@ const Script = () => {
     },
   ) => {
     if (filename) {
-      const res = await request.get(`${config.apiPrefix}scripts`);
-      let newData = res.data;
-      if (type === 'directory' && filename.includes('/')) {
-        const parts = filename.split('/');
-        parts.pop();
-        const parentPath = parts.join('/');
-        path = path ? `${path}/${parentPath}` : parentPath;
-      }
-      const item = findNode(newData, (c) => c.key === key);
-      if (path) {
-        const keys = path.split('/');
-        const sKeys: string[] = [];
-        keys.reduce((p, c) => {
-          sKeys.push(p);
-          return `${p}/${c}`;
-        });
-        setExpandedKeys([...expandedKeys, ...sKeys, path]);
-      }
-      setData(newData);
-      onSelect(item.title, item);
+      const parts = key.split('/');
+      const item = { key, title: parts.pop()!, parent: parts.join('/'), type };
+      setDirectory(item.parent);
+      setRevision(n => n + 1);
+      onSelect(key, item);
       handleIsEditing(item.title, true);
     }
     setIsAddFileModalVisible(false);
   };
 
   const initState = () => {
+    detailRequest.current?.abort();
     setSelect(intl.get('请选择脚本文件'));
     setCurrentNode(null);
     setValue(intl.get('请选择脚本文件'));
   };
 
   useEffect(() => {
-    getScripts();
-  }, []);
-
-  useEffect(() => {
-    if (treeDom.current) {
-      setHeight(treeDom.current.clientHeight - 6);
+    const { p, s } = parse(history.location.search);
+    if (typeof s === 'string' && s) {
+      const parent = typeof p === 'string' ? p : '';
+      const key = parent ? parent + '/' + s : s;
+      setDirectory(parent);
+      onSelect(key, { key, parent, title: s, type: 'file' });
     }
-  }, [treeDom.current, data]);
+  }, []);
 
   useHotkeys(
     'mod+s',
@@ -563,7 +466,8 @@ const Script = () => {
       title={
         <>
           {select}
-          {currentNode?.type === 'file' && (
+          {currentNode && readState === 'failed' && <Button type="link" onClick={() => getDetail(currentNode)}>{intl.get('重试')}</Button>}
+          {currentNode?.size != null && (
             <span
               style={{
                 marginLeft: 6,
@@ -578,7 +482,6 @@ const Script = () => {
           )}
         </>
       }
-      loading={loading}
       extra={[
         <Space key="word-wrap" size={8}>
           <span>{intl.get('自动换行')}</span>
@@ -602,26 +505,14 @@ const Script = () => {
           : []),
         ...(isPhone
           ? [
-              <TreeSelect
-                treeExpandAction="click"
-                className="log-select"
-                value={select}
-                dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
-                treeData={data}
-                placeholder={intl.get('请选择脚本')}
-                fieldNames={{ value: 'key' }}
-                treeNodeFilterProp="title"
-                showSearch
-                allowClear
-                onSelect={(key, node) => onTreeSelect([key], { node })}
-              />,
+              <FilePicker source="scripts" value={select} revision={revision} initialDirectory={directory} onSelect={node => onTreeSelect([node.key], { node })} />,
               <Dropdown menu={menu} trigger={['click']}>
                 <Button type="primary" icon={<EllipsisOutlined />} />
               </Dropdown>,
             ]
           : isEditing
           ? [
-              <Button type="primary" onClick={saveFile} loading={saving}>
+              <Button type="primary" onClick={saveFile} loading={saving} disabled={readState !== 'ready'}>
                 {intl.get('保存')}
               </Button>,
               <Button type="primary" onClick={cancelEdit}>
@@ -693,6 +584,9 @@ const Script = () => {
           hasUnsavedChanges={hasUnsavedChanges}
           onClose={() => setHistoryVisible(false)}
           onRestored={(content) => {
+            detailRequest.current?.abort();
+            detailRequest.current = undefined;
+            setReadState('ready');
             savedContentRef.current = content;
             setValue(content);
             setIsEditing(false);
@@ -704,45 +598,7 @@ const Script = () => {
           /*// @ts-ignore*/
           <SplitPane split="vertical" size={200} maxSize={-100}>
             <div className={styles['left-tree-container']}>
-              {data.length > 0 ? (
-                <>
-                  <Input.Search
-                    className={styles['left-tree-search']}
-                    onChange={onSearch}
-                    placeholder={intl.get('请输入脚本名')}
-                    allowClear
-                  ></Input.Search>
-                  <div className={styles['left-tree-scroller']} ref={treeDom}>
-                    <Tree
-                      expandAction="click"
-                      className={styles['left-tree']}
-                      treeData={filterData}
-                      showIcon={true}
-                      height={height}
-                      selectedKeys={[select]}
-                      expandedKeys={expandedKeys}
-                      onExpand={onExpand}
-                      showLine={{ showLeafIcon: true }}
-                      onSelect={onTreeSelect}
-                      onDoubleClick={onDoubleClick}
-                    ></Tree>
-                  </div>
-                </>
-              ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '100%',
-                  }}
-                >
-                  <Empty
-                    description={intl.get('暂无脚本')}
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  />
-                </div>
-              )}
+              <FileBrowser source="scripts" value={select} revision={revision} initialDirectory={directory} onSelect={node => onTreeSelect([node.key], { node })} onDoubleClick={node => onDoubleClick(null, node)} />
             </div>
             {showMonaco ? (
               <Editor
@@ -750,7 +606,7 @@ const Script = () => {
                 value={value}
                 theme={theme}
                 options={{
-                  readOnly: !isEditing || saving,
+                  readOnly: !isEditing || saving || readState !== 'ready',
                   fontSize: 12,
                   lineNumbersMinChars: 3,
                   glyphMargin: false,
@@ -774,7 +630,7 @@ const Script = () => {
               ...(wordWrap ? [EditorView.lineWrapping] : []),
             ]}
             theme={theme.includes('dark') ? 'dark' : 'light'}
-            readOnly={!isEditing || saving}
+            readOnly={!isEditing || saving || readState !== 'ready'}
             onChange={(value) => {
               setValue(value);
             }}
@@ -782,7 +638,6 @@ const Script = () => {
         )}
         {isLogModalVisible && isLogModalVisible && (
           <EditModal
-            treeData={data}
             currentNode={currentNode}
             content={value}
             wordWrap={wordWrap}
@@ -794,7 +649,6 @@ const Script = () => {
         )}
         {isAddFileModalVisible && (
           <EditScriptNameModal
-            treeData={data}
             handleCancel={addFileModalClose}
           />
         )}

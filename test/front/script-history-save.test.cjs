@@ -3,6 +3,35 @@ const test = require('node:test');
 const path = require('node:path');
 const load = require('../helpers/load-security-module.cjs');
 
+test('debugger keeps the selected script when an older read completes after it', async () => {
+  const ts = require('typescript');
+  const file = path.resolve(__dirname, '../../src/pages/script/editModal.tsx');
+  const source = ts.createSourceFile(file, require('fs').readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+  let read;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(source) === 'getDetail')
+      read = node.initializer.getText(source);
+    ts.forEachChild(node, visit);
+  }
+  visit(source);
+  const js = ts.transpile('const read = ' + read, { target: ts.ScriptTarget.ES2022 });
+  const responses = [], ready = [], contents = [];
+  const get = Function('request', 'pendingFile', 'setFileReady', 'setValue', 'config', js + '\nreturn read;')(
+    { get: (_url, { signal }) => new Promise(resolve => responses.push({ resolve, signal })) },
+    { current: undefined }, state => ready.push(state), text => contents.push(text), { apiPrefix: '/api/' },
+  );
+  get({ title: 'slow.js' });
+  get({ title: 'current.js' });
+  assert.equal(responses[0].signal.aborted, true);
+  assert.equal(ready.at(-1), false);
+  responses[1].resolve({ code: 200, data: 'current' });
+  await tick();
+  responses[0].resolve({ code: 200, data: 'stale' });
+  await tick();
+  assert.deepEqual(contents, ['', '', 'current']);
+  assert.equal(ready.at(-1), true);
+});
+
 function fixture(send) {
   const dialogs = [],
     notices = [],

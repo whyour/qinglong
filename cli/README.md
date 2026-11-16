@@ -43,7 +43,7 @@ ql auth logout --json
 
 ## 全量 OpenAPI 管理
 
-现在还支持任务/订阅创建、修改、删除，应用管理与密钥重置，以及环境变量、配置、脚本、日志、依赖、系统、仪表盘和用户管理。`ql api routes --json` 列出全部 143 条有效路由；3 条已下线文件读取接口不包含在内。新增命令在 [完整双语参考](skills/qinglong-cli/references/openapi.md) 中逐项列出，路由覆盖由 CI 与后端代码核对。
+现在还支持任务/订阅创建、修改、删除，应用管理与密钥重置，以及环境变量、配置、脚本、日志、依赖、系统、仪表盘和用户管理。`ql api routes --json` 列出当前版本的有效路由；3 条已下线文件读取接口不包含在内。新增命令在 [完整双语参考](skills/qinglong-cli/references/openapi.md) 中逐项列出，路由覆盖由 CI 与后端代码核对。
 
 ```sh
 ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
@@ -68,7 +68,7 @@ ql api request PUT /open/crons/run --data '[12,13]' --json
 
 ### 应用凭据登录
 
-在面板创建专用应用，按需授予 crons、subscriptions 等权限。旧 scope 保留原有权限；仅读取时可选用 `crons:read`、`subscriptions:read`、`envs:read`、`configs:read`、`scripts:read`、`dependencies:read`、`logs:read`、`dashboard:read`。脚本和日志下载虽使用 POST，也允许对应只读权限；`GET /crons/import` 会写入任务，不属于只读操作。`login` 与 `auth login` 等价；交互输入 Client ID 和不回显的 Client Secret，密钥不支持命令行参数。
+在面板创建专用应用，按需授予 crons、subscriptions 等权限。旧 scope 保留原有权限；仅读取时可选用 `crons:read`、`subscriptions:read`、`envs:read`、`configs:read`、`scripts:read`、`dependencies:read`、`logs:read`、`dashboard:read`。脚本和日志的只读权限也允许通过 POST 下载文件和校验目录版本；`GET /crons/import` 会写入任务，不属于只读操作。`login` 与 `auth login` 等价；交互输入 Client ID 和不回显的 Client Secret，密钥不支持命令行参数。
 
 ```sh
 ql login --url https://ql.example.com

@@ -166,3 +166,88 @@ os.environ['NOTIFY_READY'] = '1'
 assert QLAPI.notify('retry') == ('retry',)
 `);
 });
+
+for (const extension of ['js', 'mjs', 'py']) {
+  test(`the ${extension} entry marker appears after hooks and before the first user instruction`, (t) => {
+    const f = fixture(t, extension === 'py' ? 'python' : 'javascript');
+    const marker = path.join(f.root, 'started');
+    f.env.QL_SCRIPT_START_FILE = marker;
+    f.env.QL_SCRIPT_ENTRY = path.join(fs.realpathSync(f.root), 'entry.' + extension);
+    fs.copyFileSync('shell/preload/script-start.cjs', path.join(f.root, 'script-start.cjs'));
+    f.write('before.sh', 'test ! -e "$QL_SCRIPT_START_FILE" && touch "$dir_scripts/hook-ran"\n');
+    const read = "const stamp = Number(fs.readFileSync(process.env.QL_SCRIPT_START_FILE, 'utf8'));";
+    const check = "if (!Number.isSafeInteger(stamp) || stamp <= 0 || stamp > Date.now()) throw Error('invalid entry timestamp');";
+    if (extension === 'py') {
+      f.run("assert 0 < int(open(__import__('os').environ['QL_SCRIPT_START_FILE']).read()) <= __import__('time').time_ns() // 1000000\n");
+    } else if (extension === 'mjs') {
+      f.write('dependency.mjs', "import fs from 'node:fs'; if (fs.existsSync(process.env.QL_SCRIPT_START_FILE)) throw Error('entry reported during dependency evaluation');");
+      f.run("import './dependency.mjs';\nimport fs from 'node:fs';\n" + read + check, extension);
+    } else {
+      f.run("const fs = require('node:fs'); " + read + check);
+    }
+    assert.ok(fs.existsSync(path.join(f.root, 'hook-ran')));
+  });
+}
+
+test('the panel client defers gRPC until an API call, uses panel dependencies and shares one channel', (t) => {
+  const f = fixture(t, 'javascript');
+  f.env.QL_DIR = f.root;
+  f.env.QL_NODE_GLOBAL_PATH = path.join(f.root, 'global');
+  fs.copyFileSync('shell/preload/client.js', path.join(f.root, 'client.js'));
+  function packageFile(base, name, source) {
+    const dir = path.join(base, 'node_modules', name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'index.js'), source);
+  }
+  packageFile(f.env.QL_NODE_GLOBAL_PATH, '@grpc/grpc-js', 'exports.fromGlobal = true;');
+  packageFile(f.root, '@grpc/proto-loader', `
+    exports.loadSync = () => {
+      if (process.env.FAIL_PROTO === '1') throw Error('missing proto');
+      return {};
+    };
+  `);
+  packageFile(f.root, '@grpc/grpc-js', `
+    global.grpcLoads = (global.grpcLoads || 0) + 1;
+    exports.credentials = { createInsecure: () => ({}) };
+    exports.Metadata = class {};
+    class Api {
+      constructor() { global.channels = (global.channels || 0) + 1; }
+      GetEnvs(params, metadata, options, callback) { callback(null, params); }
+      close() { global.closes = (global.closes || 0) + 1; }
+    }
+    exports.loadPackageDefinition = () => ({com: { ql: { api: {Api} }}});
+  `);
+  f.run(`
+    const assert = require('node:assert/strict');
+    (async () => {
+      assert.equal(global.grpcLoads, undefined);
+      assert.equal(require('@grpc/grpc-js').fromGlobal, true);
+      const { getEnvs } = QLAPI;
+      assert.deepEqual(await Promise.all([getEnvs({n:1}), getEnvs({n:2})]), [{n:1},{n:2}]);
+      assert.equal(global.grpcLoads, 1);
+      assert.equal(global.channels, 1);
+      QLAPI.close(); QLAPI.close();
+      assert.equal(global.closes, 1);
+      await assert.rejects(getEnvs(), /Channel has been shut down/);
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  `);
+  f.run(`
+    const assert = require('node:assert/strict');
+    (async () => {
+      process.env.FAIL_PROTO = '1';
+      await assert.rejects(QLAPI.getEnvs(), /missing proto/);
+      assert.equal(global.channels, undefined);
+      delete process.env.FAIL_PROTO;
+      assert.deepEqual(await QLAPI.getEnvs(), {});
+      assert.equal(global.channels, 1);
+      QLAPI.close();
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  `);
+  f.run(`
+    const assert = require('node:assert/strict');
+    QLAPI.close();
+    assert.rejects(QLAPI.getEnvs(), /Channel has been shut down/)
+      .then(() => assert.equal(global.grpcLoads, undefined))
+      .catch(error => { console.error(error); process.exitCode = 1; });
+  `);
+});

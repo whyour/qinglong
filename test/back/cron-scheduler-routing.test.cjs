@@ -16,9 +16,9 @@ test('system and node modes route extended cron once and keep portable rules in 
   for (const mode of ['system', 'node']) {
     const module = { exports: {} };
     let file = '', installs = 0;
-    new Function('module', 'process', 'execSync', 'ScheduleType', 'config', 'writeFileWithLock', 'CrontabModel', js)(
+    new Function('module', 'process', 'execFileSync', 'ScheduleType', 'config', 'writeFileWithLock', 'CrontabModel', 'shellQuote', 'stageSystemPlan', 'confirmSystemPlan', 'suspendSystemPlan', js)(
       module, { env: { QL_SCHEDULER: mode } }, () => { installs++; }, ScheduleType,
-      { crontabFile: '/unused' }, async (_, data) => { file = data; }, { update: async () => {} },
+      { crontabFile: '/unused' }, async (_, data) => { file = data; }, { update: async () => {} }, require('../../back/shared/shellQuote').shellQuote, async () => 1, async () => {}, async () => {},
     );
     const service = new module.exports();
     service.makeCommand = (row) => `task ${row.id}.js`;

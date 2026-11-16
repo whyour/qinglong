@@ -759,6 +759,7 @@ test('lifecycle reports share execution identity and statistics survive a reject
     ref_id: 12,
     code: 9,
     elapsed: result.durationSeconds,
+    execution_id: result.executionId,
   });
   assert.match(
     fs.readFileSync(path.join(context.paths.dir_log, result.logPath), 'utf8'),

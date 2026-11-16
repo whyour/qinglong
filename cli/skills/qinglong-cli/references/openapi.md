@@ -1,18 +1,28 @@
 # OpenAPI 全量参考 / Complete OpenAPI reference
 
-CLI 对应本版本后端的 151 条有效路由。通过 `ql api routes --json` 查看方法、路径、对应命令、位置参数、请求体与上传字段；CLI 测试与 back/api 路由逐项核对。GET configs/:file、scripts/:file、logs/:file 已返回 410，改用 detail 命令，不再暴露旧入口。旧版面板可能没有新路由，以服务端响应为准。
+CLI 对应本版本后端的有效路由。通过 `ql api routes --json` 查看方法、路径、对应命令、位置参数、请求体与上传字段；CLI 测试与 back/api 路由逐项核对。GET configs/:file、scripts/:file、logs/:file 已返回 410，改用 detail 命令，不再暴露旧入口。旧版面板可能没有新路由，以服务端响应为准。
 
-The catalogue covers 151 active routes in the current backend. `ql api routes --json` lists methods, paths, commands, positional parameters, bodies and upload fields. A route-coverage test detects drift. Three retired GET :file routes return 410; use detail-based commands. Older panel versions may not implement newer routes.
+The catalogue covers the active routes in the current backend. `ql api routes --json` lists methods, paths, commands, positional parameters, bodies and upload fields. A route-coverage test detects drift. Three retired GET :file routes return 410; use detail-based commands. Older panel versions may not implement newer routes.
+
+日志和脚本分页返回 `versions`。应用可将已浏览目录的版本按每组 1 到 128 项交给同一资源的 `entries-check --data`。返回 `current: false` 时，从第一页重新读取。
+
+Log and script pages return `versions`. Pass the visited directories’ versions to the matching `entries-check --data` command in groups of 1 to 128. Restart pagination when it returns `current: false`.
+
+`ql task instances <id>` 默认返回该任务的完整运行历史，按启动时间倒序。显式传 `--query '{"paged":true,"limit":25}'` 后按实例 ID 倒序分页（默认 25，最多 100），将返回的 `next` 作为下一页的 `before`，直到 `next` 为 `null`。刷新指定实例可传 `{"paged":true,"ids":"12,13"}`。触发记录使用独立的 `task triggers` 接口，日志和脚本目录分页使用 `log entries` 和 `script entries`。
+
+`ql task instances <id>` returns the full history ordered by start time by default. Opt in with `--query '{"paged":true,"limit":25}'` to page by descending instance ID (default 25, maximum 100). Pass `next` as `before` until `next` is `null`. Use `{"paged":true,"ids":"12,13"}` to refresh specific rows. Trigger history and directory pagination use separate endpoints.
+
+直接调用 `PUT /open/crons/stop` 时，请求体为任务 ID 数组。需要安全重试的调用方应在首次发送前生成 UUID，放入 `Idempotency-Key` 请求头，并在该操作的所有重试中复用。相同键只处理第一次受理时的实例和排队记录，换用不同任务集合会返回 409。主动发起新的停止操作时使用新键。未携带键的旧客户端每次调用都会停止当前任务实例。
 
 ## 认证与权限 / Authentication and permissions
 
-常规使用 `ql login` 的应用凭据。scope 通常对应 /open 后首个路径段：crons、subscriptions、envs、configs、scripts、logs、dependencies、system、dashboard 等。旧 scope 保留原有权限；上述资源除 system 外可选用对应的 `:read` scope。`crons:read` 不包含会写入任务的 `GET /crons/import`；`scripts:read`、`logs:read` 包含使用 POST 的下载，不包含写入、删除或执行。`dashboard:read` 不允许 POST 统计上报。外部应用的 `system` scope 仅允许读取系统状态和发送通知。应用管理需要 apps；`GET /apps` 会返回 Client Secret，因此不提供 `apps:read`。user、health、update 等路由同样接受服务端权限校验。路由存在不代表现有应用已获授权。
+常规使用 `ql login` 的应用凭据。scope 通常对应 /open 后首个路径段：crons、subscriptions、envs、configs、scripts、logs、dependencies、system、dashboard 等。旧 scope 保留原有权限；上述资源除 system 外可选用对应的 `:read` scope。`crons:read` 不包含会写入任务的 `GET /crons/import`；`scripts:read`、`logs:read` 包含使用 POST 的下载和目录版本校验，不包含写入、删除或执行。`dashboard:read` 不允许 POST 统计上报。外部应用的 `system` scope 仅允许读取系统状态和发送通知。应用管理需要 apps；`GET /apps` 会返回 Client Secret，因此不提供 `apps:read`。user、health、update 等路由同样接受服务端权限校验。路由存在不代表现有应用已获授权。
 
 认证步骤、环境变量优先级、应用登录、面板会话与双因素验证、退出行为，统一见 [认证参考](panel.md#authentication)。应用管理可用已有 apps 权限的应用或授权面板会话；后端创建和更新应用时拒绝授予 apps 权限。QL_URL/QL_ACCESS_TOKEN 不保存、不刷新，不自动退回应用配置。
 
 See the [authentication reference](panel.md#authentication) for application login, direct-token precedence, owner sessions/2FA and logout. App management accepts existing apps-scoped credentials or an authorized owner session; the backend rejects granting apps scope when creating or updating an application. Direct tokens are not saved/refreshed and never fall back to application configuration.
 
-Existing scopes retain their original access. Use the resource's `:read` scope for read-only access to crons, subscriptions, envs, configs, scripts, dependencies, logs, or dashboard. `crons:read` excludes the mutating `GET /crons/import`; `scripts:read` and `logs:read` include downloads (POST), but exclude writes, deletion, and execution. `dashboard:read` excludes statistics reporting (POST). External `system` applications may only read system status and send notifications. `GET /apps` returns Client Secrets, so there is no `apps:read` scope.
+Existing scopes retain their original access. Use the resource's `:read` scope for read-only access to crons, subscriptions, envs, configs, scripts, dependencies, logs, or dashboard. `crons:read` excludes the mutating `GET /crons/import`; `scripts:read` and `logs:read` include downloads and directory version checks (POST), but exclude writes, deletion, and execution. `dashboard:read` excludes statistics reporting (POST). External `system` applications may only read system status and send notifications. `GET /apps` returns Client Secrets, so there is no `apps:read` scope.
 
 `auth status --scope <scope>` tests a representative read; update has no read endpoint and is not offered by status. This does not prove permission for every write. `app list/create/update/reset-secret` 默认隐藏 client_secret/tokens；只有明确需要凭据时才加 --show-secrets，并避免把输出记录到共享日志。其他资源/通用请求可能含环境值、配置、脚本、订阅凭据和会话，按敏感数据处理。
 
@@ -90,6 +100,7 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql task view-enable <id...>` | PUT | `crons/views/enable` | --query |
 | `ql task list ` | GET | `crons` | --query via api request |
 | `ql task detail ` | GET | `crons/detail` | --query |
+| `ql task preview` | GET | `crons/preview` | --query '{"schedule":"0 6 * * *"}' |
 | `ql task create ` | POST | `crons` | --data, --query |
 | `ql task run <id...>` | PUT | `crons/run` | --query via api request |
 | `ql task stop <id...>` | PUT | `crons/stop` | --query via api request |
@@ -105,6 +116,8 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql task import ` | GET | `crons/import` | --query |
 | `ql task get <id>` | GET | `crons/:id` | --query via api request |
 | `ql task status ` | PUT | `crons/status` | --data, --query |
+| `ql task daily-results <id>` | GET | `crons/:id/daily-results` | Verified exits and booked results for the last seven days |
+| `ql task triggers <id>` | GET | `crons/:id/triggers` | --query '{"offset":0}' |
 | `ql task instances <id>` | GET | `crons/:id/instances` | --query |
 | `ql task instance-stop <id> <instanceId>` | POST | `crons/:id/instances/:instanceId/stop` | --query |
 | `ql task log-files <id>` | GET | `crons/:id/logs` | --query |
@@ -146,6 +159,8 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql config save ` | POST | `configs/save` | --data, --query |
 | `ql script list ` | GET | `scripts` | --query |
 | `ql script get ` | GET | `scripts/detail` | --query |
+| `ql script entries ` | GET | `scripts/entries` | --query |
+| `ql script entries-check ` | POST | `scripts/entries/check` | --data, --query |
 | `ql script history-list ` | GET | `scripts/history` | --query |
 | `ql script history-detail ` | GET | `scripts/history/detail` | --query |
 | `ql script history-restore ` | PUT | `scripts/history/restore` | --data, --query |
@@ -158,6 +173,8 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql script rename ` | PUT | `scripts/rename` | --data, --query |
 | `ql log list ` | GET | `logs` | --query |
 | `ql log get ` | GET | `logs/detail` | --query |
+| `ql log entries ` | GET | `logs/entries` | --query |
+| `ql log entries-check ` | POST | `logs/entries/check` | --data, --query |
 | `ql log delete ` | DELETE | `logs` | --data, --query |
 | `ql log download ` | POST | `logs/download` | --data, --output, --query |
 | `ql dependency list ` | GET | `dependencies` | --query |

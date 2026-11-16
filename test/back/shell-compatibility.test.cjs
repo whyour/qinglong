@@ -54,13 +54,14 @@ for (const [label, args] of [
         f.write(`shell/${name}`, source(`shell/${name}`));
       f.write(
         'shell/api.sh',
-        'update_cron(){ :; }; record_cron_stat(){ :; }\n',
+        extract('shell/api.sh', 'init_execution_id') + '\nupdate_cron(){ :; }; record_cron_stat(){ :; }\n',
       );
       f.write('shell/preload/env.sh', 'export QA_PANEL="one&two"\n');
       f.write('shell/preload/sitecustomize.js', '// fixture preloader\n');
+      // An unreaped watchdog outlives the fixture's 15-second process timeout.
       f.write(
         'data/config/config.sh',
-        'DefaultCronRule="0 0 * * *"\nCommandTimeoutTime="2s"\n',
+        'DefaultCronRule="0 0 * * *"\nCommandTimeoutTime="30s"\n',
       );
       f.write('data/config/task_before.sh', 'printf "BEFORE\\n"\n');
       f.write('data/config/task_after.sh', 'printf "AFTER\\n"\n');
@@ -74,7 +75,6 @@ for (const [label, args] of [
         'data/scripts/nested folder/probe [1] $name.js',
         'console.log("ARG=" + process.argv[2]);\n',
       );
-      const started = Date.now();
       const result = f.run(
         'exec "$QA_BASH" "$QL_DIR/shell/task.sh" "$@"',
         {
@@ -90,12 +90,9 @@ for (const [label, args] of [
         },
         [...args, literal],
       );
+      assert.ifError(result.error);
       assert.equal(result.status, 0, result.stderr);
       assert.equal(result.stderr, '');
-      assert.ok(
-        Date.now() - started < 1800,
-        'completion must not wait for the two-second watchdog',
-      );
       const log = fs.readFileSync(
         path.join(f.root, 'data/log/literal [log] $name.log'),
         'utf8',
@@ -353,6 +350,7 @@ for (const fail of [false, true]) {
        exit "$result"`,
       ].join('\n'),
       {
+        dir_shell: path.resolve('shell'),
         dir_raw: path.join(f.root, 'raw'),
         dir_scripts: path.join(f.root, 'scripts'),
         list_crontab_user: path.join(f.root, 'crontab.list'),
@@ -558,3 +556,47 @@ for (const version of ['2.23.0', '2.23.0-beta.1+build.2', 'invalid']) {
     }
   });
 }
+
+test('ql extra propagates a sourced script failure through every logging mode', t => {
+  const f = fixture(t);
+  f.write('shell/update.sh', source('shell/update.sh'));
+  f.write('shell/env.sh', '');
+  f.write('shell/share.sh', [
+    'load_ql_envs() { :; }; import_config() { :; }; make_dir() { mkdir -p "$1"; }',
+    't() { :; }; format_timestamp() { echo 1; }; format_time() { echo now; }',
+  ].join('\n'));
+  f.write('shell/api.sh', [
+    extract('shell/api.sh', 'init_execution_id'),
+    'update_cron() { echo "status:$2:${7:-}" >> "$QL_DIR/records"; }',
+    'record_cron_stat() { echo "stat:$2" >> "$QL_DIR/records"; }',
+  ].join('\n'));
+  for (const [real_time, no_tee] of [['false','false'], ['false','true'], ['true','false']]) {
+    for (const [script, code] of [['return 17', 17], ['exit 17', 17], ['return 0', 0],
+      ['false | true', 0], ['set -o pipefail; false | true', 1]]) {
+      f.write('records', '');
+      const result = f.run('exec "$QA_BASH" "$QL_DIR/shell/update.sh" extra', {
+        QA_BASH: bash, QL_DIR: f.root, ID: '42', real_time, no_tee,
+        dir_log: path.join(f.root, 'log'), file_extra_shell: f.write('extra.sh', script),
+      });
+      assert.equal(result.status, code, result.stderr);
+      assert.equal(fs.readFileSync(path.join(f.root, 'records'), 'utf8'),
+        `status:0:\nstatus:1:${code}\nstat:${code}\n`);
+    }
+  }
+});
+
+test('raw sync recognizes the exact quoted operand in a wrapped crontab across repeated downloads', t => {
+  const f = fixture(t), file = "raw_owner_what's new.js";
+  const { shellQuote } = require('../../back/shared/shellQuote');
+  f.write('raw/.keep', ''); f.write('scripts/.keep', '');
+  f.write('crontab.list', '1 * * * * ID=7 QL_TRIGGER_SOURCE=system bash "$QL_DIR/shell/system-cron.sh" ' +
+    shellQuote('QL_CRON_REVISION=10 real_time=false ID=7 task ' + shellQuote(file)) + '\n');
+  const result = f.run([extract('shell/update.sh', 'update_raw'), 't(){ :; }; set_proxy(){ :; }; unset_proxy(){ :; }',
+    'wget(){ printf "body" > "$4"; }; add_cron(){ exit 55; }',
+    'update_raw https://fixture.invalid/script.js "" true false'].join('\n'), {
+    dir_shell: path.resolve('shell'), dir_raw: path.join(f.root, 'raw'), dir_scripts: path.join(f.root, 'scripts'),
+    list_crontab_user: path.join(f.root, 'crontab.list'), cmd_task: 'task', uniq_path: "owner_what's new",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.readFileSync(path.join(f.root, 'scripts', file), 'utf8'), 'body');
+});

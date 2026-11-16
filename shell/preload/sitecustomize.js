@@ -15,9 +15,11 @@ function preferGlobalNodeModules() {
     return;
   }
 
+  const clientModule = require.cache[require.resolve('./client.js')];
   const originalResolveFilename = Module._resolveFilename;
   Module._resolveFilename = function (request, parent, isMain, options) {
     if (
+      !clientModule.loadingPanelDependencies &&
       !Module.builtinModules.includes(request) &&
       !request.startsWith('node:') &&
       !request.startsWith('.') &&
@@ -170,4 +172,8 @@ try {
   };
 } catch (error) {
   console.log(`run builtin code error: `, error, '\n');
+}
+
+if (process.env.QL_SCRIPT_ENTRY && process.env.QL_SCRIPT_START_FILE) {
+  require('./script-start.cjs')(process.env.QL_SCRIPT_ENTRY, process.env.QL_SCRIPT_START_FILE);
 }

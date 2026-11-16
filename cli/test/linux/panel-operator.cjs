@@ -2,7 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
+const { once } = require('node:events');
 
 exports.verifyOperator = async function verifyOperator(api) {
   const ql = path.join(os.homedir(), 'bin/ql');
@@ -26,12 +27,18 @@ exports.verifyOperator = async function verifyOperator(api) {
       schedule: '0 0 1 1 *',
     })
   ).data;
+  const child = spawn('sleep', ['60']);
+  const ended = once(child, 'exit');
+  const start = Math.floor(Date.now() / 1000);
   try {
     await api('crons/status', 'PUT', {
       ids: [task.id],
       status: '0',
+      pid: String(child.pid),
+      last_execution_time: start,
       log_path: 'cli-retention/2000-01-01-kept.log',
     });
+    assert.equal((await api(`crons/${task.id}`)).data.log_path, 'cli-retention/2000-01-01-kept.log');
     const result = invoke(['rmlog', '7']);
     assert.ok(result.removed.includes('cli-retention/2000-01-01-unused.log'));
     assert.ok(result.retained.includes('cli-retention/2000-01-01-kept.log'));
@@ -41,6 +48,8 @@ exports.verifyOperator = async function verifyOperator(api) {
       'referenced',
     );
   } finally {
+    child.kill();
+    await ended;
     await api('crons', 'DELETE', [task.id]);
   }
   const service = invoke(['reload']);

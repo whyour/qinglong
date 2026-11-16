@@ -37,7 +37,7 @@ async function packageFixture(t) {
   const lock = 'lockfileVersion: 6.0\n';
   await fs.writeFile(path.join(root, 'pnpm-lock.yaml'), lock);
   const files = {};
-  for (const name of ['build/app.js', 'build/token.js', 'build/bootstrap/upgradeProbe.js', 'dist/index.html', 'build/app.js.map', 'dist/app.js.gz']) {
+  for (const name of ['build/app.js', 'build/token.js', 'build/shared/managedExit.cjs', 'build/bootstrap/upgradeProbe.js', 'dist/index.html', 'build/app.js.map', 'dist/app.js.gz']) {
     const bytes = name.endsWith('.html') ? '<html>pack fixture</html>' : '{}';
     await fs.mkdir(path.dirname(path.join(root, 'static', name)), { recursive: true });
     await fs.writeFile(path.join(root, 'static', name), bytes);
@@ -69,6 +69,7 @@ test('real npm pack excludes local state and its installed lifecycle restores ve
   checkPackedFiles(archive.files);
   const names = new Set(archive.files.map((file) => file.path));
   assert.ok(names.has('shell/upgrade-lock.yaml'));
+  assert.ok(names.has('shell/subscription-files.py'));
   for (const name of Object.keys(files)) assert.ok(names.has('static/' + name));
   await assert.rejects(fs.access(path.join(root, 'shell/upgrade-lock.yaml')), { code: 'ENOENT' });
   const prefix = path.join(temp, 'installed');

@@ -76,8 +76,10 @@ test('isolated initialization creates a fresh database and does not retain ORM m
   const db = new Sequelize({ dialect: 'sqlite', storage: f.storage, logging: false });
   try {
     const tables = await db.getQueryInterface().showAllTables();
-    for (const table of ['Crontabs', 'Envs', 'RunningInstances', 'SchemaMigrations']) assert.ok(tables.includes(table), table);
-    assert.equal((await db.query('SELECT id FROM SchemaMigrations', { type: QueryTypes.SELECT })).length, 15);
+    for (const table of ['Crontabs', 'Envs', 'RunningInstances', 'SchemaMigrations', 'CronLegacyExitBookings']) assert.ok(tables.includes(table), table);
+    const migrations = await db.query('SELECT id FROM SchemaMigrations', { type: QueryTypes.SELECT });
+    assert.ok(migrations.some(row => row.id === 'preserve-pruned-bound-exits-v1'));
+    assert.equal(migrations.length, 27);
   } finally { await db.close(); }
 });
 
@@ -96,7 +98,10 @@ test('isolated initialization upgrades an existing database and remains idempote
     const rows = await db.query('SELECT * FROM Crontabs', { type: QueryTypes.SELECT });
     assert.equal(rows[0].name, 'keep-me');
     assert.ok(Object.hasOwn(rows[0], 'queued_token'));
-    assert.equal((await db.query('SELECT id FROM SchemaMigrations', { type: QueryTypes.SELECT })).length, 15);
+    assert.ok(Object.hasOwn(await db.getQueryInterface().describeTable('CrontabStats'), 'fixed_max_time'));
+    const migrations = await db.query('SELECT id FROM SchemaMigrations', { type: QueryTypes.SELECT });
+    assert.ok(migrations.some(row => row.id === 'preserve-pruned-bound-exits-v1'));
+    assert.equal(migrations.length, 27);
   } finally { await db.close(); }
 });
 

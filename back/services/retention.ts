@@ -1,11 +1,13 @@
 import fs from 'fs/promises';
 import path from 'path';
 import dayjs from 'dayjs';
-import { Op } from 'sequelize';
+import { literal, Op } from 'sequelize';
 import { Service } from 'typedi';
 import config from '../config';
 import { CrontabStatModel } from '../data/cronStats';
 import { sequelize } from '../data';
+import { TriggerHistory } from '../shared/triggerHistory';
+import { prunedExitMigrationId } from '../shared/schemaMigrations';
 import { InstanceStatus, RunningInstanceModel } from '../data/runningInstance';
 import { AuthDataType, SystemModel } from '../data/system';
 import {
@@ -21,10 +23,12 @@ export interface StorageCleanupRequest extends RetentionPolicy {
   compactDatabase?: boolean;
 }
 
-function runningInstanceWhere(days: number) {
-  const cutoff = dayjs().subtract(days, 'day').unix();
+function runningInstanceWhere(cutoffMs: number) {
+  const cutoff = cutoffMs / 1000;
   return {
     status: { [Op.ne]: InstanceStatus.running },
+    id: { [Op.notIn]: literal(`(SELECT instance_id FROM CronTriggers WHERE instance_id IS NOT NULL
+      AND (exit_pending=1 OR state IN ('queued','running') OR finished_at IS NULL OR observed_at >= ${cutoffMs} OR finished_at >= ${cutoffMs}))`) },
     [Op.or]: [
       { finished_at: { [Op.lt]: cutoff } },
       {
@@ -35,9 +39,11 @@ function runningInstanceWhere(days: number) {
   };
 }
 
-function cronStatWhere(days: number) {
+function retentionCutoffs(policy: RetentionPolicy) {
+  const now = dayjs();
   return {
-    date: { [Op.lt]: dayjs().subtract(days, 'day').format('YYYY-MM-DD') },
+    history: now.subtract(policy.runningInstanceRetentionDays, 'day').startOf('second').valueOf(),
+    firstDay: now.subtract(policy.cronStatRetentionDays, 'day').format('YYYY-MM-DD'),
   };
 }
 
@@ -63,20 +69,20 @@ export default class RetentionService {
     return normalized;
   }
 
-  public async preview(request: StorageCleanupRequest) {
+  public async preview(request: StorageCleanupRequest, cutoffs = retentionCutoffs(normalizeRetentionPolicy(request))) {
     const policy = normalizeRetentionPolicy(request);
     const dependenceCacheTypes = (request.dependenceCacheTypes || []).filter(
       isDependenceCacheType,
     );
-    const [runningInstances, cronStats, dependenceCaches] = await Promise.all([
+    const [runningInstances, cronStats, dependenceCaches, triggers] = await Promise.all([
       policy.runningInstanceRetentionDays > 0
         ? RunningInstanceModel.count({
-            where: runningInstanceWhere(policy.runningInstanceRetentionDays),
+            where: runningInstanceWhere(cutoffs.history),
           })
         : 0,
       policy.cronStatRetentionDays > 0
         ? CrontabStatModel.count({
-            where: cronStatWhere(policy.cronStatRetentionDays),
+            where: { date: { [Op.lt]: cutoffs.firstDay } },
           })
         : 0,
       Promise.all(
@@ -87,11 +93,15 @@ export default class RetentionService {
           ),
         })),
       ),
+      policy.runningInstanceRetentionDays > 0
+        ? new TriggerHistory(sequelize).countExpired(cutoffs.history)
+        : 0,
     ]);
 
     return {
       policy,
       runningInstances,
+      triggers,
       cronStats,
       dependenceCaches,
       dependenceCacheBytes: dependenceCaches.reduce(
@@ -103,25 +113,46 @@ export default class RetentionService {
   }
 
   public async cleanup(request: StorageCleanupRequest) {
-    const preview = await this.preview(request);
+    const cutoffs = retentionCutoffs(normalizeRetentionPolicy(request));
+    const preview = await this.preview(request, cutoffs);
     const deleted = await sequelize.transaction(async (transaction) => {
+      const history = new TriggerHistory(sequelize);
+      if (preview.policy.runningInstanceRetentionDays || preview.policy.cronStatRetentionDays) {
+        await history.replayPublishedExits(transaction);
+      }
       const runningInstances =
         preview.policy.runningInstanceRetentionDays > 0
           ? await RunningInstanceModel.destroy({
-              where: runningInstanceWhere(
-                preview.policy.runningInstanceRetentionDays,
-              ),
+              where: runningInstanceWhere(cutoffs.history),
               transaction,
             })
           : 0;
-      const cronStats =
-        preview.policy.cronStatRetentionDays > 0
-          ? await CrontabStatModel.destroy({
-              where: cronStatWhere(preview.policy.cronStatRetentionDays),
-              transaction,
-            })
-          : 0;
-      return { runningInstances, cronStats };
+      let cronStats = 0;
+      if (preview.policy.cronStatRetentionDays > 0) {
+        const firstDay = cutoffs.firstDay;
+        cronStats = await CrontabStatModel.destroy({ where: { date: { [Op.lt]: firstDay } }, transaction });
+        await sequelize.query(`INSERT INTO CronStatRetention(id,first_day) VALUES (1,$firstDay)
+          ON CONFLICT(id) DO UPDATE SET first_day=MAX(first_day,excluded.first_day)`,
+          { bind: { firstDay }, transaction });
+        await sequelize.query(`DELETE FROM CronPrunedUnknownRuns WHERE last_possible_day <
+          (SELECT first_day FROM CronStatRetention WHERE id=1)`, { transaction });
+      }
+      const triggers = preview.policy.runningInstanceRetentionDays > 0
+        ? await history.deleteExpired(cutoffs.history, transaction)
+        : 0;
+      if (preview.policy.runningInstanceRetentionDays || preview.policy.cronStatRetentionDays) {
+        // An unbound receipt's day can be wrong. A later bound receipt still
+        // needs the execution-to-task link even after both visible histories expire.
+        // A writer can also win the lock before an interrupted upgrade retries.
+        // Keep its bound bookings until the proof-copy transaction has committed.
+        await sequelize.query(`DELETE FROM CronLegacyExitBookings WHERE day <
+          (SELECT first_day FROM CronStatRetention WHERE id=1)
+          AND NOT EXISTS (SELECT 1 FROM CronTriggers WHERE id=CronLegacyExitBookings.trigger_id)
+          AND ((bound=1 AND EXISTS (SELECT 1 FROM SchemaMigrations WHERE id=$proofMigration))
+            OR (bound=0 AND NOT EXISTS (SELECT 1 FROM Crontabs WHERE id=CronLegacyExitBookings.cron_id)))`,
+          { bind: { proofMigration: prunedExitMigrationId }, transaction });
+      }
+      return { runningInstances, cronStats, triggers };
     });
 
     const dependenceCaches = [];
@@ -135,7 +166,7 @@ export default class RetentionService {
 
     if (
       request.compactDatabase &&
-      (deleted.runningInstances || deleted.cronStats)
+      (deleted.runningInstances || deleted.cronStats || deleted.triggers)
     ) {
       await sequelize.query('VACUUM');
     }
@@ -148,7 +179,7 @@ export default class RetentionService {
       },
       compactedDatabase: Boolean(
         request.compactDatabase &&
-          (deleted.runningInstances || deleted.cronStats),
+          (deleted.runningInstances || deleted.cronStats || deleted.triggers),
       ),
     };
   }

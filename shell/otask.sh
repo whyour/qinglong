@@ -190,7 +190,7 @@ run_concurrent() {
 
   handle_env_split
   time=$(date "+$mtime_format")
-  single_log_time=$(format_log_time "$mtime_format" "$time")
+  local single_log_time="$(format_log_time "$mtime_format" "$time")-$$"
 
   enter_script_workdir || return $?
 
@@ -389,3 +389,4 @@ fi
 run_task_after "${task_shell_params[@]}"
 clear_env
 handle_task_end "${task_shell_params[@]}"
+return "$_task_exit_code"

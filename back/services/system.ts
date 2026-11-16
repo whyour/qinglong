@@ -58,6 +58,10 @@ export default class SystemService {
     private sockService: SockService,
   ) {}
 
+  public get cronConcurrency() {
+    return taskLimit.cronConcurrency;
+  }
+
   public async getSystemConfig() {
     const doc = await this.getDb({ type: AuthDataType.systemConfig });
     return {

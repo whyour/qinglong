@@ -107,7 +107,6 @@ export default function TaskResultModal({
                     size="small"
                     disabled={task.deleted}
                     onClick={() => {
-                      localStorage.setItem('logCron', String(task.id));
                       setLogCron(task);
                     }}
                   >
@@ -120,7 +119,7 @@ export default function TaskResultModal({
         )}
       </Modal>
       {logCron && (
-        <CronLogModal cron={logCron} handleCancel={() => setLogCron(null)} />
+        <CronLogModal key={logCron.id} cron={logCron} handleCancel={() => setLogCron(null)} />
       )}
     </>
   );

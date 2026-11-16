@@ -1,3 +1,6 @@
+import { createStopRequest } from './stopRequest';
+import DailyResults from './dailyResults';
+import TriggerList from './triggerList';
 import intl from 'react-intl-universal';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -30,17 +33,21 @@ import CronLogModal from './logModal';
 import Editor from '@monaco-editor/react';
 import IconFont from '@/components/iconfont';
 import { getCommandScript, getEditorMode } from '@/utils';
-import VirtualList from 'rc-virtual-list';
-import useScrollHeight from '@/hooks/useScrollHeight';
+import InstanceHistory from './instanceHistory';
+import { readableLogName } from '@/components/fileBrowser/name';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
 
+function instanceTitle(item: { id: number; log_path?: string | null }) {
+  const filename = item.log_path?.split('/').pop();
+  return filename ? readableLogName(filename) : intl.get('执行实例 #{id}', { id: String(item.id) });
+}
+
 const tabList = [
-  {
-    key: 'runningHistory',
-    tab: intl.get('运行历史'),
-  },
+  { key: 'runningHistory', tab: intl.get('运行历史') },
+  { key: 'triggers', tab: intl.get('触发记录') },
+  { key: 'daily', tab: intl.get('日统计') },
   {
     key: 'script',
     tab: intl.get('脚本'),
@@ -60,48 +67,65 @@ const CronDetailModal = ({
 }) => {
   const [activeTabKey, setActiveTabKey] = useState('runningHistory');
   const [value, setValue] = useState('');
+  const [scriptState, setScriptState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const editorRef = useRef<any>(null);
   const [scriptInfo, setScriptInfo] = useState<any>({});
   const [validTabs, setValidTabs] = useState(tabList);
   const [currentCron, setCurrentCron] = useState<any>({});
-  const listRef = useRef<HTMLDivElement>(null);
-  const tableScrollHeight = useScrollHeight(listRef);
-  const [runningInstances, setRunningInstances] = useState<any[]>([]);
+  const [historyRevision, setHistoryRevision] = useState(0);
   const needRefreshRef = useRef(false);
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
-  const [logData, setLogData] = useState('');
   const [logUrl, setLogUrl] = useState('');
 
-  const fetchRunningInstances = async () => {
-    if (!cron.id) return Promise.resolve();
-    return request
-      .get(`${config.apiPrefix}crons/${cron.id}/instances`)
-      .then(({ code, data }) => {
-        if (code === 200 && data) {
-          setRunningInstances(data);
-        }
-      })
-      .catch(() => { });
+  const refreshVersion = useRef(0);
+  const session = useRef<AbortController>();
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const refreshDetails = async () => {
+    const signal = session.current?.signal;
+    if (!cron.id || !signal || signal.aborted) return;
+    const options = { signal, retryInPlace: true };
+    const version = ++refreshVersion.current;
+    const base = `${config.apiPrefix}crons/${cron.id}`;
+    try {
+      const { code, data } = await request.get(base, options);
+      if (code !== 200) throw new Error();
+      if (!signal.aborted && version === refreshVersion.current) {
+        setCurrentCron(data);
+        setRefreshFailed(false);
+      }
+    } catch {
+      if (!signal.aborted && version === refreshVersion.current) setRefreshFailed(true);
+    }
+  };
+  const refreshAfterChange = () => {
+    needRefreshRef.current = true;
+    setHistoryRevision(n => n + 1);
+    return refreshDetails();
   };
 
   useEffect(() => {
-    fetchRunningInstances();
+    if (!cron.id) return;
     let timer: ReturnType<typeof setTimeout>;
-    let cancelled = false;
+    const controller = new AbortController();
+    session.current = controller;
     const poll = async () => {
-      await fetchRunningInstances();
-      if (cancelled) return;
-      timer = setTimeout(poll, 10000);
+      await refreshDetails();
+      if (!controller.signal.aborted) timer = setTimeout(poll, 10000);
     };
-    poll();
+    void poll();
     return () => {
-      cancelled = true;
+      controller.abort();
+      ++refreshVersion.current;
       clearTimeout(timer);
     };
   }, [cron.id]);
 
   const contentList: any = {
-    script: scriptInfo.filename && (
+    daily: <DailyResults key={cron.id} id={cron.id} />,
+    triggers: activeTabKey === 'triggers' && <TriggerList key={cron.id} id={cron.id} onViewLog={(row) => viewInstanceLog(row, row.id)} />,
+    script: scriptState === 'failed' ? (
+      <span role="status">{intl.get('加载失败')} <Button type="link" onClick={() => getScript()}>{intl.get('重试')}</Button></span>
+    ) : scriptState === 'loading' ? intl.get('加载中...') : scriptInfo.filename && (
       <Editor
         language={getEditorMode(scriptInfo.filename)}
         theme={theme}
@@ -118,15 +142,8 @@ const CronDetailModal = ({
         }}
       />
     ),
-    runningHistory: (
-      <div ref={listRef}>
-        <List>
-          <VirtualList
-            data={runningInstances}
-            height={tableScrollHeight}
-            itemHeight={47}
-            itemKey="id"
-          >
+    runningHistory: activeTabKey === 'runningHistory' && (
+      <InstanceHistory key={cron.id} id={cron.id} revision={historyRevision}>
             {(item) => (
               <List.Item
                 className="log-item"
@@ -165,11 +182,9 @@ const CronDetailModal = ({
                 <List.Item.Meta
                   title={
                     <span>
-                      {item.log_path && (
-                        <span style={{ marginRight: 8 }}>
-                          {item.log_path.split('/').pop()}
-                        </span>
-                      )}
+                      <span style={{ marginRight: 8 }} title={item.log_path || undefined}>
+                        {instanceTitle(item)}
+                      </span>
                       {item.status === 0 && (
                         <Tag icon={<Loading3QuartersOutlined spin />} color="processing">
                           {intl.get('运行中')}
@@ -180,6 +195,9 @@ const CronDetailModal = ({
                       )}
                       {item.status === 2 && (
                         <Tag color="default">{intl.get('已停止')}</Tag>
+                      )}
+                      {item.status === 4 && (
+                        <Tag>{intl.get('结果未知')}</Tag>
                       )}
                       {item.status === 3 && (
                         <Tag color="error">{intl.get('错误')}</Tag>
@@ -199,7 +217,7 @@ const CronDetailModal = ({
                           {' | '}{intl.get('结束')}: {dayjs.unix(item.finished_at).format('YYYY-MM-DD HH:mm:ss')}
                         </span>
                       )}
-                      {item.exit_code !== undefined && item.exit_code !== null && (
+                      {item.exit_code != null && item.exit_code !== 0 && (
                         <span>
                           {' | '}{intl.get('退出码')}: {item.exit_code}
                         </span>
@@ -209,14 +227,16 @@ const CronDetailModal = ({
                 />
               </List.Item>
             )}
-          </VirtualList>
-        </List>
-      </div>
+      </InstanceHistory>
     ),
   };
 
+  const stopDialogs = useRef(new Set<number>());
   const stopRunningInstance = (instance: any) => {
+    if (stopDialogs.current.has(instance.id)) return;
+    stopDialogs.current.add(instance.id);
     Modal.confirm({
+      afterClose: () => stopDialogs.current.delete(instance.id),
       title: intl.get('确认停止实例'),
       content: (
         <>
@@ -225,53 +245,59 @@ const CronDetailModal = ({
         </>
       ),
       onOk() {
-        request
+        return request
           .post(`${config.apiPrefix}crons/${cron.id}/instances/${instance.id}/stop`)
-          .then(({ code }) => {
+          .then(({ code, data }) => {
             if (code === 200) {
-              message.success(intl.get('实例已停止'));
-              needRefreshRef.current = true;
-              fetchRunningInstances();
+              if (data?.outcome === 'ended') message.info(intl.get('实例已结束'));
+              else message.success(intl.get('实例已停止'));
+              return refreshAfterChange();
             }
           });
       },
     });
   };
 
-  const viewInstanceLog = (instance: any) => {
+  const viewInstanceLog = (instance: any, triggerId?: string) => {
     if (!instance.log_path) return;
-    const parts = instance.log_path.split('/');
-    const filename = parts.pop() || '';
-    const directory = parts.join('/');
-    const url = `${config.apiPrefix}logs/detail?file=${filename}&path=${directory}`;
-    localStorage.setItem('logCron', url);
+    const base = `${config.apiPrefix}crons/${cron.id}/log`;
+    let url: string;
+    if (triggerId) url = `${base}?${new URLSearchParams({ triggerId })}`;
+    else if (instance.id) url = `${base}?${new URLSearchParams({ instanceId: String(instance.id) })}`;
+    else {
+      const parts = instance.log_path.split('/');
+      const file = parts.pop()!;
+      url = `${config.apiPrefix}logs/detail?${new URLSearchParams({ file, path: parts.join('/') })}`;
+    }
     setLogUrl(url);
-    request.get(url).then(({ code, data }) => {
-      if (code === 200) {
-        setLogData(data);
-        setIsLogModalVisible(true);
-      }
-    });
+    setIsLogModalVisible(true);
   };
 
   const onTabChange = (key: string) => {
     setActiveTabKey(key);
+    void refreshDetails();
   };
 
   const getScript = () => {
+    const signal = session.current?.signal;
     const result = getCommandScript(cron.command);
     if (Array.isArray(result)) {
+      setValidTabs(tabList);
       const [s, p] = result;
       setScriptInfo({ parent: p, filename: s });
+      setScriptState('loading');
       request
-        .get(`${config.apiPrefix}scripts/detail?file=${s}&path=${p || ''}`)
+        .get(`${config.apiPrefix}scripts/detail`, { params: { file: s, path: p || '' }, signal, retryInPlace: true })
         .then(({ code, data }) => {
-          if (code === 200) {
-            setValue(data);
-          }
+          if (signal?.aborted) return;
+          if (code !== 200) throw new Error('Script read failed');
+          setValue(data);
+          setScriptState('ready');
+        }).catch(() => {
+          if (!signal?.aborted) setScriptState('failed');
         });
     } else {
-      setValidTabs([{ key: 'runningHistory', tab: intl.get('运行历史') }]);
+      setValidTabs(tabList.filter((tab) => tab.key !== 'script'));
       setActiveTabKey('runningHistory');
     }
   };
@@ -330,8 +356,7 @@ const CronDetailModal = ({
           .put(`${config.apiPrefix}crons/run`, [currentCron.id])
           .then(({ code, data }) => {
             if (code === 200) {
-              setCurrentCron({ ...currentCron, status: CrontabStatus.running });
-              fetchRunningInstances();
+              return refreshAfterChange();
             }
           });
       },
@@ -339,6 +364,7 @@ const CronDetailModal = ({
   };
 
   const stopCron = () => {
+    const stop = createStopRequest([currentCron.id]);
     Modal.confirm({
       title: intl.get('确认停止'),
       content: (
@@ -351,11 +377,10 @@ const CronDetailModal = ({
         </>
       ),
       onOk() {
-        request
-          .put(`${config.apiPrefix}crons/stop`, [currentCron.id])
+        return stop()
           .then(({ code, data }) => {
             if (code === 200) {
-              setCurrentCron({ ...currentCron, status: CrontabStatus.idle });
+              return refreshAfterChange();
             }
           });
       },
@@ -381,12 +406,9 @@ const CronDetailModal = ({
             }`,
             [currentCron.id],
           )
-          .then(({ code, data }) => {
+          .then(async ({ code }) => {
             if (code === 200) {
-              setCurrentCron({
-                ...currentCron,
-                isDisabled: currentCron.isDisabled === 1 ? 0 : 1,
-              });
+              return refreshAfterChange();
             }
           });
       },
@@ -414,10 +436,7 @@ const CronDetailModal = ({
           )
           .then(({ code, data }) => {
             if (code === 200) {
-              setCurrentCron({
-                ...currentCron,
-                isPinned: currentCron.isPinned === 1 ? 0 : 1,
-              });
+              return refreshAfterChange();
             }
           });
       },
@@ -553,6 +572,13 @@ const CronDetailModal = ({
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">{intl.get('状态')}</div>
             <div className="cron-detail-info-value">
+              {refreshFailed && <span role="status">
+                {intl.get('任务状态刷新失败')}
+                <Button type="link" size="small" onClick={() => {
+                  setRefreshFailed(false);
+                  void refreshDetails();
+                }}>{intl.get('重试')}</Button>
+              </span>}
               {(!currentCron.isDisabled ||
                 currentCron.status !== CrontabStatus.idle) && (
                   <>
@@ -610,7 +636,7 @@ const CronDetailModal = ({
               {intl.get('最后运行时长')}
             </div>
             <div className="cron-detail-info-value">
-              {currentCron.last_running_time
+              {currentCron.last_execution_time && currentCron.last_running_time != null
                 ? diffTime(currentCron.last_running_time)
                 : '-'}
             </div>
@@ -633,7 +659,7 @@ const CronDetailModal = ({
             onTabChange(key);
           }}
           tabBarExtraContent={
-            activeTabKey === 'script' && (
+            activeTabKey === 'script' && scriptState === 'ready' && (
               <>
                 <Button
                   type="primary"
@@ -658,10 +684,10 @@ const CronDetailModal = ({
         <CronLogModal
           handleCancel={() => {
             setIsLogModalVisible(false);
-            fetchRunningInstances();
+            void refreshDetails();
           }}
           cron={cron}
-          data={logData}
+          key={logUrl}
           logUrl={logUrl}
         />
       )}

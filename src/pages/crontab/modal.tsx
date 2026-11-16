@@ -2,8 +2,7 @@ import EditableTagGroup from '@/components/tag';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
-import { Button, Form, Input, Modal, Select, Space, message } from 'antd';
-import CronExpressionParser from 'cron-parser';
+import { Button, Checkbox, Form, Input, InputNumber, Modal, Select, Space, message } from 'antd';
 import { useEffect, useState } from 'react';
 import intl from 'react-intl-universal';
 import { getScheduleType, scheduleTypeMap } from './const';
@@ -80,6 +79,23 @@ const CronModal = ({
     </Select>
   );
 
+  const [preview, setPreview] = useState('');
+  const previewRule = async (_: unknown, rule?: string) => {
+    if (!rule?.trim()) return;
+    let result;
+    let invalid = false;
+    try {
+      result = await request.get(`${config.apiPrefix}crons/preview`, {
+        params: { schedule: rule }, onError: (response) => { invalid = response?.status === 400; },
+      });
+    } catch { /* Transport errors have no validation result. */ }
+    if (!result?.data?.times) throw new Error(intl.get(invalid ? 'Cron表达式格式有误' : '无法获取调度预览，请重试'));
+    if (form.getFieldValue('schedule') === rule) {
+      const { times, timezone } = result.data;
+      setPreview(times.map((time: number) => new Date(time).toLocaleString(undefined, { timeZone: timezone })).join(' · ') + ' (' + timezone + ')');
+    }
+  };
+
   const renderScheduleFields = () => {
     if (scheduleType !== ScheduleType.Normal) return null;
 
@@ -88,23 +104,20 @@ const CronModal = ({
         <Form.Item
           name="schedule"
           label={intl.get('定时规则')}
-          rules={[
-            { required: true },
-            {
-              validator: (_, value) => {
-                try {
-                  if (!value || CronExpressionParser.parse(value).hasNext()) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(intl.get('Cron表达式格式有误'));
-                } catch (e) {
-                  return Promise.reject(intl.get('Cron表达式格式有误'));
-                }
-              },
-            },
-          ]}
+          extra={preview || undefined}
+          validateTrigger="onBlur"
+          rules={[{ required: true }, { validator: previewRule }]}
         >
-          <Input placeholder={intl.get('秒(可选) 分 时 天 月 周')} />
+          <Input onChange={() => setPreview('')} placeholder={intl.get('秒(可选) 分 时 天 月 周')} />
+        </Form.Item>
+        <Form.Item name="skip_if_pending" valuePropName="checked">
+          <Checkbox>{intl.get('如果上一次定时执行仍在排队或运行，跳过本次')}</Checkbox>
+        </Form.Item>
+        <Form.Item name="max_queue_wait" label={intl.get('最长排队时间（秒）')} extra={intl.get('超时后跳过本次执行。填 0 表示不限时。')}>
+          <InputNumber min={0} max={86400} precision={0} placeholder="0" />
+        </Form.Item>
+        <Form.Item name="catchup_seconds" label={intl.get('重启后往前查找的时长（秒）')} extra={intl.get('每条规则只补跑这段时间内最近一次错过的执行。填 0 关闭补跑。')}>
+          <InputNumber min={0} max={86400} precision={0} placeholder="0" />
         </Form.Item>
         <Form.List name="extra_schedules">
           {(fields, { add, remove }, { errors }) => (
@@ -115,7 +128,8 @@ const CronModal = ({
                     <Form.Item
                       {...restField}
                       name={[name, 'schedule']}
-                      rules={[{ required: true }]}
+                      validateTrigger="onBlur"
+                      rules={[{ required: true }, { validator: previewRule }]}
                     >
                       <Input
                         placeholder={intl.get('秒(可选) 分 时 天 月 周')}
@@ -189,7 +203,7 @@ const CronModal = ({
           name="allow_multiple_instances"
           label={intl.get('实例模式')}
           tooltip={intl.get(
-            '单实例模式：定时启动新任务前会自动停止旧任务；多实例模式：允许同时运行多个任务实例',
+            '单实例模式下，已有实例运行时会跳过新触发。多实例模式允许同时运行多个实例。',
           )}
         >
           <Select placeholder={intl.get('请选择实例模式')}>

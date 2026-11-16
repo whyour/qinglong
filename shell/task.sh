@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 dir_shell=$QL_DIR/shell
+if [[ ${QL_TRIGGER_SOURCE:-} == system && -z ${QL_TRIGGER_ID:-} && ${ID:-} =~ ^[0-9]+$ ]]; then
+  . "$dir_shell/system-cron.sh"
+fi
 . "$dir_shell/share.sh"
 . "$dir_shell/api.sh"
 . "$dir_shell/task-timeout.sh"
@@ -22,7 +25,20 @@ single_hanle() {
 run_shell_script() {
   # Preserve inherited variables/functions, but contain exit, exec and shell
   # options so the task wrapper can run after hooks and report completion.
-  ( . "$@" )
+  (
+    if [[ -n ${QL_SCRIPT_START_FILE:-} && -r $1 ]]; then
+      local stamp=${EPOCHREALTIME:-}
+      if [[ $stamp == *.* ]]; then
+        stamp=${stamp/./}; stamp=${stamp:0:13}
+      else
+        stamp=$(date +%s%3N)
+      fi
+      if [[ $stamp =~ ^[0-9]{13}$ ]]; then
+        ( set -C; printf '%s' "$stamp" > "$QL_SCRIPT_START_FILE" ) 2>/dev/null || :
+      fi
+    fi
+    . "$@"
+  )
 }
 
 define_program() {
@@ -83,7 +99,9 @@ handle_log_path() {
   else
     log_dir="$log_name"
   fi
-  log_path="$log_dir/$log_time.log"
+  local run_suffix=""
+  [[ ${QL_TRIGGER_ID:-} =~ ^[a-z0-9-]{1,120}$ ]] && run_suffix="-$QL_TRIGGER_ID"
+  log_path="$log_dir/$log_time$run_suffix.log"
 
   if [[ ${real_log_path:=} ]]; then
     log_path="$real_log_path"
@@ -160,7 +178,11 @@ fi
 format_params "$@"
 define_program "${task_shell_params[@]}"
 handle_log_path "${task_shell_params[@]}"
+if [[ -n $ID && -z ${QL_TRIGGER_ID:-} ]]; then init_execution_id || exit 1; fi
 init_begin_time
 
-eval '. "$dir_shell/otask.sh"' "$cmd"
+eval '. "$dir_shell/otask.sh"' "$cmd" '; task_status=${PIPESTATUS[0]}'
+if [[ -n ${QL_TRIGGER_ID:-} || ${QL_TRIGGER_SOURCE:-} == system ]]; then
+  exit "$task_status"
+fi
 exit 0

@@ -70,3 +70,36 @@ test('missing logs return an empty chunk', async () => {
     truncated: false,
   });
 });
+
+test('following a file distinguishes append, same-inode rewrites, and replacement', async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-log-follow-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'run.log');
+  const original = 'A\n' + '相同内容🚀\n'.repeat(80);
+  await fs.writeFile(file, original);
+  const first = await readLogChunk(file, { follow: true, offset: 0 });
+  const resume = chunk => readLogChunk(file, { cursor: chunk.cursor, offset: chunk.nextOffset });
+  assert.equal((await resume(first)).cursor, first.cursor);
+  await fs.appendFile(file, '追加\n');
+  const appended = await resume(first);
+  assert.equal(appended.reset, false);
+  assert.equal(appended.content, '追加\n');
+
+  // Preserve the entire suffix at the old offset while changing an earlier line.
+  const sameSize = 'B' + original.slice(1) + appended.content;
+  await fs.writeFile(file, sameSize);
+  const rewritten = await resume(appended);
+  assert.equal(rewritten.reset, true);
+  assert.equal(rewritten.content, sameSize);
+  await fs.rename(file, path.join(dir, 'previous.log'));
+  await fs.writeFile(file, sameSize + '下一轮\n');
+  const replaced = await resume(rewritten);
+  assert.equal(replaced.reset, true);
+  assert.equal(replaced.offset, 0);
+  await fs.truncate(file, 0);
+  const empty = await resume(replaced);
+  assert.equal(empty.reset, true);
+  assert.equal(empty.nextOffset, 0);
+  await fs.appendFile(file, '新的第一行\n');
+  assert.equal((await resume(empty)).content, '新的第一行\n');
+});

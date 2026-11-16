@@ -31,12 +31,16 @@ ESM loader. There are no separate built-in Ruby, Go, Java or PHP preload modules
 All these task paths still pass through shared dependency-path setup: non-JS
 scripts and their hooks may themselves call Node or use the QLAPI bridge.
 
-The before hooks are deliberately still synchronous: they can export environment
-variables or perform work required by the user's script. Python's preload still
-starts a child shell/Python to capture that environment; Node's preload starts a
-child shell/Node. Node also still loads its gRPC client eagerly. These are remaining
-startup costs, not work performed by the cron library, and are not removed by this
-change.
+Before hooks run synchronously so the script sees their exports and side effects.
+Python starts a child shell and interpreter to capture exported values. Node
+starts a child shell and Node process for the same purpose.
+
+Node exposes QLAPI methods during preload. The first RPC loads the panel's
+gRPC libraries, reads the protocol and TLS configuration, and creates one channel
+per script process. Concurrent calls share that channel. A script that only uses
+local libraries pays none of this cost. Closing QLAPI before the first call also
+avoids loading the transport. Calls after close reject with the usual closed-channel
+error. An initialization failure rejects the calling promise and permits a retry.
 
 Shell scripts run in a child shell that inherits the wrapper's environment and
 before-hook functions. This lets the wrapper run its after hooks and report the

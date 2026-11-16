@@ -1,5 +1,9 @@
+import { EventEmitter } from 'events';
 import PQueue, { QueueAddOptions } from 'p-queue-cjs';
 import os from 'os';
+import type { Sequelize } from 'sequelize';
+import { QueueOccupants, recordQueueAdmission } from './queueDiagnostics';
+import { CronWaitQueue, CronQueueOptions } from './cronWaitQueue';
 import { AuthDataType, SystemModel } from '../data/system';
 import Logger from '../loaders/logger';
 import { Dependence } from '../data/dependence';
@@ -23,7 +27,11 @@ class TaskLimit {
   private queuedCrons = new Map<string, ICronFn<any>[]>();
   private repeatCronNotifyMap = new Map<string, number>();
   private updateLogLimit = new PQueue({ concurrency: 1 });
-  private cronLimit = new PQueue({
+  private warnSampling = (error: Error) => Logger.warn('[queue] Could not save occupancy: %s', error.message);
+  private scheduledOccupants = new QueueOccupants('scheduled', () => this.cronLimit.concurrency, this.warnSampling);
+  private manualOccupants = new QueueOccupants('manual', () => this.manualCronoLimit.concurrency, this.warnSampling);
+  private cronLimit = new PQueue<CronWaitQueue, CronQueueOptions>({
+    queueClass: CronWaitQueue,
     concurrency: Math.max(os.cpus().length, 4),
   });
   private manualCronoLimit = new PQueue({
@@ -131,10 +139,16 @@ class TaskLimit {
     }
   }
 
+  public get cronConcurrency() {
+    return this.manualCronoLimit.concurrency;
+  }
+
   public async setCustomLimit(limit?: number) {
     if (limit) {
       this.cronLimit.concurrency = limit;
       this.manualCronoLimit.concurrency = limit;
+      this.scheduledOccupants.refresh();
+      this.manualOccupants.refresh();
       return;
     }
     await SystemModel.sync();
@@ -142,8 +156,7 @@ class TaskLimit {
       where: { type: AuthDataType.systemConfig },
     });
     if (doc?.info?.cronConcurrency) {
-      this.cronLimit.concurrency = doc.info.cronConcurrency;
-      this.manualCronoLimit.concurrency = doc.info.cronConcurrency;
+      await this.setCustomLimit(doc.info.cronConcurrency);
     }
   }
 
@@ -152,6 +165,10 @@ class TaskLimit {
     fn: ICronFn<T>,
     options?: Partial<QueueAddOptions>,
     isCurrent: () => boolean = () => true,
+    onPending?: () => void,
+    waitingSignal?: EventEmitter,
+    triggerId?: string,
+    db?: Sequelize,
   ): Promise<T | void> {
     if (!isCurrent()) return;
     fn.cron = cron;
@@ -160,6 +177,10 @@ class TaskLimit {
     const runs = this.queuedCrons
       .get(cron.id)
       ?.filter((run) => run.isCurrent?.() !== false);
+    if (cron.skip_if_pending && runs?.length) {
+      onPending?.();
+      return;
+    }
     const result = runs?.length ? [...runs, fn] : [fn];
     const repeatTimes = this.repeatCronNotifyMap.get(cron.id) || 0;
     if (result?.length > 5) {
@@ -190,14 +211,31 @@ class TaskLimit {
       return;
     }
     this.queuedCrons.set(cron.id, result);
-    return this.cronLimit.add(fn, options);
+    const run = this.trackAdmission(this.scheduledOccupants, this.cronLimit.concurrency, fn,
+      { id: triggerId, name: cron.name || cron.id }, db);
+    if (!waitingSignal) return this.cronLimit.add(run, options);
+    return new Promise<T | void>((resolve, reject) => {
+      this.cronLimit.add(run, { ...options, waitingSignal, onRemoved: () => { this.scheduledOccupants.forget(triggerId); resolve(); } }).then(resolve, reject);
+    });
+  }
+
+  private trackAdmission<T>(pool: QueueOccupants, limit: number, fn: () => Promise<T>, occupant: { id?: string; name: string }, db?: Sequelize) {
+    const admission = pool.admission(limit);
+    if (occupant.id && admission && db) {
+      pool.watch(occupant.id, db);
+      void recordQueueAdmission(db, occupant.id, admission)
+        .catch(error => Logger.warn('[queue] Failed to record wait reason: %s', error.message));
+    }
+    return pool.track(fn, occupant, db);
   }
 
   public async manualRunWithCronLimit<T>(
     fn: () => Promise<T>,
     options?: Partial<QueueAddOptions>,
+    occupant: { id?: string; name: string } = { name: '—' },
+    db?: Sequelize,
   ): Promise<T | void> {
-    return this.manualCronoLimit.add(fn, options);
+    return this.manualCronoLimit.add(this.trackAdmission(this.manualOccupants, this.manualCronoLimit.concurrency, fn, occupant, db), options);
   }
 
   public async runWithSubscriptionLimit<T>(

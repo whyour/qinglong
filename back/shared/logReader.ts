@@ -1,12 +1,18 @@
 import fs from 'fs/promises';
+import { createHash } from 'crypto';
 
 export const DEFAULT_LOG_CHUNK_BYTES = 256 * 1024;
 export const MAX_LOG_CHUNK_BYTES = 1024 * 1024;
+
+// The viewer retains at most one Mi UTF-16 code units.
+const CURSOR_WINDOW_BYTES = 4 * MAX_LOG_CHUNK_BYTES;
 
 export interface LogReadOptions {
   offset?: number;
   limit?: number;
   tail?: boolean;
+  follow?: boolean;
+  cursor?: string;
 }
 
 export interface LogChunk {
@@ -15,6 +21,8 @@ export interface LogChunk {
   nextOffset: number;
   total: number;
   truncated: boolean;
+  cursor?: string;
+  reset?: boolean;
 }
 
 function normalizeLimit(limit?: number) {
@@ -49,6 +57,10 @@ function completeUtf8End(buffer: Buffer, start: number, end: number) {
   return end - sequenceStart < expectedLength ? sequenceStart : end;
 }
 
+function logDigest(identity: string, from: number, bytes: Buffer) {
+  return createHash('sha256').update(`${identity}:${from}:`).update(bytes).digest('hex');
+}
+
 export async function readLogChunk(
   filePath: string,
   options: LogReadOptions = {},
@@ -56,23 +68,43 @@ export async function readLogChunk(
   let handle: fs.FileHandle | undefined;
   try {
     handle = await fs.open(filePath, 'r');
-    const { size: total } = await handle.stat();
+    const stat = await handle.stat({ bigint: true });
+    const total = Number(stat.size);
+    const identity = `${stat.dev}:${stat.ino}`;
     const limit = normalizeLimit(options.limit);
     const requestedOffset = Number.isFinite(options.offset)
-      ? Math.trunc(options.offset!)
+      ? Math.max(0, Math.trunc(options.offset!))
       : undefined;
-    const requestedStart =
-      options.tail || requestedOffset === undefined
-        ? Math.max(total - limit, 0)
-        : Math.min(Math.max(requestedOffset, 0), total);
-    const length = Math.min(limit + 3, total - requestedStart);
-    const buffer = Buffer.allocUnsafe(length);
-    const { bytesRead } = await handle.read(
-      buffer,
-      0,
-      length,
-      requestedStart,
-    );
+    let start = options.tail || requestedOffset === undefined
+      ? Math.max(total - limit, 0)
+      : Math.min(requestedOffset, total);
+    const resume = options.cursor && !options.tail && requestedOffset !== undefined;
+    const [fromText, digest] = resume ? options.cursor!.split('.') : [];
+    let from = resume ? Number(fromText) : start;
+    let reset = Boolean(resume && (
+      requestedOffset !== start || !Number.isSafeInteger(from) ||
+      from < 0 || from > start || start - from > CURSOR_WINDOW_BYTES
+    ));
+    if (reset) from = start = 0;
+
+    // Read the previously displayed bytes and their continuation together.
+    // A truncate followed by regrowth can leave both size and inode unchanged.
+    const readWindow = async (position: number, end: number) => {
+      const data = Buffer.allocUnsafe(Math.min(end, total) - position);
+      const { bytesRead } = await handle!.read(data, 0, data.length, position);
+      return data.subarray(0, bytesRead);
+    };
+    let window = await readWindow(from, start + limit + 3);
+    if (resume && !reset) {
+      const prefix = window.subarray(0, start - from);
+      if (prefix.length !== start - from || logDigest(identity, from, prefix) !== digest) {
+        reset = true;
+        start = from = 0;
+        window = await readWindow(0, limit + 3);
+      }
+    }
+    const buffer = window.subarray(start - from);
+    const bytesRead = buffer.length;
     let leadingBytes = 0;
     while (
       leadingBytes < bytesRead &&
@@ -80,12 +112,20 @@ export async function readLogChunk(
     ) {
       leadingBytes++;
     }
-    const offset = requestedStart + leadingBytes;
+    const offset = start + leadingBytes;
     const candidateEnd = Math.min(leadingBytes + limit, bytesRead);
     const contentEnd = completeUtf8End(buffer, leadingBytes, candidateEnd);
-    const nextOffset = requestedStart + contentEnd;
+    const nextOffset = start + contentEnd;
+
+    let cursor: string | undefined;
+    if (options.follow || options.cursor) {
+      const retainedFrom = Math.max(from, nextOffset - CURSOR_WINDOW_BYTES);
+      cursor = resume && !reset && nextOffset === start ? options.cursor :
+        `${retainedFrom}.${logDigest(identity, retainedFrom, window.subarray(retainedFrom - from, nextOffset - from))}`;
+    }
 
     return {
+      ...(cursor && { cursor, reset }),
       content: buffer.subarray(leadingBytes, contentEnd).toString('utf8'),
       offset,
       nextOffset,

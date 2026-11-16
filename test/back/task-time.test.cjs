@@ -68,7 +68,7 @@ init_begin_time
 handle_task_end`,
   );
   assert.equal(r.text('dates').trim().split('\n').length, 3);
-  assert.match(r.text('stats'), /^42 0 1\n$/);
+  assert.match(r.text('stats'), /^42 0 1 101\n$/);
   assert.match(r.text('messages'), /2026-09-13 00:00:00/);
 });
 test('explicit log paths and output mode remain intact', (t) => {
@@ -85,7 +85,7 @@ test('task failure keeps exit code and minimum one-second runtime', (t) => {
     `begin_timestamp=101; _task_exit_code=7; log_path=test.log
 handle_task_end`,
   );
-  assert.equal(r.text('stats'), '42 7 1\n');
+  assert.equal(r.text('stats'), '42 7 1 101\n');
   assert.match(r.text('messages'), /失败/);
   assert.match(r.text('status'), /101 1 7/);
 });
@@ -95,7 +95,7 @@ test('manual stop retains stopped message and exit status reporting', (t) => {
     `begin_timestamp=99; _task_exit_code=1; log_path=test.log; MANUAL=true
 handle_task_end`,
   );
-  assert.equal(r.text('stats'), '42 1 2\n');
+  assert.equal(r.text('stats'), '42 1 2 101\n');
   assert.match(r.text('messages'), /已停止/);
 });
 for (const mode of ['macos', 'custom'])
@@ -114,3 +114,13 @@ handle_task_end
 `,
     );
   });
+
+test('scheduled tasks starting in the same millisecond write different files', t => {
+  run(t, `log_name=common
+QL_TRIGGER_ID=first; handle_log_path same.py
+first=$log_path
+QL_TRIGGER_ID=second; handle_log_path same.py
+[[ "$first" != "$log_path" ]]
+QL_TRIGGER_ID=../invalid; handle_log_path same.py
+[[ "$log_path" == common/2026-09-12-23-59-59-999.log ]]`);
+});

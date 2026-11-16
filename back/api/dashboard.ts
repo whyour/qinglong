@@ -1,3 +1,7 @@
+import { executionIdPattern, executionTriggerId, receiptFinishTime } from '../shared/executionIdentity';
+import { oldestQueued } from '../shared/queueDiagnostics';
+import { containerResources } from '../shared/containerResources';
+import { TriggerHistory } from '../shared/triggerHistory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { fn, col, where, Op } from 'sequelize';
@@ -12,6 +16,11 @@ import os from 'os';
 import { isEmpty } from 'lodash';
 import { t, tf } from '../shared/i18n';
 
+function averageElapsed(totalTime: number, runs: number, untimed: number) {
+  const samples = Number(runs) - (Number(untimed) || 0);
+  return samples > 0 ? Math.round(Number(totalTime) / samples) : 0;
+}
+
 const route = Router();
 
 export default (app: Router) => {
@@ -19,41 +28,24 @@ export default (app: Router) => {
 
   route.post('/record', async (req: Request, res: Response) => {
     try {
-      const { ref_id, code, elapsed } = req.body;
+      const { ref_id, code, elapsed, trigger_id, execution_id } = req.body;
       if (!ref_id) return res.send({ code: 400, message: 'ref_id required' });
 
-      const today = dayjs().format('YYYY-MM-DD');
-      const isSuccess = code === 0 ? 1 : 0;
-      const isFail = code !== 0 ? 1 : 0;
-      const elapsedMs = (Number(elapsed) || 0) * 1000;
-
-      const existing = await CrontabStatModel.findOne({
-        where: { ref_id: Number(ref_id), date: today },
-      });
-
-      if (existing) {
-        await CrontabStatModel.update(
-          {
-            run_count: (existing.run_count || 0) + 1,
-            success_count: (existing.success_count || 0) + isSuccess,
-            fail_count: (existing.fail_count || 0) + isFail,
-            total_time: (existing.total_time || 0) + elapsedMs,
-            max_time: Math.max(existing.max_time || 0, elapsedMs),
-          },
-          { where: { id: existing.id } },
-        );
-      } else {
-        await CrontabStatModel.create({
-          ref_id: Number(ref_id),
-          date: today,
-          run_count: 1,
-          success_count: isSuccess,
-          fail_count: isFail,
-          total_time: elapsedMs,
-          max_time: elapsedMs,
-        });
+      if (trigger_id != null && (typeof trigger_id !== 'string' || !/^[a-z0-9-]{1,120}$/.test(trigger_id))) {
+        return res.send({ code: 400 });
       }
-
+      if (execution_id !== undefined && (trigger_id !== undefined ||
+          typeof execution_id !== 'string' || !executionIdPattern.test(execution_id))) return res.send({ code: 400 });
+      const id = execution_id ? executionTriggerId(execution_id) : trigger_id;
+      // Old wrappers also send a status receipt with the process identity.
+      // A stats-only retry cannot be distinguished from another identical run.
+      if (!id) return res.send({ code: 200, data: { counted: false, reason: 'missing_execution_identity' } });
+      const exitCode = typeof code === 'string' && /^-?\d+$/.test(code) ? Number(code) : code;
+      const elapsedMs = Number(elapsed ?? 0) * 1000;
+      if (!Number.isInteger(exitCode) || !Number.isSafeInteger(elapsedMs) || elapsedMs < 0) {
+        return res.send({ code: 400, message: 'invalid exit code or elapsed time' });
+      }
+      await new TriggerHistory(CrontabStatModel.sequelize!).recordShellResult(id, Number(ref_id), exitCode, elapsedMs, Date.now(), receiptFinishTime(req.get('X-QL-Finished-At')));
       res.send({ code: 200 });
     } catch (e) {
       res.send({ code: 500 });
@@ -66,7 +58,7 @@ export default (app: Router) => {
       try {
         const today = dayjs().format('YYYY-MM-DD');
 
-        const [total, enabled, disabled, stats] = await Promise.all([
+        const [total, enabled, disabled, stats, triggers] = await Promise.all([
           CrontabModel.count(),
           CrontabModel.count({ where: { isDisabled: 0 } }),
           CrontabModel.count({ where: { isDisabled: 1 } }),
@@ -75,11 +67,13 @@ export default (app: Router) => {
               [fn('SUM', col('run_count')), 'total_runs'],
               [fn('SUM', col('success_count')), 'total_success'],
               [fn('SUM', col('fail_count')), 'total_fail'],
+              [fn('SUM', col('untimed_count')), 'untimed_count'],
               [fn('SUM', col('total_time')), 'total_time'],
             ],
             where: { date: today },
             raw: true,
           }),
+          new TriggerHistory(CrontabStatModel.sequelize!).metrics(dayjs().startOf('day').valueOf()),
         ]);
 
         const row = stats as any;
@@ -94,11 +88,13 @@ export default (app: Router) => {
             total,
             enabled,
             disabled,
+            triggers,
             todayRuns: totalRuns,
             todaySuccess: totalSuccess,
             todayFail: totalFail,
+            todayStopped: totalRuns - totalSuccess - totalFail,
             successRate: totalRuns > 0 ? ((totalSuccess / totalRuns) * 100).toFixed(1) : '0',
-            avgTime: totalRuns > 0 ? Math.round(totalTime / totalRuns) : 0,
+            avgTime: averageElapsed(totalTime,totalRuns,row?.untimed_count),
           },
         });
       } catch (e) {
@@ -202,6 +198,7 @@ export default (app: Router) => {
         const rows = (await CrontabStatModel.findAll({
           attributes: [
             'ref_id',
+            [fn('SUM', col('untimed_count')), 'untimed_count'],
             [fn('SUM', col('total_time')), 'total_time'],
             [fn('SUM', col('run_count')), 'run_count'],
             [fn('MAX', col('max_time')), 'max_time'],
@@ -224,7 +221,7 @@ export default (app: Router) => {
         const data = rows.map((r: any, i) => ({
           rank: i + 1,
           name: nameMap[Number(r.ref_id)] || tf('任务#%s', r.ref_id),
-          avgTime: Math.round(Number(r.total_time) / Number(r.run_count)),
+          avgTime: averageElapsed(r.total_time,r.run_count,r.untimed_count),
           maxTime: Number(r.max_time),
         }));
 
@@ -245,6 +242,7 @@ export default (app: Router) => {
           attributes: [
             'ref_id',
             [fn('SUM', col('run_count')), 'run_count'],
+            [fn('SUM', col('untimed_count')), 'untimed_count'],
             [fn('SUM', col('total_time')), 'total_time'],
             [fn('SUM', col('success_count')), 'success_count'],
           ],
@@ -267,7 +265,7 @@ export default (app: Router) => {
           rank: i + 1,
           name: nameMap[Number(r.ref_id)] || tf('任务#%s', r.ref_id),
           runCount: Number(r.run_count),
-          avgTime: Math.round(Number(r.total_time) / Number(r.run_count)),
+          avgTime: averageElapsed(r.total_time,r.run_count,r.untimed_count),
           successRate:
             Number(r.run_count) > 0
               ? ((Number(r.success_count) / Number(r.run_count)) * 100).toFixed(1)
@@ -285,16 +283,10 @@ export default (app: Router) => {
     '/runtime',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
+        const queued = await new TriggerHistory(CrontabModel.sequelize!).queueCounts();
         const runningInstances = await RunningInstanceModel.findAll({
           where: {
             status: InstanceStatus.running,
-          },
-          raw: true,
-        });
-
-        const queuedCrons = await CrontabModel.findAll({
-          where: {
-            status: 3, // queued
           },
           raw: true,
         });
@@ -341,7 +333,9 @@ export default (app: Router) => {
           code: 200,
           data: {
             runningCount: running.length,
-            queuedCount: queuedCrons.length,
+            queuedCount: queued.triggers,
+            queuedTasks: queued.tasks,
+            oldestQueued: queued.triggers ? await oldestQueued(CrontabModel.sequelize!) : [],
             running,
             idleTasks: idleTasks.map((c: any) => ({
               id: c.id,
@@ -371,7 +365,7 @@ export default (app: Router) => {
         const statMap: Record<number, any> = {};
         stats.forEach((s: any) => { statMap[s.ref_id] = s; });
 
-        const labelMap: Record<string, { count: number; runs: number; success: number; totalTime: number }> = {};
+        const labelMap: Record<string, { count: number; runs: number; success: number; untimed: number; totalTime: number }> = {};
         crons.forEach((c) => {
           let rawLabels = c.labels;
           if (typeof rawLabels === 'string') rawLabels = JSON.parse(rawLabels);
@@ -383,11 +377,12 @@ export default (app: Router) => {
           }
           const st = statMap[c.id!];
           labels.forEach((label: string) => {
-            if (!labelMap[label]) labelMap[label] = { count: 0, runs: 0, success: 0, totalTime: 0 };
+            if (!labelMap[label]) labelMap[label] = { count: 0, runs: 0, success: 0, untimed: 0, totalTime: 0 };
             labelMap[label].count += 1;
             if (st) {
               labelMap[label].runs += Number(st.run_count) || 0;
               labelMap[label].success += Number(st.success_count) || 0;
+              labelMap[label].untimed += Number(st.untimed_count) || 0;
               labelMap[label].totalTime += Number(st.total_time) || 0;
             }
           });
@@ -399,7 +394,7 @@ export default (app: Router) => {
             count: v.count,
             todayRuns: v.runs,
             successRate: v.runs > 0 ? ((v.success / v.runs) * 100).toFixed(1) : '0',
-            avgTime: v.runs > 0 ? Math.round(v.totalTime / v.runs) : 0,
+            avgTime: averageElapsed(v.totalTime,v.runs,v.untimed),
           }))
           .sort((a, b) => b.todayRuns - a.todayRuns);
 
@@ -420,13 +415,10 @@ export default (app: Router) => {
           data: {
             platform: os.platform(),
             uptime: Math.floor(process.uptime()),
-            memTotal: os.totalmem(),
-            memFree: os.freemem(),
-            memUsagePercent: ((1 - os.freemem() / os.totalmem()) * 100).toFixed(1),
+            ...containerResources(),
             heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
             heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
             loadAvg: os.loadavg().map((v) => Number(v.toFixed(2))),
-            cpus: os.cpus().length,
           },
         });
       } catch (e) {

@@ -40,7 +40,7 @@ repo/raw 沿用位置参数，使用 QL_DIR/QL_DATA_DIR，不接受 --root/--jso
 
 包含选择加载器的面板设置 `QL_CLI_ROOT=/absolute/path/to/built/cli`，指向包含完整 dist 的面板工具构建目录，**不能指向 npm 包**。重启后加载器在 ~/bin 创建私有 ql/task/cron 包装器，并为面板进程优先使用它们；独立终端应显式使用该路径。清除变量并重启恢复原 Shell 入口。无效路径报错，不静默降级。默认仍保留旧 Shell 入口。
 
-`dist/startup.js` 兼容旧启动/reload；`dist/compat.js` 与 `dist/subscription-worker.js` 保留内部适配用途，不注册为 npm 命令。生命周期根据已安装面板版本选择字段，定制版本可设置 QL_CLI_LIFECYCLE=legacy|extended。
+`dist/startup.js` 兼容旧启动/reload；`dist/compat.js` 与 `dist/subscription-worker.js` 保留内部适配用途，不注册为 npm 命令。CLI 根据运行中的面板对回执字段的校验结果选择协议。设置 `QL_CLI_LIFECYCLE=legacy` 可强制使用旧格式。
 
 独立 Skill 位于 [skills/qinglong-local](skills/qinglong-local/SKILL.md)，包含完整执行与维护参考。远程管理另用 qinglong-cli Skill。`QL_LANG=en` 切换帮助和执行提示；JSON 字段保持一致。
 

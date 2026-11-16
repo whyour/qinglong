@@ -26,6 +26,7 @@ export type Override<
   : Omit<T, keyof K> & K;
 
 export interface ICustomConfig {
+  retryInPlace?: boolean;
   onError?: (res: AxiosResponse<unknown, any>) => void;
 }
 
@@ -40,6 +41,9 @@ const errorHandler = function (
     { config: InternalAxiosRequestConfig & ICustomConfig }
   >,
 ) {
+  if (error.config?.retryInPlace && error.response?.status !== 401) {
+    return Promise.reject(error);
+  }
   if (error.response) {
     const msg = error.response.data
       ? error.response.data.message || error.message

@@ -1,3 +1,4 @@
+import { FilePicker } from '@/components/fileBrowser';
 import intl from 'react-intl-universal';
 import React, {
   useEffect,
@@ -14,7 +15,6 @@ import {
   Select,
   Space,
   Switch,
-  TreeSelect,
 } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
@@ -30,14 +30,12 @@ import Ansi from 'ansi-to-react';
 const { Option } = Select;
 
 const EditModal = ({
-  treeData,
   currentNode,
   content,
   wordWrap,
   onWordWrapChange,
   handleCancel,
 }: {
-  treeData?: any;
   content?: string;
   currentNode: any;
   wordWrap: boolean;
@@ -54,6 +52,9 @@ const EditModal = ({
   const [log, setLog] = useState('');
   const { theme } = useTheme();
   const editorRef = useRef<any>(null);
+  const pendingFile = useRef<AbortController>();
+  const pickedFile = useRef(false);
+  const [fileReady, setFileReady] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [currentPid, setCurrentPid] = useState(null);
   const cancel = () => {
@@ -61,7 +62,7 @@ const EditModal = ({
   };
 
   const onSelect = (value: any, node: any) => {
-    if (node.key === selectedKey || !value) {
+    if ((node.key === selectedKey && (fileReady || pendingFile.current)) || !value) {
       return;
     }
 
@@ -70,6 +71,7 @@ const EditModal = ({
     }
 
     const newMode = getEditorMode(value);
+    pickedFile.current = true;
     setCNode(node);
     setLanguage(newMode);
     getDetail(node);
@@ -77,17 +79,23 @@ const EditModal = ({
   };
 
   const getDetail = (node: any) => {
+    pendingFile.current?.abort();
+    const controller = new AbortController();
+    pendingFile.current = controller;
+    setFileReady(false);
+    setValue('');
     request
       .get(
-        `${config.apiPrefix}scripts/detail?file=${node.title}&path=${
-          node.parent || ''
-        }`,
+        `${config.apiPrefix}scripts/detail`, { params: { file: node.title, path: node.parent || '' }, signal: controller.signal },
       )
       .then(({ code, data }) => {
-        if (code === 200) {
+        if (code === 200 && !controller.signal.aborted) {
           setValue(data);
+          setFileReady(true);
         }
-      });
+      })
+      .catch(() => { /* The HTTP handler reports errors. Selecting the file again retries it. */ })
+      .finally(() => { if (pendingFile.current === controller) pendingFile.current = undefined; });
   };
 
   const run = () => {
@@ -140,15 +148,22 @@ const EditModal = ({
     ws.subscribe('manuallyRunScript', handleMessage);
 
     return () => {
+      pendingFile.current?.abort();
       ws.unsubscribe('manuallyRunScript', handleMessage);
     };
   }, []);
 
   useEffect(() => {
     setLog('');
-    if (currentNode) {
+    if (currentNode?.type === 'file' && !pickedFile.current) {
+      pendingFile.current?.abort();
       setCNode(currentNode);
-      setValue(content as string);
+      if (typeof content === 'string' && content !== intl.get('加载中...')) {
+        setFileReady(true);
+        setValue(content);
+      } else {
+        getDetail(currentNode);
+      }
       setSelectedKey(currentNode.key);
       const newMode = getEditorMode(currentNode.title);
       setLanguage(newMode);
@@ -161,18 +176,7 @@ const EditModal = ({
       closable={false}
       title={
         <>
-          <TreeSelect
-            treeExpandAction="click"
-            style={{ marginRight: 8, width: 300 }}
-            value={selectedKey}
-            dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
-            treeData={treeData}
-            placeholder={intl.get('请选择脚本文件')}
-            fieldNames={{ value: 'key', label: 'title' }}
-            showSearch
-            onSelect={onSelect}
-            treeLine={{ showLeafIcon: true }}
-          />
+          <FilePicker source="scripts" value={selectedKey} onSelect={node => onSelect(node.key, node)} />
           <Select
             value={language}
             style={{ width: 110, marginRight: 8 }}
@@ -189,6 +193,7 @@ const EditModal = ({
             type="primary"
             style={{ marginRight: 8 }}
             onClick={isRunning ? stop : run}
+            disabled={!isRunning && !fileReady}
           >
             {isRunning ? intl.get('停止') : intl.get('运行')}
           </Button>
@@ -216,6 +221,7 @@ const EditModal = ({
             onClick={() => {
               setSaveModalVisible(true);
             }}
+            disabled={!fileReady}
           >
             {intl.get('保存')}
           </Button>

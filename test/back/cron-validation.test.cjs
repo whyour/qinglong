@@ -74,6 +74,7 @@ test('create and update reject invalid extra schedules before calling the servic
   const load = require('../helpers/load-security-module.cjs');
   const mutations = [];
   const service = {
+    async status(value) { return value; },
     async create(value) {
       mutations.push(value);
       return { id: 1, ...value };
@@ -109,6 +110,20 @@ test('create and update reject invalid extra schedules before calling the servic
     server.once('error', reject);
   });
   t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  // Released CLI wrappers reuse this execution_id for start and exit; both must reach the same receipt.
+  const uuid = require('node:crypto').randomUUID();
+  const statusRequest = (status, extra = {}) => fetch(`http://127.0.0.1:${server.address().port}/crons/status`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ids: [1], pid: '122', status, execution_id: `legacy-system:123:${uuid}`, ...extra }),
+  });
+  for (const status of ['0', '1']) {
+    const res = await statusRequest(status);
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).data.trigger_id, `system-cli-123-${uuid}`);
+  }
+  assert.equal((await statusRequest('1', { trigger_id: 'another' })).status, 400);
+  assert.equal((await statusRequest('1', { execution_id: 'broken' })).status, 400);
 
   for (const method of ['POST', 'PUT']) {
     const payload = {
@@ -166,4 +181,12 @@ test('create and update reject invalid extra schedules before calling the servic
     );
   }
   assert.equal(mutations.length, 2);
+});
+
+test('saving a migrated task accepts a null pending policy and rejects invalid input', () => {
+  const task = { name: 'legacy', command: 'task old.sh', schedule: '1 * * * *' };
+  for (const value of [null, false, true]) {
+    assert.equal(schema.validate({ ...task, skip_if_pending: value }).error, undefined);
+  }
+  assert.ok(schema.validate({ ...task, skip_if_pending: 'invalid' }).error);
 });

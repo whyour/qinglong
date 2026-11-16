@@ -1,3 +1,4 @@
+import { directoryCheckHandler, directoryPageHandler } from '../shared/directoryPageRoute';
 import { celebrate, Joi } from 'celebrate';
 import { NextFunction, Request, Response, Router } from 'express';
 import { Container } from 'typedi';
@@ -17,6 +18,8 @@ const blacklist = ['.tmp'];
 
 export default (app: Router) => {
   app.use('/logs', route);
+  route.get('/entries', ...directoryPageHandler(() => config.logPath, blacklist, true));
+  route.post('/entries/check', ...directoryCheckHandler(() => config.logPath, blacklist));
 
   route.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const logger: Logger = Container.get('logger');
@@ -38,6 +41,8 @@ export default (app: Router) => {
       query: Joi.object({
         path: Joi.string().allow('').optional(),
         file: Joi.string().required(),
+        follow: Joi.boolean().optional(),
+        cursor: Joi.string().pattern(/^\d{1,16}\.[a-f0-9]{64}$/).optional(),
         offset: Joi.number().integer().min(0).optional(),
         limit: Joi.number()
           .integer()
@@ -67,14 +72,18 @@ export default (app: Router) => {
         });
 
         const chunk = await readLogChunk(finalPath, {
+          follow: req.query.follow as unknown as boolean,
+          cursor: req.query.cursor as string | undefined,
           offset: req.query.offset as unknown as number,
           limit: req.query.limit as unknown as number,
           tail: req.query.tail as unknown as boolean,
         });
         res.send({
           code: 200,
-          data: removeAnsi(chunk.content),
+          data: req.query.follow ? chunk.content : removeAnsi(chunk.content),
           logStatus: runningInstance ? 'running' : undefined,
+          cursor: chunk.cursor,
+          reset: chunk.reset,
           offset: chunk.offset,
           nextOffset: chunk.nextOffset,
           total: chunk.total,

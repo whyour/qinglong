@@ -150,3 +150,14 @@ test('healthy bootstrap continues loading system information', async () => {
   await new Promise(setImmediate);
   assert.deepEqual(events, ['system', ['loading', false]]);
 });
+
+test('retryable panel reads retain their route on gateway failures and still enforce login expiry', async () => {
+  for (const [status, retryInPlace, expected] of [[502, true, []], [504, true, []],
+    [502, false, ['/error']], [401, true, ['/login']]]) {
+    const {request, pushes} = fixture('/crontab');
+    await assert.rejects(request.get('/api/crons/1/triggers', {retryInPlace, adapter: async config => {
+      throw new axios.AxiosError('failed', 'ERR_BAD_RESPONSE', config, null, {status, config, data: {}});
+    }}));
+    assert.deepEqual(pushes, expected);
+  }
+});

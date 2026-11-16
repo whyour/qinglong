@@ -43,7 +43,7 @@ Use command `--help` and `QL_LANG=en` for English. Command names and JSON fields
 
 ## Complete OpenAPI management
 
-The CLI also supports task/subscription CRUD, application and secret management, environment variables, configuration, scripts, logs, dependencies, system, dashboard and user APIs. `ql api routes --json` lists all 143 active routes; three retired file-reading endpoints are excluded. CI compares the catalogue against backend routes. See the [complete bilingual reference](skills/qinglong-cli/references/openapi.md) for every command and payload.
+The CLI also supports task/subscription CRUD, application and secret management, environment variables, configuration, scripts, logs, dependencies, system, dashboard and user APIs. `ql api routes --json` lists the active routes; three retired file-reading endpoints are excluded. CI compares the catalogue against backend routes. See the [complete bilingual reference](skills/qinglong-cli/references/openapi.md) for every command and payload.
 
 ```sh
 ql task create --name demo --command 'task demo.js' --schedule '0 0 * * *' --json
@@ -68,7 +68,7 @@ Protected requests use `Authorization: Bearer <token>`. Two credential sources a
 
 ### Application login
 
-Create a dedicated panel application with the required scopes. Existing scopes retain their original permissions. For read-only access, use `crons:read`, `subscriptions:read`, `envs:read`, `configs:read`, `scripts:read`, `dependencies:read`, `logs:read`, or `dashboard:read`. Script and log downloads use POST but are available to their read-only scopes. `GET /crons/import` writes tasks and is excluded from `crons:read`. `login` and `auth login` are equivalent. Interactive login hides the Client Secret; secret command-line arguments are not supported.
+Create a dedicated panel application with the required scopes. Existing scopes retain their original permissions. For read-only access, use `crons:read`, `subscriptions:read`, `envs:read`, `configs:read`, `scripts:read`, `dependencies:read`, `logs:read`, or `dashboard:read`. Script and log read-only scopes also allow downloads and directory version checks via POST. `GET /crons/import` writes tasks and is excluded from `crons:read`. `login` and `auth login` are equivalent. Interactive login hides the Client Secret; secret command-line arguments are not supported.
 
 ```sh
 ql login --url https://ql.example.com

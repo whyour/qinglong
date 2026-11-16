@@ -1,12 +1,10 @@
 import { translate } from '../../shared/i18n/index';
-import { extendedLifecycle } from './lifecycle';
+import { LifecycleReceipt } from './lifecycle';
 import { within } from './files';
 import fs from 'node:fs/promises';
 import { writeSync } from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import type { LocalContext } from './context';
-import { LocalApi } from './api';
 import { CliError } from '../../shared/errors';
 import { withOperationOutput } from './output';
 import { cancellableOperation, interruptedCode } from './cancellation';
@@ -32,7 +30,9 @@ export async function loggedOperation<T>(
   ]
     .map((value) => String(value).padStart(2, '0'))
     .join('-');
-  const logPath = context.env.real_log_path || `${action}/${stamp}.log`;
+  const receipt = new LifecycleReceipt(context, started);
+  const triggerId = receipt.triggerId;
+  const logPath = context.env.real_log_path || `${action}/${stamp}${triggerId ? '-' + triggerId : ''}.log`;
   const file = within(context.paths.dir_log!, logPath, context.env);
   const persist = context.env.real_time !== 'true';
   if (persist) await fs.mkdir(path.dirname(file), { recursive: true });
@@ -45,25 +45,17 @@ export async function loggedOperation<T>(
       process.stderr.write(chunk);
   };
   const id = Number(context.env.ID);
-  const extended = await extendedLifecycle(context);
-  const executionId =
-    extended && context.env.QL_EXECUTION_ORIGIN === 'scheduled_system'
-      ? `legacy-system:${started}:${randomUUID()}`
-      : undefined;
-  const api = new LocalApi(context);
   const report = async (final: boolean, code: number) => {
     if (!Number.isSafeInteger(id) || id <= 0) return;
     try {
-      await api.call('crons/status', 'PUT', {
+      await receipt.status({
         ids: [id],
         status: final ? '1' : '0',
         pid: String(process.pid),
         log_path: logPath,
         last_execution_time: started,
         last_running_time: final ? Math.floor((Date.now() - start) / 1000) : 0,
-        ...(final && extended ? { exit_code: code } : {}),
-        ...(executionId ? { execution_id: executionId } : {}),
-      });
+      }, final ? code : undefined);
     } catch {
       output(
         Buffer.from(

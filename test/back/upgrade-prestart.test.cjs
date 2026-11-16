@@ -10,6 +10,17 @@ const {
   repairDependencies,
 } = require('../../cli/src/internal/maintenance/upgradePrestart.cjs');
 
+function checkGroupSignals(t) {
+  const kill = t.mock.method(process, 'kill');
+  return () => {
+    if (process.platform === 'win32') return;
+    const groups = kill.mock.calls.filter(call => call.arguments[0] < 0 && call.arguments[1] === 'SIGKILL')
+      .map(call => call.arguments[0]);
+    assert.ok(groups.length > 0);
+    assert.equal(new Set(groups).size, groups.length, 'a retired process group was signalled twice');
+  };
+}
+
 for (const [version, exitCode] of [
   ['2.23.0', 0],
   ['2.23.0', 1],
@@ -43,12 +54,14 @@ for (const [version, exitCode] of [
       },message:'simulated prestart failure',build:{sourceCommit:'a'.repeat(40),version:${JSON.stringify(version)},backendSha256:crypto.createHash('sha256').update('backend').digest('hex')}},()=>process.exit(${exitCode}));
     `,
     );
+    const checkSignals = checkGroupSignals(t);
     const operation = prestartBackend(
       { source, static: statics },
       { target: { arch: 'armv6' }, limits: { heapMb: 128, timeoutMs: 3000 } },
     );
     if (exitCode) await assert.rejects(operation, /simulated prestart failure/);
     else await operation;
+    checkSignals();
     assert.deepEqual((await fs.readdir(root)).sort(), ['source', 'static']);
     await new Promise((r) => setTimeout(r, 700));
     await assert.rejects(fs.access(survivor), { code: 'ENOENT' });
@@ -84,6 +97,7 @@ for (const phase of ['install', 'rebuild'])
     `,
       { mode: 0o755 },
     );
+    const checkSignals = checkGroupSignals(t);
     await assert.rejects(
       repairDependencies(source, {
         target: { arch: 'armv6' },
@@ -96,6 +110,7 @@ for (const phase of ['install', 'rebuild'])
       }),
       /simulated repair failure/,
     );
+    checkSignals();
     assert.equal(
       await fs.readFile(path.join(source, 'node_modules/old'), 'utf8'),
       'preserved',

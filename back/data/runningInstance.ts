@@ -6,6 +6,7 @@ export enum InstanceStatus {
   'finished' = 1,
   'stopped' = 2,
   'error' = 3,
+  'unknown' = 4,
 }
 
 export interface RunningInstanceAttributes {
@@ -78,4 +79,5 @@ export const RunningInstanceModel = sequelize.define<RunningInstanceModel>(
       allowNull: true,
     },
   },
+  { indexes: [{ fields: ['cron_id', 'pid', 'started_at'] }, { fields: ['cron_id', 'id'] }] },
 );

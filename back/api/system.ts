@@ -4,6 +4,7 @@ import { Logger } from 'winston';
 import * as fs from 'fs/promises';
 import config from '../config';
 import SystemService from '../services/system';
+import { containerResources } from '../shared/containerResources';
 import { celebrate, Joi } from 'celebrate';
 import UserService from '../services/user';
 import { t } from '../shared/i18n';
@@ -62,7 +63,8 @@ export default (app: Router) => {
       try {
         const systemService = Container.get(SystemService);
         const data = await systemService.getSystemConfig();
-        res.send({ code: 200, data });
+        res.send({ code: 200, data: { ...data, effectiveCronConcurrency: systemService.cronConcurrency,
+          availableCpus: containerResources().cpus } });
       } catch (e) {
         return next(e);
       }

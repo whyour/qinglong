@@ -21,6 +21,7 @@ function create(env) {
   const cluster = {
     fork(options) {
       const worker = {
+        on() {},
         id: calls.length + 1,
         process: { pid: 100 + calls.length },
       };

@@ -8,8 +8,10 @@ export class CrontabStat {
   run_count?: number;
   success_count?: number;
   fail_count?: number;
+  untimed_count?: number;
   total_time?: number;
   max_time?: number;
+  fixed_max_time?: number | null;
 
   constructor(options: CrontabStat) {
     this.id = options.id;
@@ -18,6 +20,7 @@ export class CrontabStat {
     this.run_count = options.run_count || 0;
     this.success_count = options.success_count || 0;
     this.fail_count = options.fail_count || 0;
+    this.untimed_count = options.untimed_count || 0;
     this.total_time = options.total_time || 0;
     this.max_time = options.max_time || 0;
   }
@@ -53,10 +56,16 @@ export const CrontabStatModel = sequelize.define<CrontabStatInstance>(
       type: DataTypes.NUMBER,
       defaultValue: 0,
     },
+    untimed_count: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
     total_time: {
       type: DataTypes.NUMBER,
       defaultValue: 0,
     },
+    fixed_max_time: { type: DataTypes.NUMBER, allowNull: true },
     max_time: {
       type: DataTypes.NUMBER,
       defaultValue: 0,

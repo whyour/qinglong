@@ -90,8 +90,7 @@ test('real gRPC server rejects plaintext and TLS without client certificates, ac
         }
       },
     },
-    '../schedule/addCron': {},
-    '../schedule/delCron': {},
+    '../schedule/registeredPlans': {},
     '../schedule/setConcurrency': {},
     '../schedule/api': {},
     '../schedule/health': {

@@ -25,6 +25,7 @@ function fixture(client) {
   );
   const service = new module.exports();
   service.setCrontab = async () => {};
+  service.markSchedulesSaved = async () => {};
   service.logger = { warn() {} };
   service.shouldUseCronClient = () => true;
   service.makeCommand = () => 'true';

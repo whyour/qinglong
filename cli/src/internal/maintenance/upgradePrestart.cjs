@@ -45,6 +45,22 @@ function dependencyFailure(error) {
   );
 }
 
+// Once the group has received its final signal, its numeric ID can be reused.
+function childGroupSignaler(child) {
+  let finished = false;
+  return (signal) => {
+    if (finished) return;
+    try {
+      if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, signal);
+      else child.kill(signal);
+      if (signal === 'SIGKILL') finished = true;
+    } catch (error) {
+      if (error.code !== 'ESRCH') throw error;
+      finished = true;
+    }
+  };
+}
+
 async function prestartBackend(
   selected,
   { target, signal, limits = probeLimits(target) },
@@ -136,14 +152,9 @@ async function prestartBackend(
       try {
         if (child.pid) os.setPriority(child.pid, 10);
       } catch {}
+      const signalGroup = childGroupSignaler(child);
       const kill = (signalName) => {
-        try {
-          if (process.platform !== 'win32' && child.pid)
-            process.kill(-child.pid, signalName);
-          else child.kill(signalName);
-        } catch (error) {
-          if (error.code !== 'ESRCH') failure ||= error;
-        }
+        try { signalGroup(signalName); } catch (error) { failure ||= error; }
       };
       const stop = (error) => {
         failure ||= error;
@@ -179,8 +190,6 @@ async function prestartBackend(
       // Reap the group on exit rather than waiting for those pipes to close.
       child.once('exit', () => kill('SIGKILL'));
       child.on('close', (code, exitSignal) => {
-        // Reap descendants even when the backend exits unexpectedly.
-        kill('SIGKILL');
         if (failure) return finish(failure);
         if (code !== 0 || !report?.ok)
           return finish(
@@ -335,12 +344,9 @@ async function runRepair(program, args, options) {
       detached: process.platform !== 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    const signalGroup = childGroupSignaler(child);
     const kill = (sig) => {
-      try {
-        if (child.pid && process.platform !== 'win32')
-          process.kill(-child.pid, sig);
-        else child.kill(sig);
-      } catch {}
+      try { signalGroup(sig); } catch {}
     };
     const stop = (error) => {
       failure ||= error;
@@ -365,9 +371,9 @@ async function runRepair(program, args, options) {
       clearTimeout(timer);
       clearTimeout(killTimer);
       options.signal?.removeEventListener('abort', abort);
-      kill('SIGKILL');
     };
     child.on('error', (error) => {
+      kill('SIGKILL');
       cleanup();
       reject(error);
     });

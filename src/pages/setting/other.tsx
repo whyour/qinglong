@@ -65,6 +65,7 @@ const Other = ({
     runningInstanceRetentionDays?: number | null;
     cronStatRetentionDays?: number | null;
   }>();
+  const [limits, setLimits] = useState<{ concurrency: number; cpus: number }>();
   const [form] = Form.useForm();
   const [exportLoading, setExportLoading] = useState(false);
   const showUploadProgress = useProgress(intl.get('上传'));
@@ -117,6 +118,7 @@ const Other = ({
       .then(({ code, data }) => {
         if (code === 200 && data.info) {
           setSystemConfig(data.info);
+          setLimits({ concurrency: data.effectiveCronConcurrency, cpus: data.availableCpus });
         }
       })
       .catch((error: any) => {
@@ -133,6 +135,7 @@ const Other = ({
       .then(({ code, data }) => {
         if (code === 200) {
           message.success(intl.get('更新成功'));
+          if (path === 'cron-concurrency') getSystemConfig();
           if (path === 'panel-title') {
             reloadSystemConfig();
           }
@@ -194,6 +197,9 @@ const Other = ({
             <div>
               <p>
                 {intl.get('将删除历史运行实例')}: {data.runningInstances}
+              </p>
+              <p>
+                {intl.get('将删除触发记录')}: {data.triggers}
               </p>
               <p>
                 {intl.get('将删除任务统计')}: {data.cronStats}
@@ -459,13 +465,15 @@ const Other = ({
             {intl.get('预览清理')}
           </Button>
         </Form.Item>
-        <Form.Item label={intl.get('定时任务并发数')} name="frequency">
+        <Form.Item label={intl.get('定时任务并发数')} extra={limits && intl.get('定时和手动任务各有一条队列，每条最多同时运行 {slots} 个实例。当前可用 CPU 核数为 {cpus}。', { slots: limits.concurrency, cpus: limits.cpus })}>
           <Input.Group compact>
             <InputNumber
               style={{ width: 180 }}
-              min={4}
-              value={systemConfig?.cronConcurrency}
-              placeholder={intl.get('默认为 CPU 个数')}
+              min={1}
+              precision={0}
+              max={2147483647}
+              value={systemConfig?.cronConcurrency || null}
+              placeholder={intl.get('自动设置')}
               onChange={(value) => {
                 setSystemConfig({ ...systemConfig, cronConcurrency: value });
               }}
