@@ -1,10 +1,8 @@
-version: 2.25.0-rc.0
-changeLogLink: https://github.com/whyour/qinglong/blob/develop/docs/releases/2.25.0-rc.0.md
-publishTime: "2026-11-10 01:16:12"
+version: 2.25.0-rc.1
+changeLogLink: https://github.com/whyour/qinglong/blob/develop/docs/releases/2.25.0-rc.1.md
+publishTime: "2026-11-17 09:59:16"
 changeLog: |
-  1. 收紧应用权限、首次通知配置与任务环境变量边界；启动前修复不安全的环境变量标签
-  2. 依赖管理改为按需复查状态，配置与脚本编辑器新增自动换行开关
-  3. 通知请求及线程等待增加超时，避免无响应渠道阻塞任务
-  4. 修复挂载空数据卷后 Python 通知缺少 requests 依赖的问题
-  5. 独立远程 CLI 候选版本为 0.1.5-rc.1，改善跨平台配置与 OpenAPI 命令
-  6. 此版本为开发候选；升级前备份数据并在目标设备验证任务、依赖、通知和应用权限
+  1. 修复 Node 24 下的开发启动，并恢复旧版定时任务的注册。
+  2. 定时任务现可查看触发记录、运行实例、每日结果与调度耗时。并发运行时可单独停止指定实例并检查对应日志。
+  3. 改进重启后的调度恢复、队列诊断，以及脚本和日志目录的分页读取。
+  4. 配套远程 CLI 增补调度、实例和文件浏览相关的 OpenAPI 操作。
