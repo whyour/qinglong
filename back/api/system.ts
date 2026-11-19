@@ -424,6 +424,7 @@ export default (app: Router) => {
 
   route.put(
     '/auth/reset',
+    rateLimit({ windowMs: 15 * 60 * 1000, limit: 20 }),
     celebrate({
       body: Joi.object({
         retries: Joi.number().optional(),

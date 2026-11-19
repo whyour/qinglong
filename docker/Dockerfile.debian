@@ -8,6 +8,7 @@ RUN apt-get update && \
 
 FROM python:3.11.14-slim-bookworm AS builder
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
+COPY patches/ /tmp/build/patches/
 COPY --from=nodebuilder /usr/local/bin/node /usr/local/bin/
 COPY --from=nodebuilder /usr/local/lib/node_modules/. /usr/local/lib/node_modules/
 RUN set -x && \

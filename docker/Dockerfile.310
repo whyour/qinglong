@@ -8,6 +8,7 @@ ENV NPM_CONFIG_PREFIX=/opt/node-global
 ENV PATH=/opt/node-global/bin:${PATH}
 
 COPY package.json .npmrc pnpm-lock.yaml /tmp/build/
+COPY patches/ /tmp/build/patches/
 RUN set -x \
   && apk add --no-cache git \
   && npm i -g pnpm@8.3.1 pm2 ts-node typescript@5 \
