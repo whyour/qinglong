@@ -6,6 +6,7 @@ import config from './config';
 import Logger from './loaders/logger';
 import { errStack } from './shared/errors';
 import { initializeLanguageSync } from './shared/languageSync';
+import { startupStage } from './shared/startupTiming';
 import { type GrpcServerService } from './services/grpc';
 import { type HttpServerService } from './services/http';
 
@@ -26,9 +27,9 @@ class Application {
   async start() {
     try {
       if (cluster.isPrimary) {
-        await this.initializeDatabase();
+        await startupStage('database', () => this.initializeDatabase());
       }
-      await initializeLanguageSync();
+      await startupStage('language', () => initializeLanguageSync());
       if (cluster.isPrimary) {
         this.startMasterProcess();
       } else {
@@ -229,9 +230,9 @@ class Application {
     Logger.info(`[boot] ${serviceType} worker started (PID: ${process.pid})`);
 
     try {
-      const { triggerHistory } = await import('./shared/triggerHistory');
+      const { triggerHistory } = await startupStage('history.import', () => import('./shared/triggerHistory'));
       const history = triggerHistory();
-      await history.interrupt(serviceType);
+      await startupStage('history.recover', () => history.interrupt(serviceType));
       if (serviceType === 'http') {
         await this.startHttpService();
         const retryExits = async () => {
@@ -257,16 +258,16 @@ class Application {
 
   private async startHttpService() {
     // 在导入任何 gRPC 客户端模块之前初始化 mTLS 证书
-    const { initGrpcCerts } = await import('./config/grpcCerts');
-    await initGrpcCerts();
+    const { initGrpcCerts } = await startupStage('certificates.import', () => import('./config/grpcCerts'));
+    await startupStage('certificates.initialize', () => initGrpcCerts());
 
-    const app = await this.setupMiddlewares();
+    const app = await startupStage('http.middleware', () => this.setupMiddlewares());
 
     const { HttpServerService } = await import('./services/http');
     this.httpServerService = Container.get(HttpServerService);
 
-    const appLoader = await import('./loaders/app');
-    await appLoader.default({ app });
+    const appLoader = await startupStage('http.import', () => import('./loaders/app'));
+    await startupStage('http.initialize', () => appLoader.default({ app }));
 
     const server = await this.httpServerService.initialize(
       app,
@@ -279,10 +280,10 @@ class Application {
   }
 
   private async startGrpcService() {
-    const { GrpcServerService } = await import('./services/grpc');
+    const { GrpcServerService } = await startupStage('grpc.import', () => import('./services/grpc'));
     this.grpcServerService = Container.get(GrpcServerService);
 
-    await this.grpcServerService.initialize();
+    await startupStage('grpc.initialize', () => this.grpcServerService!.initialize());
     this.setupWorkerShutdown('grpc');
   }
 

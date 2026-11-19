@@ -3,13 +3,14 @@
     "back",
     ".env"
   ],
-  "ext": "js,ts,json",
+  "ext": "js,cjs,ts,json",
   "env": {
     "NODE_ENV": "development",
-    "TS_NODE_PROJECT": "./back/tsconfig.json"
+    "TS_NODE_PROJECT": "./back/tsconfig.json",
+    "QL_STARTUP_TIMING": "1"
   },
   "verbose": true,
   "execMap": {
-    "ts": "node --require ts-node/register"
+    "ts": "node --require ts-node/register/transpile-only"
   }
 }

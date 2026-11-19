@@ -8,6 +8,10 @@ The catalogue covers the active routes in the current backend. `ql api routes --
 
 Log and script pages return `versions`. Pass the visited directories’ versions to the matching `entries-check --data` command in groups of 1 to 128. Restart pagination when it returns `current: false`.
 
+`ql dashboard schedule-anomalies --query '{"source":"panel","kind":"missing","at":1795046400000}'` 查询异常明细。`source` 为 `panel` 或 `system`，`kind` 为 `missing`、`skipped` 或 `unconfirmed`；`at` 必须替换为查询窗口的服务端毫秒时间戳。分页传 `page` 和上一响应的 `revision`，记录变化时按返回的 `page` 重新展示。`live:true` 用于今日实时明细：返回 `status: expired` 或 `unavailable` 时重新读取 overview，不能把该响应当作空页继续拼接。
+
+`ql dashboard schedule-anomalies` accepts required `source` (`panel` or `system`), `kind` (`missing`, `skipped` or `unconfirmed`) and `at` (server epoch milliseconds for the query window) through `--query`. Pass `page` and the previous `revision` for pagination and honor the returned page if records change. With `live:true`, refresh the overview when `status` is `expired` or `unavailable`; do not append these responses as empty pages.
+
 `ql task instances <id>` 默认返回该任务的完整运行历史，按启动时间倒序。显式传 `--query '{"paged":true,"limit":25}'` 后按实例 ID 倒序分页（默认 25，最多 100），将返回的 `next` 作为下一页的 `before`，直到 `next` 为 `null`。刷新指定实例可传 `{"paged":true,"ids":"12,13"}`。触发记录使用独立的 `task triggers` 接口，日志和脚本目录分页使用 `log entries` 和 `script entries`。
 
 `ql task instances <id>` returns the full history ordered by start time by default. Opt in with `--query '{"paged":true,"limit":25}'` to page by descending instance ID (default 25, maximum 100). Pass `next` as `before` until `next` is `null`. Use `{"paged":true,"ids":"12,13"}` to refresh specific rows. Trigger history and directory pagination use separate endpoints.
@@ -214,6 +218,7 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql system config-dependence-clean ` | PUT | `system/config/dependence-clean` | --data, --query |
 | `ql dashboard record ` | POST | `dashboard/record` | --data, --query |
 | `ql dashboard overview ` | GET | `dashboard/overview` | --query |
+| `ql dashboard schedule-anomalies ` | GET | `dashboard/schedule-anomalies` | --query |
 | `ql dashboard trend ` | GET | `dashboard/trend` | --query |
 | `ql dashboard top-time ` | GET | `dashboard/top-time` | --query |
 | `ql dashboard top-count ` | GET | `dashboard/top-count` | --query |

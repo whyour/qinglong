@@ -24,14 +24,16 @@ export default defineConfig({
     },
   },
   chainWebpack: ((config: any) => {
-    config.plugin('compression-webpack-plugin').use(
-      new CompressionPlugin({
-        algorithm: 'gzip',
-        test: new RegExp('\\.(js|css)$'),
-        threshold: 10240,
-        minRatio: 0.6,
-      }),
-    );
+    if (process.env.NODE_ENV === 'production') {
+      config.plugin('compression-webpack-plugin').use(
+        new CompressionPlugin({
+          algorithm: 'gzip',
+          test: new RegExp('\\.(js|css)$'),
+          threshold: 10240,
+          minRatio: 0.6,
+        }),
+      );
+    }
   }) as any,
   headScripts: [`./api/env.js`],
   copy: [

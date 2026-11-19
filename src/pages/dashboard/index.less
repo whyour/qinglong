@@ -1,3 +1,5 @@
+@import '~antd/es/style/themes/default.less';
+
 .schedule-overview {
   margin-top: 16px;
   container-type: inline-size;
@@ -120,4 +122,14 @@
   p { margin: 8px 0 0; }
   > :first-child { margin-top: 0; }
   .timing-samples { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; }
+}
+
+.anomaly-count {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ant-primary-color, @primary-color);
+  font: inherit;
+  cursor: pointer;
+  &:hover, &:focus-visible { text-decoration: underline; }
 }

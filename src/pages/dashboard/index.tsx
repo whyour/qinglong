@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Button, Card, Col, Popover, Row, Statistic, Table, Tabs, Tag, Spin, Empty } from 'antd';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { message, Button, Card, Col, Popover, Row, Statistic, Table, Tabs, Tag, Spin, Empty } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -19,10 +19,14 @@ import config from '@/utils/config';
 import CronLogModal from '../crontab/logModal';
 import { QueueReason } from '../crontab/triggerTiming';
 import TimingStatistic from './timingStatistic';
+import ScheduleAnomalies, { AnomalyMetric, AnomalySelection } from './scheduleAnomalies';
 import TaskResultModal from './taskResultModal';
 import './index.less';
 
-interface Overview {
+export interface Overview {
+  serverNow?: number;
+  expiresAt?: number;
+  anomalyDeadline?: number;
   total: number;
   enabled: number;
   disabled: number;
@@ -33,7 +37,7 @@ interface Overview {
     triggerDeviationP95: number | null; waitP95: number | null; commandStartP95: number | null;
     scriptStartP95: number | null; scriptSamples: number;
   } | null; systemAudit?: {
-    since: number; confirmedAt: number | null; pending: boolean; partial: boolean; expected: number; observed: number;
+    since: number; through: number; actualUnconfirmed?: number; confirmedAt: number | null; pending: boolean; partial: boolean; expected: number; observed: number;
     dispatched: number; skipped: number; missing: number; unmatched: number; duplicates: number; actualStarts: number; actualSkips?: number; uncertain: number; awaiting: number; switchSlots: number;
     recent: { time: number; task: number; name?: string; status: string; id?: string; triggerCount?: number; startCount?: number; skipCount?: number; unknownExitCount?: number }[];
   } | null };
@@ -137,6 +141,29 @@ const Dashboard = () => {
   const [result, setResult] = useState<'success' | 'failure' | null>(null);
 
   const [selectedSource, setSelectedSource] = useState<string>();
+  const [anomaly, setAnomaly] = useState<AnomalySelection>();
+  const anomalySession = useRef<AnomalySelection>();
+  const anomalyVersion = useRef(0);
+  const closeAnomaly = useCallback(() => {
+    anomalySession.current = undefined;
+    setAnomaly(undefined);
+  }, []);
+  const updateAnomalySummary = useCallback((selection: AnomalySelection, summary: NonNullable<Overview['triggers']>) => {
+    if (anomalySession.current !== selection) return;
+    setOverview(previous => anomalySession.current === selection && previous
+      ? { ...previous, triggers: { ...previous.triggers, ...summary } } : previous);
+  }, []);
+  const invalidateAnomaly = useCallback((selection: AnomalySelection, reason: 'expired' | 'unavailable') => {
+    if (anomalySession.current !== selection) return;
+    const version = anomalyVersion.current;
+    closeAnomaly();
+    setOverview(previous => anomalyVersion.current === version && previous
+      ? { ...previous, triggers: undefined } : previous);
+    setLogCron(previous => previous?.anomalySession === selection.session ? null : previous);
+    message.info(intl.get(reason === 'expired'
+      ? '日期已变化，已关闭旧明细并刷新今日调度。'
+      : '这次明细已不可用，已关闭并刷新调度统计。'));
+  }, [closeAnomaly]);
   const [helpOpen, setHelpOpen] = useState(false);
   const helpButton = useRef<HTMLButtonElement>(null);
   const helpPopover = useRef<{ forcePopupAlign(): void }>(null);
@@ -207,11 +234,22 @@ const Dashboard = () => {
       if (pending.has(section)) return;
       pending.add(section);
       try {
+        const requestedAt = performance.now();
         const response = await request.get<{ code: number; data: T }>(
           `${config.apiPrefix}dashboard/${section}`, { signal, retryInPlace: true },
         );
         if (signal.aborted) return;
-        if (response.code === 200) apply(response.data);
+        if (response.code === 200) {
+          let data = response.data;
+          if (section === 'overview' && data) {
+            const clock = data as Overview;
+            if (typeof clock.expiresAt === 'number' && typeof clock.serverNow === 'number') {
+              const deadline = requestedAt + clock.expiresAt - clock.serverNow;
+              if (Number.isFinite(deadline)) data = { ...data, anomalyDeadline: deadline };
+            }
+          }
+          apply(data);
+        }
         if (section === 'overview') setOverviewFailed(response.code !== 200);
       } catch {
         if (!signal.aborted && section === 'overview') setOverviewFailed(true);
@@ -222,7 +260,7 @@ const Dashboard = () => {
     }
 
     function poll() {
-      void refresh<Overview>('overview', setOverview);
+      if (!anomaly) void refresh<Overview>('overview', setOverview);
       void refresh<TrendItem[]>('trend', setTrend);
       void refresh<TopItem[]>('top-time', setTopTime);
       void refresh<TopItem[]>('top-count', setTopCount);
@@ -237,7 +275,7 @@ const Dashboard = () => {
       clearInterval(timer);
       controller.abort();
     };
-  }, []);
+  }, [anomaly]);
 
   const trendConfig = {
     data: trend.flatMap((d) => [
@@ -270,6 +308,13 @@ const Dashboard = () => {
 
   if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
+  const anomalyMetric = (source: AnomalySelection['source'], kind: AnomalySelection['kind'], count: number | undefined, through: number) =>
+    <AnomalyMetric kind={kind} count={count} open={() => {
+      const selection = { kind, source, count: count!, at: through + 5000, session: ++anomalyVersion.current,
+        deadline: overview?.anomalyDeadline };
+      anomalySession.current = selection;
+      setAnomaly(selection);
+    }} />;
   const sources = [];
   if (audit) {
     const timings = [
@@ -298,13 +343,13 @@ const Dashboard = () => {
       children: <>
         <div className="schedule-metrics">
           <Statistic title={intl.get('计划触发次数')} value={audit.expected} />
-          <Statistic title={intl.get('未收到触发记录')} value={audit.missing} />
+          {anomalyMetric('panel', 'missing', audit.missing, audit.through)}
           <Statistic title={intl.get('有触发记录的计划')} value={audit.observed} />
           <ScheduleRate title={intl.get('准时触发率')} count={audit.partial ? undefined : audit.onTime} total={audit.expected} />
           <Statistic title={intl.get('命令已启动')} value={audit.dispatched} />
-          <Statistic title={intl.get('触发后跳过')} value={audit.skipped} />
+          {anomalyMetric('panel', 'skipped', audit.skipped, audit.through)}
           <Statistic title={intl.get('仍在排队')} value={audit.queued} />
-          <Statistic title={intl.get('启动未确认')} value={audit.unconfirmed} />
+          {anomalyMetric('panel', 'unconfirmed', audit.unconfirmed, audit.through)}
         </div>
         <details className="schedule-details">
           <summary>{intl.get('查看启动耗时')}</summary>
@@ -332,14 +377,15 @@ const Dashboard = () => {
         <div className="schedule-metrics">
           <Statistic title={intl.get('计划触发次数')} value={systemAudit.expected} />
           <Statistic title={intl.get('有触发记录的计划')} value={systemAudit.observed} />
-          <Statistic title={intl.get('未收到触发记录')} value={systemAudit.missing} />
+          {anomalyMetric('system', 'missing', systemAudit.missing, systemAudit.through)}
         </div>
         <h4 className="schedule-group-title">{intl.get('按触发记录统计（共 {count} 条）', {
           count: systemAudit.observed + systemAudit.duplicates + systemAudit.unmatched,
         })}</h4>
         <div className="schedule-metrics">
           <Statistic title={intl.get('命令启动次数')} value={systemAudit.actualStarts} />
-          <Statistic title={intl.get('跳过次数')} value={systemAudit.actualSkips ?? '—'} />
+          {anomalyMetric('system', 'skipped', systemAudit.actualSkips, systemAudit.through)}
+          {anomalyMetric('system', 'unconfirmed', systemAudit.actualUnconfirmed, systemAudit.through)}
           <Statistic title={intl.get('重复触发次数')} value={systemAudit.duplicates} />
           <Statistic title={intl.get('找不到对应计划的触发记录')} value={systemAudit.unmatched} />
         </div>
@@ -447,7 +493,7 @@ const Dashboard = () => {
       </>}>
         {sources.length === 2 ? (
           <Tabs items={sources.map(({ key, label, children }) => ({ key, label, children }))}
-            activeKey={activeSource?.key} onChange={setSelectedSource} />
+            activeKey={activeSource?.key} onChange={source => { setSelectedSource(source); closeAnomaly(); }} />
         ) : sources.length === 1 ? (
           sources[0].children
         ) : (
@@ -616,11 +662,17 @@ const Dashboard = () => {
         </Col>
       </Row>
       {result && <TaskResultModal key={result} result={result} onCancel={() => setResult(null)} />}
+      {anomaly && <ScheduleAnomalies key={anomaly.session}
+        selection={anomaly} onUpdate={updateAnomalySummary} onInvalidate={invalidateAnomaly} close={closeAnomaly}
+        openLog={(id, trigger, name) => {
+          if (anomalySession.current === anomaly)
+            setLogCron({ id, trigger, name, anomalySession: anomaly.session });
+        }} />}
       {logCron && (
         <CronLogModal
-          key={logCron.instanceId}
+          key={logCron.trigger ?? logCron.instanceId}
           cron={logCron}
-          logUrl={`${config.apiPrefix}crons/${logCron.id}/log?instanceId=${logCron.instanceId}`}
+          logUrl={`${config.apiPrefix}crons/${logCron.id}/log?${logCron.trigger ? 'triggerId=' + encodeURIComponent(logCron.trigger) : 'instanceId=' + logCron.instanceId}`}
           handleCancel={() => setLogCron(null)}
         />
       )}

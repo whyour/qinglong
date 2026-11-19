@@ -1,3 +1,4 @@
+import { AnomalyPage } from './scheduleAnomalies';
 import { QueryTypes, Sequelize, Transaction } from 'sequelize';
 import { blockSize, blockSlots } from './scheduleAudit';
 
@@ -15,6 +16,8 @@ type Receipt = {
   system_rule: string | null;
   observed_at: number;
   system_dispatch_at: number | null;
+  reason: string | null;
+  log_path: string | null;
   launched: number;
   state: string;
 };
@@ -83,6 +86,7 @@ export async function systemScheduleAudit(
   db: Sequelize,
   dayStart: number,
   now = Date.now(),
+  details?: AnomalyPage,
 ) {
   const next = new Date(dayStart);
   next.setHours(24, 0, 0, 0);
@@ -101,7 +105,7 @@ export async function systemScheduleAudit(
         { transaction, bind: { since, now }, type: QueryTypes.SELECT },
       );
       const receipts = await db.query<Receipt>(
-        `SELECT id,cron_id,system_rule,system_dispatch_at,observed_at,state,
+        `SELECT id,cron_id,system_rule,system_dispatch_at,observed_at,state,${details ? 'reason,log_path,' : ''}
        (command_started_at IS NOT NULL OR script_started_at IS NOT NULL OR
         (started_at IS NOT NULL AND EXISTS (SELECT 1 FROM CronLegacyExitBookings b
          WHERE b.trigger_id=CronTriggers.id AND b.bound=1 AND b.disputed=0))) AS launched
@@ -133,6 +137,7 @@ export async function systemScheduleAudit(
       (JSON.parse(plan.rules) as SystemRule[]).map((rule) => [rule.id, rule]),
     ),
   }));
+  const matched = details && details.kind !== 'missing' ? new Map<string, { time: number; name?: string }>() : null;
   const groups = new Map<string, Receipt[]>();
   const dispatchedTasks = new Set<string>();
   const legacyThrough = new Map<string, number>();
@@ -247,10 +252,11 @@ export async function systemScheduleAudit(
       );
       let status: string;
       const launched = group.find((row) => row.launched === 1);
-      const skip = group.find((row) => row.state === 'skipped');
+      const skip = group.find((row) => !row.launched && row.state === 'skipped');
       if (group.length) {
         ++expected;
         ++observed;
+        if (matched) for (const row of group) matched.set(row.id, { time, name });
         matchedReceipts += group.length;
         duplicates += group.length - 1;
         if (launched) ++dispatched;
@@ -277,6 +283,8 @@ export async function systemScheduleAudit(
           status = 'awaiting';
         } else {
           ++missing;
+          if (details?.kind === 'missing') details.add({ task, name, rule: schedule, time, source: 'system',
+            trigger: null, observed: null, reason: null, logPath: null });
           status = 'missing';
         }
       }
@@ -287,7 +295,7 @@ export async function systemScheduleAudit(
         status,
         triggerCount: group.length,
         startCount: group.filter((row) => row.launched === 1).length,
-        skipCount: group.filter((row) => row.state === 'skipped').length,
+        skipCount: group.filter((row) => !row.launched && row.state === 'skipped').length,
         unknownExitCount: group.filter((row) => row.launched === 1 && row.state === 'unknown').length,
         id: (launched || skip || group[0])?.id,
       });
@@ -295,6 +303,18 @@ export async function systemScheduleAudit(
     if (entries.length)
       recent.unshift(...entries.sort((a, b) => a.task - b.task).slice(0, 25));
     recent.splice(25);
+  }
+  let actualSkips = 0, actualUnconfirmed = 0;
+  for (const row of receipts) {
+    if (row.launched === 1) continue;
+    const kind = row.state === 'skipped' ? 'skipped' : 'unconfirmed';
+    if (kind === 'skipped') actualSkips++;
+    else actualUnconfirmed++;
+    if (details?.kind === kind) {
+      const slot = matched?.get(row.id);
+      details.add({ task: row.cron_id, name: slot?.name, rule: row.system_rule, time: slot?.time ?? null,
+        source: 'system', trigger: row.id, observed: row.observed_at, reason: row.reason, logPath: row.log_path });
+    }
   }
   return {
     since: Math.max(since, plans[0]?.staged ?? since),
@@ -312,7 +332,7 @@ export async function systemScheduleAudit(
     uncertain,
     awaiting,
     switchSlots,
-    actualSkips: receipts.filter((row) => row.state === 'skipped').length,
+    actualSkips, actualUnconfirmed,
     actualStarts: receipts.filter((row) => row.launched === 1).length,
     unmatched: receipts.length - matchedReceipts,
     recent,

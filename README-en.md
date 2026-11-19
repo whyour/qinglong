@@ -115,7 +115,9 @@ pnpm install
 pnpm start
 ```
 
-Open your browser and visit <http://127.0.0.1:5700>
+Open your browser and visit <http://127.0.0.1:8000>. The development server proxies API requests to the backend on port 5700.
+
+The backend starts with `ts-node/register/transpile-only`, skipping type checking during development, and restarts automatically after source changes. Run `pnpm build:back` for full type checking. `[boot:timing]` logs report startup stages. Development builds skip gzip generation; production builds retain gzip compression. Keep frontend caches and the `data` directory during normal development to avoid rebuilding dependencies, initializing the database and generating certificates on each start.
 
 ## Links
 

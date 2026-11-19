@@ -6075,3 +6075,312 @@ test('a late skipped timer affects trigger deviation but only valid queue endpoi
   assert.equal(metrics.samples, 3);
   assert.equal(metrics.waitP95, 136);
 });
+
+test('overview clock pins the original server day when its data query crosses midnight', async t => {
+  const { root, models, stats } = await fixture(t);
+  const day = require('dayjs')().startOf('day');
+  const midnight = day.add(1, 'day').valueOf();
+  let clock = midnight - 100;
+  t.mock.method(Date, 'now', () => clock);
+  const router = express.Router();
+  load('back/api/dashboard.ts', {
+    '../config': { logPath: root }, '../data/cron': models, '../data/cronStats': stats,
+    '../shared/triggerHistory': { TriggerHistory: class {
+      async metrics(since) {
+        assert.equal(since, day.valueOf());
+        clock = midnight + 100;
+        return { audit: { through: midnight - 5100 } };
+      }
+    } },
+  }).default(router);
+  const handler = router.stack[0].handle.stack.find(x => x.route?.path === '/overview').route.stack.at(-1).handle;
+  let result;
+  await handler({}, { send(value) { result = value; } }, error => { throw error; });
+  assert.equal(result.code, 200);
+  assert.equal(result.data.serverNow, midnight - 100);
+  assert.equal(result.data.expiresAt, midnight);
+  assert.equal(result.data.todayRuns, 0);
+});
+
+test('panel anomaly pages match scheduled counts, isolate overlapping rules and restart paging on late evidence', async t => {
+  const { db, history } = await fixture(t);
+  const { AnomalyPage } = require('../../back/shared/scheduleAnomalies');
+  const { saveSchedulePlan, auditSchedule } = require('../../back/shared/scheduleAudit');
+  const start = new Date(2026, 1, 1, 9).getTime(), rule = '* * * * * *';
+  await saveSchedulePlan(db, { replace: true, crons: [{ id:'9', schedule:rule, extra_schedules:[{schedule:rule}] }] }, start);
+  const read = async (kind, page = 1, revision) => {
+    const rows = new AnomalyPage(kind, page, revision);
+    const audit = await auditSchedule(db,start,start+35000,rows);
+    const result = rows.result();
+    assert.equal(result.total, audit[kind]);
+    return result;
+  };
+  const put = (i,n,source='node') => {
+    const at=start+n*1000;
+    return history.enqueue(slotId('9',i,rule,at),9,source,at,at);
+  };
+  const first=await read('missing'), second=await read('missing',2,first.revision);
+  assert.equal(first.total,60); assert.equal(second.page,2);
+  assert.equal(new Set([...first.rows,...second.rows].map(r=>r.ruleIndex+'/'+r.time)).size,50);
+  await put(0,1,'recovery'); await put(1,1); await put(0,2); await put(1,2);
+  const id=(i,n)=>slotId('9',i,rule,start+n*1000);
+  await history.finish(id(0,1),'skipped','overlap',null);
+  await history.start(id(1,1),start+1100,true);
+  await history.finish(id(1,1),'failed','spawn',127);
+  await db.query("UPDATE CronTriggers SET log_path='one.log' WHERE id=$id",{bind:{id:id(1,1)}});
+  await history.recordCommandStart(id(0,2),start+2100);
+  const late=await read('missing',2,first.revision);
+  assert.deepEqual([late.changed,late.page,late.total],[true,1,56]);
+  assert.ok(late.rows.every(r=>r.trigger===null && !r.logPath));
+  assert.deepEqual((await read('skipped')).rows.map(r=>[r.trigger,r.reason,r.source]),[[id(0,1),'overlap','recovery']]);
+  assert.deepEqual((await read('unconfirmed')).rows.map(r=>[r.trigger,!!r.logPath]),[[id(1,1),true]]);
+});
+
+test('crond anomaly details count individual duplicate and unmatched receipts without inventing their schedule', async t => {
+  const { db } = await fixture(t);
+  const { AnomalyPage } = require('../../back/shared/scheduleAnomalies');
+  const { stageSystemPlan, confirmSystemPlan, systemScheduleAudit } = require('../../back/shared/systemScheduleAudit');
+  const m=60000, start=new Date(2026,1,1,9).getTime(), schedule='* * * * *';
+  const plan=await stageSystemPlan(db,[{id:1,name:'minute',schedule}],start-2*m);
+  await confirmSystemPlan(db,plan,start-2*m+1);
+  for (const [id,state,launch,rule,dispatch,observed,log] of [
+    ['ran','finished',start+1,schedule,start,start,null], ['skip','skipped',null,schedule,start,start+m+7,null],
+    ['unknown','unknown',null,schedule,start,start+2,null], ['old','skipped',null,null,null,start+3,'/dev/null'],
+    ['unmatched','unknown',null,'0 0 * * *',start+m,start+m+4,'task/x.log'],
+  ]) await db.query('INSERT INTO CronTriggers(id,cron_id,source,state,observed_at,system_rule,system_dispatch_at,command_started_at,log_path) VALUES($id,1,\'system\',$state,$observed,$rule,$dispatch,$launch,$log)',{bind:{id,state,launch,rule,dispatch,observed,log}});
+  for (const [kind,field,count] of [['missing','missing',2],['skipped','actualSkips',2],['unconfirmed','actualUnconfirmed',2]]) {
+    const page=new AnomalyPage(kind,1);
+    const audit=await systemScheduleAudit(db,start,start+4*m+6000,page), report=page.result();
+    assert.equal(report.total,count);assert.equal(audit[field],count);
+    assert.equal(audit.actualStarts+audit.actualSkips+audit.actualUnconfirmed,5);
+    if (kind==='missing') assert.deepEqual(report.rows.map(r=>r.time),[start+2*m,start+3*m]);
+    if (kind==='skipped') assert.deepEqual(report.rows.map(r=>[r.trigger,r.time,r.logPath]),[['old',null,'/dev/null'],['skip',start,null]]);
+    if (kind==='unconfirmed') assert.deepEqual(report.rows.map(r=>[r.trigger,r.time,r.logPath]),[['unknown',start,null],['unmatched',null,'task/x.log']]);
+  }
+});
+
+test('anomaly endpoint resolves task names and offers only the retained log for the exact trigger', async t => {
+  const { root, db, models, stats } = await fixture(t);
+  const at = require('dayjs')().subtract(1, 'day').hour(12).valueOf();
+  await models.CrontabModel.create({ id: 4, name: 'Report', command: 'echo report' });
+  const logs = path.join(root, 'logs');
+  await fs.mkdir(logs);
+  await fs.writeFile(path.join(logs, 'one.log'), 'only for run one');
+  await fs.symlink(path.join(root, 'panel.sqlite'), path.join(logs, 'outside'));
+  for (const [id, file] of [['one', 'one.log'], ['two', 'missing.log'], ['three', 'outside'], ['four', '/dev/null']]) {
+    await db.query(`INSERT INTO CronTriggers(id,cron_id,source,state,observed_at,log_path)
+      VALUES($id,4,'system','unknown',$at,$file)`, { bind: { id, at: at - 10000, file } });
+  }
+  const router = express.Router();
+  load('back/api/dashboard.ts', {
+    '../config': { logPath: logs }, '../data/cron': models, '../data/cronStats': stats,
+  }).default(router);
+  const handle = router.stack[0].handle.stack.find(layer => layer.route?.path === '/schedule-anomalies').route.stack.at(-1).handle;
+  const read = async () => {
+    let result;
+    await handle({ query: { source: 'system', kind: 'unconfirmed', page: 1, at } },
+      { send(value) { result = value.data; } }, error => { throw error; });
+    assert.equal(result.total, 4);
+    assert.ok(result.rows.every(row => row.name === 'Report' && row.time === null && !('logPath' in row)));
+    return result.rows.filter(row => row.hasLog).map(row => row.trigger);
+  };
+  assert.deepEqual(await read(), ['one']);
+  await fs.unlink(path.join(logs, 'one.log'));
+  assert.deepEqual(await read(), []);
+});
+
+for (const source of ['node', 'system']) test(source + ' anomaly pages reset after late reports and expose the same summary as starts are confirmed', async t => {
+  const { root, db, models, stats, history } = await fixture(t);
+  const { saveSchedulePlan } = require('../../back/shared/scheduleAudit');
+  const { stageSystemPlan, confirmSystemPlan } = require('../../back/shared/systemScheduleAudit');
+  const day = require('dayjs')().subtract(1, 'day').startOf('day').valueOf();
+  const start = day + 9 * 3600000;
+  const period = source === 'node' ? 1000 : 60000;
+  const rule = source === 'node' ? '* * * * * *' : '* * * * *';
+  const at = start + 61 * period + 5000;
+  await models.CrontabModel.create({ id: 7, name: 'Late', command: 'echo late' });
+  if (source === 'node') await saveSchedulePlan(db, { replace: true, crons: [{ id: '7', schedule: rule }] }, start);
+  else {
+    const plan = await stageSystemPlan(db, [{ id: 7, name: 'Late', schedule: rule }], start);
+    await confirmSystemPlan(db, plan, start + 1);
+  }
+  const router = express.Router();
+  load('back/api/dashboard.ts', { '../config': { logPath: root }, '../data/cron': models, '../data/cronStats': stats }).default(router);
+  const handler = router.stack[0].handle.stack.find(x => x.route?.path === '/schedule-anomalies').route.stack.at(-1).handle;
+  const read = async (kind, page = 1, revision) => {
+    let result;
+    await handler({ query: { source: source === 'node' ? 'panel' : 'system', kind, at, page, revision } },
+      { send(value) { result = value.data; } }, error => { throw error; });
+    const summary = result.summary[source === 'node' ? 'audit' : 'systemAudit'];
+    const field = source === 'node' || kind === 'missing' ? kind : kind === 'skipped' ? 'actualSkips' : 'actualUnconfirmed';
+    assert.equal(result.total, summary[field]);
+    return result;
+  };
+  const first = await read('missing');
+  assert.ok(first.total > 50);
+  const second = await read('missing', 2, first.revision);
+  const third = await read('missing', 3, first.revision);
+  assert.equal(new Set([...first.rows, ...second.rows, ...third.rows].map(r => r.time)).size, first.total);
+  const slot = first.rows[0];
+  const id = source === 'node' ? slotId('7', 0, rule, slot.time) : 'system-late';
+  await history.enqueue(id, 7, source, slot.time, at);
+  await history.start(id, at, true);
+  if (source === 'system') await db.query('UPDATE CronTriggers SET system_rule=$rule,system_dispatch_at=$time WHERE id=$id',
+    { bind: { rule, time: slot.time, id } });
+  await history.finish(id, 'failed', 'spawn', 127);
+  const filled = await read('missing', 3, first.revision);
+  assert.equal(filled.page, 1);
+  assert.equal(filled.changed, true);
+  assert.equal(filled.total, first.total - 1);
+  assert.ok(filled.rows.every(row => row.time !== slot.time));
+  const unknown = await read('unconfirmed');
+  assert.deepEqual(unknown.rows.map(r => r.trigger), [id]);
+  await history.recordCommandStart(id, at);
+  const started = await read('unconfirmed', 1, unknown.revision);
+  assert.equal(started.changed, true);
+  assert.equal(started.total, 0);
+  assert.deepEqual(started.rows, []);
+  const summary = started.summary[source === 'node' ? 'audit' : 'systemAudit'];
+  assert.equal(summary[source === 'node' ? 'dispatched' : 'actualStarts'], 1);
+  // Same count with a different member must also invalidate page offsets.
+  await db.query('DELETE FROM CronTriggers WHERE id=$id', { bind: { id } });
+  const nextSlot = second.rows[0];
+  const nextId = source === 'node' ? slotId('7', 0, rule, nextSlot.time) : 'system-other';
+  await history.enqueue(nextId, 7, source, nextSlot.time, at);
+  if (source === 'system') await db.query('UPDATE CronTriggers SET system_rule=$rule,system_dispatch_at=$time WHERE id=$id',
+    { bind: { rule, time: nextSlot.time, id: nextId } });
+  const replaced = await read('missing', 2, filled.revision);
+  assert.equal(replaced.total, filled.total);
+  assert.equal(replaced.changed, true);
+  assert.equal(replaced.page, 1);
+  const retried = await read('missing', 2, replaced.revision);
+  assert.equal(retried.page, 2);
+  assert.equal(retried.changed, false);
+  assert.equal(new Set([...replaced.rows, ...retried.rows].map(r => r.time)).size, 50);
+});
+
+for (const source of ['node', 'system']) test(source + ' partial history cleanup fences in-flight anomaly pages and preserves retained pagination', async t => {
+  const { root, db, models, stats, history } = await fixture(t);
+  const dayjs = require('dayjs');
+  const at = dayjs().startOf('day').hour(12).valueOf(), start = at - 70 * 60000, rule = '* * * * *';
+  t.mock.method(Date, 'now', () => at + 1000);
+  await models.CrontabModel.create({ id: 12, name: 'Partial cleanup', command: 'echo retained' });
+  if (source === 'node') await require('../../back/shared/scheduleAudit').saveSchedulePlan(db,
+    { replace: true, crons: [{ id: '12', schedule: rule }] }, start);
+  else {
+    const { stageSystemPlan, confirmSystemPlan } = require('../../back/shared/systemScheduleAudit');
+    const plan = await stageSystemPlan(db, [{ id: 12, schedule: rule }], start - 60000);
+    await confirmSystemPlan(db, plan, start - 60000 + 1);
+  }
+  const ids = [];
+  for (let n = 1; n <= 60; n++) {
+    const time = start + n * 60000;
+    const id = source === 'node' ? slotId('12', 0, rule, time) : 'partial-system-' + n;
+    ids.push(id);
+    await history.enqueue(id, 12, source, time, time + 10);
+    await history.start(id, time + 20, true);
+    await history.finish(id, 'failed', 'spawn', 127);
+    await db.query("UPDATE CronTriggers SET finished_at=$end,log_path='retained.log',system_rule=$rule,system_dispatch_at=$time WHERE id=$id",
+      { bind: { id, time, rule, end: time + 1000 } });
+  }
+  await fs.writeFile(path.join(root, 'retained.log'), 'retained log');
+  // After an upgrade the earliest known installation can be newer than
+  // retained unmatched receipts. Plan coverage is not the retention boundary.
+  if (source === 'system') await db.query('UPDATE CronSystemPlans SET staged=$time,confirmed=$confirmed',
+    { bind: { time: start + 40 * 60000, confirmed: start + 40 * 60000 + 1 } });
+  let cleanOnStat = false;
+  const cutoff = start + 20 * 60000 + 2000;
+  const router = express.Router();
+  load('back/api/dashboard.ts', {
+    '../config': { logPath: root }, '../data/cron': models, '../data/cronStats': stats,
+    'fs/promises': { stat: async file => {
+      if (cleanOnStat) {
+        cleanOnStat = false;
+        await db.transaction(transaction => history.deleteExpired(cutoff, transaction));
+      }
+      return fs.stat(file);
+    } },
+  }).default(router);
+  const handler = router.stack[0].handle.stack.find(x => x.route?.path === '/schedule-anomalies').route.stack.at(-1).handle;
+  const read = async (page = 1, revision, kind = 'unconfirmed') => {
+    let result;
+    await handler({ query: { source: source === 'node' ? 'panel' : 'system', kind, at, page, revision, live: true } },
+      { send(value) { result = value.data; } }, error => { throw error; });
+    return result;
+  };
+  const first = await read();
+  assert.equal(first.total, 60);
+  assert.equal((await read(3, first.revision)).rows.length, 10);
+  cleanOnStat = true;
+  assert.deepEqual(await read(2, first.revision), { status: 'unavailable' });
+  const retained = await read(3, first.revision);
+  assert.equal(retained.total, 40);
+  assert.equal(retained.page, 1);
+  assert.equal(retained.changed, true);
+  const second = await read(2, retained.revision);
+  const rows = [...retained.rows, ...second.rows];
+  assert.equal(new Set(rows.map(r => r.trigger)).size, 40);
+  assert.deepEqual(rows.map(r => r.trigger).sort(), ids.slice(20).sort());
+  assert.ok(rows.every(r => r.hasLog));
+  for (const kind of ['missing', 'skipped', 'unconfirmed']) {
+    const result = await read(1, undefined, kind);
+    const summary = result.summary[source === 'node' ? 'audit' : 'systemAudit'];
+    const field = source === 'node' || kind === 'missing' ? kind : kind === 'skipped' ? 'actualSkips' : 'actualUnconfirmed';
+    assert.equal(result.total, summary[field]);
+    assert.ok(result.rows.every(r => r.time == null || r.time >= cutoff));
+  }
+  assert.deepEqual(await history.visibleTriggers(12, ids.slice(0, 20)), []);
+});
+
+for (const source of ['node', 'system']) test(source + ' live anomaly sessions expire across midnight and after retained history is cleared', async t => {
+  const { root, db, models, stats, history } = await fixture(t);
+  const dayjs = require('dayjs');
+  const { saveSchedulePlan } = require('../../back/shared/scheduleAudit');
+  const { stageSystemPlan, confirmSystemPlan } = require('../../back/shared/systemScheduleAudit');
+  const at = dayjs().startOf('day').hour(12).valueOf(), start = at - 180000, rule = '* * * * *';
+  const expiresAt = dayjs(at).startOf('day').add(1, 'day').valueOf();
+  let clock = at + 10000, crossOnStat = false;
+  t.mock.method(Date, 'now', () => clock);
+  await models.CrontabModel.create({ id: 11, name: 'Midnight', command: 'echo midnight' });
+  if (source === 'node') await saveSchedulePlan(db, { replace: true, crons: [{ id: '11', schedule: rule }] }, start);
+  else {
+    const plan = await stageSystemPlan(db, [{ id: 11, schedule: rule }], start - 60000);
+    await confirmSystemPlan(db, plan, start - 60000 + 1);
+  }
+  const time = Math.ceil((start + 60000) / 60000) * 60000;
+  const id = source === 'node' ? slotId('11', 0, rule, time) : 'system-midnight';
+  await history.enqueue(id, 11, source, time, time + 10);
+  await history.start(id, time + 20, true);
+  await history.finish(id, 'failed', 'spawn', 127);
+  await fs.writeFile(path.join(root, 'midnight.log'), id);
+  await db.query("UPDATE CronTriggers SET finished_at=$end,log_path='midnight.log',system_rule=$rule,system_dispatch_at=$time WHERE id=$id",
+    { bind: { end: time + 1000, id, rule, time } });
+  const router = express.Router();
+  load('back/api/dashboard.ts', {
+    '../config': { logPath: root }, '../data/cron': models, '../data/cronStats': stats,
+    'fs/promises': { stat: async file => { if (crossOnStat) clock = expiresAt; return fs.stat(file); } },
+  }).default(router);
+  const handler = router.stack[0].handle.stack.find(x => x.route?.path === '/schedule-anomalies').route.stack.at(-1).handle;
+  const read = async kind => {
+    let result;
+    const res = { status() { return this; }, send(value) { result = value; } };
+    await handler({ query: { source: source === 'node' ? 'panel' : 'system', kind, at, page: 1, live: true } }, res, error => { throw error; });
+    assert.equal(result.code, 200);
+    return result.data;
+  };
+  const first = await read('unconfirmed');
+  assert.deepEqual(first.rows.map(row => row.trigger), [id]);
+  assert.equal(first.expiresAt, expiresAt);
+  crossOnStat = true;
+  assert.deepEqual(await read('unconfirmed'), { status: 'expired' });
+  crossOnStat = false;
+  assert.deepEqual(await read('missing'), { status: 'expired' });
+  clock = at + 10000;
+  await db.transaction(transaction => history.deleteExpired(at + 1000, transaction));
+  assert.deepEqual(await history.visibleTriggers(11, [id]), []);
+  for (const kind of ['missing', 'skipped', 'unconfirmed'])
+    assert.deepEqual(await read(kind), { status: 'unavailable' });
+  // Repeated reads do not reconstitute the missing plan or the old log entry.
+  assert.deepEqual(await read('unconfirmed'), { status: 'unavailable' });
+  assert.deepEqual(await history.visibleTriggers(11, [id]), []);
+});

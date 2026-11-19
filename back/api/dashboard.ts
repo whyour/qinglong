@@ -1,10 +1,17 @@
+import config from '../config';
+import { stat } from 'fs/promises';
+import { resolveFileAccess } from '../shared/fileAccess';
+import { AnomalyPage, AnomalyKind } from '../shared/scheduleAnomalies';
+import { auditSchedule } from '../shared/scheduleAudit';
+import { systemScheduleAudit } from '../shared/systemScheduleAudit';
+import { celebrate, Joi } from 'celebrate';
 import { executionIdPattern, executionTriggerId, receiptFinishTime } from '../shared/executionIdentity';
 import { oldestQueued } from '../shared/queueDiagnostics';
 import { containerResources } from '../shared/containerResources';
 import { TriggerHistory } from '../shared/triggerHistory';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
-import { fn, col, where, Op } from 'sequelize';
+import { fn, col, where, Op, QueryTypes } from 'sequelize';
 import { CrontabModel } from '../data/cron';
 import { CrontabStatModel } from '../data/cronStats';
 import {
@@ -56,7 +63,9 @@ export default (app: Router) => {
     '/overview',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const today = dayjs().format('YYYY-MM-DD');
+        const serverNow = Date.now();
+        const day = dayjs(serverNow).startOf('day');
+        const today = day.format('YYYY-MM-DD');
 
         const [total, enabled, disabled, stats, triggers] = await Promise.all([
           CrontabModel.count(),
@@ -73,7 +82,7 @@ export default (app: Router) => {
             where: { date: today },
             raw: true,
           }),
-          new TriggerHistory(CrontabStatModel.sequelize!).metrics(dayjs().startOf('day').valueOf()),
+          new TriggerHistory(CrontabStatModel.sequelize!).metrics(day.valueOf()),
         ]);
 
         const row = stats as any;
@@ -85,6 +94,8 @@ export default (app: Router) => {
         res.send({
           code: 200,
           data: {
+            serverNow,
+            expiresAt: day.add(1, 'day').valueOf(),
             total,
             enabled,
             disabled,
@@ -102,6 +113,56 @@ export default (app: Router) => {
       }
     },
   );
+
+  route.get('/schedule-anomalies', celebrate({ query: Joi.object({
+    source: Joi.string().valid('panel', 'system').required(),
+    kind: Joi.string().valid('missing', 'skipped', 'unconfirmed').required(),
+    at: Joi.number().integer().positive().required(),
+    page: Joi.number().integer().min(1).default(1),
+    revision: Joi.string().hex().length(64),
+    live: Joi.boolean().default(false),
+  }).unknown(true) }), async (req, res, next) => {
+    try {
+      const { source, kind, page, at, revision, live } = req.query;
+      const until = Number(at);
+      const serverNow = Date.now();
+      const expiresAt = dayjs(until).startOf('day').add(1, 'day').valueOf();
+      if (live && serverNow >= expiresAt)
+        return res.send({ code: 200, data: { status: 'expired' } });
+      if (until > Date.now() || until < dayjs().subtract(1, 'day').startOf('day').valueOf())
+        return res.status(400).send({ code: 400 });
+      const [snapshotRetention] = live ? await CrontabStatModel.sequelize!.query<{ cutoff: number }>(
+        'SELECT cutoff FROM CronHistoryRetention WHERE id=1', { type: QueryTypes.SELECT },
+      ) : [];
+      const details = new AnomalyPage(kind as AnomalyKind, Number(page), revision as string | undefined);
+      const audit = source === 'panel' ? auditSchedule : systemScheduleAudit;
+      const summary = await audit(CrontabStatModel.sequelize!, dayjs(until).startOf('day').valueOf(), until, details);
+      if (live && (!summary || summary.since > summary.through))
+        return res.send({ code: 200, data: { status: 'unavailable' } });
+      if (!summary) return res.status(409).send({ code: 409 });
+      const result = details.result();
+      const ids = [...new Set(result.rows.filter(row => !row.name).map(row => row.task))];
+      const tasks = ids.length ? await CrontabModel.findAll({ where: { id: ids }, attributes: ['id','name','command'], raw: true }) : [];
+      const names = new Map(tasks.map(task => [task.id, task.name || task.command]));
+      const rows = await Promise.all(result.rows.map(async ({ logPath, ...row }) => {
+        const path = logPath && resolveFileAccess(config.logPath, [logPath]);
+        const hasLog = path ? await stat(path).then(file => file.isFile(), () => false) : false;
+        return { ...row, name: row.name || names.get(row.task), hasLog };
+      }));
+      // Log checks can yield after the audit transaction. Do not publish that
+      // snapshot if history cleanup has since removed part of its plan window.
+      if (live) {
+        const [retention] = await CrontabStatModel.sequelize!.query<{ cutoff: number }>(
+          'SELECT cutoff FROM CronHistoryRetention WHERE id=1', { type: QueryTypes.SELECT },
+        );
+        if (retention && retention.cutoff > (snapshotRetention?.cutoff ?? 0))
+          return res.send({ code: 200, data: { status: 'unavailable' } });
+      }
+      if (live && Date.now() >= expiresAt)
+        return res.send({ code: 200, data: { status: 'expired' } });
+      return res.send({ code: 200, data: { ...result, rows, serverNow, expiresAt, summary: source === 'panel' ? { audit: summary } : { systemAudit: summary }, zone: Intl.DateTimeFormat().resolvedOptions().timeZone } });
+    } catch (error) { next(error); }
+  });
 
   for (const isSuccess of [false, true]) {
     route.get(

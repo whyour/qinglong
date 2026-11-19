@@ -58,6 +58,35 @@ test('dashboard record sends execution statistics and rejects a missing body bef
   assert.equal(f.requests.length, 1);
 });
 
+test('schedule anomaly commands preserve sources, pagination and expired responses', async t => {
+  const f = await fixture(t);
+  const response = { code: 200, data: { status: 'expired' } };
+  f.reply((_req, res) => {
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify(response));
+  });
+  for (const source of ['panel', 'system']) {
+    for (const kind of ['missing', 'skipped', 'unconfirmed']) {
+      const query = { source, kind, at: 1795046400000, page: 3, revision: 'a'.repeat(64), live: true };
+      for (const command of [
+        ['dashboard', 'schedule-anomalies'],
+        ['api', 'request', 'GET', '/open/dashboard/schedule-anomalies'],
+      ]) {
+        const before = f.requests.length;
+        assert.deepEqual(success(await f.run([...command, '--query', JSON.stringify(query)])), response);
+        assert.equal(f.requests.length, before + 1, 'expired responses must not be retried');
+        const req = f.requests.at(-1), url = new URL(req.url, 'http://localhost');
+        assert.equal(req.method, 'GET');
+        assert.equal(url.pathname, '/panel/open/dashboard/schedule-anomalies');
+        assert.deepEqual(Object.fromEntries(url.searchParams),
+          Object.fromEntries(Object.entries(query).map(([key, value]) => [key, String(value)])));
+        assert.equal(req.body, '');
+        assert.equal(req.headers.authorization, 'Bearer fixture-token');
+      }
+    }
+  }
+});
+
 test('script history commands send exact query parameters and restore payloads', async t => {
   const f = await fixture(t);
   const identity = { filename: '中文 script.js', path: 'nested folder' };

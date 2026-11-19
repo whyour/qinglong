@@ -523,6 +523,11 @@ export const openOperations: readonly OpenOperation[] = [
     body: 'json',
   },
   { name: 'dashboard overview', method: 'GET', path: 'dashboard/overview' },
+  {
+    name: 'dashboard schedule-anomalies',
+    method: 'GET',
+    path: 'dashboard/schedule-anomalies',
+  },
   { name: 'dashboard trend', method: 'GET', path: 'dashboard/trend' },
   { name: 'dashboard top-time', method: 'GET', path: 'dashboard/top-time' },
   { name: 'dashboard top-count', method: 'GET', path: 'dashboard/top-count' },
