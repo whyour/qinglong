@@ -325,7 +325,7 @@ const Dashboard = () => {
     ];
     sources.push({
       key: 'panel',
-      label: intl.get('由青龙触发'),
+      label: intl.get('内置调度'),
       help: <>
         {audit.partial && <p className="schedule-note">{intl.get('规则切换期间有些计划无法确认。这里只统计能确认的计划，暂不显示准时率。')}</p>}
         <p className="schedule-note">{intl.get('从 {time} 起统计，最近 5 秒暂不计入。触发时间与计划相差不超过 5 秒算准时。准时率 = 准时触发次数 ÷ 计划触发次数。', {
@@ -363,7 +363,7 @@ const Dashboard = () => {
   if (systemAudit) {
     sources.push({
       key: 'system',
-      label: intl.get('由系统触发（crond）'),
+      label: intl.get('系统调度（crond）'),
       help: <>
         <p className="schedule-note">{intl.get('同一计划多出的记录计为重复。只有明确记录的跳过才计入跳过次数。记录写入前中断的派发无法核实。')}</p>
         <p className="schedule-note">{intl.get('上次成功安装规则')} {systemAudit.confirmedAt ? new Date(systemAudit.confirmedAt).toLocaleString() : '—'}

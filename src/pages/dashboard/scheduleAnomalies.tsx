@@ -116,7 +116,7 @@ export default function ScheduleAnomalies({ selection, close, openLog, onUpdate,
     return () => { ctrl.abort(); clearTimeout(timer); clearTimeout(deadline); };
   }, [selection, query, onUpdate, onInvalidate]);
   const format = (ms: number) => new Date(ms).toLocaleString(undefined, { timeZone: data?.zone, hour12: false });
-  return <Modal open width={860} title={<>{intl.get(titles[selection.kind])} · {intl.get(selection.source === 'panel' ? '由青龙触发' : '由系统触发（crond）')}</>} onCancel={close} footer={null}>
+  return <Modal open width={860} title={<>{intl.get(titles[selection.kind])} · {intl.get(selection.source === 'panel' ? '内置调度' : '系统调度（crond）')}</>} onCancel={close} footer={null}>
     <p>{intl.get('截至 {time} 的计划，明细随回报更新。', { time: format(selection.at - 5000) })}</p>
     {failed ? <Alert type="error" message={<>{intl.get('加载失败')} <Button type="link"
       onClick={() => setQuery({ ...query })}>{intl.get('重试')}</Button></>} /> : <>
@@ -130,7 +130,7 @@ export default function ScheduleAnomalies({ selection, close, openLog, onUpdate,
           { title: intl.get('任务'), render: (_, r) => <>{r.name || '#' + r.task}<br/><small>{r.rule}</small></> },
           { title: intl.get('计划时间'), render: (_, r) => r.time != null ? format(r.time) : <>
             {intl.get('计划时间无法确定')}<br/><small>{r.observed != null && intl.get('收到于 {time}', {time: format(r.observed)})}</small></> },
-          { title: intl.get('调度来源'), render: (_, r) => intl.get(r.source === 'system' ? '由系统触发（crond）' : r.source === 'recovery' ? '重启补跑' : '由青龙触发') },
+          { title: intl.get('调度来源'), render: (_, r) => intl.get(r.source === 'system' ? '系统调度（crond）' : r.source === 'recovery' ? '重启补跑' : '内置调度') },
           { title: intl.get('判断原因'), render: (_, r) => explanation(selection.kind, r) },
           { title: intl.get('日志'), render: (_, r) => r.hasLog && r.trigger ? <Button type="link" size="small"
             onClick={() => openLog(r.task, r.trigger!, r.name)}>{intl.get('查看日志')}</Button> : '—' },
