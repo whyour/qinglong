@@ -21,6 +21,7 @@ const run = (program, args, options = {}) => execute(program, args, {
   ...options,
 });
 const requiredFiles = [
+  ...Object.values(require('../package.json').pnpm?.patchedDependencies || {}),
   '.env.example', 'back/protos/api.proto', 'ecosystem.config.js', 'version.yaml',
   'shell/upgrade.cjs', 'shell/install-bundle.cjs', 'shell/install-package.cjs',
   'shell/upgrade-lock.yaml', 'shell/node-runtime-probe.cjs', 'shell/start.sh', 'shell/start-simplify.sh',
@@ -40,7 +41,7 @@ function checkPackedFiles(files) {
   const names = new Set(files.map((file) => file.path));
   for (const name of requiredFiles) assert.ok(names.has(name), `Missing npm runtime: ${name}`);
   for (const name of names) {
-    assert.ok(/^(?:package\.json$|LICENSE$|README[^/]*\.md$|\.env\.example$|ecosystem\.config\.js$|version\.yaml$|back\/protos\/api\.proto$|cli\/(?:README[^/]*\.md$|src\/internal\/maintenance\/[^/]+\.cjs$)|sample\/|shell\/|static\/)/.test(name), `Unexpected npm file: ${name}`);
+    assert.ok(requiredFiles.includes(name) || /^(?:package\.json$|LICENSE$|README[^/]*\.md$|\.env\.example$|ecosystem\.config\.js$|version\.yaml$|back\/protos\/api\.proto$|cli\/(?:README[^/]*\.md$|src\/internal\/maintenance\/[^/]+\.cjs$)|sample\/|shell\/|static\/)/.test(name), `Unexpected npm file: ${name}`);
     assert.ok(!/^shell\/(?:pub\.sh$|preload\/(?:env\.|notify\.|__ql_notify__\.|lang_env\.sh|.*-notify\.json))/.test(name), `Generated or release-only runtime file: ${name}`);
     assert.ok(!/(?:^|\/)__pycache__\/|\.pyc$|(?:^|\/)\.DS_Store$/.test(name), name);
     assert.notEqual(name, 'sample/tool.ts');

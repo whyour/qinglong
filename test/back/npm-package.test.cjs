@@ -29,6 +29,7 @@ async function packageFixture(t) {
     });
   }
   const metadata = JSON.parse(await fs.readFile('package.json', 'utf8'));
+  for (const name of Object.values(metadata.pnpm?.patchedDependencies || {})) await copy(name);
   // The structural test stays offline; full production installation and service
   // upgrades run against the unmodified package in verify-panel-package.cjs.
   metadata.dependencies = {};
@@ -67,6 +68,11 @@ test('real npm pack excludes local state and its installed lifecycle restores ve
   const packed = await pack();
   const [archive] = JSON.parse(packed.stdout);
   checkPackedFiles(archive.files);
+  const patches = Object.values(JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8')).pnpm?.patchedDependencies || {});
+  for (const patch of patches) {
+    assert.throws(() => checkPackedFiles(archive.files.filter((file) => file.path !== patch)), /Missing npm runtime/);
+  }
+  assert.throws(() => checkPackedFiles([...archive.files, { path: 'patches/undeclared.patch' }]), /Unexpected npm file/);
   const names = new Set(archive.files.map((file) => file.path));
   assert.ok(names.has('shell/upgrade-lock.yaml'));
   assert.ok(names.has('shell/subscription-files.py'));
@@ -75,6 +81,7 @@ test('real npm pack excludes local state and its installed lifecycle restores ve
   const prefix = path.join(temp, 'installed');
   await execute('npm', ['install', '--offline', '--omit=dev', '--no-audit', '--no-fund', '--cache', path.join(temp, 'cache'), '--prefix', prefix, path.join(output, archive.filename)], { cwd: temp, env, timeout: 60000 });
   const installed = path.join(prefix, 'node_modules/@whyour/qinglong');
+  for (const patch of patches) assert.deepEqual(await fs.readFile(path.join(installed, patch)), await fs.readFile(path.join(root, patch)));
   for (const { path: name } of archive.files)
     assert.equal((await fs.readFile(path.join(installed, name))).includes(Buffer.from('DO_NOT_PUBLISH')), false, `Private fixture content in npm package: ${name}`);
   await assert.rejects(fs.access(path.join(installed, '.env')), { code: 'ENOENT' });

@@ -44,11 +44,9 @@ for (const [version, exitCode] of [
       path.join(statics, 'build/bootstrap/upgradeProbe.js'),
       `
       const fs=require('node:fs'),crypto=require('node:crypto');
-      require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(
-        `setTimeout(()=>require('node:fs').writeFileSync(${JSON.stringify(
-          survivor,
-        )},'escaped'),600);`,
-      )}],{stdio:'inherit'});
+      require('node:child_process').spawn(process.execPath,['-e',
+        "setTimeout(()=>require('node:fs').writeFileSync(process.argv[1],'escaped'),600);",
+        ${JSON.stringify(survivor)}],{stdio:'inherit'});
       process.send({type:'upgrade-probe',ok:${
         exitCode === 0
       },message:'simulated prestart failure',build:{sourceCommit:'a'.repeat(40),version:${JSON.stringify(version)},backendSha256:crypto.createHash('sha256').update('backend').digest('hex')}},()=>process.exit(${exitCode}));
@@ -148,13 +146,9 @@ test('cancelled dependency repair kills descendants and retains the original tre
     path.join(bin, 'pnpm'),
     `#!${process.execPath}
     if(process.argv[2]==='--version'){console.log('8.3.1');process.exit(0);}
-    require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(
-      `process.on('SIGTERM',()=>{});require('node:fs').writeFileSync(${JSON.stringify(
-        started,
-      )},'started');setTimeout(()=>require('node:fs').writeFileSync(${JSON.stringify(
-        survivor,
-      )},'escaped'),1400);`,
-    )}],{stdio:'inherit'});
+    require('node:child_process').spawn(process.execPath,['-e',
+      "process.on('SIGTERM',()=>{});require('node:fs').writeFileSync(process.argv[1],'started');setTimeout(()=>require('node:fs').writeFileSync(process.argv[2],'escaped'),1400);",
+      ${JSON.stringify(started)},${JSON.stringify(survivor)}],{stdio:'inherit'});
     setInterval(()=>{},1000);
   `,
     { mode: 0o755 },
@@ -329,11 +323,9 @@ test('prestart deadline kills its process group and removes temporary data', asy
   await fs.writeFile(
     path.join(statics, 'build/bootstrap/upgradeProbe.js'),
     `
-    require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(
-      `setTimeout(()=>require('node:fs').writeFileSync(${JSON.stringify(
-        survivor,
-      )},'escaped'),2200)`,
-    )}],{stdio:'ignore'});
+    require('node:child_process').spawn(process.execPath,['-e',
+      "setTimeout(()=>require('node:fs').writeFileSync(process.argv[1],'escaped'),2200)",
+      ${JSON.stringify(survivor)}],{stdio:'ignore'});
     setInterval(()=>{},1000);
   `,
   );

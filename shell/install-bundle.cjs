@@ -77,11 +77,10 @@ async function installBundle(argv = process.argv.slice(2), env = process.env) {
         '--noprofile',
         '--norc',
         '-c',
-        '. "$1/shell/share.sh"\n. "$1/shell/env.sh"\nimport_config\nexport QlPort="${ql_port:-${QlPort:-5700}}" QlBaseUrl="${ql_base_url:-${QlBaseUrl:-/}}"\nenv -0',
+        '. ./shell/share.sh\n. ./shell/env.sh\nimport_config\nexport QlPort="${ql_port:-${QlPort:-5700}}" QlBaseUrl="${ql_base_url:-${QlBaseUrl:-/}}"\nenv -0',
         'ql-offline',
-        root,
       ],
-      { env: environment, maxBuffer: 1024 * 1024 },
+      { cwd: root, env: environment, maxBuffer: 1024 * 1024 },
     );
     const loaded = Object.fromEntries(
       captured.stdout.split('\0').flatMap((line) => {

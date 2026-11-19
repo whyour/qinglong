@@ -1,4 +1,7 @@
-import { directoryCheckHandler, directoryPageHandler } from '../shared/directoryPageRoute';
+import {
+  directoryCheckHandler,
+  directoryPageHandler,
+} from '../shared/directoryPageRoute';
 import { randomUUID } from 'crypto';
 import { resolveFileAccess } from '../shared/fileAccess';
 import { fileExist, readDirs, readDir, rmPath, IFile } from '../config/util';
@@ -14,19 +17,20 @@ import ScriptHistoryService from '../services/scriptHistory';
 import { t } from '../shared/i18n';
 import multer from 'multer';
 import { writeFileWithLock } from '../shared/utils';
+import { rateLimit } from 'express-rate-limit';
 import {
   ScriptHistoryError,
   HistoryUnavailableError,
 } from '../shared/scriptHistory';
 const route = Router();
 const blacklist = [
-          'node_modules',
-          '.git',
-          '.pnpm',
-          'pnpm-lock.yaml',
-          'yarn.lock',
-          'package-lock.json',
-        ];
+  'node_modules',
+  '.git',
+  '.pnpm',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  'package-lock.json',
+];
 
 function isPathAllowed(targetPath: string): boolean {
   const resolved = path.resolve(targetPath);
@@ -42,6 +46,26 @@ function isPathAllowed(targetPath: string): boolean {
       ),
     ),
   );
+}
+
+// Return the checked, normalized value so filesystem calls never reuse the
+// original request path. Keep the root boundary visible to static analysis.
+function writablePath(targetPath: string): string {
+  const normalized = resolve(targetPath);
+  if (!isPathAllowed(normalized)) return '';
+  for (const writableRoot of config.writePathList) {
+    const root = resolve(writableRoot) + sep;
+    if (normalized.startsWith(root)) return normalized;
+  }
+  return '';
+}
+
+function uploadedPath(filePath: string): string {
+  const normalized = resolve(filePath);
+  const root = resolve(config.tmpPath) + sep;
+  if (!normalized.startsWith(root)) return '';
+  if (!resolveFileAccess(config.tmpPath, [normalized])) return '';
+  return normalized;
 }
 
 async function existingWritableRealPath(targetPath: string): Promise<string> {
@@ -84,8 +108,14 @@ const upload = multer({ storage: storage });
 
 export default (app: Router) => {
   app.use('/scripts', route);
-  route.get('/entries', ...directoryPageHandler(() => config.scriptPath, blacklist, false));
-  route.post('/entries/check', ...directoryCheckHandler(() => config.scriptPath, blacklist));
+  route.get(
+    '/entries',
+    ...directoryPageHandler(() => config.scriptPath, blacklist, false),
+  );
+  route.post(
+    '/entries/check',
+    ...directoryCheckHandler(() => config.scriptPath, blacklist),
+  );
 
   route.get(
     '/',
@@ -244,7 +274,10 @@ export default (app: Router) => {
     '/',
     (req: Request, res: Response, next: NextFunction) => {
       res.on('finish', () => {
-        if (req.file?.path) fs.unlink(req.file.path).catch(() => undefined);
+        if (req.file?.path) {
+          const temporaryPath = uploadedPath(req.file.path);
+          if (temporaryPath) fs.unlink(temporaryPath).catch(() => undefined);
+        }
       });
       next();
     },
@@ -292,18 +325,19 @@ export default (app: Router) => {
         }
 
         if (req.file) {
-          const uploadPath = join(path, filename);
-          if (!isPathAllowed(uploadPath)) {
+          const uploadPath = writablePath(join(path, filename));
+          const temporaryPath = uploadedPath(req.file.path);
+          if (!uploadPath || !temporaryPath) {
             return res.send({ code: 403, message: t('暂无权限') });
           }
-          await fs.copyFile(req.file.path, uploadPath);
-          await fs.unlink(req.file.path);
+          await fs.copyFile(temporaryPath, uploadPath);
+          await fs.unlink(temporaryPath);
           return res.send({ code: 200 });
         }
 
         if (directory) {
-          const dirPath = join(path, directory);
-          if (!isPathAllowed(dirPath)) {
+          const dirPath = writablePath(join(path, directory));
+          if (!dirPath) {
             return res.send({ code: 403, message: t('暂无权限') });
           }
           await fs.mkdir(dirPath, { recursive: true });
@@ -313,9 +347,9 @@ export default (app: Router) => {
         if (!originFilename) {
           originFilename = filename;
         }
-        const originFilePath = join(path, originFilename);
-        const filePath = join(path, filename);
-        if (!isPathAllowed(filePath) || !isPathAllowed(originFilePath)) {
+        const originFilePath = writablePath(join(path, originFilename));
+        const filePath = writablePath(join(path, filename));
+        if (!filePath || !originFilePath) {
           return res.send({ code: 403, message: t('暂无权限') });
         }
         // Check the canonical parent directly at the directory creation boundary.
@@ -462,6 +496,7 @@ export default (app: Router) => {
 
   route.post(
     '/download',
+    rateLimit({ windowMs: 60 * 1000, limit: 600 }),
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
@@ -513,8 +548,10 @@ export default (app: Router) => {
           path = '';
         }
         const { name, ext } = parse(filename);
-        const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
-        if (!isPathAllowed(filePath)) {
+        const filePath = writablePath(
+          join(config.scriptPath, path, `${name}.swap${ext}`),
+        );
+        if (!filePath) {
           return res.send({ code: 403, message: t('暂无权限') });
         }
         await writeFileWithLock(filePath, content || '');
@@ -544,8 +581,10 @@ export default (app: Router) => {
           path = '';
         }
         const { name, ext } = parse(filename);
-        const filePath = join(config.scriptPath, path, `${name}.swap${ext}`);
-        if (!isPathAllowed(filePath)) {
+        const filePath = writablePath(
+          join(config.scriptPath, path, `${name}.swap${ext}`),
+        );
+        if (!filePath) {
           return res.send({ code: 403, message: t('暂无权限') });
         }
         const logPath = resolveFileAccess(config.logPath, [
@@ -573,6 +612,7 @@ export default (app: Router) => {
 
   route.put(
     '/rename',
+    rateLimit({ windowMs: 60 * 1000, limit: 600 }),
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),
@@ -590,9 +630,11 @@ export default (app: Router) => {
         if (!path) {
           path = '';
         }
-        const filePath = join(config.scriptPath, path, filename);
-        const newPath = join(config.scriptPath, path, newFilename);
-        if (!isPathAllowed(filePath) || !isPathAllowed(newPath)) {
+        const filePath = writablePath(join(config.scriptPath, path, filename));
+        const newPath = writablePath(
+          join(config.scriptPath, path, newFilename),
+        );
+        if (!filePath || !newPath) {
           return res.send({ code: 403, message: t('暂无权限') });
         }
         await fs.rename(filePath, newPath);

@@ -8,6 +8,30 @@ const {
 const artifacts = require('../../cli/src/internal/maintenance/upgradeArtifacts.cjs');
 const { installBundle } = require('../../shell/install-bundle.cjs');
 
+test('offline environment loading treats installation paths as data and preserves the caller directory', async (t) => {
+  const directory = await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'ql-offline-path-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const root = path.join(directory, 'panel space \' " $(echo injected) `echo injected`;');
+  await fs.mkdir(path.join(root, 'shell'), { recursive: true });
+  await fs.writeFile(path.join(root, 'shell/share.sh'), 'import_config() { ql_port=5789; ql_base_url=/panel/; }\n');
+  await fs.writeFile(path.join(root, 'shell/env.sh'), 'export QL_BRANCH=develop\n');
+  const cwd = process.cwd();
+  let captured;
+  t.mock.method(artifacts, 'stageUpgrade', async ({ env }) => {
+    captured = env;
+    throw new Error('reached staging');
+  });
+  await assert.rejects(installBundle(
+    ['--file', path.join(root, 'unused.tar.gz'), '--download-only'],
+    { ...process.env, QL_DIR: root },
+  ), /reached staging/);
+  assert.equal(captured.QL_DIR, root);
+  assert.equal(captured.QlPort, '5789');
+  assert.equal(captured.QlBaseUrl, '/panel/');
+  assert.equal(captured.QL_BRANCH, 'develop');
+  assert.equal(process.cwd(), cwd);
+});
+
 for (const scenario of ['cancel-new-start', 'both-starts-fail'])
   test(`offline application restores files and records failure: ${scenario}`, async (t) => {
     const f = await manualUpgradeFixture(t);

@@ -13,6 +13,7 @@ import {
 import LogService from '../services/log';
 import { InstanceStatus, RunningInstanceModel } from '../data/runningInstance';
 import { MAX_LOG_CHUNK_BYTES, readLogChunk } from '../shared/logReader';
+import { rateLimit } from 'express-rate-limit';
 const route = Router();
 const blacklist = ['.tmp'];
 
@@ -138,6 +139,7 @@ export default (app: Router) => {
 
   route.post(
     '/download',
+    rateLimit({ windowMs: 60 * 1000, limit: 600 }),
     celebrate({
       body: Joi.object({
         filename: Joi.string().required(),

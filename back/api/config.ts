@@ -9,6 +9,7 @@ import { t } from '../shared/i18n';
 import ConfigService from '../services/config';
 import { writeFileWithLock } from '../shared/utils';
 import { resolveFileAccess } from '../shared/fileAccess';
+import { rateLimit } from 'express-rate-limit';
 const route = Router();
 
 export default (app: Router) => {
@@ -30,6 +31,7 @@ export default (app: Router) => {
 
   route.get(
     '/files',
+    rateLimit({ windowMs: 60 * 1000, limit: 600 }),
     async (req: Request, res: Response, next: NextFunction) => {
       const logger: Logger = Container.get('logger');
       try {

@@ -1,0 +1,26 @@
+diff --git a/index.js b/index.js
+index 4dfca40730089d0b7a8ad9818bc918240ca8cb89..454d50f086915fea0a38116c8719229d433910a9 100644
+--- a/index.js
++++ b/index.js
+@@ -136,7 +136,7 @@ function customDecodeURIComponent(input) {
+ 	return input.replace(multiMatcher, run => decode(run));
+ }
+ 
+-export default function decodeUriComponent(encodedURI) {
++module.exports = function decodeUriComponent(encodedURI) {
+ 	if (typeof encodedURI !== 'string') {
+ 		throw new TypeError(`Expected \`encodedURI\` to be of type \`string\`, got \`${typeof encodedURI}\``);
+ 	}
+diff --git a/package.json b/package.json
+index 5991062db5af96559ed102a22431f2edf29595a0..c8f13808709e64abbb3e19009bca16d9e988be31 100644
+--- a/package.json
++++ b/package.json
+@@ -10,7 +10,7 @@
+ 		"email": "sam.verschueren@gmail.com",
+ 		"url": "github.com/SamVerschueren"
+ 	},
+-	"type": "module",
++	"type": "commonjs",
+ 	"exports": {
+ 		"types": "./index.d.ts",
+ 		"default": "./index.js"
