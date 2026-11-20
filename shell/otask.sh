@@ -167,13 +167,18 @@ run_normal() {
   run_task_command ${which_program:+"$which_program"} "$file_param" "${script_params[@]}"
 }
 
+safe_perl() {
+  # Task environment values must not configure Perl before helper code runs.
+  env -u PERL5OPT -u PERL5DB -u PERL5LIB -u PERLLIB -u PERL5SHELL -u PERL_LOCAL_LIB_ROOT perl "$@"
+}
+
 handle_env_split() {
   if [[ ! $num_param ]]; then
     num_param="1-max"
   fi
 
   env_str_to_array
-  local tempArr=$(echo $num_param | sed "s/-max/-${array_length}/g" | sed "s/max-/${array_length}-/g" | perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
+  local tempArr=$(echo $num_param | sed "s/-max/-${array_length}/g" | sed "s/max-/${array_length}-/g" | safe_perl -pe "s|(\d+)(-\|~\|_)(\d+)|{\1..\3}|g")
   local runArr=($(eval echo $tempArr))
   array_run=($(awk -v RS=' ' '!a[$1]++' <<<"${runArr[*]}"))
 }
@@ -182,7 +187,7 @@ handle_env_split() {
 run_concurrent() {
   local file_param="$1"
   local env_param="$2"
-  local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
+  local num_param=$(echo "$3" | safe_perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
   if [[ ! $env_param ]]; then
     t '\n缺少并发运行的环境变量参数'
     exit 1
@@ -219,7 +224,7 @@ run_concurrent() {
 run_designated() {
   local file_param="$1"
   local env_param="$2"
-  local num_param=$(echo "$3" | perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
+  local num_param=$(echo "$3" | safe_perl -pe "s|.*$2(.*)|\1|" | awk '{$1=$1};1')
   if [[ ! $env_param ]]; then
     t '\n缺少单独运行的参数 task xxx.js desi Test'
     exit 1

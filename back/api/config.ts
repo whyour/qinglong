@@ -10,7 +10,16 @@ import ConfigService from '../services/config';
 import { writeFileWithLock } from '../shared/utils';
 import { resolveFileAccess } from '../shared/fileAccess';
 import { rateLimit } from 'express-rate-limit';
+import path from 'path';
 const route = Router();
+const openApiProtectedFiles = new Set([
+  'config.sh',
+  'task_before.sh',
+  'task_after.sh',
+  'task_before.js',
+  'task_before.py',
+  'extra.sh',
+]);
 
 export default (app: Router) => {
   app.use('/configs', route);
@@ -84,6 +93,16 @@ export default (app: Router) => {
         );
         if (!normalized) {
           return res.send({ code: 403, message: t('文件无法访问') });
+        }
+        // OpenAPI config scopes grant data-file access, not executable hooks.
+        if (/(?:^|\/)open\/configs(?:\/|\?|$)/.test(req.originalUrl || '')) {
+          const realPath = await fs.realpath(normalized).catch(() => normalized);
+          if (
+            openApiProtectedFiles.has(path.basename(normalized).toLowerCase()) ||
+            openApiProtectedFiles.has(path.basename(realPath).toLowerCase())
+          ) {
+            return res.send({ code: 403, message: t('文件无法访问') });
+          }
         }
         await writeFileWithLock(normalized, content);
         res.send({ code: 200, message: t('保存成功') });

@@ -208,7 +208,16 @@ export default (app: Router) => {
     '/trend',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const days = parseInt(req.query.days as string) || 7;
+        const requestedDays = req.query.days;
+        const days =
+          requestedDays === undefined
+            ? 7
+            : typeof requestedDays === 'string' && /^[1-9]\d{0,2}$/.test(requestedDays)
+              ? Number(requestedDays)
+              : NaN;
+        if (!Number.isInteger(days) || days > 365) {
+          return res.status(400).send({ code: 400, message: t('无效的天数') });
+        }
         const dates: string[] = [];
         for (let i = days - 1; i >= 0; i--) {
           dates.push(dayjs().subtract(i, 'day').format('YYYY-MM-DD'));
