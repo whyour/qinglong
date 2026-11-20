@@ -483,8 +483,8 @@ const Script = () => {
         </>
       }
       extra={[
-        <Space key="word-wrap" size={8}>
-          <span>{intl.get('自动换行')}</span>
+        <Space key="word-wrap" size={8} className="editor-wrap-setting">
+          <span className="editor-wrap-label">{intl.get('自动换行')}</span>
           <Switch
             aria-label={intl.get('自动换行')}
             checked={wordWrap}

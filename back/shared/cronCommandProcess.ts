@@ -7,7 +7,7 @@ import type { Readable } from 'stream';
 
 // A managed command waits on its parent's pipe. EOF before authorization exits
 // without interpreting the command, even when the worker is killed by SIGKILL.
-export function spawnCronCommand(command: string, triggerId?: string, onCommandStart?: (at: number) => void) {
+export function spawnCronCommand(command: string, triggerId?: string, onCommandStart?: (at: number) => void, outputPath?: string) {
   if (!triggerId) return spawn(command, { shell: '/bin/bash' });
   const sourceScript = join(__dirname, '../../shell/cron-command.py');
   const supervisor = existsSync(sourceScript) ? sourceScript : join(process.env.QL_DIR!, 'shell/cron-command.py');
@@ -15,6 +15,7 @@ export function spawnCronCommand(command: string, triggerId?: string, onCommandS
     receiptPath(triggerId) || '', process.execPath, join(__dirname, 'managedExit.cjs'),
   ];
   if (onCommandStart) args.push('report-start');
+  if (outputPath) args.push('log-output', outputPath);
   const child = spawn('python3', args, { env: { ...process.env, QL_TRIGGER_ID: triggerId },
     stdio: onCommandStart ? ['pipe', 'pipe', 'pipe', 'pipe'] : 'pipe' }) as ChildProcessWithoutNullStreams;
   if (onCommandStart && child.stdio[3]) {

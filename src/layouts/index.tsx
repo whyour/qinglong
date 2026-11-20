@@ -278,12 +278,6 @@ export default function () {
     }
   }
 
-  const isFirefox = navigator.userAgent.includes('Firefox');
-  const isSafari =
-    navigator.userAgent.includes('Safari') &&
-    !navigator.userAgent.includes('Chrome');
-  const isQQBrowser = navigator.userAgent.includes('QQBrowser');
-
   const menu: MenuProps = {
     items: [
       {
@@ -304,36 +298,30 @@ export default function () {
       logo={
         <>
           <Image preview={false} src="https://qn.whyour.cn/logo.png" />
-          <div className="title">
-            <span className="title">{intl.get('青龙')}</span>
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                window.open(systemInfo?.changeLogLink, '_blank');
-              }}
-            >
+          <div className="brand-title">
+            <span className="brand-name">{intl.get('青龙')}</span>
+            {systemInfo?.version && (
               <Tooltip
-                title={
-                  systemInfo?.branch === 'develop'
+                title={`v${systemInfo.version} · ${
+                  systemInfo.branch === 'develop'
                     ? intl.get('开发版')
                     : intl.get('正式版')
-                }
+                }`}
               >
-                <Badge size="small" dot={systemInfo?.branch === 'develop'}>
-                  <span
-                    style={{
-                      fontSize: isFirefox ? 9 : 12,
-                      color: '#666',
-                      marginLeft: 2,
-                      zoom: isSafari ? 0.66 : 0.8,
-                      letterSpacing: isQQBrowser ? -2 : 0,
-                    }}
-                  >
-                    v{systemInfo?.version}
-                  </span>
-                </Badge>
+                <span
+                  className="brand-version-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.open(systemInfo.changeLogLink, '_blank');
+                  }}
+                >
+                  <Badge size="small" dot={systemInfo.branch === 'develop'}>
+                    <span className="brand-version">v{systemInfo.version}</span>
+                  </Badge>
+                </span>
               </Tooltip>
-            </span>
+            )}
           </div>
         </>
       }

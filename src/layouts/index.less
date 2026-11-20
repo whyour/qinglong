@@ -156,6 +156,37 @@ body {
   }
 }
 
+.editor-wrap-setting {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid @border-color-base;
+  border-radius: 6px;
+  background: @component-background;
+  white-space: nowrap;
+}
+
+.editor-wrap-label {
+  color: @text-color-secondary;
+  font-size: 12px;
+}
+
+body[data-mode='phone'] {
+  .ql-container-wrapper .ant-page-header-heading-extra {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .config-wrapper .config-select {
+    width: min(38vw, 140px);
+  }
+}
+
 .ant-tree {
   .ant-tree-treenode {
     width: 100%;
@@ -413,15 +444,19 @@ body[data-mode='phone'] .side-menu-user-wrapper {
 .ant-pro-sider-logo {
   padding-inline: 5px !important;
 
-  .title {
+  .brand-title {
     display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
     height: 32px;
     margin: 0 5px;
     font-weight: 600;
     font-size: 16px;
-    line-height: 32px;
-    vertical-align: middle;
+    line-height: 18px;
+    white-space: nowrap;
     animation: pro-layout-title-hide 0.3s;
+    gap: 6px;
 
     a {
       display: inline-flex;
@@ -429,10 +464,53 @@ body[data-mode='phone'] .side-menu-user-wrapper {
     }
   }
 
+  .brand-name {
+    flex: 0 0 auto;
+    font-size: 18px;
+    line-height: 22px;
+  }
+
+  > a {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .ant-image {
+    flex-shrink: 0;
+  }
+
   img {
     width: 32px !important;
     border-radius: 52% !important;
   }
+}
+
+.brand-version-link {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  max-width: 100px;
+  padding-right: 4px;
+  cursor: pointer;
+  line-height: 14px;
+
+  .ant-badge {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+.brand-version {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #595959;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .ant-pro-global-header-logo {
@@ -490,7 +568,7 @@ textarea.ant-input {
 
 .ant-pro-sider-collapsed,
 body[data-mode='phone'] header {
-  .title {
+  .brand-title {
     display: none;
   }
 }
@@ -510,6 +588,10 @@ body[data-mode='phone'] header {
 }
 
 body[data-dark='true'] {
+  .brand-version {
+    color: #a6adb4;
+  }
+
   .upgrade-notice {
     background: #3a3214;
     border-color: #6b5415;

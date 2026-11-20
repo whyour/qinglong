@@ -1007,8 +1007,15 @@ export default class CronService {
             return;
           }
         }
+        const launchCommand = `real_log_path=${shellValue(logPath)} no_delay=true ${this.makeCommand(cron, true)}`;
+        // Let the independent supervisor own the log, while the command keeps
+        // writing to a drained pipe even if the worker dies or the log fills up.
+        const supervisedLog = Boolean(triggerId && outputPath);
         const cp = spawnCronCommand(
-          `real_log_path=${shellValue(logPath)} no_delay=true ${this.makeCommand(cron, true)}`, triggerId,
+          launchCommand,
+          triggerId,
+          undefined,
+          outputPath,
         );
         // Install observers before the first await: very short children may already exit.
         const { completed } = observeChildProcess(cp, {
@@ -1051,8 +1058,10 @@ export default class CronService {
               throw error;
             }
           },
-          onStdout: outputPath ? (message) => logStreamManager.write(outputPath, message) : undefined,
-          onStderr: outputPath ? (message) => logStreamManager.write(outputPath, message) : undefined,
+          onStdout: outputPath && !supervisedLog ? (message) => logStreamManager.write(outputPath, message) : undefined,
+          onStderr: supervisedLog
+            ? async (message) => { this.logger.error('[panel][Command supervisor] Task ID: %s, %s', id, message.trim()); }
+            : outputPath ? (message) => logStreamManager.write(outputPath, message) : undefined,
         });
         const result = await completed;
         state = result.signal ? 'stopped' : result.error || result.code !== 0 ? 'failed' : 'finished';

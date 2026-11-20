@@ -7,7 +7,7 @@ import threading
 import time
 
 
-def relay(source, destination):
+def relay(source, destination, on_error=None):
     with source:
         for chunk in iter(lambda: os.read(source.fileno(), 65536), b''):
             if destination is None:
@@ -16,10 +16,38 @@ def relay(source, destination):
             try:
                 while remaining:
                     remaining = remaining[os.write(destination, remaining):]
-            except OSError:
+            except OSError as error:
                 # The worker stopped reading. Continue draining so the user's
                 # command and its log wrapper can still report their real exit.
                 destination = None
+                if on_error is not None:
+                    on_error(error)
+
+
+def report_log_error(error):
+    # A missing HTTP worker must not turn an output failure into a task failure.
+    try:
+        os.write(2, ('[scheduler] Could not write command log: ' + str(error) + '\n').encode('utf-8'))
+    except OSError:
+        pass
+
+
+def relay_log(source, log_path):
+    destination = None
+    try:
+        try:
+            destination = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
+        except OSError as error:
+            report_log_error(error)
+        # Do not forward these bytes to the worker: that would duplicate the log
+        # and reintroduce a dependency on the worker continuing to read stdout.
+        relay(source, destination, report_log_error)
+    finally:
+        if destination is not None:
+            try:
+                os.close(destination)
+            except OSError as error:
+                report_log_error(error)
 
 
 def sync_directory(directory):
@@ -34,16 +62,23 @@ def main():
     command, owner, marker, node, reporter = sys.argv[1:6]
     if sys.stdin.buffer.read() != b'run\n':
         return 125
+    options = sys.argv[6:]
+    report_start = options[:1] == ['report-start']
+    if report_start:
+        options = options[1:]
+    log_path = options[1] if len(options) == 2 and options[0] == 'log-output' else None
     child = subprocess.Popen(['/bin/bash', '-c', command], stdin=subprocess.DEVNULL,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if sys.argv[6:] == ['report-start']:
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT if log_path else subprocess.PIPE)
+    if report_start:
         try:
             with os.fdopen(3, 'wb', buffering=0) as timing:
                 timing.write(str(time.time_ns() // 1000000).encode('ascii'))
         except OSError:
             pass
-    streams = [threading.Thread(target=relay, args=(child.stdout, 1)),
-               threading.Thread(target=relay, args=(child.stderr, 2))]
+    streams = ([threading.Thread(target=relay_log, args=(child.stdout, log_path))]
+               if log_path else [threading.Thread(target=relay, args=(child.stdout, 1)),
+                                 threading.Thread(target=relay, args=(child.stderr, 2))])
     for stream in streams:
         stream.start()
     status = child.wait()
