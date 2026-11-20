@@ -1,8 +1,8 @@
-version: 2.25.0-rc.1
-changeLogLink: https://github.com/whyour/qinglong/blob/develop/docs/releases/2.25.0-rc.1.md
-publishTime: "2026-11-17 09:59:16"
+version: 2.25.0-rc.2
+changeLogLink: https://github.com/whyour/qinglong/blob/develop/docs/releases/2.25.0-rc.2.md
+publishTime: "2026-11-20 20:29:29"
 changeLog: |
-  1. 修复 Node 24 下的开发启动，并恢复旧版定时任务的注册。
-  2. 定时任务现可查看触发记录、运行实例、每日结果与调度耗时。并发运行时可单独停止指定实例并检查对应日志。
-  3. 改进重启后的调度恢复、队列诊断，以及脚本和日志目录的分页读取。
-  4. 配套远程 CLI 增补调度、实例和文件浏览相关的 OpenAPI 操作。
+  1. 仪表盘新增调度异常明细，支持查看未触发、跳过和启动未确认的记录。
+  2. 明确内置调度与系统调度的展示名称，改善开发模式启动。
+  3. 修复依赖与代码扫描发现的安全问题，更新 SQLite 等运行依赖。
+  4. 远程 CLI 新增 dashboard schedule-anomalies 命令。
