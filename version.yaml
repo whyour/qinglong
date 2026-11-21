@@ -1,8 +1,8 @@
-version: 2.25.0-rc.2
-changeLogLink: https://github.com/whyour/qinglong/blob/develop/docs/releases/2.25.0-rc.2.md
-publishTime: "2026-11-20 20:29:29"
+version: 2.25.0-rc.3
+changeLogLink: https://github.com/whyour/qinglong/blob/develop/docs/releases/2.25.0-rc.3.md
+publishTime: "2026-11-21 19:00:16"
 changeLog: |
-  1. 仪表盘新增调度异常明细，支持查看未触发、跳过和启动未确认的记录。
-  2. 明确内置调度与系统调度的展示名称，改善开发模式启动。
-  3. 修复依赖与代码扫描发现的安全问题，更新 SQLite 等运行依赖。
-  4. 远程 CLI 新增 dashboard schedule-anomalies 命令。
+  1. 补齐 OpenAPI 可执行配置、脚本写入、趋势查询和 Perl 环境变量的安全边界。
+  2. 修复 HTTP 工作进程异常退出后的任务日志保留，完善正常退出与失败任务的日志记录。
+  3. 优化版本信息展示与脚本、配置编辑器的自动换行控件。
+  4. 修复 Node 24 开发模式冷启动，以及 Node、Alpine 带版本依赖卸载。
