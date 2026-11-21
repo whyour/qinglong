@@ -28,14 +28,18 @@ const compiled = ts.transpileModule(
   },
 ).outputText;
 
-for (const [arch, armVersion, timeout] of [
-  ['arm', 6, 120000],
-  ['arm', 7, 30000],
-  ['arm64', undefined, 30000],
+for (const [arch, armVersion, mode, timeout] of [
+  ['arm', 6, 'production', 120000],
+  ['arm', 7, 'production', 30000],
+  ['arm64', undefined, 'production', 30000],
+  ['x64', undefined, 'production', 30000],
+  ['x64', undefined, undefined, 30000],
+  ['x64', undefined, 'development', 120000],
+  ['arm64', undefined, 'development', 120000],
 ]) {
   test(`${arch} v${
     armVersion ?? ''
-  } waits for scheduler readiness before HTTP and job recovery`, async () => {
+  } ${mode ?? 'default'} waits for scheduler readiness before HTTP and job recovery`, async () => {
     const cluster = new EventEmitter();
     const module = { exports: {} };
     const logger = { info() {}, warn() {}, error() {} };
@@ -48,6 +52,7 @@ for (const [arch, armVersion, timeout] of [
       compiled,
     )(module, cluster, logger, String, {
       arch,
+      env: { NODE_ENV: mode },
       config: { variables: { arm_version: armVersion } },
       exit() {
         assert.fail('unexpected application exit');

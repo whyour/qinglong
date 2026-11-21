@@ -42,11 +42,15 @@ class Application {
   }
 
   private startMasterProcess() {
+    // Source transpilation competes with the frontend's cold compilation in
+    // development. Keep a bounded wait without applying that budget to normal
+    // production startup.
     const readyTimeout =
-      process.arch === 'arm' &&
-      Number(
-        (process.config.variables as { arm_version?: string | number }).arm_version,
-      ) === 6
+      process.env.NODE_ENV === 'development' ||
+      (process.arch === 'arm' &&
+        Number(
+          (process.config.variables as { arm_version?: string | number }).arm_version,
+        ) === 6)
         ? 120000
         : 30000;
     // Fork gRPC worker first and wait for it to be ready

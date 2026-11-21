@@ -315,7 +315,7 @@ export default class DependenceService {
         }
         const linuxCommand = LINUX_DEPENDENCE_COMMAND[osType];
         depInstallCommand = `${linuxCommand.install} ${doc.name.trim()}`;
-        depUnInstallCommand = `${linuxCommand.uninstall} ${doc.name.trim()}`;
+        depUnInstallCommand = getUninstallCommand(doc.type, doc.name, osType);
       }
       const pids = await Promise.all([
         getPid(depInstallCommand),
@@ -442,7 +442,7 @@ export default class DependenceService {
         if (isLinuxDependence) {
           command = isInstall
             ? `${linuxCommand.install} ${depName.trim()}`
-            : `${linuxCommand.uninstall} ${depName.trim()}`;
+            : getUninstallCommand(dependency.type, depName, osType);
         }
         const startTime = dayjs();
 

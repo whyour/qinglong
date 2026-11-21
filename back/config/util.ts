@@ -861,7 +861,22 @@ export function getInstallCommand(type: DependenceTypes, name: string): string {
 export function getUninstallCommand(
   type: DependenceTypes,
   name: string,
+  linuxOsType?: 'Debian' | 'Ubuntu' | 'Alpine',
 ): string {
+  if (type === DependenceTypes.nodejs) {
+    // pnpm remove expects the installed name, not an install specifier. Start
+    // after the first character so a scoped name keeps its leading '@'.
+    const specifier = name.trim();
+    const versionIndex = specifier.indexOf('@', 1);
+    const packageName =
+      versionIndex === -1 ? specifier : specifier.slice(0, versionIndex);
+    // Keep ordinary names identical to the process argv used by cancel's PID
+    // lookup, while passing unusual input literally to the shell.
+    const argument = /^(?:@[a-z0-9._~-]+\/)?[a-z0-9._~-]+$/i.test(packageName)
+      ? packageName
+      : shellQuote(packageName);
+    return `pnpm remove -g -- ${argument}`;
+  }
   if (type === DependenceTypes.python3) {
     name = name.trim();
     if (isRequirementsFile(name)) {
@@ -899,12 +914,16 @@ export function getUninstallCommand(
       PYTHON_VENV_DIR ? '' : ' --root-user-action=ignore'
     } -y -- ${shellQuote(packageName)}`;
   }
-  const baseCommands = {
-    [DependenceTypes.nodejs]: 'pnpm remove -g',
-    [DependenceTypes.linux]:
-      getOsTypeSync() === 'Alpine' ? 'apk del' : maybeSudo('apt-get remove -y'),
-  };
-  return `${baseCommands[type]} ${name.trim()}`;
+  if ((linuxOsType || getOsTypeSync()) === 'Alpine') {
+    // apk del accepts package names, not the version constraints or repository
+    // tags accepted by apk add. Keep apt's version/architecture selectors intact.
+    const packageName = name.trim().split(/[<>=~@]/, 1)[0].trim();
+    const argument = /^[a-z0-9][a-z0-9+_.-]*$/i.test(packageName)
+      ? packageName
+      : shellQuote(packageName);
+    return `apk del -- ${argument}`;
+  }
+  return `${maybeSudo('apt-get remove -y')} ${name.trim()}`;
 }
 
 export function isDemoEnv() {
