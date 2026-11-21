@@ -73,6 +73,7 @@ export default (app: Router) => {
 
   route.post(
     '/save',
+    rateLimit({ windowMs: 60 * 1000, limit: 600 }),
     celebrate({
       body: Joi.object({
         name: Joi.string().required(),

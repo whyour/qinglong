@@ -7,6 +7,45 @@ const { execFileSync } = require('node:child_process');
 const express = require('express');
 const load = require('../helpers/load-security-module.cjs');
 
+test('config saves share a rate limit across API mounts before writing files', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-config-limit-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  let writes = 0;
+  const app = express();
+  app.use(express.json());
+  const router = express.Router();
+  load(path.resolve('back/api/config.ts'), {
+    '../config': { configPath: root, blackFileList: [] },
+    '../config/const': { SAMPLE_FILES: [] },
+    '../services/config': {},
+    '../shared/i18n': { t: (x) => x },
+    '../shared/utils': { writeFileWithLock: async () => { writes++; } },
+    typedi: { Container: { get: () => ({}) } },
+  }).default(router);
+  app.use('/api', router);
+  app.use('/open', router);
+  const server = await new Promise((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  for (let i = 0; i < 601; i++) {
+    const response = await fetch(`${base}/${i % 2 ? 'api' : 'open'}/configs/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'settings.json', content: '{}' }),
+    });
+    if (i < 600) {
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).code, 200);
+    } else {
+      assert.equal(response.status, 429);
+      await response.text();
+    }
+  }
+  assert.equal(writes, 600);
+});
+
 test('Python environment generation escapes backslashes and triple quotes together', async () => {
   const output = {};
   const Env = load(path.resolve('back/services/env.ts'), {
