@@ -358,9 +358,21 @@ const Crontab = () => {
     const result = getCommandScript(record.command);
     if (Array.isArray(result)) {
       const [s, p] = result;
-      history.push(`/script?p=${p}&s=${s}`);
+      history.push(`/script?${new URLSearchParams({ p, s }).toString()}`);
     } else if (result) {
-      location.href = result;
+      // Repository commands may use SSH, but only explicit web URLs should
+      // navigate the browser. Never treat command text as an executable URL.
+      if (
+        !/^https?:\/\//i.test(result) ||
+        /[\u0000-\u0020\u007f\\]/.test(result)
+      ) {
+        return;
+      }
+      try {
+        location.href = new URL(result).href;
+      } catch {
+        return;
+      }
     }
   };
 
