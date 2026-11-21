@@ -1,6 +1,6 @@
 # Run Node package installation natively on the builder. Node/npm can spin at
 # 100% CPU when Alpine s390x is emulated through QEMU.
-FROM --platform=$BUILDPLATFORM node:24.18.1-alpine3.24 AS builder
+FROM --platform=$BUILDPLATFORM node:24.22.3-alpine3.24 AS builder
 
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -31,7 +31,7 @@ RUN set -x \
     pnpm install --prod --frozen-lockfile --side-effects-cache=false
 
 # Pin amd64 to upstream's musl runtime after native URL parser crashes with APK Node.
-FROM --platform=linux/amd64 node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS node-runtime-amd64
+FROM --platform=linux/amd64 node:24.22.3-alpine3.24@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS node-runtime-amd64
 
 FROM python:3.11-alpine3.24
 
@@ -70,7 +70,7 @@ RUN --mount=type=bind,from=node-runtime-amd64,source=/usr/local/bin/node,target=
   tzdata \
   perl \
   openssl \
-  nodejs \
+  nodejs=24.22.3-r0 \
   jq \
   openssh \
   procps \
@@ -81,7 +81,7 @@ RUN --mount=type=bind,from=node-runtime-amd64,source=/usr/local/bin/node,target=
        cp /tmp/node-runtime-amd64 /usr/local/bin/node; \
        ln -sf /usr/local/bin/node /usr/bin/node; \
      fi \
-  && node --version | grep -E '^v24\.' \
+  && test "$(node --version)" = "v24.22.3" \
   && rm -rf /var/cache/apk/* \
   && apk update \
   && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \

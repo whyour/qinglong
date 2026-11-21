@@ -185,6 +185,19 @@ body[data-mode='phone'] {
   .config-wrapper .config-select {
     width: min(38vw, 140px);
   }
+
+  .editor-toolbar-wrapper .ant-page-header-heading-extra {
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-start;
+
+    // PageContainer wraps its extra controls in a non-wrapping Space.
+    > .ant-space {
+      max-width: 100%;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+  }
 }
 
 .ant-tree {

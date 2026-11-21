@@ -16,7 +16,7 @@ RUN set -x && \
   apt-get update && \
   apt-get install --no-install-recommends -y libatomic1 && \
   npm i -g pnpm@8.3.1 && \
-  test "$(node --version)" = "v24.18.1" && \
+  test "$(node --version)" = "v24.22.3" && \
   test "$(pnpm --version)" = "8.3.1" && \
   cd /tmp/build && \
   pnpm install --prod --frozen-lockfile
@@ -77,7 +77,7 @@ RUN set -x && \
   git config --global user.name "qinglong" && \
   git config --global http.postBuffer 524288000 && \
   npm install -g pnpm@8.3.1 pm2 ts-node typescript@5 && \
-  test "$(node --version)" = "v24.18.1" && \
+  test "$(node --version)" = "v24.22.3" && \
   test "$(pnpm --version)" = "8.3.1" && \
   npm cache clean --force && \
   rm -rf /root/.cache && \

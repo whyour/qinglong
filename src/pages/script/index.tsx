@@ -462,7 +462,7 @@ const Script = () => {
 
   return (
     <PageContainer
-      className="ql-container-wrapper log-wrapper"
+      className="ql-container-wrapper log-wrapper editor-toolbar-wrapper"
       title={
         <>
           {select}

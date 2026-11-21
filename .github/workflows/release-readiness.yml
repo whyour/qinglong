@@ -4,13 +4,18 @@ on:
   pull_request:
     paths:
       - '.github/workflows/release-readiness.yml'
+      - '.github/workflows/validate.yml'
+      - '.nvmrc'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'docker/Dockerfile*'
+      - 'docker/install-node-debian.sh'
       - 'shell/node-runtime-probe.cjs'
       - 'scripts/verify-panel-package.cjs'
       - 'scripts/verify-image-node-layers.py'
+      - 'scripts/verify-runtime-dependencies.cjs'
       - 'test/back/node-runtime-probe.test.cjs'
+      - 'test/back/release-runtime-alignment.test.cjs'
   workflow_dispatch:
 
 permissions:
@@ -36,7 +41,7 @@ jobs:
           version: '8.3.1'
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:front && pnpm build:back && pnpm build:info
@@ -122,9 +127,9 @@ jobs:
           sbom: false
       - name: Verify native production runtime without external networking
         run: |
-          docker run --rm --network none --entrypoint node \
+          docker run --rm -i --network none --entrypoint node \
             qinglong-readiness:${{ matrix.image }} \
-            -e 'const assert=require("node:assert/strict"); const {createRequire}=require("node:module"); for(const [name,want] of Object.entries({"@grpc/grpc-js":"1.14.5",compression:"1.8.2",multer:"2.4.0",sequelize:"6.37.8"}))assert.equal(require(name+"/package.json").version,want); const expressRequire=createRequire(require.resolve("express")); assert.equal(expressRequire("proxy-addr/package.json").version,"2.0.8"); const sockRequire=createRequire(require.resolve("sockjs")); assert.equal(sockRequire("websocket-driver/package.json").version,"0.7.5"); require("sqlite3"); require("nodemailer"); require("undici"); console.log("Minimal production patches and runtime imports verified")'
+            < scripts/verify-runtime-dependencies.cjs
       - name: Load ARMv6 image for SQLite and Node regression checks
         if: startsWith(matrix.image, 'alpine')
         uses: docker/build-push-action@v7

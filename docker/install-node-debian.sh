@@ -3,12 +3,12 @@ set -eu
 
 # The official Node 24 Bookworm image does not cover s390x. Use the same
 # verified upstream release archive on every supported Debian architecture.
-version=24.18.1
+version=24.22.3
 case "${1:?Missing Docker TARGETARCH}" in
-  amd64) arch=x64; checksum=d6c664df3f3f61458e8c277585571328522d705166723a7c7823a9253a4d15a0 ;;
-  arm64) arch=arm64; checksum=7201e3a09dc825bac57867c81913e2b8f0ef87d04cb9082af4cda82f6ff3d88c ;;
-  ppc64le) arch=ppc64le; checksum=c47812c13862be7f6e71194c434c4d78a99096e72efb9c31a2627437e056d669 ;;
-  s390x) arch=s390x; checksum=acf57bd726f35afc2ba8475194e5a8bd532c00e1a3b2436295b2fbdde199d0e9 ;;
+  amd64) arch=x64; checksum=4f2b175a6d53a5c617a80dba2676238a0688cef28c6da4eba35c7d844e66fcfb ;;
+  arm64) arch=arm64; checksum=6e51a2ada00f0011cc266f65d98922b403d7ad88f809ca2aa615a5fe1ce6e86c ;;
+  ppc64le) arch=ppc64le; checksum=c4b446699171f64763304a0bc6fb972b0fb4acb1de5358e52b4c52a95883593a ;;
+  s390x) arch=s390x; checksum=b5dbeb563ffb81946478fd765ae92efc21117e410e4e9b7d966bf59b00cee55d ;;
   *) echo "Node ${version} has no supported Debian binary for TARGETARCH=$1" >&2; exit 1 ;;
 esac
 

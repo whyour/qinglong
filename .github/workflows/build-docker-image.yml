@@ -76,8 +76,13 @@ jobs:
     if: ${{ !inputs.static_sync_only }}
     needs: validate
     runs-on: ubuntu-latest
+    outputs:
+      node-version: ${{ steps.runtime.outputs.node-version }}
     steps:
       - uses: actions/checkout@v6
+      - name: Read production Node version
+        id: runtime
+        run: echo "node-version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@v6
         with:
           version: "8.3.1"
@@ -251,7 +256,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version-file: ".nvmrc"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -340,7 +345,7 @@ jobs:
           version: "8.3.1"
       - uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version-file: ".nvmrc"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -441,7 +446,8 @@ jobs:
       fail-fast: false
       matrix:
         node: ['20.18.1', '24']
-    container: node:${{ matrix.node }}-bookworm
+    # Keep Node 20 for legacy upgrade acceptance; the current runtime is pinned.
+    container: node:${{ matrix.node == '24' && needs.build-static.outputs.node-version || matrix.node }}-bookworm
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v6
@@ -481,10 +487,11 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - uses: actions/checkout@v6
       - name: Set up Node for trusted publishing
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version-file: '.nvmrc'
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
@@ -593,7 +600,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version-file: '.nvmrc'
       - uses: pnpm/action-setup@v6
         with:
           version: '8.3.1'

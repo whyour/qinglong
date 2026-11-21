@@ -96,7 +96,7 @@ const Config = () => {
 
   return (
     <PageContainer
-      className="ql-container-wrapper config-wrapper"
+      className="ql-container-wrapper config-wrapper editor-toolbar-wrapper"
       title={title}
       loading={loading}
       extra={[
