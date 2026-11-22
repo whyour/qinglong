@@ -68,28 +68,57 @@
   grid-auto-rows: 1fr;
   gap: 12px;
   margin: 0 !important;
-  > .ant-col { min-width: 0; max-width: none; padding: 0 !important; }
-  .ant-card { height: 100%; }
-  .ant-statistic-content { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.3; }
-  small { display: block; margin-top: 3px; }
+  > .ant-col {
+    min-width: 0;
+    max-width: none;
+    padding: 0 !important;
+  }
+  .ant-card {
+    height: 100%;
+  }
+  .ant-statistic-content {
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+  }
+  small {
+    display: block;
+    margin-top: 3px;
+  }
 }
 
-.dashboard-wrapper { container-type: inline-size; }
+.dashboard-wrapper {
+  container-type: inline-size;
+}
 @container (min-width: 640px) {
-  .dashboard-totals.ant-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dashboard-totals.ant-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 @container (min-width: 1280px) {
-  .dashboard-totals.ant-row { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .dashboard-totals.ant-row {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
 }
 
-.queue-entry { padding: 8px 0; border-bottom: 1px solid var(--ant-border-color-split); }
-.queue-reason ul { padding-inline-start: 22px; margin: 4px 0; }
+.queue-entry {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ant-border-color-split);
+}
+.queue-reason ul {
+  padding-inline-start: 22px;
+  margin: 4px 0;
+}
 
-.schedule-group-title { margin-top: 16px; }
+.schedule-group-title {
+  margin-top: 16px;
+}
 
 .timing-samples {
   margin: 0;
-  dd { margin: 0; }
+  dd {
+    margin: 0;
+  }
 }
 
 .schedule-overview > .ant-card-head .ant-card-head-title {
@@ -118,10 +147,19 @@
   overscroll-behavior: contain;
   overflow-wrap: anywhere;
 
-  h4 { margin: 12px 0 6px; }
-  p { margin: 8px 0 0; }
-  > :first-child { margin-top: 0; }
-  .timing-samples { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; }
+  h4 {
+    margin: 12px 0 6px;
+  }
+  p {
+    margin: 8px 0 0;
+  }
+  > :first-child {
+    margin-top: 0;
+  }
+  .timing-samples {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 16px;
+  }
 }
 
 .anomaly-count {
@@ -131,5 +169,8 @@
   color: var(--ant-primary-color, @primary-color);
   font: inherit;
   cursor: pointer;
-  &:hover, &:focus-visible { text-decoration: underline; }
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
 }

@@ -34,6 +34,12 @@ App results omit client_secret/tokens unless --show-secrets is explicit. Other r
 
 ## 输入和输出 / Inputs and outputs
 
+`PUT /open/crons/run` 保留任务 ID 数组请求体和 `code:200` 响应，新增 `data:[{taskId,triggerId,state,reason}]`。每个存在的任务返回本次事务已落库的触发 ID，state 是受理时的 queued 或 skipped（例如 reason=overlap）；重复 ID 合并，不存在的任务不生成记录。提交不代表执行成功；后续通过 `GET /open/crons/:id/triggers?ids=<triggerId>` 查询，日志通过 `GET /open/crons/:id/log?triggerId=<triggerId>` 读取。触发记录受保留期约束，运行请求没有幂等键。
+
+The run API retains its array request and code:200 envelope, adding `data:[{taskId,triggerId,state,reason}]` for existing tasks. Receipts are committed before returning; queued/skipped is the admission snapshot, not the final outcome. Duplicate IDs are deduplicated; missing tasks produce no receipt. Query the exact trigger via `crons/:id/triggers?ids=<triggerId>` and its log via `crons/:id/log?triggerId=<triggerId>`. History retention still applies; run requests are not idempotent.
+
+`ql task run <id> --wait --timeout 300 --json` 等待本轮；`ql task wait <id> --trigger-id <triggerId> --timeout 300 --json` 仅等待已有轮次；`ql task logs <id> --trigger-id <triggerId> --tail 200 --json` 读取对应日志。此处 timeout 是总等待秒数（默认 300，最多 86400），超时不停止任务。具体退出码和旧面板行为见 [任务参考](panel.md)。These wait commands poll an exact trigger without replaying execution. Their timeout is the total wait budget, distinct from the per-request timeout below; see the task reference for outcome errors and older-panel compatibility.
+
 - `--data '<JSON>'` / `--data @file.json` / `--data -`：完整请求体，保留所有后端字段；query 同样支持这三种输入。
 - `--query '{"searchValue":"demo","page":1}'`：查询对象，值为标量或标量数组，CLI 编码为 URL 参数；不要拼接 URL 查询字符串。
 - `create/update` 常用字段可用选项；同一字段不能同时在 --data 和选项中提供。update 的位置 ID 注入请求体，拒绝与 body.id 冲突；它提交完整更新对象，不会先读取后盲目合并。
@@ -106,13 +112,13 @@ System/user operations below execute remotely through the panel API. They do not
 | `ql task detail ` | GET | `crons/detail` | --query |
 | `ql task preview` | GET | `crons/preview` | --query '{"schedule":"0 6 * * *"}' |
 | `ql task create ` | POST | `crons` | --data, --query |
-| `ql task run <id...>` | PUT | `crons/run` | --query via api request |
+| `ql task run <id>` | PUT | `crons/run` | --wait --timeout 300 |
 | `ql task stop <id...>` | PUT | `crons/stop` | --query via api request |
 | `ql task labels-delete ` | DELETE | `crons/labels` | --data, --query |
 | `ql task labels-create ` | POST | `crons/labels` | --data, --query |
 | `ql task disable <id...>` | PUT | `crons/disable` | --query |
 | `ql task enable <id...>` | PUT | `crons/enable` | --query |
-| `ql task logs <id>` | GET | `crons/:id/log` | --query via api request |
+| `ql task logs <id>` | GET | `crons/:id/log` | --trigger-id --tail |
 | `ql task update <id>` | PUT | `crons` | --data, --query |
 | `ql task delete <id...>` | DELETE | `crons` | --query |
 | `ql task pin <id...>` | PUT | `crons/pin` | --query |

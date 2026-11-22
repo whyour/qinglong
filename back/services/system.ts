@@ -36,9 +36,9 @@ import {
   NotifyStatus,
   NotifyLogInfo,
 } from '../data/system';
-import taskLimit from '../shared/pLimit';
+import taskLimit from '../cron/execution/cronLimit';
 import cronClient from '../schedule/client';
-import { withSchedulerMutation } from '../shared/schedulerMutationLock';
+import { withSchedulerMutation } from '../cron/scheduling/schedulerMutationLock';
 import NotificationService from './notify';
 import ScheduleService, { TaskCallbacks } from './schedule';
 import SockService from './sock';

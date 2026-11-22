@@ -13,16 +13,31 @@ const util = load('back/config/util.ts', {
 });
 
 for (const specifier of [
-  'tree', ' tree=2.3.2-r0 ', 'tree>=2.3', 'tree<=2.3', 'tree~2.3',
-  'tree>2', 'tree<3', 'tree@testing', 'tree@testing=2.3.2-r0',
+  'tree',
+  ' tree=2.3.2-r0 ',
+  'tree>=2.3',
+  'tree<=2.3',
+  'tree~2.3',
+  'tree>2',
+  'tree<3',
+  'tree@testing',
+  'tree@testing=2.3.2-r0',
 ]) {
   test(`apk uninstall removes the constraint from ${specifier}`, () => {
-    assert.equal(util.getUninstallCommand(2, specifier, 'Alpine'), 'apk del -- tree');
+    assert.equal(
+      util.getUninstallCommand(2, specifier, 'Alpine'),
+      'apk del -- tree',
+    );
   });
 }
 
 for (const osType of ['Debian', 'Ubuntu']) {
-  for (const specifier of ['tree', 'tree=2.1.0-1', 'tree:amd64=1:2.1.0-1+b1', 'tree/stable']) {
+  for (const specifier of [
+    'tree',
+    'tree=2.1.0-1',
+    'tree:amd64=1:2.1.0-1+b1',
+    'tree/stable',
+  ]) {
     test(`${osType} uninstall preserves ${specifier}, including sudo selection`, (t) => {
       const original = process.env.QL_CONTAINER;
       t.after(() => {
@@ -31,8 +46,12 @@ for (const osType of ['Debian', 'Ubuntu']) {
       });
       for (const container of ['false', 'true']) {
         process.env.QL_CONTAINER = container;
-        assert.equal(util.getUninstallCommand(2, specifier, osType),
-          `${container === 'true' ? 'sudo ' : ''}apt-get remove -y ${specifier}`);
+        assert.equal(
+          util.getUninstallCommand(2, specifier, osType),
+          `${
+            container === 'true' ? 'sudo ' : ''
+          }apt-get remove -y ${specifier}`,
+        );
       }
     });
   }
@@ -57,9 +76,19 @@ for (const osType of ['Alpine', 'Debian', 'Ubuntu']) {
         if (original === undefined) delete process.env.QL_CONTAINER;
         else process.env.QL_CONTAINER = original;
       });
-      const install = `${osType === 'Alpine' ? 'apk add --no-check-certificate' : 'apt-get install -y'} ${specifier}`;
-      const uninstall = osType === 'Alpine' ? 'apk del -- tree' : `apt-get remove -y ${specifier}`;
-      const spawned = [], lookedUp = [], killed = [], removed = [];
+      const install = `${
+        osType === 'Alpine'
+          ? 'apk add --no-check-certificate'
+          : 'apt-get install -y'
+      } ${specifier}`;
+      const uninstall =
+        osType === 'Alpine'
+          ? 'apk del -- tree'
+          : `apt-get remove -y ${specifier}`;
+      const spawned = [],
+        lookedUp = [],
+        killed = [],
+        removed = [];
       const dep = { id: 1, name: specifier, type: 2, status: 1, log: [] };
       const Service = load('back/services/dependence.ts', {
         '../config': {},
@@ -76,7 +105,14 @@ for (const osType of ['Alpine', 'Debian', 'Ubuntu']) {
         '../data/dependence': {
           Dependence: class {},
           DependenceTypes: types,
-          DependenceStatus: { installed: 1, installing: 0, removing: 3, removed: 4, removeFailed: 5, cancelled: 7 },
+          DependenceStatus: {
+            installed: 1,
+            installing: 0,
+            removing: 3,
+            removed: 4,
+            removeFailed: 5,
+            cancelled: 7,
+          },
           versionDependenceCommandTypes: { 0: '@', 1: '==', 2: '=' },
           DependenceModel: {
             findAll: async () => [dep],

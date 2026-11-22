@@ -22,14 +22,18 @@ export class LifecycleReceipt {
       this.triggerId = parent;
       this.identity = { trigger_id: parent };
     } else {
-      const prefix = context.env.QL_EXECUTION_ORIGIN === 'scheduled_system'
-        ? `legacy-system:${started}:` : 'client-';
+      const prefix =
+        context.env.QL_EXECUTION_ORIGIN === 'scheduled_system'
+          ? `legacy-system:${started}:`
+          : 'client-';
       this.identity = { execution_id: prefix + randomUUID() };
     }
   }
 
   get executionId() {
-    return this.identity && 'execution_id' in this.identity ? this.identity.execution_id : undefined;
+    return this.identity && 'execution_id' in this.identity
+      ? this.identity.execution_id
+      : undefined;
   }
 
   async status(body: Record<string, unknown>, exitCode?: number) {
@@ -38,15 +42,27 @@ export class LifecycleReceipt {
     if (starting) this.startAttempted = true;
     if (!starting && this.identity) this.finishedAt ??= Date.now();
     try {
-      await this.api.call('crons/status', 'PUT', {
-        ...body, ...this.identity, ...(!starting && this.extended && { exit_code: exitCode }),
-      }, starting ? undefined : this.finishedAt);
+      await this.api.call(
+        'crons/status',
+        'PUT',
+        {
+          ...body,
+          ...this.identity,
+          ...(!starting && this.extended && { exit_code: exitCode }),
+        },
+        starting ? undefined : this.finishedAt,
+      );
     } catch (error) {
       if (!(error instanceof ReceiptValidationError)) throw error;
       if (firstStart && this.identity && error.field in this.identity) {
         // The old schema rejected this start before its handler could write.
         this.identity = undefined;
-      } else if (!starting && !this.identity && this.extended && error.field === 'exit_code') {
+      } else if (
+        !starting &&
+        !this.identity &&
+        this.extended &&
+        error.field === 'exit_code'
+      ) {
         this.extended = false;
       } else {
         throw error;
@@ -58,6 +74,11 @@ export class LifecycleReceipt {
 
   async statistics(refId: number, code: number, elapsed: number) {
     if (this.extended && (this.identity || this.acceptedStart))
-      await this.api.call('dashboard/record', 'POST', { ref_id: refId, code, elapsed, ...this.identity }, this.finishedAt);
+      await this.api.call(
+        'dashboard/record',
+        'POST',
+        { ref_id: refId, code, elapsed, ...this.identity },
+        this.finishedAt,
+      );
   }
 }

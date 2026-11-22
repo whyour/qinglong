@@ -79,5 +79,10 @@ export const RunningInstanceModel = sequelize.define<RunningInstanceModel>(
       allowNull: true,
     },
   },
-  { indexes: [{ fields: ['cron_id', 'pid', 'started_at'] }, { fields: ['cron_id', 'id'] }] },
+  {
+    indexes: [
+      { fields: ['cron_id', 'pid', 'started_at'] },
+      { fields: ['cron_id', 'id'] },
+    ],
+  },
 );

@@ -225,7 +225,10 @@ for (const branch of ['master', 'develop', 'debian', 'debian-dev'])
     const f = await fixture(t, { branch, lockChange: true, tee: true });
     let result = await f.execute('update', 'false');
     assert.equal(result.code, 0, result.stdout + result.stderr);
-    assert.ok(result.stdout.includes('　　　　　'), 'update logs retain the completion marker');
+    assert.ok(
+      result.stdout.includes('　　　　　'),
+      'update logs retain the completion marker',
+    );
     assert.equal(f.read('version.yaml'), 'version: 2.21.0');
     assert.equal(fs.existsSync(path.join(f.root, 'stops')), false);
     assert.match(

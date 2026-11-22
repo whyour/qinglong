@@ -31,6 +31,24 @@ export const english: Record<string, string> = {
     'Local API rejected request. Check panel logs and permissions.',
   '任务列表响应无效。': 'Invalid task list response.',
   '任务响应无效。': 'Invalid task response.',
+  '触发 ID 无效。': 'Invalid trigger ID.',
+  '--timeout 需要与 --wait 一起使用。': '--timeout requires --wait.',
+  '运行响应未包含有效的本轮触发记录，请检查任务状态，不要直接重试运行。':
+    'The run response has no valid receipt for this task. Check task status; do not blindly retry the run.',
+  '运行请求已提交，但面板未返回 triggerId，无法等待本轮执行。请检查任务状态，不要直接重试运行。':
+    'The run request was submitted, but the panel returned no triggerId. Cannot wait for this run. Check task status; do not blindly retry the run.',
+  '面板未确认日志所属的触发 ID，已拒绝返回可能属于其他轮次的日志。':
+    'The panel did not confirm the log trigger ID. Refusing to return logs that may belong to another run.',
+  '等待触发 %s 超时；任务未被停止或重新运行，可用 task wait 继续等待。':
+    'Timed out waiting for trigger %s. The task was not stopped or rerun; use task wait to resume waiting.',
+  '等待触发 %s 中断：%s 不会重试运行，可用 task wait 继续等待。':
+    'Waiting for trigger %s was interrupted: %s The run will not be retried; use task wait to resume waiting.',
+  '触发 %s 不存在、已清理或不属于该任务，无法确认执行结果。':
+    'Trigger %s does not exist, was pruned, or belongs to another task. Cannot confirm the execution result.',
+  '触发 %s 的查询响应无效或与请求不匹配，无法确认执行结果。':
+    'The query response for trigger %s is invalid or does not match the request. Cannot confirm the execution result.',
+  '触发 %s 未成功完成（状态 %s，退出码 %s）。':
+    'Trigger %s did not finish successfully (state %s, exit code %s).',
   '日志响应无效。': 'Invalid log response.',
   '订阅响应无效。': 'Invalid subscription response.',
   '订阅列表响应无效。': 'Invalid subscription list response.',

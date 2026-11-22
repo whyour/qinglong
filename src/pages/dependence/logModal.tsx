@@ -98,10 +98,7 @@ const DependenceLogModal = ({
 
   const handleMessage = (payload: any) => {
     const { message, references, status } = payload;
-    if (
-      !references?.length ||
-      !references.includes(dependence.id)
-    ) return;
+    if (!references?.length || !references.includes(dependence.id)) return;
 
     if (typeof status === 'number') {
       setExecuting(status === Status.安装中 || status === Status.删除中);

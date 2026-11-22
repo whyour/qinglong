@@ -11,16 +11,32 @@ module.exports = function observeScriptStart(entry, marker) {
     session.connect();
     const target = pathToFileURL(entry).href;
     session.post('Debugger.enable');
-    session.post('Debugger.setBreakpointByUrl', { url: target, lineNumber: 0 }, (err, bp) => {
-      if (err || !bp) { session.disconnect(); return; }
-      session.on('Debugger.paused', ({ params }) => {
-        if (params.hitBreakpoints?.includes(bp.breakpointId)) {
-          try { writeFileSync(marker, String(Date.now()), { flag: 'wx', mode: 0o600 }); } catch {}
+    session.post(
+      'Debugger.setBreakpointByUrl',
+      { url: target, lineNumber: 0 },
+      (err, bp) => {
+        if (err || !bp) {
           session.disconnect();
-        } else {
-          session.post('Debugger.resume');
+          return;
         }
-      });
-    });
-  } catch { try { session.disconnect(); } catch {} }
+        session.on('Debugger.paused', ({ params }) => {
+          if (params.hitBreakpoints?.includes(bp.breakpointId)) {
+            try {
+              writeFileSync(marker, String(Date.now()), {
+                flag: 'wx',
+                mode: 0o600,
+              });
+            } catch {}
+            session.disconnect();
+          } else {
+            session.post('Debugger.resume');
+          }
+        });
+      },
+    );
+  } catch {
+    try {
+      session.disconnect();
+    } catch {}
+  }
 };

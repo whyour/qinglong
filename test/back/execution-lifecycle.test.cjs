@@ -19,11 +19,11 @@ test(
   async () => {
     let releases = 0;
     let active = 0;
-    const { runCron } = load(path.resolve('back/shared/runCron.ts'), {
+    const { runCron } = load(path.resolve('back/cron/execution/runCron.ts'), {
       'cross-spawn': {
         spawn: () => spawn('true', { shell: '/nonexistent-ql-test-shell' }),
       },
-      './pLimit': {
+      './cronLimit': {
         runWithCronLimit: async (_cron, fn) => {
           active++;
           try {
@@ -34,16 +34,16 @@ test(
         },
         removeQueuedCron: () => releases++,
       },
-      '../loaders/logger': logger,
-      '../data/cron': {
+      '../../loaders/logger': logger,
+      '../../data/cron': {
         CrontabModel: { findOne: async () => ({ isDisabled: 0 }) },
         CrontabStatus: {},
       },
-      '../data/runningInstance': {
+      '../../data/runningInstance': {
         RunningInstanceModel: {},
         InstanceStatus: {},
       },
-      '../config/util': { killTask: async () => {} },
+      '../../config/util': { killTask: async () => {} },
     });
     await runCron('true', { id: '1' });
     await runCron('true', { id: '2' });

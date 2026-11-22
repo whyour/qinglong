@@ -119,7 +119,11 @@ export default function TaskResultModal({
         )}
       </Modal>
       {logCron && (
-        <CronLogModal key={logCron.id} cron={logCron} handleCancel={() => setLogCron(null)} />
+        <CronLogModal
+          key={logCron.id}
+          cron={logCron}
+          handleCancel={() => setLogCron(null)}
+        />
       )}
     </>
   );

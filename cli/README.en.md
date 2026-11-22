@@ -111,9 +111,22 @@ Commands output pretty-printed JSON by default; `--json` produces a single line.
 - Task run/stop: `{code:200,data:{taskId:12,action:"run",accepted:true}}`. Subscription run/stop/enable/disable use `subscriptionId`; CRUD and raw API operations retain their server response instead. Acceptance does not mean execution succeeded.
 - Errors: `{code:1,message:"..."}`. Exit codes: 0 success, 1 API/network/configuration failure, 2 invalid arguments, 3 missing authentication, HTTP/API 401/403 or a two-factor challenge.
 
-IDs must be positive integers. Each task run/stop request addresses one task. The 2.x API provides no separate run ID or idempotency key: an error may leave the outcome unknown. Inspect status before retrying. The CLI does not automatically retry HTTP requests.
+IDs must be positive integers. Each task run/stop request addresses one task. New panels add this run's `triggerId`, admission `state` (queued/skipped) and `reason`, preserving `taskId/action/accepted`. Immediate run keeps its original output on older panels without trigger IDs. Run requests do not have idempotency keys: an error may leave the outcome unknown. Inspect status before retrying. The CLI does not automatically retry HTTP requests.
 
-Logs may belong to an earlier run; `completed` does not imply success. `--tail` truncates on the client and does not reduce server reads or network traffic. Neither task fields nor logs are automatically redacted.
+### Wait for one run and read its logs
+
+```sh
+ql task run 12 --wait --timeout 300 --json
+# Use the returned triggerId; waiting again does not rerun the task
+ql task wait 12 --trigger-id <triggerId> --timeout 300 --json
+ql task logs 12 --trigger-id <triggerId> --tail 200 --json
+```
+
+`run --wait` submits once and polls that trigger every second. `task wait` only reads an existing trigger and supports `crons:read`. The wait timeout defaults to 300 seconds (1–86400), starting after the run response; run's `--timeout` requires `--wait`. Each query is bounded by 30 seconds and the remaining wait time. Timeout, authentication or network failure ends waiting without stopping or rerunning the task. Resume with `task wait` and the returned ID. Token expiry during waiting ends the command; the next invocation obtains a session using the existing authentication rules.
+
+Only `finished` with exit code 0 succeeds, returning `{code:200,data:{taskId,action,triggerId,state,reason,exitCode}}` on stdout; a run-initiated wait also retains `accepted:true`. Failed, skipped, stopped and unknown outcomes exit 1. JSON errors go to stderr with the existing `{code,message}` plus `data` containing the trigger ID and observed outcome. Timeout/query errors use `waitStatus` (timeout/interrupted/notFound/invalidResponse), without inventing a task outcome. Authentication failures retain exit code 3.
+
+If an old panel returns no triggerId, `run --wait` explicitly fails after submission, without guessing the latest run or retrying. Selected log responses must confirm the same triggerId or the CLI refuses to print their content. Pruned triggers/logs never fall back to sibling runs. Plain `task logs` still reads the latest log, which may belong to an earlier run; `completed` does not imply success. `--tail` truncates on the client and does not reduce server reads or network traffic. Neither task fields nor logs are automatically redacted.
 
 ## Skill, build and validation
 

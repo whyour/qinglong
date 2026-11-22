@@ -77,7 +77,9 @@ test('ql log reads the requested system log history without PM2', () => {
 test('ql log follows the current Winston system log without PM2', () => {
   const { binDir, shellDir, testRoot } = prepareFixture('container');
   const systemLogDir = path.join(testRoot, 'data/syslog');
-  const currentDate = spawnSync('date', ['+%F'], { encoding: 'utf8' }).stdout.trim();
+  const currentDate = spawnSync('date', ['+%F'], {
+    encoding: 'utf8',
+  }).stdout.trim();
   const currentLog = path.join(systemLogDir, `${currentDate}.log`);
   fs.mkdirSync(systemLogDir, { recursive: true });
   fs.writeFileSync(currentLog, 'system-one\n');

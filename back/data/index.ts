@@ -29,8 +29,10 @@ sequelize.addHook('beforeQuery', async (_options, query) => {
   let ready = initialized.get(connection);
   if (!ready) {
     ready = new Promise<void>((resolve, reject) => {
-      connection.run('PRAGMA synchronous=EXTRA', error => error ? reject(error) : resolve());
-    }).catch(error => {
+      connection.run('PRAGMA synchronous=EXTRA', (error) =>
+        error ? reject(error) : resolve(),
+      );
+    }).catch((error) => {
       initialized.delete(connection);
       throw error;
     });

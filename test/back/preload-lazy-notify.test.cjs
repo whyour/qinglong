@@ -9,14 +9,29 @@ function fixture(t, language) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-lazy-notify-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const extension = language === 'python' ? 'py' : 'js';
-  fs.copyFileSync(`shell/preload/sitecustomize.${extension}`, path.join(root, `sitecustomize.${extension}`));
+  fs.copyFileSync(
+    `shell/preload/sitecustomize.${extension}`,
+    path.join(root, `sitecustomize.${extension}`),
+  );
   fs.writeFileSync(path.join(root, `env.${extension}`), '');
   fs.writeFileSync(path.join(root, 'before.sh'), 'export FROM_SHELL=before\n');
-  fs.writeFileSync(path.join(root, 'before.js'), 'process.env.FROM_LANGUAGE = "javascript";\n');
-  fs.writeFileSync(path.join(root, 'task_before.py'), 'import os\nos.environ["FROM_LANGUAGE"] = "python"\n');
-  fs.writeFileSync(path.join(root, 'client.js'), 'module.exports = { getEnvs: () => "client-ready" };\n');
+  fs.writeFileSync(
+    path.join(root, 'before.js'),
+    'process.env.FROM_LANGUAGE = "javascript";\n',
+  );
+  fs.writeFileSync(
+    path.join(root, 'task_before.py'),
+    'import os\nos.environ["FROM_LANGUAGE"] = "python"\n',
+  );
+  fs.writeFileSync(
+    path.join(root, 'client.js'),
+    'module.exports = { getEnvs: () => "client-ready" };\n',
+  );
   fs.copyFileSync('shell/preload/client.py', path.join(root, 'client.py'));
-  fs.copyFileSync('shell/preload/esm-loader.mjs', path.join(root, 'esm-loader.mjs'));
+  fs.copyFileSync(
+    'shell/preload/esm-loader.mjs',
+    path.join(root, 'esm-loader.mjs'),
+  );
   const env = {
     ...process.env,
     PYTHONPATH: root,
@@ -37,9 +52,13 @@ function fixture(t, language) {
     const entry = path.join(root, `entry.${extensionOverride}`);
     write(path.basename(entry), body);
     const python = language === 'python';
-    const result = spawnSync(python ? 'python3' : process.execPath,
-      python ? [entry] : ['--require', path.join(root, 'sitecustomize.js'), entry],
-      { cwd: root, env, encoding: 'utf8', timeout: 15000 });
+    const result = spawnSync(
+      python ? 'python3' : process.execPath,
+      python
+        ? [entry]
+        : ['--require', path.join(root, 'sitecustomize.js'), entry],
+      { cwd: root, env, encoding: 'utf8', timeout: 15000 },
+    );
     assert.equal(result.status, 0, result.stderr + result.stdout);
     return result.stdout;
   };
@@ -49,29 +68,42 @@ function fixture(t, language) {
 for (const extension of ['js', 'mjs']) {
   test(`${extension} startup preserves hooks, environment selection and client without importing notifications`, (t) => {
     const f = fixture(t, 'javascript');
-    f.write('__ql_notify__.js', 'throw Error("notification dependencies must not load at startup");');
-    f.run(`
-      const assert = ${extension === 'mjs' ? '(await import("node:assert/strict")).default' : 'require("node:assert/strict")'};
+    f.write(
+      '__ql_notify__.js',
+      'throw Error("notification dependencies must not load at startup");',
+    );
+    f.run(
+      `
+      const assert = ${
+        extension === 'mjs'
+          ? '(await import("node:assert/strict")).default'
+          : 'require("node:assert/strict")'
+      };
       assert.equal(process.env.FROM_SHELL, 'before');
       assert.equal(process.env.FROM_LANGUAGE, 'javascript');
       assert.equal(process.env.FROM_COMMAND, 'command');
       assert.equal(process.env.ACCOUNTS, 'second&third');
       assert.equal(QLAPI.getEnvs(), 'client-ready');
       assert.equal(typeof QLAPI.notify, 'function');
-    `, extension);
+    `,
+      extension,
+    );
   });
 }
 
 test('JavaScript first notification imports once and preserves arguments, this, promises and errors', (t) => {
   const f = fixture(t, 'javascript');
-  f.write('__ql_notify__.js', `
+  f.write(
+    '__ql_notify__.js',
+    `
     global.notificationLoads = (global.notificationLoads || 0) + 1;
     exports.sendNotify = function (...args) {
       if (args[0] === 'fail') throw new Error('send failed');
       global.notificationResult = Promise.resolve({ args, receiver: this });
       return global.notificationResult;
     };
-  `);
+  `,
+  );
   f.run(`
     const assert = require('node:assert/strict');
     assert.equal(global.notificationLoads, undefined);
@@ -91,10 +123,13 @@ test('JavaScript first notification imports once and preserves arguments, this, 
 
 test('JavaScript reports import failures on notify and permits a later retry', (t) => {
   const f = fixture(t, 'javascript');
-  f.write('__ql_notify__.js', `
+  f.write(
+    '__ql_notify__.js',
+    `
     if (!process.env.NOTIFY_READY) throw Error('notification dependency unavailable');
     exports.sendNotify = (...args) => args;
-  `);
+  `,
+  );
   f.run(`
     const assert = require('node:assert/strict');
     assert.equal(QLAPI.getEnvs(), 'client-ready');
@@ -106,7 +141,10 @@ test('JavaScript reports import failures on notify and permits a later retry', (
 
 test('Python startup preserves hooks, environment selection and client without importing notifications', (t) => {
   const f = fixture(t, 'python');
-  f.write('__ql_notify__.py', 'raise RuntimeError("notification dependencies must not load at startup")\n');
+  f.write(
+    '__ql_notify__.py',
+    'raise RuntimeError("notification dependencies must not load at startup")\n',
+  );
   f.run(`
 import os, sys
 assert os.environ['FROM_SHELL'] == 'before'
@@ -121,14 +159,17 @@ assert callable(QLAPI.getEnvs)
 
 test('Python first notification imports once and preserves args, kwargs, return values and errors', (t) => {
   const f = fixture(t, 'python');
-  f.write('__ql_notify__.py', `
+  f.write(
+    '__ql_notify__.py',
+    `
 import builtins
 builtins.notification_loads = getattr(builtins, 'notification_loads', 0) + 1
 def send(*args, **kwargs):
     if args[0] == 'fail':
         raise ValueError('send failed')
     return args, kwargs
-`);
+`,
+  );
   f.run(`
 import builtins, sys
 assert '__ql_notify__' not in sys.modules
@@ -146,13 +187,16 @@ else:
 
 test('Python reports import failures on notify and permits a later retry', (t) => {
   const f = fixture(t, 'python');
-  f.write('__ql_notify__.py', `
+  f.write(
+    '__ql_notify__.py',
+    `
 import os
 if not os.environ.get('NOTIFY_READY'):
     raise RuntimeError('notification dependency unavailable')
 def send(*args, **kwargs):
     return args
-`);
+`,
+  );
   f.run(`
 import os, sys
 assert '__ql_notify__' not in sys.modules
@@ -172,16 +216,37 @@ for (const extension of ['js', 'mjs', 'py']) {
     const f = fixture(t, extension === 'py' ? 'python' : 'javascript');
     const marker = path.join(f.root, 'started');
     f.env.QL_SCRIPT_START_FILE = marker;
-    f.env.QL_SCRIPT_ENTRY = path.join(fs.realpathSync(f.root), 'entry.' + extension);
-    fs.copyFileSync('shell/preload/script-start.cjs', path.join(f.root, 'script-start.cjs'));
-    f.write('before.sh', 'test ! -e "$QL_SCRIPT_START_FILE" && touch "$dir_scripts/hook-ran"\n');
-    const read = "const stamp = Number(fs.readFileSync(process.env.QL_SCRIPT_START_FILE, 'utf8'));";
-    const check = "if (!Number.isSafeInteger(stamp) || stamp <= 0 || stamp > Date.now()) throw Error('invalid entry timestamp');";
+    f.env.QL_SCRIPT_ENTRY = path.join(
+      fs.realpathSync(f.root),
+      'entry.' + extension,
+    );
+    fs.copyFileSync(
+      'shell/preload/script-start.cjs',
+      path.join(f.root, 'script-start.cjs'),
+    );
+    f.write(
+      'before.sh',
+      'test ! -e "$QL_SCRIPT_START_FILE" && touch "$dir_scripts/hook-ran"\n',
+    );
+    const read =
+      "const stamp = Number(fs.readFileSync(process.env.QL_SCRIPT_START_FILE, 'utf8'));";
+    const check =
+      "if (!Number.isSafeInteger(stamp) || stamp <= 0 || stamp > Date.now()) throw Error('invalid entry timestamp');";
     if (extension === 'py') {
-      f.run("assert 0 < int(open(__import__('os').environ['QL_SCRIPT_START_FILE']).read()) <= __import__('time').time_ns() // 1000000\n");
+      f.run(
+        "assert 0 < int(open(__import__('os').environ['QL_SCRIPT_START_FILE']).read()) <= __import__('time').time_ns() // 1000000\n",
+      );
     } else if (extension === 'mjs') {
-      f.write('dependency.mjs', "import fs from 'node:fs'; if (fs.existsSync(process.env.QL_SCRIPT_START_FILE)) throw Error('entry reported during dependency evaluation');");
-      f.run("import './dependency.mjs';\nimport fs from 'node:fs';\n" + read + check, extension);
+      f.write(
+        'dependency.mjs',
+        "import fs from 'node:fs'; if (fs.existsSync(process.env.QL_SCRIPT_START_FILE)) throw Error('entry reported during dependency evaluation');",
+      );
+      f.run(
+        "import './dependency.mjs';\nimport fs from 'node:fs';\n" +
+          read +
+          check,
+        extension,
+      );
     } else {
       f.run("const fs = require('node:fs'); " + read + check);
     }
@@ -199,14 +264,25 @@ test('the panel client defers gRPC until an API call, uses panel dependencies an
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'index.js'), source);
   }
-  packageFile(f.env.QL_NODE_GLOBAL_PATH, '@grpc/grpc-js', 'exports.fromGlobal = true;');
-  packageFile(f.root, '@grpc/proto-loader', `
+  packageFile(
+    f.env.QL_NODE_GLOBAL_PATH,
+    '@grpc/grpc-js',
+    'exports.fromGlobal = true;',
+  );
+  packageFile(
+    f.root,
+    '@grpc/proto-loader',
+    `
     exports.loadSync = () => {
       if (process.env.FAIL_PROTO === '1') throw Error('missing proto');
       return {};
     };
-  `);
-  packageFile(f.root, '@grpc/grpc-js', `
+  `,
+  );
+  packageFile(
+    f.root,
+    '@grpc/grpc-js',
+    `
     global.grpcLoads = (global.grpcLoads || 0) + 1;
     exports.credentials = { createInsecure: () => ({}) };
     exports.Metadata = class {};
@@ -216,7 +292,8 @@ test('the panel client defers gRPC until an API call, uses panel dependencies an
       close() { global.closes = (global.closes || 0) + 1; }
     }
     exports.loadPackageDefinition = () => ({com: { ql: { api: {Api} }}});
-  `);
+  `,
+  );
   f.run(`
     const assert = require('node:assert/strict');
     (async () => {

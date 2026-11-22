@@ -120,7 +120,9 @@ export default ({ app }: { app: Application }) => {
             )) ||
           (['scripts', 'logs'].includes(key || '') &&
             req.method === 'POST' &&
-            /^\/open\/(?:scripts|logs)\/(?:download|entries\/check)\/?$/.test(pathLower));
+            /^\/open\/(?:scripts|logs)\/(?:download|entries\/check)\/?$/.test(
+              pathLower,
+            ));
         const hasNamespaceScope =
           doc.scopes.includes(key as AppScope) ||
           ([

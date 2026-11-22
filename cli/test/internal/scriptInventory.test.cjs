@@ -5,7 +5,9 @@ const path = require('node:path');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { createContext } = require('../../dist/internal/runtime/context');
-const { listTaskScripts } = require('../../dist/internal/execution/scriptInventory');
+const {
+  listTaskScripts,
+} = require('../../dist/internal/execution/scriptInventory');
 
 test('no-argument runner lists legacy JS candidates without evaluating scripts or config', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-inventory-'));

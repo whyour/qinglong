@@ -60,10 +60,23 @@ test('mirror verification selects GNU timeout when the default is another implem
   assert.ok(realTimeout, 'The mirror script requires GNU timeout');
   const bin = path.join(tmp, 'bin');
   fs.mkdirSync(bin);
-  fs.symlinkSync(execFileSync('which', [realTimeout], { encoding: 'utf8' }).trim(), path.join(bin, 'gnutimeout'));
-  fs.symlinkSync(execFileSync('which', ['git'], { encoding: 'utf8' }).trim(), path.join(bin, 'git'));
-  fs.symlinkSync(execFileSync('which', ['sort'], { encoding: 'utf8' }).trim(), path.join(bin, 'sort'));
-  fs.writeFileSync(path.join(bin, 'timeout'), '#!/bin/sh\nif [ "$1" = --version ]; then echo "timeout (uutils coreutils)"; exit 0; fi\nexit 98\n', { mode: 0o755 });
+  fs.symlinkSync(
+    execFileSync('which', [realTimeout], { encoding: 'utf8' }).trim(),
+    path.join(bin, 'gnutimeout'),
+  );
+  fs.symlinkSync(
+    execFileSync('which', ['git'], { encoding: 'utf8' }).trim(),
+    path.join(bin, 'git'),
+  );
+  fs.symlinkSync(
+    execFileSync('which', ['sort'], { encoding: 'utf8' }).trim(),
+    path.join(bin, 'sort'),
+  );
+  fs.writeFileSync(
+    path.join(bin, 'timeout'),
+    '#!/bin/sh\nif [ "$1" = --version ]; then echo "timeout (uutils coreutils)"; exit 0; fi\nexit 98\n',
+    { mode: 0o755 },
+  );
   const args = [script, source, mirror, 'develop'];
   const result = spawnSync('/bin/bash', args, options({ PATH: bin }));
   assert.equal(result.status, 0, result.stderr + result.stdout);
@@ -270,10 +283,7 @@ test('Gitee workflows verify both mirrors and do not gate image publication', ()
     JSON.stringify(backfill),
     /GITEE_TOKEN|git@gitee|sync-static|ssh-keyscan/,
   );
-  for (const name of [
-    'build-alpine',
-    'build-debian',
-  ]) {
+  for (const name of ['build-alpine', 'build-debian']) {
     assert.equal(workflow.jobs[name].needs, 'build-static');
   }
 });

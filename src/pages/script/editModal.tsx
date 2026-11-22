@@ -7,15 +7,7 @@ import React, {
   useCallback,
   useReducer,
 } from 'react';
-import {
-  Drawer,
-  Button,
-  Tabs,
-  Badge,
-  Select,
-  Space,
-  Switch,
-} from 'antd';
+import { Drawer, Button, Tabs, Badge, Select, Space, Switch } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import SplitPane from 'react-split-pane';
@@ -62,7 +54,10 @@ const EditModal = ({
   };
 
   const onSelect = (value: any, node: any) => {
-    if ((node.key === selectedKey && (fileReady || pendingFile.current)) || !value) {
+    if (
+      (node.key === selectedKey && (fileReady || pendingFile.current)) ||
+      !value
+    ) {
       return;
     }
 
@@ -85,17 +80,22 @@ const EditModal = ({
     setFileReady(false);
     setValue('');
     request
-      .get(
-        `${config.apiPrefix}scripts/detail`, { params: { file: node.title, path: node.parent || '' }, signal: controller.signal },
-      )
+      .get(`${config.apiPrefix}scripts/detail`, {
+        params: { file: node.title, path: node.parent || '' },
+        signal: controller.signal,
+      })
       .then(({ code, data }) => {
         if (code === 200 && !controller.signal.aborted) {
           setValue(data);
           setFileReady(true);
         }
       })
-      .catch(() => { /* The HTTP handler reports errors. Selecting the file again retries it. */ })
-      .finally(() => { if (pendingFile.current === controller) pendingFile.current = undefined; });
+      .catch(() => {
+        /* The HTTP handler reports errors. Selecting the file again retries it. */
+      })
+      .finally(() => {
+        if (pendingFile.current === controller) pendingFile.current = undefined;
+      });
   };
 
   const run = () => {
@@ -176,7 +176,11 @@ const EditModal = ({
       closable={false}
       title={
         <>
-          <FilePicker source="scripts" value={selectedKey} onSelect={node => onSelect(node.key, node)} />
+          <FilePicker
+            source="scripts"
+            value={selectedKey}
+            onSelect={(node) => onSelect(node.key, node)}
+          />
           <Select
             value={language}
             style={{ width: 110, marginRight: 8 }}

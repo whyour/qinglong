@@ -1,15 +1,14 @@
-import { directoryCheckHandler, directoryPageHandler } from '../shared/directoryPageRoute';
+import {
+  directoryCheckHandler,
+  directoryPageHandler,
+} from '../shared/directoryPageRoute';
 import { celebrate, Joi } from 'celebrate';
 import { NextFunction, Request, Response, Router } from 'express';
 import { Container } from 'typedi';
 import { Logger } from 'winston';
 import config from '../config';
 import { t } from '../shared/i18n';
-import {
-  readDirs,
-  removeAnsi,
-  rmPath,
-} from '../config/util';
+import { readDirs, removeAnsi, rmPath } from '../config/util';
 import LogService from '../services/log';
 import { InstanceStatus, RunningInstanceModel } from '../data/runningInstance';
 import { MAX_LOG_CHUNK_BYTES, readLogChunk } from '../shared/logReader';
@@ -19,8 +18,14 @@ const blacklist = ['.tmp'];
 
 export default (app: Router) => {
   app.use('/logs', route);
-  route.get('/entries', ...directoryPageHandler(() => config.logPath, blacklist, true));
-  route.post('/entries/check', ...directoryCheckHandler(() => config.logPath, blacklist));
+  route.get(
+    '/entries',
+    ...directoryPageHandler(() => config.logPath, blacklist, true),
+  );
+  route.post(
+    '/entries/check',
+    ...directoryCheckHandler(() => config.logPath, blacklist),
+  );
 
   route.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const logger: Logger = Container.get('logger');
@@ -43,7 +48,9 @@ export default (app: Router) => {
         path: Joi.string().allow('').optional(),
         file: Joi.string().required(),
         follow: Joi.boolean().optional(),
-        cursor: Joi.string().pattern(/^\d{1,16}\.[a-f0-9]{64}$/).optional(),
+        cursor: Joi.string()
+          .pattern(/^\d{1,16}\.[a-f0-9]{64}$/)
+          .optional(),
         offset: Joi.number().integer().min(0).optional(),
         limit: Joi.number()
           .integer()
@@ -67,7 +74,9 @@ export default (app: Router) => {
             message: t('暂无权限'),
           });
         }
-        const logPath = `${req.query.path as string}/${req.query.file as string}`;
+        const logPath = `${req.query.path as string}/${
+          req.query.file as string
+        }`;
         const runningInstance = await RunningInstanceModel.findOne({
           where: { log_path: logPath, status: InstanceStatus.running },
         });
@@ -96,15 +105,12 @@ export default (app: Router) => {
     },
   );
 
-  route.get(
-    '/:file',
-    (req: Request, res: Response) => {
-      return res.send({
-        code: 410,
-        message: t('接口已下线，请使用 /logs/detail 接口'),
-      });
-    },
-  );
+  route.get('/:file', (req: Request, res: Response) => {
+    return res.send({
+      code: 410,
+      message: t('接口已下线，请使用 /logs/detail 接口'),
+    });
+  });
 
   route.delete(
     '/',

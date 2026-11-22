@@ -46,12 +46,11 @@ test('release images receive the same-run artifact and verify it before use', ()
     fs.readFileSync('.github/workflows/build-docker-image.yml', 'utf8'),
   );
   assert.equal(workflow.jobs['build-static'].needs, 'validate');
-  const upload = workflow.jobs['build-static'].steps.find(step => step.uses?.startsWith('actions/upload-artifact@'));
+  const upload = workflow.jobs['build-static'].steps.find((step) =>
+    step.uses?.startsWith('actions/upload-artifact@'),
+  );
   assert.equal(upload.with['include-hidden-files'], true);
-  for (const name of [
-    'build-alpine',
-    'build-debian',
-  ]) {
+  for (const name of ['build-alpine', 'build-debian']) {
     const job = workflow.jobs[name];
     assert.equal(job.needs, 'build-static');
     const download = job.steps.find((step) =>

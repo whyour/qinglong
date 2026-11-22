@@ -124,7 +124,8 @@ export async function runProcess(
       terminate(cancellationSignal(options.signal));
     };
     const startTimeout = () => {
-      if (!options.timeoutMs || options.timeoutMs <= 0 || timedOut || aborted) return;
+      if (!options.timeoutMs || options.timeoutMs <= 0 || timedOut || aborted)
+        return;
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         timedOut = true;
@@ -184,20 +185,21 @@ export async function runProcess(
       else capture(chunk);
     });
     if (options.captureFd === 3) child.stdio[3]!.on('data', capture);
-    if (options.timeoutControl) child.stdio[3]!.on('data', (chunk: Buffer) => {
-      for (const phase of chunk.toString()) {
-        if (phase === 'T') startTimeout();
-        if (phase === 'A') {
-          cleanupStarted = true;
-          clearTimeout(timeout);
-          // Allow the Shell's cleanup to finish after a cooperative timeout.
-          if (timedOut && !aborted) {
-            clearTimeout(escalation);
-            escalation = undefined;
+    if (options.timeoutControl)
+      child.stdio[3]!.on('data', (chunk: Buffer) => {
+        for (const phase of chunk.toString()) {
+          if (phase === 'T') startTimeout();
+          if (phase === 'A') {
+            cleanupStarted = true;
+            clearTimeout(timeout);
+            // Allow the Shell's cleanup to finish after a cooperative timeout.
+            if (timedOut && !aborted) {
+              clearTimeout(escalation);
+              escalation = undefined;
+            }
           }
         }
-      }
-    });
+      });
     child.stderr!.on('data', (chunk: Buffer) =>
       emit(chunk, options.stderrOutput ?? options.output),
     );

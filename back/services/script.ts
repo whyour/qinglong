@@ -8,7 +8,7 @@ import ScheduleService, { TaskCallbacks } from './schedule';
 import config from '../config';
 import { TASK_COMMAND } from '../config/const';
 import { getFileContentByName, getPid, killTask, rmPath } from '../config/util';
-import taskLimit from '../shared/pLimit';
+import taskLimit from '../cron/execution/cronLimit';
 
 @Service()
 export default class ScriptService {

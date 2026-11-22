@@ -36,7 +36,9 @@ Remote URLs require HTTPS; loopback HTTP is allowed. Use the panel root URL with
 
 Use `<cli> task run <id> --json` or `<cli> task stop <id> --json` when the user authorizes that operation on the identified task. A request to diagnose does not authorize a rerun. Respect authorization already given; clarify only unresolved targets or scope.
 
-`accepted: true` means the API accepted the request, not that the task finished successfully. Follow with `task get` and, when needed, `task logs`; report what is observable. On a timeout or uncertain response, inspect status before considering another operation. Never blindly retry run/stop: 2.x does not provide CLI execution idempotency.
+`accepted: true` means the API accepted the request, not that the task finished successfully. New panels return `triggerId`, admission `state` and `reason`. Use `task run <id> --wait --timeout 300 --json` to submit once and wait for that run, or `task wait <id> --trigger-id <triggerId> --timeout 300 --json` to resume waiting without executing again. Read its log with `task logs <id> --trigger-id <triggerId> --tail 200 --json`. Only `finished` with exit code 0 succeeds; other terminal outcomes exit 1, with observed outcome and triggerId in JSON stderr `data`. Wait timeouts and interrupted reads retain the trigger ID and `waitStatus`, and never stop or rerun the task. A 401/403 still exits 3. The wait timeout defaults to 300 seconds (maximum 86400); on run it requires --wait.
+
+Older panels without a run triggerId keep the immediate-run contract; --wait fails explicitly after submission, without guessing the newest trigger or replaying the run. Selected logs must confirm their triggerId or the CLI refuses to print them. Plain task logs retains latest-log behavior. On a timeout or uncertain response, inspect status before considering another operation. Never blindly retry run/stop: the CLI does not provide execution idempotency.
 
 ## Subscriptions
 

@@ -6,7 +6,9 @@ const os = require('node:os');
 const http = require('node:http');
 const { randomUUID } = require('node:crypto');
 const { createContext } = require('../../dist/internal/runtime/context');
-const { syncRaw } = require('../../dist/internal/subscription/subscriptionRunner');
+const {
+  syncRaw,
+} = require('../../dist/internal/subscription/subscriptionRunner');
 const { runProcess } = require('../../dist/internal/runtime/process');
 
 test('raw subscriptions retain legacy netrc authentication and preserve files on denied access', async (t) => {

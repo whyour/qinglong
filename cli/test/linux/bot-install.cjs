@@ -106,6 +106,8 @@ assert.equal(process.env.QL_PANEL_INTEGRATION, '1');
     await fs.rm(foreignRoot, { recursive: true, force: true });
   }
 })().catch(() => {
-  console.error('Bot installation integration test failed; raw subprocess errors are omitted to protect environment credentials.');
+  console.error(
+    'Bot installation integration test failed; raw subprocess errors are omitted to protect environment credentials.',
+  );
   process.exitCode = 1;
 });

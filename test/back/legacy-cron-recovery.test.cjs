@@ -2,7 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { format } = require('node:util');
 const load = require('../helpers/load-security-module.cjs');
-const { SchedulerReadiness } = require('../../back/shared/schedulerReadiness');
+const {
+  SchedulerReadiness,
+} = require('../../back/cron/scheduling/schedulerReadiness');
 
 const { getTasks } = require('node-cron');
 
@@ -24,7 +26,12 @@ test('API accepts legacy question-mark schedules but rejects malformed cron', ()
   for (const schedule of [...legacySchedules, '@once', '@boot']) {
     assert.equal(scheduleSchema.validate(schedule).error, undefined, schedule);
   }
-  for (const schedule of ['@bogus', '0 /5 * * * ?', '0 70 * * * ?', 'not a cron']) {
+  for (const schedule of [
+    '@bogus',
+    '0 /5 * * * ?',
+    '0 70 * * * ?',
+    'not a cron',
+  ]) {
     assert.ok(scheduleSchema.validate(schedule).error, schedule);
   }
 });
@@ -36,18 +43,23 @@ test('legacy main and extra schedules restore real jobs and healthy readiness', 
   });
   const { addCron } = load('back/schedule/addCron.ts', {
     './data': { scheduleStacks: stacks },
-    '../shared/runCron': { runCron() {} },
+    '../cron/execution/runCron': { runCron() {} },
     '../loaders/logger': { info() {}, warn() {} },
     '../shared/i18n': { t: (s) => s, tf: format },
   });
   const crons = legacySchedules.map((schedule, index) => ({
-    id: `legacy-${index}`, name: 'legacy', schedule, command: 'true',
+    id: `legacy-${index}`,
+    name: 'legacy',
+    schedule,
+    command: 'true',
     extra_schedules: [{ schedule: '0 0/30 * * * ?' }],
   }));
-  const register = (rows) => new Promise((resolve, reject) => {
-    addCron({ request: { replace: true, crons: rows } }, (error) =>
-      error ? reject(error) : resolve());
-  });
+  const register = (rows) =>
+    new Promise((resolve, reject) => {
+      addCron({ request: { replace: true, crons: rows } }, (error) =>
+        error ? reject(error) : resolve(),
+      );
+    });
   const readiness = new SchedulerReadiness(async () => {}, 60000);
   t.after(() => clearTimeout(readiness.retry));
   readiness.configure(() => register(crons));

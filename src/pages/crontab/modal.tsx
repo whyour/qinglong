@@ -2,7 +2,17 @@ import EditableTagGroup from '@/components/tag';
 import config from '@/utils/config';
 import { request } from '@/utils/http';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Form, Input, InputNumber, Modal, Select, Space, message } from 'antd';
+import {
+  Button,
+  Checkbox,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  message,
+} from 'antd';
 import { useEffect, useState } from 'react';
 import intl from 'react-intl-universal';
 import { getScheduleType, scheduleTypeMap } from './const';
@@ -86,13 +96,30 @@ const CronModal = ({
     let invalid = false;
     try {
       result = await request.get(`${config.apiPrefix}crons/preview`, {
-        params: { schedule: rule }, onError: (response) => { invalid = response?.status === 400; },
+        params: { schedule: rule },
+        onError: (response) => {
+          invalid = response?.status === 400;
+        },
       });
-    } catch { /* Transport errors have no validation result. */ }
-    if (!result?.data?.times) throw new Error(intl.get(invalid ? 'Cron表达式格式有误' : '无法获取调度预览，请重试'));
+    } catch {
+      /* Transport errors have no validation result. */
+    }
+    if (!result?.data?.times)
+      throw new Error(
+        intl.get(invalid ? 'Cron表达式格式有误' : '无法获取调度预览，请重试'),
+      );
     if (form.getFieldValue('schedule') === rule) {
       const { times, timezone } = result.data;
-      setPreview(times.map((time: number) => new Date(time).toLocaleString(undefined, { timeZone: timezone })).join(' · ') + ' (' + timezone + ')');
+      setPreview(
+        times
+          .map((time: number) =>
+            new Date(time).toLocaleString(undefined, { timeZone: timezone }),
+          )
+          .join(' · ') +
+          ' (' +
+          timezone +
+          ')',
+      );
     }
   };
 
@@ -108,15 +135,30 @@ const CronModal = ({
           validateTrigger="onBlur"
           rules={[{ required: true }, { validator: previewRule }]}
         >
-          <Input onChange={() => setPreview('')} placeholder={intl.get('秒(可选) 分 时 天 月 周')} />
+          <Input
+            onChange={() => setPreview('')}
+            placeholder={intl.get('秒(可选) 分 时 天 月 周')}
+          />
         </Form.Item>
         <Form.Item name="skip_if_pending" valuePropName="checked">
-          <Checkbox>{intl.get('如果上一次定时执行仍在排队或运行，跳过本次')}</Checkbox>
+          <Checkbox>
+            {intl.get('如果上一次定时执行仍在排队或运行，跳过本次')}
+          </Checkbox>
         </Form.Item>
-        <Form.Item name="max_queue_wait" label={intl.get('最长排队时间（秒）')} extra={intl.get('超时后跳过本次执行。填 0 表示不限时。')}>
+        <Form.Item
+          name="max_queue_wait"
+          label={intl.get('最长排队时间（秒）')}
+          extra={intl.get('超时后跳过本次执行。填 0 表示不限时。')}
+        >
           <InputNumber min={0} max={86400} precision={0} placeholder="0" />
         </Form.Item>
-        <Form.Item name="catchup_seconds" label={intl.get('重启后往前查找的时长（秒）')} extra={intl.get('每条规则只补跑这段时间内最近一次错过的执行。填 0 关闭补跑。')}>
+        <Form.Item
+          name="catchup_seconds"
+          label={intl.get('重启后往前查找的时长（秒）')}
+          extra={intl.get(
+            '每条规则只补跑这段时间内最近一次错过的执行。填 0 关闭补跑。',
+          )}
+        >
           <InputNumber min={0} max={86400} precision={0} placeholder="0" />
         </Form.Item>
         <Form.List name="extra_schedules">

@@ -1,8 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
-const { createCronJob } = require('../../back/shared/cronScheduler');
-const { isValidCronSchedule } = require('../../back/shared/cronSchedule');
+const { createCronJob } = require('../../back/cron/scheduling/cronScheduler');
+const {
+  isValidCronSchedule,
+} = require('../../back/cron/scheduling/cronSchedule');
 const native = require('node-cron');
 const fixture = require('../fixtures/cron-calendar-boundaries.json');
 

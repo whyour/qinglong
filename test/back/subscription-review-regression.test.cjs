@@ -305,7 +305,11 @@ git_clone_scripts() { mkdir -p "$2"; cp "$QA_ROOT/template/"* "$2/"; exit_status
 ql() { get_uniq_path "$2" "$6"; update_repo "${'${@:2}'}"; }
 ${formatCommand(doc)}`;
       execFileSync('/bin/bash', ['-c', code], {
-        env: { ...process.env, dir_shell: path.resolve('shell'), QA_ROOT: root },
+        env: {
+          ...process.env,
+          dir_shell: path.resolve('shell'),
+          QA_ROOT: root,
+        },
         encoding: 'utf8',
         timeout: 5000,
       });
@@ -457,7 +461,11 @@ function cancellationFixture(t, subscriptions) {
       events.push(['createInterval', doc.command, interval, immediately]),
   };
   const service = new Subscription(
-    {}, schedule, {}, { removeSSHKey: async () => {} }, {},
+    {},
+    schedule,
+    {},
+    { removeSSHKey: async () => {} },
+    {},
   );
   service.setSshConfig = async () => {};
   return { service, docs, events };
@@ -466,25 +474,44 @@ function cancellationFixture(t, subscriptions) {
 async function sshLifecycleFixture(t, initial) {
   const root = temporary(t);
   const ssh = sshService(root);
-  let docs = [{ ...initial, get() { return { ...this }; } }];
-  const SubscriptionService = load(path.resolve('back/services/subscription.ts'), {
-    '../config': { scriptPath: root, repoPath: root },
-    '../data/subscription': {
-      Subscription: class { constructor(value) { Object.assign(this, value); } },
-      SubscriptionModel: {
-        findAll: async () => docs,
-        destroy: async () => { docs = []; },
+  let docs = [
+    {
+      ...initial,
+      get() {
+        return { ...this };
       },
     },
-    '../data/cron': { CrontabModel: { findAll: async () => [] } },
-    '../config/util': {
-      rmPath: (p) => fs.promises.rm(p, { recursive: true, force: true }),
+  ];
+  const SubscriptionService = load(
+    path.resolve('back/services/subscription.ts'),
+    {
+      '../config': { scriptPath: root, repoPath: root },
+      '../data/subscription': {
+        Subscription: class {
+          constructor(value) {
+            Object.assign(this, value);
+          }
+        },
+        SubscriptionModel: {
+          findAll: async () => docs,
+          destroy: async () => {
+            docs = [];
+          },
+        },
+      },
+      '../data/cron': { CrontabModel: { findAll: async () => [] } },
+      '../config/util': {
+        rmPath: (p) => fs.promises.rm(p, { recursive: true, force: true }),
+      },
+      '../config/const': {},
+      '../shared/i18n': { t: (x) => x, tf: (x) => x },
+      '../shared/pLimit': {},
+      './schedule': {},
+      './sock': {},
+      './sshKey': {},
+      './cron': {},
     },
-    '../config/const': {},
-    '../shared/i18n': { t: (x) => x, tf: (x) => x },
-    '../shared/pLimit': {},
-    './schedule': {}, './sock': {}, './sshKey': {}, './cron': {},
-  }).default;
+  ).default;
   const service = new SubscriptionService({}, {}, {}, ssh, {});
   service.handleTask = async () => {};
   service.getDb = async () => ({ ...docs[0] });
@@ -503,8 +530,14 @@ test('editing an SSH subscription removes the old alias key and configuration', 
   await f.service.update({ ...initial, alias });
   const mapped = paths.getSubscriptionSshAlias(alias);
   assert.equal(fs.existsSync(path.join(f.root, initial.alias)), false);
-  assert.equal(fs.existsSync(path.join(f.root, initial.alias + '.config')), false);
-  assert.equal(fs.readFileSync(path.join(f.root, mapped), 'utf8').trim(), 'fixture-key');
+  assert.equal(
+    fs.existsSync(path.join(f.root, initial.alias + '.config')),
+    false,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(f.root, mapped), 'utf8').trim(),
+    'fixture-key',
+  );
   assert.ok(fs.existsSync(path.join(f.root, mapped + '.config')));
 });
 
@@ -606,112 +639,202 @@ test('valid subscription scheduling still creates quoted commands for both sched
   }
 });
 
-test('repeated subscription sync recognizes installed system-wrapper and legacy rules', t => {
+test('repeated subscription sync recognizes installed system-wrapper and legacy rules', (t) => {
   const f = updateFixture(t);
   const { shellQuote } = load(path.resolve('back/shared/shellQuote.ts'));
-  const wrapped = shellQuote("real_time=false ID=1 task_before='task owner_repo/hook.js' task node 'owner_repo/keep.js' -- 'one two'");
-  fs.writeFileSync(path.join(f.root, 'crontab'), [
-    '1 * * * * ID=1 QL_TRIGGER_SOURCE=system bash "$QL_DIR/shell/system-cron.sh" ' + wrapped,
-    '# 2 * * * * ID=2 task owner_repo/keep.py',
-    '3 * * * * ID=3 other-task owner_repo/unrelated.js',
-  ].join('\n'));
+  const wrapped = shellQuote(
+    "real_time=false ID=1 task_before='task owner_repo/hook.js' task node 'owner_repo/keep.js' -- 'one two'",
+  );
+  fs.writeFileSync(
+    path.join(f.root, 'crontab'),
+    [
+      '1 * * * * ID=1 QL_TRIGGER_SOURCE=system bash "$QL_DIR/shell/system-cron.sh" ' +
+        wrapped,
+      '# 2 * * * * ID=2 task owner_repo/keep.py',
+      '3 * * * * ID=3 other-task owner_repo/unrelated.js',
+    ].join('\n'),
+  );
   const lists = path.join(f.root, 'lists');
   for (let sync = 0; sync < 2; sync++) {
     f.run('js|py');
-    assert.deepEqual(fs.readFileSync(path.join(lists, 'owner_repo_user.list'), 'utf8').trim().split('\n'),
-      ['owner_repo/keep.js', 'owner_repo/keep.py']);
-    execFileSync('/bin/bash', ['-c', shellFunction('diff_cron') + '\ndiff_cron owner_repo_scripts.list owner_repo_user.list added removed'], { cwd: lists });
-    for (const name of ['added', 'removed']) assert.equal(fs.readFileSync(path.join(lists, name), 'utf8'), '');
+    assert.deepEqual(
+      fs
+        .readFileSync(path.join(lists, 'owner_repo_user.list'), 'utf8')
+        .trim()
+        .split('\n'),
+      ['owner_repo/keep.js', 'owner_repo/keep.py'],
+    );
+    execFileSync(
+      '/bin/bash',
+      [
+        '-c',
+        shellFunction('diff_cron') +
+          '\ndiff_cron owner_repo_scripts.list owner_repo_user.list added removed',
+      ],
+      { cwd: lists },
+    );
+    for (const name of ['added', 'removed'])
+      assert.equal(fs.readFileSync(path.join(lists, name), 'utf8'), '');
   }
 });
 
-test('subscription cleanup deletes only exact script operands and keeps files outside its repository', t => {
+test('subscription cleanup deletes only exact script operands and keeps files outside its repository', (t) => {
   const f = updateFixture(t);
   const { shellQuote } = load(path.resolve('back/shared/shellQuote.ts'));
-  const wrapper = cmd => '1 * * * * ID=12 QL_TRIGGER_SOURCE=system bash "$QL_DIR/shell/system-cron.sh" ' + shellQuote(cmd);
-  fs.writeFileSync(path.join(f.root, 'crontab'), [
-    '1 * * * * ID=10 task consumer.js owner_repo/drop.js',
-    wrapper('real_time=false ID=12 task node owner_repo/drop.js -- argument'),
-    '1 * * * * ID=13 task owner_repo/../../outside',
-    '1 * * * * ID=14 task owner_repo/link/outside',
-    '1 * * * * ID=15 task consumer.js owner_repo/../../outside',
-    '1 * * * * ID=16 task owner_repo/keep.js',
-    '1 * * * * ID=17 task owner_repo/keep.py',
-    '1 * * * * ID=18 task owner_repo/keepXjs',
-    '1 * * * * ID=19 task "owner_repo/keep spaces.js"',
-    '1 * * * * ID=20 task consumer.js bash "$QL_DIR/shell/system-cron.sh" "ID=21 task owner_repo/wrong.js"',
-    wrapper('real_time=false ID=22 task owner_repo/foreign.js'),
-  ].join('\n'));
+  const wrapper = (cmd) =>
+    '1 * * * * ID=12 QL_TRIGGER_SOURCE=system bash "$QL_DIR/shell/system-cron.sh" ' +
+    shellQuote(cmd);
+  fs.writeFileSync(
+    path.join(f.root, 'crontab'),
+    [
+      '1 * * * * ID=10 task consumer.js owner_repo/drop.js',
+      wrapper('real_time=false ID=12 task node owner_repo/drop.js -- argument'),
+      '1 * * * * ID=13 task owner_repo/../../outside',
+      '1 * * * * ID=14 task owner_repo/link/outside',
+      '1 * * * * ID=15 task consumer.js owner_repo/../../outside',
+      '1 * * * * ID=16 task owner_repo/keep.js',
+      '1 * * * * ID=17 task owner_repo/keep.py',
+      '1 * * * * ID=18 task owner_repo/keepXjs',
+      '1 * * * * ID=19 task "owner_repo/keep spaces.js"',
+      '1 * * * * ID=20 task consumer.js bash "$QL_DIR/shell/system-cron.sh" "ID=21 task owner_repo/wrong.js"',
+      wrapper('real_time=false ID=22 task owner_repo/foreign.js'),
+    ].join('\n'),
+  );
   fs.writeFileSync(path.join(f.root, 'template', 'keep spaces.js'), 'keep');
   const scripts = f.run('js|py');
   fs.writeFileSync(path.join(f.root, 'outside'), 'keep');
   fs.symlinkSync(f.root, path.join(scripts, 'link'));
   fs.writeFileSync(path.join(scripts, 'drop.js'), 'old');
   const lists = path.join(f.root, 'lists');
-  execFileSync('/bin/bash', ['-c', [
-    shellFunction('diff_cron'), shellFunction('del_cron'), 't(){ :; }; notify_api(){ :; }',
-    'del_cron_api(){ echo "$1" > deleted; }',
-    'diff_cron owner_repo_scripts.list owner_repo_user.list added removed',
-    'del_cron removed owner_repo',
-  ].join('\n')], { cwd: lists, env: { ...process.env, dir_shell: path.resolve('shell'), dir_list_tmp: lists, dir_scripts: path.dirname(scripts) } });
-  assert.deepEqual(fs.readFileSync(path.join(lists, 'deleted'), 'utf8').trim().split(',').sort(), ['12', '18']);
+  execFileSync(
+    '/bin/bash',
+    [
+      '-c',
+      [
+        shellFunction('diff_cron'),
+        shellFunction('del_cron'),
+        't(){ :; }; notify_api(){ :; }',
+        'del_cron_api(){ echo "$1" > deleted; }',
+        'diff_cron owner_repo_scripts.list owner_repo_user.list added removed',
+        'del_cron removed owner_repo',
+      ].join('\n'),
+    ],
+    {
+      cwd: lists,
+      env: {
+        ...process.env,
+        dir_shell: path.resolve('shell'),
+        dir_list_tmp: lists,
+        dir_scripts: path.dirname(scripts),
+      },
+    },
+  );
+  assert.deepEqual(
+    fs
+      .readFileSync(path.join(lists, 'deleted'), 'utf8')
+      .trim()
+      .split(',')
+      .sort(),
+    ['12', '18'],
+  );
   assert.equal(fs.readFileSync(path.join(f.root, 'outside'), 'utf8'), 'keep');
   assert.equal(fs.existsSync(path.join(scripts, 'drop.js')), false);
   assert.ok(fs.existsSync(path.join(scripts, 'keep.js')));
   assert.ok(fs.existsSync(path.join(scripts, 'keep spaces.js')));
 });
 
-test('subscription creation retains schedule and passes a quoted script name as one operand', t => {
+test('subscription creation retains schedule and passes a quoted script name as one operand', (t) => {
   const root = temporary(t);
   fs.mkdirSync(path.join(root, 'repo'));
   const filename = "repo/what's new.js";
   fs.writeFileSync(path.join(root, filename), "// 7 6 * * * what's new.js\n");
   fs.writeFileSync(path.join(root, 'added'), filename + '\n');
   const instructions = [
-    shellFunction('add_cron'), 'cmd_task=task; dir_scripts=$1',
+    shellFunction('add_cron'),
+    'cmd_task=task; dir_scripts=$1',
     'notify_api(){ :; }; t(){ :; }',
     'add_cron_api(){ printf "%s\\n%s\\n" "$1" "$2" > "$dir_scripts/result"; }',
     'add_cron "$1/added" repo',
   ].join('\n');
   execFileSync('/bin/bash', ['-c', instructions, '--', root], { cwd: root });
-  const [rule, command] = fs.readFileSync(path.join(root, 'result'), 'utf8').trimEnd().split('\n');
+  const [rule, command] = fs
+    .readFileSync(path.join(root, 'result'), 'utf8')
+    .trimEnd()
+    .split('\n');
   assert.equal(rule, '7 6 * * *');
-  assert.equal(command, 'task ' + load(path.resolve('back/shared/shellQuote.ts')).shellQuote(filename));
+  assert.equal(
+    command,
+    'task ' +
+      load(path.resolve('back/shared/shellQuote.ts')).shellQuote(filename),
+  );
 });
 
-test('invalid include, exclude or dependency filters never become an empty successful sync', t => {
+test('invalid include, exclude or dependency filters never become an empty successful sync', (t) => {
   const f = updateFixture(t);
   const scripts = f.run('js|py');
   const listing = path.join(f.root, 'lists', 'owner_repo_scripts.list');
   const original = fs.readFileSync(listing, 'utf8');
-  const code = shellFunction('gen_list_repo') + '\ngen_list_repo "$QA_ROOT/template" owner "$1" "$2" "$3" js';
-  for (const filters of [['[', '', ''], ['', '[', ''], ['no-match', '', '[']]) {
-    const result = require('node:child_process').spawnSync('/bin/bash', ['-c', code, '--', ...filters], { env: {
-      ...process.env, dir_shell: path.resolve('shell'), QA_ROOT: f.root, uniq_path: 'owner_repo',
-      dir_list_tmp: path.dirname(listing), dir_scripts: path.dirname(scripts),
-    } });
+  const code =
+    shellFunction('gen_list_repo') +
+    '\ngen_list_repo "$QA_ROOT/template" owner "$1" "$2" "$3" js';
+  for (const filters of [
+    ['[', '', ''],
+    ['', '[', ''],
+    ['no-match', '', '['],
+  ]) {
+    const result = require('node:child_process').spawnSync(
+      '/bin/bash',
+      ['-c', code, '--', ...filters],
+      {
+        env: {
+          ...process.env,
+          dir_shell: path.resolve('shell'),
+          QA_ROOT: f.root,
+          uniq_path: 'owner_repo',
+          dir_list_tmp: path.dirname(listing),
+          dir_scripts: path.dirname(scripts),
+        },
+      },
+    );
     assert.notEqual(result.status, 0);
     assert.match(result.stderr.toString(), /invalid subscription filter/);
     assert.equal(fs.readFileSync(listing, 'utf8'), original);
-    assert.equal(fs.readFileSync(path.join(scripts, 'keep.js'), 'utf8'), 'keep.js');
+    assert.equal(
+      fs.readFileSync(path.join(scripts, 'keep.js'), 'utf8'),
+      'keep.js',
+    );
   }
 });
 
-test('subscription writes reject destination links and replace hardlinks without altering the other inode name', t => {
+test('subscription writes reject destination links and replace hardlinks without altering the other inode name', (t) => {
   const f = updateFixture(t);
-  const scripts = path.join(f.root, 'scripts'), repo = path.join(scripts, 'owner_repo');
+  const scripts = path.join(f.root, 'scripts'),
+    repo = path.join(scripts, 'owner_repo');
   const outside = path.join(f.root, 'outside');
   fs.mkdirSync(outside);
   const file = path.join(outside, 'keep.js');
   fs.writeFileSync(file, 'protected');
   const helper = path.resolve('shell/subscription-files.py');
-  const install = (dest) => require('node:child_process').spawnSync('python3', [helper, 'copy', path.join(f.root, 'template/keep.js'), scripts, dest]);
+  const install = (dest) =>
+    require('node:child_process').spawnSync('python3', [
+      helper,
+      'copy',
+      path.join(f.root, 'template/keep.js'),
+      scripts,
+      dest,
+    ]);
   fs.symlinkSync(outside, repo);
   assert.notEqual(install('owner_repo/keep.js').status, 0);
-  fs.unlinkSync(repo); fs.mkdirSync(repo);
+  fs.unlinkSync(repo);
+  fs.mkdirSync(repo);
   fs.symlinkSync(outside, path.join(repo, 'nested'));
   assert.notEqual(install('owner_repo/nested/keep.js').status, 0);
-  for (const dest of ['owner_repo/notify.js', 'owner_repo/dep.js', 'owner_repo/keep.js', 'raw_test.js']) {
+  for (const dest of [
+    'owner_repo/notify.js',
+    'owner_repo/dep.js',
+    'owner_repo/keep.js',
+    'raw_test.js',
+  ]) {
     fs.symlinkSync(file, path.join(scripts, dest));
     assert.notEqual(install(dest).status, 0);
     assert.equal(fs.readFileSync(file, 'utf8'), 'protected');
@@ -723,22 +846,41 @@ test('subscription writes reject destination links and replace hardlinks without
   assert.equal(fs.readFileSync(file, 'utf8'), 'protected');
 });
 
-test('a rejected guarded deletion preserves its file and propagates failure to subscription sync', t => {
+test('a rejected guarded deletion preserves its file and propagates failure to subscription sync', (t) => {
   const f = updateFixture(t);
   const scripts = f.run('js');
-  const lists = path.join(f.root, 'lists'), operand = "owner_repo/what's old.js";
+  const lists = path.join(f.root, 'lists'),
+    operand = "owner_repo/what's old.js";
   fs.writeFileSync(path.join(f.root, 'scripts', operand), 'old contents');
-  fs.writeFileSync(path.join(lists, 'owner_repo_registered.list'), '37\t' + operand + '\t1234\n');
+  fs.writeFileSync(
+    path.join(lists, 'owner_repo_registered.list'),
+    '37\t' + operand + '\t1234\n',
+  );
   fs.writeFileSync(path.join(lists, 'removed'), operand + '\n');
   const shell = [
-    shellFunction('del_cron'), 't(){ :; }; notify_api(){ :; }',
+    shellFunction('del_cron'),
+    't(){ :; }; notify_api(){ :; }',
     'del_cron_api(){ printf "%s" "$2" > "$dir_list_tmp/request"; return 1; }',
     'del_cron "$dir_list_tmp/removed" owner_repo',
   ].join('\n');
-  const result = require('node:child_process').spawnSync('/bin/bash', ['-c', shell], {
-    env: { ...process.env, dir_shell: path.resolve('shell'), dir_scripts: path.dirname(scripts), dir_list_tmp: lists },
-  });
+  const result = require('node:child_process').spawnSync(
+    '/bin/bash',
+    ['-c', shell],
+    {
+      env: {
+        ...process.env,
+        dir_shell: path.resolve('shell'),
+        dir_scripts: path.dirname(scripts),
+        dir_list_tmp: lists,
+      },
+    },
+  );
   assert.notEqual(result.status, 0);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(lists, 'request'))), [{id: 37, script: operand, revision: 1234}]);
-  assert.equal(fs.readFileSync(path.join(f.root, 'scripts', operand), 'utf8'), 'old contents');
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(lists, 'request'))), [
+    { id: 37, script: operand, revision: 1234 },
+  ]);
+  assert.equal(
+    fs.readFileSync(path.join(f.root, 'scripts', operand), 'utf8'),
+    'old contents',
+  );
 });

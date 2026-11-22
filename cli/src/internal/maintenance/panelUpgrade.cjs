@@ -182,8 +182,12 @@ async function getStatus(tmp) {
       // The worker can publish its terminal state and exit after our first read.
       const previous = state;
       state = await readState(tmp);
-      if (active.has(state.status) && state.id === previous.id &&
-          state.pid === previous.pid && state.startedAt === previous.startedAt) {
+      if (
+        active.has(state.status) &&
+        state.id === previous.id &&
+        state.pid === previous.pid &&
+        state.startedAt === previous.startedAt
+      ) {
         state.status = 'failed';
         state.error = '升级任务意外中断，请重试';
       }

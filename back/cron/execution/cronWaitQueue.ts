@@ -12,7 +12,9 @@ export interface CronQueueOptions extends QueueAddOptions {
 export class CronWaitQueue {
   private entries: { run: Job; priority: number; detach: () => void }[] = [];
 
-  get size() { return this.entries.length; }
+  get size() {
+    return this.entries.length;
+  }
 
   enqueue(run: Job, options: Partial<CronQueueOptions> = {}) {
     const { priority = 0, waitingSignal, onRemoved } = options;
@@ -22,10 +24,19 @@ export class CronWaitQueue {
       this.entries.splice(index, 1);
       onRemoved?.();
     };
-    const entry = { run, priority, detach: () => waitingSignal?.off('expired', remove) };
+    const entry = {
+      run,
+      priority,
+      detach: () => waitingSignal?.off('expired', remove),
+    };
     const last = this.entries[this.size - 1];
     if (!last || last.priority >= priority) this.entries.push(entry);
-    else this.entries.splice(this.entries.findIndex((job) => job.priority < priority), 0, entry);
+    else
+      this.entries.splice(
+        this.entries.findIndex((job) => job.priority < priority),
+        0,
+        entry,
+      );
     waitingSignal?.once('expired', remove);
   }
 
@@ -36,6 +47,8 @@ export class CronWaitQueue {
   }
 
   filter(options: Partial<CronQueueOptions>) {
-    return this.entries.filter((entry) => entry.priority === options.priority).map((entry) => entry.run);
+    return this.entries
+      .filter((entry) => entry.priority === options.priority)
+      .map((entry) => entry.run);
   }
 }

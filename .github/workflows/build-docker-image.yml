@@ -3,21 +3,21 @@ name: Build And Push Docker Image
 on:
   push:
     paths:
-      - "**"
-      - "!*.md"
+      - '**'
+      - '!*.md'
       # CLI is verified separately; its shared Bash upgrade engine ships in images.
-      - "!cli/**"
-      - "cli/src/internal/maintenance/upgradeArtifacts.cjs"
-      - "cli/src/internal/maintenance/platformBundle.cjs"
-      - "cli/src/internal/maintenance/upgradePrestart.cjs"
-      - "cli/src/internal/maintenance/panelUpgrade.cjs"
-      - "cli/src/internal/maintenance/nodeRuntime.cjs"
-      - "!.github/workflows/cli-package.yml"
+      - '!cli/**'
+      - 'cli/src/internal/maintenance/upgradeArtifacts.cjs'
+      - 'cli/src/internal/maintenance/platformBundle.cjs'
+      - 'cli/src/internal/maintenance/upgradePrestart.cjs'
+      - 'cli/src/internal/maintenance/panelUpgrade.cjs'
+      - 'cli/src/internal/maintenance/nodeRuntime.cjs'
+      - '!.github/workflows/cli-package.yml'
     branches:
-      - "master"
-      - "develop"
+      - 'master'
+      - 'develop'
     tags:
-      - "v*"
+      - 'v*'
   workflow_dispatch:
     inputs:
       static_sync_only:
@@ -85,12 +85,12 @@ jobs:
         run: echo "node-version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@v6
         with:
-          version: "8.3.1"
+          version: '8.3.1'
 
       - uses: actions/setup-node@v6
         with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
       - name: build front and back
@@ -253,11 +253,11 @@ jobs:
           path: static/
       - uses: pnpm/action-setup@v6
         with:
-          version: "8.3.1"
+          version: '8.3.1'
       - uses: actions/setup-node@v6
         with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Read version from version.yaml
@@ -342,11 +342,11 @@ jobs:
           path: static/
       - uses: pnpm/action-setup@v6
         with:
-          version: "8.3.1"
+          version: '8.3.1'
       - uses: actions/setup-node@v6
         with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Read version from version.yaml

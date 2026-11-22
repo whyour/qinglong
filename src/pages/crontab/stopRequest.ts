@@ -10,7 +10,11 @@ export function createStopRequest(ids: readonly (string | number)[]) {
   const headers = { 'Idempotency-Key': uuid() };
   return async () => {
     try {
-      const result = await request.put(`${config.apiPrefix}crons/stop`, targets, { headers, retryInPlace: true });
+      const result = await request.put(
+        `${config.apiPrefix}crons/stop`,
+        targets,
+        { headers, retryInPlace: true },
+      );
       if (result.code !== 200) throw new Error(result.message);
       return result;
     } catch (error) {

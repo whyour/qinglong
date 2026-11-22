@@ -29,7 +29,10 @@ for (const [specifier, installedName] of [
     const args = execFileSync('/bin/sh', [
       '-c',
       'pnpm() { printf "%s\\0" "$@"; }; ' + command,
-    ]).toString().split('\0').slice(0, -1);
+    ])
+      .toString()
+      .split('\0')
+      .slice(0, -1);
     assert.deepEqual(args, ['remove', '-g', '--', installedName]);
   });
 }
@@ -37,9 +40,11 @@ for (const [specifier, installedName] of [
 test('cancel can locate an uninstall process after shell argument parsing', async (t) => {
   const name = `@ql-uninstall-fixture/worker-${process.pid}`;
   const command = api.getUninstallCommand(0, `${name}@1.0.0`);
-  const worker = spawn(process.execPath, [
-    '-e', 'setInterval(() => {}, 1000)', 'pnpm', 'remove', '-g', '--', name,
-  ], { stdio: 'ignore' });
+  const worker = spawn(
+    process.execPath,
+    ['-e', 'setInterval(() => {}, 1000)', 'pnpm', 'remove', '-g', '--', name],
+    { stdio: 'ignore' },
+  );
   t.after(() => worker.kill());
   await new Promise((resolve, reject) => {
     worker.once('spawn', resolve);

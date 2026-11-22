@@ -8,20 +8,20 @@ const load = require('../helpers/load-security-module.cjs');
 const logger = { info() {}, debug() {}, warn() {}, error() {} };
 const tick = () => new Promise(setImmediate);
 function createLimit() {
-  return load('back/shared/pLimit.ts', {
-    '../data/system': {
+  return load('back/cron/execution/cronLimit.ts', {
+    '../../data/system': {
       AuthDataType: { systemConfig: 'systemConfig' },
       SystemModel: {
         sync: async () => {},
         findOne: async () => ({ info: { cronConcurrency: 1 } }),
       },
     },
-    '../loaders/logger': logger,
-    '../services/notify': class {},
-    '../shared/i18n': { t: (x) => x, tf: (x) => x },
-    '../config': {},
-    '../config/grpcCerts': { getGrpcCerts: () => null },
-    '../protos/api': {},
+    '../../loaders/logger': logger,
+    '../../services/notify': class {},
+    '../../shared/i18n': { t: (x) => x, tf: (x) => x },
+    '../../config': {},
+    '../../config/grpcCerts': { getGrpcCerts: () => null },
+    '../../protos/api': {},
   }).default;
 }
 function createSystem(client, limit, options = {}) {
@@ -35,9 +35,9 @@ function createSystem(client, limit, options = {}) {
   const writes = [];
   const Service = load('back/services/system.ts', {
     '../config': options.config || {},
-    '../shared/schedulerMutationLock': options.config
-      ? load('back/shared/schedulerMutationLock.ts', {
-          '../config': options.config,
+    '../cron/scheduling/schedulerMutationLock': options.config
+      ? load('back/cron/scheduling/schedulerMutationLock.ts', {
+          '../../config/index': options.config,
         })
       : { withSchedulerMutation: (operation) => operation() },
     '../config/const': {},
@@ -57,7 +57,7 @@ function createSystem(client, limit, options = {}) {
         },
       },
     },
-    '../shared/pLimit': limit,
+    '../cron/execution/cronLimit': limit,
     '../schedule/client': client,
     '../shared/i18n': { t: (x) => x },
     './notify': class {},
@@ -82,7 +82,7 @@ async function rpcFixture(t) {
     apiLimit = createLimit();
   await tick();
   const handler = load('back/schedule/setConcurrency.ts', {
-    '../shared/pLimit': schedulerLimit,
+    '../cron/execution/cronLimit': schedulerLimit,
   });
   let port;
   const Grpc = load('back/services/grpc.ts', {
@@ -214,7 +214,7 @@ test('invalid concurrency is rejected before configuration writes or queue chang
   assert.deepEqual(f.writes, []);
   assert.deepEqual(mutations, []);
   const handler = load('back/schedule/setConcurrency.ts', {
-    '../shared/pLimit': {
+    '../cron/execution/cronLimit': {
       setCustomLimit: async (value) => mutations.push(value),
     },
   }).setConcurrency;

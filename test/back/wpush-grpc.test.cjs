@@ -46,7 +46,12 @@ test('decoded SystemNotify requests reach WPUSH with explicit or saved configura
   const decorators = { Service: () => (x) => x, Inject: () => () => {} };
   const NotificationService = load(back('services/notify.ts'), {
     typedi: decorators,
-    './user': {},
+    '../data/notificationSettings': {
+      readNotificationMode: async () => ({
+        type: 'wpush',
+        wpushApiKey: 'saved-key',
+      }),
+    },
     '../config/util': {},
     '../shared/i18n': { t: (x) => x },
     '../config/http': {
@@ -64,8 +69,12 @@ test('decoded SystemNotify requests reach WPUSH with explicit or saved configura
     '../config/const': constants,
     '../config/util': {},
     '../data/dependence': {},
-    '../data/system': { AuthDataType: { notifyLog: 'notifyLog' }, NotifyStatus: { success: 0, fail: 1 }, SystemModel: { create: async () => {}, findAll: async () => [] } },
-    '../shared/pLimit': {},
+    '../data/system': {
+      AuthDataType: { notifyLog: 'notifyLog' },
+      NotifyStatus: { success: 0, fail: 1 },
+      SystemModel: { create: async () => {}, findAll: async () => [] },
+    },
+    '../cron/execution/cronLimit': {},
     '../schedule/client': {},
     '../shared/i18n': { t: (x) => x },
     './notify': {},
@@ -73,12 +82,6 @@ test('decoded SystemNotify requests reach WPUSH with explicit or saved configura
     './sock': {},
   }).default;
   const notification = new NotificationService();
-  notification.userService = {
-    getNotificationMode: async () => ({
-      type: 'wpush',
-      wpushApiKey: 'saved-key',
-    }),
-  };
   const system = new SystemService({ error() {} });
   system.notificationService = notification;
 

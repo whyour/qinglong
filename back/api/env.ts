@@ -259,7 +259,10 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const envService = Container.get(EnvService);
-        const data = await envService.removeLabels(req.body.ids, req.body.labels);
+        const data = await envService.removeLabels(
+          req.body.ids,
+          req.body.labels,
+        );
         return res.send({ code: 200, data });
       } catch (e) {
         return next(e);
@@ -285,10 +288,13 @@ export default (app: Router) => {
           : [parseContent];
         if (
           data.length > 0 &&
-          data.every((x) =>
-            x && typeof x.name === 'string' &&
-            /^[a-zA-Z_][0-9a-zA-Z_]*$/.test(x.name) &&
-            typeof x.value === 'string' && x.value.length > 0,
+          data.every(
+            (x) =>
+              x &&
+              typeof x.name === 'string' &&
+              /^[a-zA-Z_][0-9a-zA-Z_]*$/.test(x.name) &&
+              typeof x.value === 'string' &&
+              x.value.length > 0,
           )
         ) {
           const result = await envService.create(
@@ -303,7 +309,9 @@ export default (app: Router) => {
         } else {
           return res.send({
             code: 400,
-            message: t('每条数据 name 或者 value 字段不能为空，参考导出文件格式'),
+            message: t(
+              '每条数据 name 或者 value 字段不能为空，参考导出文件格式',
+            ),
           });
         }
       } catch (e) {

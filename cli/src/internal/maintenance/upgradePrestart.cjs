@@ -51,7 +51,8 @@ function childGroupSignaler(child) {
   return (signal) => {
     if (finished) return;
     try {
-      if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, signal);
+      if (process.platform !== 'win32' && child.pid)
+        process.kill(-child.pid, signal);
       else child.kill(signal);
       if (signal === 'SIGKILL') finished = true;
     } catch (error) {
@@ -141,7 +142,11 @@ async function prestartBackend(
       // one backend process. Keep normal V8 mode for Node 20's HTTP/WASM support.
       const child = spawn(
         process.execPath,
-        [...serverRuntimeArgs(), `--max-old-space-size=${limits.heapMb}`, entry],
+        [
+          ...serverRuntimeArgs(),
+          `--max-old-space-size=${limits.heapMb}`,
+          entry,
+        ],
         {
           cwd: workspace,
           env,
@@ -154,7 +159,11 @@ async function prestartBackend(
       } catch {}
       const signalGroup = childGroupSignaler(child);
       const kill = (signalName) => {
-        try { signalGroup(signalName); } catch (error) { failure ||= error; }
+        try {
+          signalGroup(signalName);
+        } catch (error) {
+          failure ||= error;
+        }
       };
       const stop = (error) => {
         failure ||= error;
@@ -346,7 +355,9 @@ async function runRepair(program, args, options) {
     });
     const signalGroup = childGroupSignaler(child);
     const kill = (sig) => {
-      try { signalGroup(sig); } catch {}
+      try {
+        signalGroup(sig);
+      } catch {}
     };
     const stop = (error) => {
       failure ||= error;

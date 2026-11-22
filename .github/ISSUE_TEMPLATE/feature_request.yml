@@ -1,6 +1,6 @@
 name: "\U0001F680 New feature proposal"
 description: Suggest an idea for this project
-labels: [":sparkles: feature request"]
+labels: [':sparkles: feature request']
 body:
   - type: markdown
     attributes:
@@ -10,14 +10,14 @@ body:
     id: feature-description
     attributes:
       label: Clear and concise description of the problem
-      description: "Explain your use case, context, and rationale behind this feature request. More importantly, what is the **end user experience** you are trying to build that led to the need for this feature?"
+      description: 'Explain your use case, context, and rationale behind this feature request. More importantly, what is the **end user experience** you are trying to build that led to the need for this feature?'
     validations:
       required: true
   - type: textarea
     id: suggested-solution
     attributes:
       label: Suggested solution
-      description: "In module [xy] we could provide following implementation..."
+      description: 'In module [xy] we could provide following implementation...'
     validations:
       required: true
   - type: textarea

@@ -1,6 +1,6 @@
 # Node cron 调度器迁移
 
-Node 调度路径使用固定版本 `node-cron@4.6.0`，普通任务（含额外规则）、订阅和系统 cron 共用 `back/shared/cronScheduler.ts`。启动/一次性任务、间隔任务、脚本并发限制和进程执行链路保持原有实现。系统模式只将语义一致的普通五字段规则交给 crond。
+Node 调度路径使用固定版本 `node-cron@4.6.0`，普通任务（含额外规则）、订阅和系统 cron 共用 `back/cron/scheduling/cronScheduler.ts`。启动/一次性任务、间隔任务、脚本并发限制和进程执行链路保持原有实现。系统模式只将语义一致的普通五字段规则交给 crond。
 
 移除 `node-schedule`、其类型包以及兼容别名 `cron-parser-v4`。保留 `cron-parser@5` 做旧表达式的校验与标准化；计时器和日历推进由 node-cron 管理。
 

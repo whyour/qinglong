@@ -2,19 +2,43 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const builtinModules = [
-  'assert', 'buffer', 'child_process', 'cluster', 'crypto', 'dgram', 'dns',
-  'events', 'fs', 'http', 'https', 'net', 'os', 'path', 'process', 'querystring',
-  'readline', 'stream', 'string_decoder', 'timers', 'tls', 'tty', 'url', 'util',
-  'v8', 'zlib',
+  'assert',
+  'buffer',
+  'child_process',
+  'cluster',
+  'crypto',
+  'dgram',
+  'dns',
+  'events',
+  'fs',
+  'http',
+  'https',
+  'net',
+  'os',
+  'path',
+  'process',
+  'querystring',
+  'readline',
+  'stream',
+  'string_decoder',
+  'timers',
+  'tls',
+  'tty',
+  'url',
+  'util',
+  'v8',
+  'zlib',
 ];
 
 function isBareSpecifier(specifier) {
-  return !specifier.startsWith('.') &&
+  return (
+    !specifier.startsWith('.') &&
     !specifier.startsWith('/') &&
     !specifier.startsWith('file:') &&
     !specifier.startsWith('node:') &&
     !builtinModules.includes(specifier) &&
-    !builtinModules.includes(specifier.split('/')[0]);
+    !builtinModules.includes(specifier.split('/')[0])
+  );
 }
 
 export function resolve(specifier, context, nextResolve) {

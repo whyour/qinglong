@@ -82,11 +82,7 @@ test('maintenance log banners honor Chinese fallback and English selection', asy
 });
 
 test('standalone entry help supports both languages without panel or repository setup', () => {
-  for (const entry of [
-    'runner',
-    'compat',
-    'subscription-worker',
-  ]) {
+  for (const entry of ['runner', 'compat', 'subscription-worker']) {
     for (const language of ['en', 'zh']) {
       const result = spawnSync(
         process.execPath,
@@ -113,7 +109,9 @@ test('standalone entry help supports both languages without panel or repository 
 test('task, maintenance and subscription failure warnings honor locale without failing completed work', async (t) => {
   const { LocalApi } = require('../../dist/internal/runtime/api');
   const { executeTask } = require('../../dist/internal/execution/taskRunner');
-  const { syncRepository } = require('../../dist/internal/subscription/subscriptionRunner');
+  const {
+    syncRepository,
+  } = require('../../dist/internal/subscription/subscriptionRunner');
   const { withOperationOutput } = require('../../dist/internal/runtime/output');
   const { execFileSync } = require('node:child_process');
   const git = process.platform === 'darwin' ? '/usr/bin/git' : 'git';

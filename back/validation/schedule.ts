@@ -1,5 +1,5 @@
 import { Joi } from 'celebrate';
-import { isValidCronSchedule } from '../shared/cronSchedule';
+import { isValidCronSchedule } from '../cron/scheduling/cronSchedule';
 import { ScheduleType } from '../interface/schedule';
 import path from 'path';
 import config from '../config';
@@ -71,7 +71,12 @@ export const commonCronSchema = {
 
         // For other absolute paths, ensure they are within the safe log directory
         const relative = path.relative(config.logPath, value);
-        if (!relative || relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+        if (
+          !relative ||
+          relative === '..' ||
+          relative.startsWith('..' + path.sep) ||
+          path.isAbsolute(relative)
+        ) {
           return helpers.error('string.unsafePath');
         }
       }
@@ -89,7 +94,8 @@ export const commonCronSchema = {
       return value;
     })
     .messages({
-      'string.pattern.base': '日志名称只能包含中文、字母、数字、下划线、连字符、点和路径分隔符',
+      'string.pattern.base':
+        '日志名称只能包含中文、字母、数字、下划线、连字符、点和路径分隔符',
       'string.max': '日志名称不能超过100个字符',
       'string.unsafePath': '绝对路径必须在日志目录内或使用 /dev/null',
     }),

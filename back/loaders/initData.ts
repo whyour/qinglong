@@ -18,7 +18,7 @@ import OpenService from '../services/open';
 import { shareStore } from '../shared/store';
 import Logger from './logger';
 import cronClient from '../schedule/client';
-import { TriggerHistory } from '../shared/triggerHistory';
+import { TriggerHistory } from '../cron/history';
 import { setLang, systemLang } from '../shared/i18n';
 
 export default async () => {
@@ -124,7 +124,8 @@ export default async () => {
   const history = new TriggerHistory(CrontabModel.sequelize!);
   const pendingStops = await history.pendingStops();
   const pendingBatches = await history.pendingStopBatches();
-  if (pendingStops.length || pendingBatches.length) await cronService.resumePendingStops(history, pendingStops, pendingBatches);
+  if (pendingStops.length || pendingBatches.length)
+    await cronService.resumePendingStops(history, pendingStops, pendingBatches);
   await history.reconcileInstances();
 
   // 初始化时执行一次所有的 ql repo 任务
@@ -213,7 +214,7 @@ export default async () => {
     if (!langEnvExist) {
       await writeFile(config.langEnvFile, `export QL_LANG='${lang}'\n`);
     }
-  } catch { }
+  } catch {}
 
   // Replace legacy task environment files before recovered tasks can run.
   await envService.set_envs();

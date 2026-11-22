@@ -4,16 +4,18 @@ import intl from 'react-intl-universal';
 
 export function rootContainer(container: any) {
   const locales = {
-    'en': require('./locales/en-US.json'),
-    'zh': require('./locales/zh-CN.json'),
+    en: require('./locales/en-US.json'),
+    zh: require('./locales/zh-CN.json'),
   };
   let currentLocale: string;
   try {
-    currentLocale = intl.determineLocale({
-      urlLocaleKey: 'lang',
-      cookieLocaleKey: 'lang',
-      localStorageLocaleKey: 'lang',
-    }).slice(0, 2);
+    currentLocale = intl
+      .determineLocale({
+        urlLocaleKey: 'lang',
+        cookieLocaleKey: 'lang',
+        localStorageLocaleKey: 'lang',
+      })
+      .slice(0, 2);
   } catch (e: unknown) {
     // Handle decodeURIComponent errors from malformed cookies
     console.warn('Failed to determine locale from cookies:', e);

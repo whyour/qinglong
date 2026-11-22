@@ -4,7 +4,9 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { matchSubscriptionPaths } = require('../../dist/internal/subscription/subscriptionFilter');
+const {
+  matchSubscriptionPaths,
+} = require('../../dist/internal/subscription/subscriptionFilter');
 
 test('subscription filters preserve legacy POSIX classes, escaping, anchors and option-like patterns', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-filter-'));

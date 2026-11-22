@@ -97,9 +97,13 @@ export default (app: Router) => {
         }
         // OpenAPI config scopes grant data-file access, not executable hooks.
         if (/(?:^|\/)open\/configs(?:\/|\?|$)/.test(req.originalUrl || '')) {
-          const realPath = await fs.realpath(normalized).catch(() => normalized);
+          const realPath = await fs
+            .realpath(normalized)
+            .catch(() => normalized);
           if (
-            openApiProtectedFiles.has(path.basename(normalized).toLowerCase()) ||
+            openApiProtectedFiles.has(
+              path.basename(normalized).toLowerCase(),
+            ) ||
             openApiProtectedFiles.has(path.basename(realPath).toLowerCase())
           ) {
             return res.send({ code: 403, message: t('文件无法访问') });

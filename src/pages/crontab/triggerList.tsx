@@ -237,24 +237,28 @@ export default function TriggerList({
                   </Button>
                 )}
               </div>
-              <TriggerTiming row={row} open={openIds.has(row.id)} onToggle={() => {
-                if (!expanded) statusRequest.current?.abort();
-                if (!pinned) {
-                  headRef.current = rows[0];
-                  pageRequest.current?.abort();
-                  // An open and close may be batched without ever committing a pinned page.
-                  setAttempt((value) => value + 1);
-                  setFailed(false);
-                  setHasNew(false);
-                  setRefreshFailed(false);
-                }
-                setOpenIds((previous) => {
-                  const next = new Set(previous);
-                  if (next.has(row.id)) next.delete(row.id);
-                  else next.add(row.id);
-                  return next;
-                });
-              }} />
+              <TriggerTiming
+                row={row}
+                open={openIds.has(row.id)}
+                onToggle={() => {
+                  if (!expanded) statusRequest.current?.abort();
+                  if (!pinned) {
+                    headRef.current = rows[0];
+                    pageRequest.current?.abort();
+                    // An open and close may be batched without ever committing a pinned page.
+                    setAttempt((value) => value + 1);
+                    setFailed(false);
+                    setHasNew(false);
+                    setRefreshFailed(false);
+                  }
+                  setOpenIds((previous) => {
+                    const next = new Set(previous);
+                    if (next.has(row.id)) next.delete(row.id);
+                    else next.add(row.id);
+                    return next;
+                  });
+                }}
+              />
             </div>
           </List.Item>
         )}

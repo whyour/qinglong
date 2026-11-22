@@ -56,7 +56,7 @@ function scriptFixture(killTask, pid = 100) {
     '../config': { scriptPath: '/scripts' },
     '../config/const': { TASK_COMMAND: 'task' },
     '../config/util': { killTask, getPid: async () => pid },
-    '../shared/pLimit': { removeQueuedCron() {} },
+    '../cron/execution/cronLimit': { removeQueuedCron() {} },
     './sock': {},
     './cron': {},
     './schedule': {},

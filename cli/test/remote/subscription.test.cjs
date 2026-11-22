@@ -18,10 +18,9 @@ test('public CLI excludes local maintenance while the admin entry retains compat
     parse(['--help'], 'local').help,
     /subscription list|auth login/,
   );
-  assert.throws(
-    () => parse(['auth', 'status', '--scope', 'all']),
-    { exitCode: 2 },
-  );
+  assert.throws(() => parse(['auth', 'status', '--scope', 'all']), {
+    exitCode: 2,
+  });
 });
 
 test('subscription management uses panel API, projects credentials out and never invokes local repo/raw', async (t) => {

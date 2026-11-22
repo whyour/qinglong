@@ -1,6 +1,7 @@
 import { parse } from './arguments';
 import { translate } from '../i18n/index';
 import { CliError } from '../errors';
+import { CliResultError } from '../resultError';
 import type { Invocation } from './arguments';
 import type { CommandRegistry } from './registry';
 
@@ -42,7 +43,15 @@ export async function invoke(
       ? error.message
       : translate(process.env, 'CLI 操作失败，请检查本机配置和权限。');
     process.stderr.write(
-      (json ? JSON.stringify({ code, message }) : message) + '\n',
+      (json
+        ? JSON.stringify({
+            code,
+            message,
+            ...(!cancelled && error instanceof CliResultError
+              ? { data: error.data }
+              : {}),
+          })
+        : message) + '\n',
     );
     return code;
   }

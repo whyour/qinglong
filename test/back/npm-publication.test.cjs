@@ -13,10 +13,7 @@ const publication = workflow.jobs.publish.steps.find(
 ).run;
 
 test('npm publication waits for every supported release image', () => {
-  for (const name of [
-    'build-alpine',
-    'build-debian',
-  ])
+  for (const name of ['build-alpine', 'build-debian'])
     assert.ok(workflow.jobs.publish.needs.includes(name), name);
 });
 
@@ -42,7 +39,11 @@ for (const [scenario, expectedStatus, published] of [
       path.join(root, 'package/package.json'),
       JSON.stringify({ name: '@whyour/qinglong', version: '2.22.0' }),
     );
-    const packed = spawnSync('tar', ['-czf', 'npm-panel/verified.tgz', 'package'], { cwd: root });
+    const packed = spawnSync(
+      'tar',
+      ['-czf', 'npm-panel/verified.tgz', 'package'],
+      { cwd: root },
+    );
     assert.equal(packed.status, 0, String(packed.stderr));
     fs.writeFileSync(
       path.join(bin, 'npm'),
@@ -77,8 +78,15 @@ case 'network': console.log('upstream unavailable'); process.exit(1);
     assert.equal(result.status, expectedStatus, result.stdout + result.stderr);
     assert.equal(fs.existsSync(path.join(root, 'published')), published);
     if (published)
-      assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'published'), 'utf8')), [
-        './npm-panel/verified.tgz', '--ignore-scripts', '--access', 'public', '--registry=https://registry.npmjs.org',
-      ]);
+      assert.deepEqual(
+        JSON.parse(fs.readFileSync(path.join(root, 'published'), 'utf8')),
+        [
+          './npm-panel/verified.tgz',
+          '--ignore-scripts',
+          '--access',
+          'public',
+          '--registry=https://registry.npmjs.org',
+        ],
+      );
   });
 }

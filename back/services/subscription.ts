@@ -149,7 +149,10 @@ export default class SubscriptionService {
         let beforeStr = '';
         try {
           if (doc.sub_before) {
-            await logStreamManager.write(absolutePath, `\n## ${t('执行before命令...')}\n\n`);
+            await logStreamManager.write(
+              absolutePath,
+              `\n## ${t('执行before命令...')}\n\n`,
+            );
             beforeStr = await promiseExec(doc.sub_before);
           }
         } catch (error: any) {
@@ -186,7 +189,8 @@ export default class SubscriptionService {
             }
           } catch (error: any) {
             afterStr =
-              (error.stderr && error.stderr.toString()) || JSON.stringify(error);
+              (error.stderr && error.stderr.toString()) ||
+              JSON.stringify(error);
           }
           if (afterStr) {
             await logStreamManager.write(absolutePath, `${afterStr}\n`);
@@ -321,7 +325,9 @@ export default class SubscriptionService {
           // A URL accepted by one engine can produce an invalid name in another.
           // Validate each candidate independently, retaining the safe candidate.
           if (!Object.values(names).every(isSubscriptionStorageName)) continue;
-          const resolve = deleting ? resolveSubscriptionStoragePath : path.resolve;
+          const resolve = deleting
+            ? resolveSubscriptionStoragePath
+            : path.resolve;
           const scriptPath = resolve(config.scriptPath, names.script);
           if (scriptPath) targets.push(scriptPath);
           if (names.repo) {
@@ -329,7 +335,10 @@ export default class SubscriptionService {
             if (repoPath) targets.push(repoPath);
           }
           if (names.raw) {
-            const rawPath = resolve(path.join(config.dataPath, 'raw'), names.raw);
+            const rawPath = resolve(
+              path.join(config.dataPath, 'raw'),
+              names.raw,
+            );
             if (rawPath) targets.push(rawPath);
           }
         }
@@ -364,10 +373,11 @@ export default class SubscriptionService {
         for (const storagePath of new Set(storagePaths)) {
           // rm is recursive: an ancestor must also be retained if a surviving
           // subscription uses a nested branch, and vice versa.
-          const shared = retainedPaths.some((retained) =>
-            retained === storagePath ||
-            retained.startsWith(`${storagePath}${path.sep}`) ||
-            storagePath.startsWith(`${retained}${path.sep}`),
+          const shared = retainedPaths.some(
+            (retained) =>
+              retained === storagePath ||
+              retained.startsWith(`${storagePath}${path.sep}`) ||
+              storagePath.startsWith(`${retained}${path.sep}`),
           );
           if (!shared) await rmPath(storagePath);
         }

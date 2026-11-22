@@ -118,7 +118,10 @@ const Other = ({
       .then(({ code, data }) => {
         if (code === 200 && data.info) {
           setSystemConfig(data.info);
-          setLimits({ concurrency: data.effectiveCronConcurrency, cpus: data.availableCpus });
+          setLimits({
+            concurrency: data.effectiveCronConcurrency,
+            cpus: data.availableCpus,
+          });
         }
       })
       .catch((error: any) => {
@@ -465,7 +468,16 @@ const Other = ({
             {intl.get('预览清理')}
           </Button>
         </Form.Item>
-        <Form.Item label={intl.get('定时任务并发数')} extra={limits && intl.get('定时和手动任务各有一条队列，每条最多同时运行 {slots} 个实例。当前可用 CPU 核数为 {cpus}。', { slots: limits.concurrency, cpus: limits.cpus })}>
+        <Form.Item
+          label={intl.get('定时任务并发数')}
+          extra={
+            limits &&
+            intl.get(
+              '定时和手动任务各有一条队列，每条最多同时运行 {slots} 个实例。当前可用 CPU 核数为 {cpus}。',
+              { slots: limits.concurrency, cpus: limits.cpus },
+            )
+          }
+        >
           <Input.Group compact>
             <InputNumber
               style={{ width: 180 }}
@@ -517,8 +529,8 @@ const Other = ({
             </Button>
           </Input.Group>
         </Form.Item>
-        <Form.Item 
-          label={intl.get('全局SSH私钥')} 
+        <Form.Item
+          label={intl.get('全局SSH私钥')}
           name="globalSshKey"
           tooltip={intl.get('用于访问所有私有仓库的全局SSH私钥')}
         >
@@ -529,7 +541,10 @@ const Other = ({
               autoSize={{ minRows: 3, maxRows: 8 }}
               placeholder={intl.get('请输入完整的SSH私钥内容')}
               onChange={(e) => {
-                setSystemConfig({ ...systemConfig, globalSshKey: e.target.value });
+                setSystemConfig({
+                  ...systemConfig,
+                  globalSshKey: e.target.value,
+                });
               }}
             />
           </Input.Group>

@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { translate } from '../../shared/i18n/index';
 import { standaloneHelp } from '../help/standalone';
-import { withCommandCancellation, interruptedCode } from '../runtime/cancellation';
+import {
+  withCommandCancellation,
+  interruptedCode,
+} from '../runtime/cancellation';
 import { localContext } from '../runtime/context';
 import {
   syncRaw,

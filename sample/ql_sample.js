@@ -19,11 +19,13 @@ QLAPI.getCrons({ searchValue: 'test' }).then((x) => {
 });
 
 // 通过ID查询定时任务 (Get cron by ID)
-QLAPI.getCronById({ id: 1 }).then((x) => {
-  console.log('getCronById', x);
-}).catch((err) => {
-  console.log('getCronById error', err);
-});
+QLAPI.getCronById({ id: 1 })
+  .then((x) => {
+    console.log('getCronById', x);
+  })
+  .catch((err) => {
+    console.log('getCronById error', err);
+  });
 
 // 启用定时任务 (Enable cron tasks)
 QLAPI.enableCrons({ ids: [1, 2] }).then((x) => {

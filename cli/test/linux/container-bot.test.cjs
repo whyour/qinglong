@@ -5,8 +5,12 @@ const path = require('node:path');
 const os = require('node:os');
 const { setTimeout: delay } = require('node:timers/promises');
 const { createContext } = require('../../dist/internal/runtime/context');
-const { runContainer } = require('../../dist/internal/runtime/containerRuntime');
-const { launchStartupHook } = require('../../dist/internal/maintenance/bootstrap');
+const {
+  runContainer,
+} = require('../../dist/internal/runtime/containerRuntime');
+const {
+  launchStartupHook,
+} = require('../../dist/internal/maintenance/bootstrap');
 const { launchBot } = require('../../dist/internal/maintenance/bot');
 
 const live = (pid) => {

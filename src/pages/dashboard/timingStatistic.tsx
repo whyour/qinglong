@@ -12,11 +12,22 @@ export function formatTiming(ms: number | null) {
   });
 }
 
-export default function TimingStatistic({ title, ms }: {
+export default function TimingStatistic({
+  title,
+  ms,
+}: {
   title: string;
   ms: number | null;
 }) {
-  return <Statistic title={title} value={ms ?? '—'} formatter={() => (
-      <span title={ms == null ? undefined : `${ms} ms`}>{formatTiming(ms)}</span>
-    )} />;
+  return (
+    <Statistic
+      title={title}
+      value={ms ?? '—'}
+      formatter={() => (
+        <span title={ms == null ? undefined : `${ms} ms`}>
+          {formatTiming(ms)}
+        </span>
+      )}
+    />
+  );
 }

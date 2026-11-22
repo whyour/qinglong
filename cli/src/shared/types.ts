@@ -4,6 +4,7 @@ export interface ApiResponse<T> {
 }
 
 export interface LogResponse extends ApiResponse<string> {
+  triggerId?: string;
   logStatus?: string;
   truncated: boolean;
 }

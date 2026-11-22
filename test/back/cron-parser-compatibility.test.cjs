@@ -5,8 +5,8 @@ const {
   parseCronSchedule,
   isValidCronSchedule,
   getInvalidCronSchedules,
-} = require('../../back/shared/cronSchedule');
-const { createCronJob } = require('../../back/shared/cronScheduler');
+} = require('../../back/cron/scheduling/cronSchedule');
+const { createCronJob } = require('../../back/cron/scheduling/cronScheduler');
 
 const logger = { warn() {}, error() {} };
 
@@ -132,7 +132,7 @@ for (const [schedule, patterns, maxValidations] of [
   test(`supported expressions skip field validation: ${schedule}`, () => {
     const load = require('../helpers/load-security-module.cjs');
     const validations = [];
-    const isolated = load('back/shared/cronSchedule.ts', {
+    const isolated = load('back/cron/scheduling/cronSchedule.ts', {
       'node-cron': {
         validate(pattern) {
           validations.push(pattern);

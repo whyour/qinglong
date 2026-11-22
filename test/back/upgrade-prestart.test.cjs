@@ -14,10 +14,17 @@ function checkGroupSignals(t) {
   const kill = t.mock.method(process, 'kill');
   return () => {
     if (process.platform === 'win32') return;
-    const groups = kill.mock.calls.filter(call => call.arguments[0] < 0 && call.arguments[1] === 'SIGKILL')
-      .map(call => call.arguments[0]);
+    const groups = kill.mock.calls
+      .filter(
+        (call) => call.arguments[0] < 0 && call.arguments[1] === 'SIGKILL',
+      )
+      .map((call) => call.arguments[0]);
     assert.ok(groups.length > 0);
-    assert.equal(new Set(groups).size, groups.length, 'a retired process group was signalled twice');
+    assert.equal(
+      new Set(groups).size,
+      groups.length,
+      'a retired process group was signalled twice',
+    );
   };
 }
 
@@ -34,7 +41,10 @@ for (const [version, exitCode] of [
       survivor = path.join(root, 'survivor');
     await fs.mkdir(path.join(source, 'node_modules'), { recursive: true });
     await fs.mkdir(path.join(statics, 'build/bootstrap'), { recursive: true });
-    await fs.writeFile(path.join(source, 'version.yaml'), `version: ${version}`);
+    await fs.writeFile(
+      path.join(source, 'version.yaml'),
+      `version: ${version}`,
+    );
     await fs.writeFile(path.join(statics, 'build/app.js'), 'backend');
     await fs.writeFile(
       path.join(statics, 'build-info.json'),
@@ -49,7 +59,9 @@ for (const [version, exitCode] of [
         ${JSON.stringify(survivor)}],{stdio:'inherit'});
       process.send({type:'upgrade-probe',ok:${
         exitCode === 0
-      },message:'simulated prestart failure',build:{sourceCommit:'a'.repeat(40),version:${JSON.stringify(version)},backendSha256:crypto.createHash('sha256').update('backend').digest('hex')}},()=>process.exit(${exitCode}));
+      },message:'simulated prestart failure',build:{sourceCommit:'a'.repeat(40),version:${JSON.stringify(
+        version,
+      )},backendSha256:crypto.createHash('sha256').update('backend').digest('hex')}},()=>process.exit(${exitCode}));
     `,
     );
     const checkSignals = checkGroupSignals(t);
@@ -148,7 +160,9 @@ test('cancelled dependency repair kills descendants and retains the original tre
     if(process.argv[2]==='--version'){console.log('8.3.1');process.exit(0);}
     require('node:child_process').spawn(process.execPath,['-e',
       "process.on('SIGTERM',()=>{});require('node:fs').writeFileSync(process.argv[1],'started');setTimeout(()=>require('node:fs').writeFileSync(process.argv[2],'escaped'),1400);",
-      ${JSON.stringify(started)},${JSON.stringify(survivor)}],{stdio:'inherit'});
+      ${JSON.stringify(started)},${JSON.stringify(
+      survivor,
+    )}],{stdio:'inherit'});
     setInterval(()=>{},1000);
   `,
     { mode: 0o755 },

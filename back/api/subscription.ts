@@ -3,7 +3,7 @@ import { Container } from 'typedi';
 import { Logger } from 'winston';
 import SubscriptionService from '../services/subscription';
 import { celebrate, Joi } from 'celebrate';
-import { isValidCronSchedule } from '../shared/cronSchedule';
+import { isValidCronSchedule } from '../cron/scheduling/cronSchedule';
 const route = Router();
 
 export default (app: Router) => {

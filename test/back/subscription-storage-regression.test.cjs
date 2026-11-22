@@ -478,7 +478,12 @@ test('an unrelated dangling or outside symlink reference does not block safe cle
 });
 
 test('URL-derived storage accepts legal directory names longer than user aliases and containing spaces', async (t) => {
-  const doc = { ...cases[0], id: 1, alias: 'short-alias', url: `/tmp/owner/${'r'.repeat(205)} repo.git` };
+  const doc = {
+    ...cases[0],
+    id: 1,
+    alias: 'short-alias',
+    url: `/tmp/owner/${'r'.repeat(205)} repo.git`,
+  };
   const f = fixture(t, [doc]);
   const files = f.paths(doc).map((p) => path.join(p, 'job.js'));
   files.forEach(f.write);
@@ -506,7 +511,12 @@ test('an unrepresentable unused Shell filename does not block valid CLI raw clea
 });
 
 test('cleanup retains each representable path when only its prefixed Shell script name is too long', async (t) => {
-  const doc = { id: 1, alias: 'partial-raw', type: 'file', url: 'https://example.com/job.js?token=' };
+  const doc = {
+    id: 1,
+    alias: 'partial-raw',
+    type: 'file',
+    url: 'https://example.com/job.js?token=',
+  };
   const prefix = getSubscriptionStorageNames(doc).raw;
   doc.url += 'a'.repeat(255 - Buffer.byteLength(prefix));
   const shell = getSubscriptionStorageNames(doc);
@@ -536,7 +546,12 @@ test('a legal Unicode alias with an unrepresentable unused directory does not bl
 });
 
 test('Unicode storage follows filesystem limits rather than imposing a UTF-8 byte cap', async (t) => {
-  const doc = { ...cases[0], id: 1, alias: 'short-alias', url: `/tmp/owner/${'中'.repeat(86)}.git` };
+  const doc = {
+    ...cases[0],
+    id: 1,
+    alias: 'short-alias',
+    url: `/tmp/owner/${'中'.repeat(86)}.git`,
+  };
   const f = fixture(t, [doc]);
   const files = f.paths(doc).map((p) => path.join(p, 'job.js'));
   for (const file of files) {

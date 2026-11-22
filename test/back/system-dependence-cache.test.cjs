@@ -60,7 +60,7 @@ test('clearing a dependency cache marks installed entries for reinstall', async 
     SystemModel: {},
   });
   stubModule('../../back/schedule/client', { __esModule: true, default: {} });
-  stubModule('../../back/shared/pLimit', {
+  stubModule('../../back/cron/execution/cronLimit', {
     __esModule: true,
     default: {},
   });

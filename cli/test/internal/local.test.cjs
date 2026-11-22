@@ -4,7 +4,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
-const { createContext, sourceEnvironment } = require('../../dist/internal/runtime/context');
+const {
+  createContext,
+  sourceEnvironment,
+} = require('../../dist/internal/runtime/context');
 const { runProcess } = require('../../dist/internal/runtime/process');
 const { pruneLogs } = require('../../dist/internal/maintenance/maintenance');
 const { parse } = require('../helpers/commands.cjs');
@@ -276,7 +279,9 @@ test('concurrent accounts finish independently but merge logs in selection order
 });
 
 test('concurrent log spool waits for peers and cleans up on invocation failure', async (t) => {
-  const { orderedConcurrent } = require('../../dist/internal/execution/concurrent');
+  const {
+    orderedConcurrent,
+  } = require('../../dist/internal/execution/concurrent');
   const root = sandbox(t);
   const chunks = [];
   let peerFinished = false;
@@ -485,10 +490,7 @@ test('shell tasks inherit before-hook state without leaking script state into af
     path.join(context.paths.dir_log, result.logPath),
     'utf8',
   );
-  assert.match(
-    log,
-    /before:private\narg:space value\nafter:private:unset:7/,
-  );
+  assert.match(log, /before:private\narg:space value\nafter:private:unset:7/);
 });
 
 test('task resolves modules from pnpm global root and restores the previous path for after hooks', async (t) => {
@@ -538,7 +540,9 @@ test('task resolves modules from pnpm global root and restores the previous path
 });
 
 test('missing optional pnpm still provides user dependency resolution', async (t) => {
-  const { taskDependencyEnvironment } = require('../../dist/internal/execution/dependencies');
+  const {
+    taskDependencyEnvironment,
+  } = require('../../dist/internal/execution/dependencies');
   const context = createContext(
     { root: sandbox(t) },
     {

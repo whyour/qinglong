@@ -115,12 +115,15 @@ handle_task_end
     );
   });
 
-test('scheduled tasks starting in the same millisecond write different files', t => {
-  run(t, `log_name=common
+test('scheduled tasks starting in the same millisecond write different files', (t) => {
+  run(
+    t,
+    `log_name=common
 QL_TRIGGER_ID=first; handle_log_path same.py
 first=$log_path
 QL_TRIGGER_ID=second; handle_log_path same.py
 [[ "$first" != "$log_path" ]]
 QL_TRIGGER_ID=../invalid; handle_log_path same.py
-[[ "$log_path" == common/2026-09-12-23-59-59-999.log ]]`);
+[[ "$log_path" == common/2026-09-12-23-59-59-999.log ]]`,
+  );
 });

@@ -86,7 +86,9 @@ class GrpcClient {
         grpcOptions,
       );
     } catch (error) {
-      throw new Error('Failed to initialize gRPC client: ' + error.message, { cause: error });
+      throw new Error('Failed to initialize gRPC client: ' + error.message, {
+        cause: error,
+      });
     } finally {
       module.loadingPanelDependencies = false;
     }
@@ -105,12 +107,17 @@ class GrpcClient {
           Date.now() + GrpcClient.#config.defaultTimeout,
         );
 
-        this.#client[capitalizedMethod](params, metadata, { deadline }, (error, response) => {
-          if (error) {
-            return reject(error);
-          }
-          resolve(response);
-        });
+        this.#client[capitalizedMethod](
+          params,
+          metadata,
+          { deadline },
+          (error, response) => {
+            if (error) {
+              return reject(error);
+            }
+            resolve(response);
+          },
+        );
       });
     };
   }

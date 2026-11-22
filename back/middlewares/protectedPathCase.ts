@@ -10,8 +10,7 @@ export default function protectedPathCase(
 
   if (
     originalPath !== normalizedPath &&
-    (normalizedPath.startsWith('/api/') ||
-      normalizedPath.startsWith('/open/'))
+    (normalizedPath.startsWith('/api/') || normalizedPath.startsWith('/open/'))
   ) {
     return res.status(400).json({
       code: 400,

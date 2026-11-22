@@ -5,7 +5,6 @@ import { session } from './auth';
 import { fail } from '../../shared/errors';
 import type { ApiResponse, LogResponse } from '../../shared/types';
 
-
 // Subscription API records can contain private repository credentials and hooks.
 // The management view deliberately exposes only the fields needed for selection.
 const visibleFields = [

@@ -1,8 +1,9 @@
 const messages: Record<string, Record<string, string>> = {
   zh: {},
   en: {
-    '系统定时规则安装失败，旧规则可能仍在运行，正在重试': 'System crontab installation failed. The previous rules may still run. Retrying.',
-    'Cron表达式格式有误': 'Invalid cron expression',
+    '系统定时规则安装失败，旧规则可能仍在运行，正在重试':
+      'System crontab installation failed. The previous rules may still run. Retrying.',
+    Cron表达式格式有误: 'Invalid cron expression',
     '升级任务启动失败，请检查日志后重试':
       'Failed to start the update. Check the logs and try again.',
     '[schedule][停止已运行任务] 任务ID: %s, PID: %s':
@@ -264,7 +265,8 @@ const messages: Record<string, Record<string, string>> = {
     '执行after命令...': 'Execute after command...',
     '## 执行结束... %s  耗时 %s 秒':
       '## Execution finished... %s  elapsed %s seconds',
-    '原调度未能恢复，正在重试': 'Could not restore the previous schedule. Retrying.',
+    '原调度未能恢复，正在重试':
+      'Could not restore the previous schedule. Retrying.',
     '任务已修改，请刷新后重试': 'The task has changed. Refresh and try again.',
     '调度器注册失败，任务创建已回滚':
       'Scheduler registration failed, task creation rolled back',

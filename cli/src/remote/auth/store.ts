@@ -21,10 +21,7 @@ export function readConfig(): StoredConfig {
     const pathStat = fs.lstatSync(file);
     if (!pathStat.isFile())
       fail(
-        translate(
-          process.env,
-          'CLI 配置必须是普通文件，且不能是符号链接。',
-        ),
+        translate(process.env, 'CLI 配置必须是普通文件，且不能是符号链接。'),
       );
     // Not every platform or filesystem implements POSIX mode bits or O_NOFOLLOW.
     const noFollow = fs.constants.O_NOFOLLOW ?? 0;
@@ -36,10 +33,7 @@ export function readConfig(): StoredConfig {
       pathStat.ino !== stat.ino
     ) {
       fail(
-        translate(
-          process.env,
-          'CLI 配置必须是普通文件，且不能是符号链接。',
-        ),
+        translate(process.env, 'CLI 配置必须是普通文件，且不能是符号链接。'),
       );
     }
     const config: unknown = JSON.parse(fs.readFileSync(fd, 'utf8'));

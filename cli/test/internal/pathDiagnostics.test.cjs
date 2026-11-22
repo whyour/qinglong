@@ -7,7 +7,10 @@ const { within } = require('../../dist/internal/runtime/files');
 const { createContext } = require('../../dist/internal/runtime/context');
 const { loggedOperation } = require('../../dist/internal/runtime/commandLog');
 const { executeTask } = require('../../dist/internal/execution/taskRunner');
-const { syncRaw, repositoryName } = require('../../dist/internal/subscription/subscriptionRunner');
+const {
+  syncRaw,
+  repositoryName,
+} = require('../../dist/internal/subscription/subscriptionRunner');
 const { LocalApi } = require('../../dist/internal/runtime/api');
 const subprocess = require('../../dist/internal/runtime/process');
 

@@ -245,7 +245,12 @@ test('a terminal state published between the status read and PID probe wins', as
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-finished-job-'));
   t.after(() => fs.rm(tmp, { recursive: true, force: true }));
   const file = path.join(tmp, 'panel-upgrade.json');
-  const running = { id: 'finishing', status: 'running', pid: 123456, startedAt: 1 };
+  const running = {
+    id: 'finishing',
+    status: 'running',
+    pid: 123456,
+    startedAt: 1,
+  };
   await fs.writeFile(file, JSON.stringify(running));
   const kill = process.kill;
   t.mock.method(process, 'kill', (pid, signal) => {

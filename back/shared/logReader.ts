@@ -47,18 +47,15 @@ function completeUtf8End(buffer: Buffer, start: number, end: number) {
 
   const firstByte = buffer[sequenceStart];
   const expectedLength =
-    firstByte < 0x80
-      ? 1
-      : firstByte < 0xe0
-        ? 2
-        : firstByte < 0xf0
-          ? 3
-          : 4;
+    firstByte < 0x80 ? 1 : firstByte < 0xe0 ? 2 : firstByte < 0xf0 ? 3 : 4;
   return end - sequenceStart < expectedLength ? sequenceStart : end;
 }
 
 function logDigest(identity: string, from: number, bytes: Buffer) {
-  return createHash('sha256').update(`${identity}:${from}:`).update(bytes).digest('hex');
+  return createHash('sha256')
+    .update(`${identity}:${from}:`)
+    .update(bytes)
+    .digest('hex');
 }
 
 export async function readLogChunk(
@@ -75,16 +72,22 @@ export async function readLogChunk(
     const requestedOffset = Number.isFinite(options.offset)
       ? Math.max(0, Math.trunc(options.offset!))
       : undefined;
-    let start = options.tail || requestedOffset === undefined
-      ? Math.max(total - limit, 0)
-      : Math.min(requestedOffset, total);
-    const resume = options.cursor && !options.tail && requestedOffset !== undefined;
+    let start =
+      options.tail || requestedOffset === undefined
+        ? Math.max(total - limit, 0)
+        : Math.min(requestedOffset, total);
+    const resume =
+      options.cursor && !options.tail && requestedOffset !== undefined;
     const [fromText, digest] = resume ? options.cursor!.split('.') : [];
     let from = resume ? Number(fromText) : start;
-    let reset = Boolean(resume && (
-      requestedOffset !== start || !Number.isSafeInteger(from) ||
-      from < 0 || from > start || start - from > CURSOR_WINDOW_BYTES
-    ));
+    let reset = Boolean(
+      resume &&
+        (requestedOffset !== start ||
+          !Number.isSafeInteger(from) ||
+          from < 0 ||
+          from > start ||
+          start - from > CURSOR_WINDOW_BYTES),
+    );
     if (reset) from = start = 0;
 
     // Read the previously displayed bytes and their continuation together.
@@ -97,7 +100,10 @@ export async function readLogChunk(
     let window = await readWindow(from, start + limit + 3);
     if (resume && !reset) {
       const prefix = window.subarray(0, start - from);
-      if (prefix.length !== start - from || logDigest(identity, from, prefix) !== digest) {
+      if (
+        prefix.length !== start - from ||
+        logDigest(identity, from, prefix) !== digest
+      ) {
         reset = true;
         start = from = 0;
         window = await readWindow(0, limit + 3);
@@ -120,8 +126,14 @@ export async function readLogChunk(
     let cursor: string | undefined;
     if (options.follow || options.cursor) {
       const retainedFrom = Math.max(from, nextOffset - CURSOR_WINDOW_BYTES);
-      cursor = resume && !reset && nextOffset === start ? options.cursor :
-        `${retainedFrom}.${logDigest(identity, retainedFrom, window.subarray(retainedFrom - from, nextOffset - from))}`;
+      cursor =
+        resume && !reset && nextOffset === start
+          ? options.cursor
+          : `${retainedFrom}.${logDigest(
+              identity,
+              retainedFrom,
+              window.subarray(retainedFrom - from, nextOffset - from),
+            )}`;
     }
 
     return {

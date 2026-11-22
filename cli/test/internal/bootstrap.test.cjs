@@ -240,7 +240,9 @@ for (const language of ['zh', 'en', 'unsupported']) {
         return true;
       },
     );
-    const { runtimeEnvironment } = require('../../dist/internal/maintenance/bootstrap');
+    const {
+      runtimeEnvironment,
+    } = require('../../dist/internal/maintenance/bootstrap');
     assert.throws(
       () => runtimeEnvironment(ctx, 'bad'),
       (error) => {

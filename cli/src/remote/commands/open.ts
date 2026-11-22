@@ -1,17 +1,13 @@
 import { readFile, stat, lstat } from 'node:fs/promises';
 import { openAsBlob } from 'node:fs';
 import { basename } from 'node:path';
-import {
-  openOperations,
-  type OpenOperation,
-} from '../api/openOperations';
+import { openOperations, type OpenOperation } from '../api/openOperations';
 import { request, isRecord } from '../api/client';
 import { session } from './auth';
 import { panelUrl } from '../auth/url';
 import { integer, type Invocation } from '../../shared/cli/arguments';
 import { fail } from '../../shared/errors';
 import type { ApiResponse } from '../../shared/types';
-
 
 function usage(zh: string, en: string): never {
   return fail(process.env.QL_LANG === 'en' ? en : zh, 2);

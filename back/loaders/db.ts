@@ -9,7 +9,7 @@ import { CrontabViewModel } from '../data/cronView';
 import { CrontabStatModel } from '../data/cronStats';
 import { RunningInstanceModel } from '../data/runningInstance';
 import { sequelize } from '../data';
-import { migrateSchema } from '../shared/schemaMigrations';
+import { migrateSchema } from '../data/schemaMigrations';
 
 export default async () => {
   try {

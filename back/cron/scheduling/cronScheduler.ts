@@ -1,4 +1,4 @@
-import { t } from './i18n';
+import { t } from '../../shared/i18n';
 import { createTask, ScheduledTask } from 'node-cron';
 import { parseCronSchedule } from './cronSchedule';
 
@@ -12,7 +12,12 @@ export interface CronJob {
   cancel(): void;
 }
 
-function acceptsSlot(parsed: ReturnType<typeof parseCronSchedule>, tasks: ScheduledTask[], index: number, date: Date) {
+function acceptsSlot(
+  parsed: ReturnType<typeof parseCronSchedule>,
+  tasks: ScheduledTask[],
+  index: number,
+  date: Date,
+) {
   if (tasks.length === 1) return true;
   // Preserve cron-parser 4's day/weekday OR semantics, including its
   // month-dependent full-day range and the global nth-week constraint.
@@ -35,7 +40,8 @@ export function createCronJob(
   let cancelled = false;
   let started = false;
   const dispatch = async (index: number, date: Date, missed: boolean) => {
-    if (cancelled || !started || !acceptsSlot(parsed, tasks, index, date)) return;
+    if (cancelled || !started || !acceptsSlot(parsed, tasks, index, date))
+      return;
     if (missed) {
       options.logger.warn(
         t('[schedule][补执行迟到任务] 任务: %s, 计划时间: %s'),
@@ -90,30 +96,45 @@ export function createCronJob(
   return job;
 }
 
-
 // node-cron 4.6.0 exposes getNextRuns only from the wall clock. Its pinned
 // inline matcher also accepts an explicit cursor, needed for previews and recovery.
-export function upcomingSlots(schedule: string, after: number, count = 1, through?: number): number[] {
+export function upcomingSlots(
+  schedule: string,
+  after: number,
+  count = 1,
+  through?: number,
+): number[] {
   const parsed = parseCronSchedule(schedule);
   const tasks: ScheduledTask[] = [];
   try {
     const matchers = parsed.patterns.map((pattern) => {
       const task = createTask(pattern, () => {});
       tasks.push(task);
-      return (task as ScheduledTask & {
-        timeMatcher: { getNextMatch(date: Date): Date; expressions: number[][] };
-      }).timeMatcher;
+      return (
+        task as ScheduledTask & {
+          timeMatcher: {
+            getNextMatch(date: Date): Date;
+            expressions: number[][];
+          };
+        }
+      ).timeMatcher;
     });
-    const next = matchers.map((matcher) => matcher.getNextMatch(new Date(after)));
+    const next = matchers.map((matcher) =>
+      matcher.getNextMatch(new Date(after)),
+    );
     // All calendar branches share their clock fields. For bounded audit ranges,
     // resolve each matching minute once, including the matcher's DST choice.
-    const seconds = through == null ? [] : [...new Set(matchers[0].expressions[0])].sort((a,b) => a-b);
+    const seconds =
+      through == null
+        ? []
+        : [...new Set(matchers[0].expressions[0])].sort((a, b) => a - b);
     const slots: number[] = [];
     let horizon = after + 366 * 100 * 86400000;
     while (slots.length < count) {
       const time = Math.min(...next.map(Number));
       if (through != null && time > through) break;
-      if (!Number.isFinite(time) || time > horizon) throw new Error('No matching calendar date');
+      if (!Number.isFinite(time) || time > horizon)
+        throw new Error('No matching calendar date');
       let accepted = false;
       next.forEach((date, index) => {
         if (+date !== time) return;
@@ -123,15 +144,17 @@ export function upcomingSlots(schedule: string, after: number, count = 1, throug
         // entire local day, including schedules that fire every second.
         const cursor = new Date(time);
         if (!valid) cursor.setHours(23, 59, 59, 999);
-        else if (through != null) cursor.setTime(time - time % 60000 + 59999);
+        else if (through != null) cursor.setTime(time - (time % 60000) + 59999);
         next[index] = matchers[index].getNextMatch(cursor);
       });
       if (accepted) {
         if (through == null) slots.push(time);
-        else for (const second of seconds) {
-          const slot = time - time % 60000 + second * 1000;
-          if (slot >= time && slot <= through && slots.length < count) slots.push(slot);
-        }
+        else
+          for (const second of seconds) {
+            const slot = time - (time % 60000) + second * 1000;
+            if (slot >= time && slot <= through && slots.length < count)
+              slots.push(slot);
+          }
         horizon = time + 366 * 100 * 86400000;
       }
     }

@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { runProcess, checkedProcess } = require('../../dist/internal/runtime/process');
+const {
+  runProcess,
+  checkedProcess,
+} = require('../../dist/internal/runtime/process');
 
 for (const language of ['zh', 'en', 'unsupported']) {
   test(`subprocess failures localize and reap failed writers: ${language}`, async () => {

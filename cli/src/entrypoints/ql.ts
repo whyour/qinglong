@@ -33,6 +33,7 @@ const remoteTaskActions = new Set([
   'list',
   'get',
   'run',
+  'wait',
   'stop',
   'logs',
 ]);

@@ -9,7 +9,9 @@ const net = require('node:net');
 const { randomUUID } = require('node:crypto');
 const { execFileSync, spawn } = require('node:child_process');
 const { createContext } = require('../../dist/internal/runtime/context');
-const { syncRepository } = require('../../dist/internal/subscription/subscriptionRunner');
+const {
+  syncRepository,
+} = require('../../dist/internal/subscription/subscriptionRunner');
 const git = process.platform === 'darwin' ? '/usr/bin/git' : 'git';
 
 for (const tls of [false, true])

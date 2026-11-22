@@ -456,7 +456,10 @@ test('sidebar and dialog use the same authoritative status even when old phase f
   );
   f.store.setJob({ status: 'ready', phase: 'downloading', percent: 62 });
   notice.render();
-  assert.equal(notice.nodes('button')[0].props['aria-label'], '下载完成，等待重启');
+  assert.equal(
+    notice.nodes('button')[0].props['aria-label'],
+    '下载完成，等待重启',
+  );
   f.store.setJob({ status: 'completed', phase: 'ready' });
   assert.equal(notice.render(), null);
   panel.render();

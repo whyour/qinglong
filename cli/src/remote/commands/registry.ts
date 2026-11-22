@@ -2,7 +2,20 @@ import { openCommands } from './openCommands';
 import { openOperations } from '../api/openOperations';
 import type { CommandSpec, CommandRegistry } from '../../shared/cli/registry';
 import { integer } from '../../shared/cli/arguments';
+import { validTriggerId } from '../trigger';
+import { fail } from '../../shared/errors';
+import { translate } from '../../shared/i18n/index';
 const positiveId = '<id>';
+const waitTimeout = {
+  type: 'string' as const,
+  description: 'Maximum wait in seconds (default 300; does not stop the task)',
+  default: '300',
+  integer: { min: 1, max: 86400 },
+};
+const triggerOption = {
+  type: 'string' as const,
+  description: 'Exact trigger ID returned by task run',
+};
 export const commands: readonly CommandSpec[] = [
   ...openCommands,
   {
@@ -62,7 +75,7 @@ export const commands: readonly CommandSpec[] = [
       },
     },
   },
-  ...['get', 'run', 'stop'].map(
+  ...['get', 'stop'].map(
     (action): CommandSpec => ({
       name: `task ${action}`,
       summary: `${action} a remote task by ID`,
@@ -72,12 +85,38 @@ export const commands: readonly CommandSpec[] = [
     }),
   ),
   {
+    name: 'task run',
+    summary: 'run a remote task by ID',
+    arguments: positiveId,
+    minimum: 1,
+    maximum: 1,
+    options: {
+      wait: {
+        type: 'boolean',
+        description: 'Wait for this run to finish successfully',
+      },
+      timeout: { ...waitTimeout, default: undefined },
+    },
+  },
+  {
+    name: 'task wait',
+    summary: 'Wait for an existing trigger without running the task again',
+    arguments: positiveId,
+    minimum: 1,
+    maximum: 1,
+    options: {
+      'trigger-id': { ...triggerOption, required: true },
+      timeout: waitTimeout,
+    },
+  },
+  {
     name: 'task logs',
     summary: 'Read the latest task log',
     arguments: positiveId,
     minimum: 1,
     maximum: 1,
     options: {
+      'trigger-id': triggerOption,
       tail: {
         type: 'string',
         short: 'n',
@@ -126,6 +165,19 @@ export const registry: CommandRegistry = {
   options: {},
   surface: 'public',
   validate(command) {
+    if (
+      command.name === 'task run' &&
+      command.values.timeout !== undefined &&
+      !command.values.wait
+    ) {
+      fail(translate(process.env, '--timeout 需要与 --wait 一起使用。'), 2);
+    }
+    if (
+      command.values['trigger-id'] !== undefined &&
+      !validTriggerId(command.values['trigger-id'])
+    ) {
+      fail(translate(process.env, '触发 ID 无效。'), 2);
+    }
     if (
       !openCommands.some((op) => op.name === command.name) &&
       /^(task|subscription) /.test(command.name) &&

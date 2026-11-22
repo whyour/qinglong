@@ -54,7 +54,10 @@ for (const [arch, arm, node] of [
     );
     const context = createContext(
       { root },
-      { PATH: process.platform === 'linux' ? '' : '/usr/bin:/bin', QL_LANG: 'en' },
+      {
+        PATH: process.platform === 'linux' ? '' : '/usr/bin:/bin',
+        QL_LANG: 'en',
+      },
     );
     const entry = path.join(context.paths.dir_static, 'build/app.js');
     let pid;

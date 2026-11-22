@@ -32,7 +32,9 @@ export async function loggedOperation<T>(
     .join('-');
   const receipt = new LifecycleReceipt(context, started);
   const triggerId = receipt.triggerId;
-  const logPath = context.env.real_log_path || `${action}/${stamp}${triggerId ? '-' + triggerId : ''}.log`;
+  const logPath =
+    context.env.real_log_path ||
+    `${action}/${stamp}${triggerId ? '-' + triggerId : ''}.log`;
   const file = within(context.paths.dir_log!, logPath, context.env);
   const persist = context.env.real_time !== 'true';
   if (persist) await fs.mkdir(path.dirname(file), { recursive: true });
@@ -48,14 +50,19 @@ export async function loggedOperation<T>(
   const report = async (final: boolean, code: number) => {
     if (!Number.isSafeInteger(id) || id <= 0) return;
     try {
-      await receipt.status({
-        ids: [id],
-        status: final ? '1' : '0',
-        pid: String(process.pid),
-        log_path: logPath,
-        last_execution_time: started,
-        last_running_time: final ? Math.floor((Date.now() - start) / 1000) : 0,
-      }, final ? code : undefined);
+      await receipt.status(
+        {
+          ids: [id],
+          status: final ? '1' : '0',
+          pid: String(process.pid),
+          log_path: logPath,
+          last_execution_time: started,
+          last_running_time: final
+            ? Math.floor((Date.now() - start) / 1000)
+            : 0,
+        },
+        final ? code : undefined,
+      );
     } catch {
       output(
         Buffer.from(

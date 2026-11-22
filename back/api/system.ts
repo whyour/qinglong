@@ -10,7 +10,7 @@ import UserService from '../services/user';
 import { t } from '../shared/i18n';
 import { isDefaultAuthInfo } from '../shared/auth';
 import { getUniqPath, handleLogPath, parseVersion } from '../config/util';
-import { findCronId } from '../shared/cronCommand';
+import { findCronId } from '../cron/execution/cronCommand';
 import dayjs from 'dayjs';
 import multer from 'multer';
 import { logStreamManager } from '../shared/logStreamManager';
@@ -63,8 +63,14 @@ export default (app: Router) => {
       try {
         const systemService = Container.get(SystemService);
         const data = await systemService.getSystemConfig();
-        res.send({ code: 200, data: { ...data, effectiveCronConcurrency: systemService.cronConcurrency,
-          availableCpus: containerResources().cpus } });
+        res.send({
+          code: 200,
+          data: {
+            ...data,
+            effectiveCronConcurrency: systemService.cronConcurrency,
+            availableCpus: containerResources().cpus,
+          },
+        });
       } catch (e) {
         return next(e);
       }

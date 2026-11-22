@@ -1,5 +1,5 @@
 import lockfile from 'proper-lockfile';
-import config from '../config';
+import config from '../../config/index';
 
 // HTTP and gRPC both mutate cron definitions. Hold one shared lock from the
 // initial DB read/write through scheduler registration (including rollback).

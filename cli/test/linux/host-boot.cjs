@@ -36,7 +36,12 @@ const { LocalApi } = require('../../dist/internal/runtime/api');
       { stdio: 'pipe' },
     );
   const nginxPid = Number(
-    (await fs.readFile(systemd ? '/run/nginx.pid' : '/run/nginx/nginx.pid', 'utf8')).trim(),
+    (
+      await fs.readFile(
+        systemd ? '/run/nginx.pid' : '/run/nginx/nginx.pid',
+        'utf8',
+      )
+    ).trim(),
   );
   assert.ok(Number.isSafeInteger(nginxPid) && nginxPid > 1);
   process.kill(nginxPid, 0);

@@ -8,12 +8,14 @@ test('BSD identity and parent lookups distinguish a vanished PID from ps failure
   const platform = Object.getOwnPropertyDescriptor(process, 'platform');
   const pid = process.pid;
   let result, field;
-  const probes = load('back/shared/cronProcess.ts', {
-    child_process: { spawnSync(command, args) {
-      assert.equal(command, 'ps');
-      assert.deepEqual(args, ['-p', String(pid), '-o', field + '=']);
-      return result;
-    } },
+  const probes = load('back/cron/execution/cronProcess.ts', {
+    child_process: {
+      spawnSync(command, args) {
+        assert.equal(command, 'ps');
+        assert.deepEqual(args, ['-p', String(pid), '-o', field + '=']);
+        return result;
+      },
+    },
   });
   Object.defineProperty(process, 'platform', { ...platform, value: 'darwin' });
   try {
@@ -30,7 +32,12 @@ test('BSD identity and parent lookups distinguish a vanished PID from ps failure
         { status: null, signal: 'SIGTERM', stdout: '', stderr: '' },
         { error: Object.assign(Error('spawn ps ENOENT'), { code: 'ENOENT' }) },
       ]) {
-        assert.throws(probe, error => !['ESRCH', 'ENOENT'].includes(error.code) && /ps|PID/.test(error.message));
+        assert.throws(
+          probe,
+          (error) =>
+            !['ESRCH', 'ENOENT'].includes(error.code) &&
+            /ps|PID/.test(error.message),
+        );
       }
     }
   } finally {
@@ -51,7 +58,16 @@ function fixture(descendants, probe = () => {}, birth, descendant) {
   }).outputText;
   const signals = [];
   const exports = {};
-  new Function('exports', 'process', 'psTree', 'fs', 'setTimeout', 'systemOwner', 'isProcessDescendant', code)(
+  new Function(
+    'exports',
+    'process',
+    'psTree',
+    'fs',
+    'setTimeout',
+    'systemOwner',
+    'isProcessDescendant',
+    code,
+  )(
     exports,
     {
       platform: 'linux',
@@ -63,7 +79,9 @@ function fixture(descendants, probe = () => {}, birth, descendant) {
     },
     async () => [...descendants],
     {},
-    setTimeout, birth, descendant,
+    setTimeout,
+    birth,
+    descendant,
   );
   return { killTask: exports.killTask, signals };
 }
@@ -114,41 +132,83 @@ test('a leaf retains SIGINT and a process tree retains child-first SIGTERM', asy
 test('verified stop ignores reused, vanished and reparented descendants from the tree snapshot', async () => {
   const seen = new Set();
   let rootExited = false;
-  const birth = pid => {
-    if (pid === 102 || (pid === 100 && rootExited)) throw Object.assign(Error('gone'), { code: 'ESRCH' });
+  const birth = (pid) => {
+    if (pid === 102 || (pid === 100 && rootExited))
+      throw Object.assign(Error('gone'), { code: 'ESRCH' });
     if (pid === 101 && seen.has(pid)) return 'replacement';
     seen.add(pid);
     return 'original-' + pid;
   };
-  const f = fixture([101, 102, 103], (pid, sig) => {
-    if (pid === 100 && sig === 'SIGTERM') rootExited = true;
-  }, birth, pid => pid !== 103);
-  await f.killTask(100, true, () => {}, async signal => signal());
+  const f = fixture(
+    [101, 102, 103],
+    (pid, sig) => {
+      if (pid === 100 && sig === 'SIGTERM') rootExited = true;
+    },
+    birth,
+    (pid) => pid !== 103,
+  );
+  await f.killTask(
+    100,
+    true,
+    () => {},
+    async (signal) => signal(),
+  );
   assert.deepEqual(f.signals, [[100, 'SIGTERM']]);
 });
 
 test('a root exiting immediately before TERM cannot claim a stop or signal a surviving child', async () => {
-  const f = fixture([101], (pid, sig) => {
-    if (pid === 100 && sig === 'SIGTERM') throw Object.assign(Error('gone'), { code: 'ESRCH' });
-  }, pid => 'birth-' + pid, () => true);
+  const f = fixture(
+    [101],
+    (pid, sig) => {
+      if (pid === 100 && sig === 'SIGTERM')
+        throw Object.assign(Error('gone'), { code: 'ESRCH' });
+    },
+    (pid) => 'birth-' + pid,
+    () => true,
+  );
   let committed = false;
-  await assert.rejects(f.killTask(100, true, () => {}, async signal => {
-    signal();
-    committed = true;
-  }), { code: 'ESRCH' });
+  await assert.rejects(
+    f.killTask(
+      100,
+      true,
+      () => {},
+      async (signal) => {
+        signal();
+        committed = true;
+      },
+    ),
+    { code: 'ESRCH' },
+  );
   assert.equal(committed, false);
   assert.deepEqual(f.signals, [[100, 'SIGTERM']]);
 });
 
 test('a descendant delivery failure after root TERM preserves the claim and still signals siblings', async () => {
   const denied = Object.assign(Error('denied'), { code: 'EPERM' });
-  const f = fixture([101, 102], (pid, signal) => {
-    if (pid === 102 && signal === 'SIGTERM') throw denied;
-  }, pid => 'birth-' + pid, () => true);
-  await assert.rejects(f.killTask(100, true, () => {}, async signal => {
-    const delivery = signal();
-    assert.equal(delivery, denied);
-    throw delivery;
-  }), error => error === denied);
-  assert.deepEqual(f.signals, [[100, 'SIGTERM'], [102, 'SIGTERM'], [101, 'SIGTERM']]);
+  const f = fixture(
+    [101, 102],
+    (pid, signal) => {
+      if (pid === 102 && signal === 'SIGTERM') throw denied;
+    },
+    (pid) => 'birth-' + pid,
+    () => true,
+  );
+  await assert.rejects(
+    f.killTask(
+      100,
+      true,
+      () => {},
+      async (signal) => {
+        const delivery = signal();
+        assert.equal(delivery, denied);
+        throw delivery;
+      },
+    ),
+    (error) => error === denied,
+  );
+  assert.deepEqual(f.signals, [
+    [100, 'SIGTERM'],
+    [102, 'SIGTERM'],
+    [101, 'SIGTERM'],
+  ]);
 });

@@ -1,19 +1,16 @@
 import { persistNotificationAudit } from '../shared/notificationAudit';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-import { Inject, Service } from 'typedi';
+import { Service } from 'typedi';
 import { parseBody, parseHeaders } from '../config/util';
 import { NotificationInfo } from '../data/notify';
 import { t } from '../shared/i18n';
-import UserService from './user';
+import { readNotificationMode } from '../data/notificationSettings';
 import { httpClient } from '../config/http';
 import { ProxyAgent } from 'undici';
 
 @Service()
 export default class NotificationService {
-  @Inject((type) => UserService)
-  private userService!: UserService;
-
   private modeMap = new Map([
     ['gotify', this.gotify],
     ['goCqHttpBot', this.goCqHttpBot],
@@ -59,7 +56,7 @@ export default class NotificationService {
     let type: string | undefined;
     let success = false;
     try {
-      const saved = await this.userService.getNotificationMode();
+      const saved = await readNotificationMode();
       type = notificationInfo?.type || saved.type;
       if (type) {
         this.title = title;

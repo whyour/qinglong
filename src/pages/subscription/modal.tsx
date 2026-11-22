@@ -153,7 +153,11 @@ const SubscriptionModal = ({
           style={{ width: 'calc(100% - 100px)' }}
           onChange={numberChange}
         />
-        <Select value={intervalType} onChange={intervalTypeChange} style={{ width: 100 }}>
+        <Select
+          value={intervalType}
+          onChange={intervalTypeChange}
+          style={{ width: 100 }}
+        >
           <Option value="days">{intl.get('天')}</Option>
           <Option value="hours">{intl.get('时')}</Option>
           <Option value="minutes">{intl.get('分')}</Option>
@@ -213,10 +217,18 @@ const SubscriptionModal = ({
     let justClosed = false;
     for (const ch of text) {
       if (inDouble) {
-        if (ch === '"') { inDouble = false; justClosed = true; continue; }
+        if (ch === '"') {
+          inDouble = false;
+          justClosed = true;
+          continue;
+        }
         current += ch;
       } else if (inSingle) {
-        if (ch === "'") { inSingle = false; justClosed = true; continue; }
+        if (ch === "'") {
+          inSingle = false;
+          justClosed = true;
+          continue;
+        }
         current += ch;
       } else if (ch === '"') {
         inDouble = true;
@@ -225,7 +237,11 @@ const SubscriptionModal = ({
         inSingle = true;
         justClosed = false;
       } else if (ch === ' ' || ch === '\t') {
-        if (current || justClosed) { args.push(current); current = ''; justClosed = false; }
+        if (current || justClosed) {
+          args.push(current);
+          current = '';
+          justClosed = false;
+        }
       } else {
         current += ch;
         justClosed = false;
@@ -250,8 +266,8 @@ const SubscriptionModal = ({
         type === 'raw'
           ? 'file'
           : url.startsWith('http')
-            ? 'public-repo'
-            : 'private-repo';
+          ? 'public-repo'
+          : 'private-repo';
 
       form.setFieldsValue({
         type: _type,
@@ -412,7 +428,9 @@ const SubscriptionModal = ({
                   ) {
                     return Promise.resolve();
                   } else {
-                    return Promise.reject(intl.get('Subscription表达式格式有误'));
+                    return Promise.reject(
+                      intl.get('Subscription表达式格式有误'),
+                    );
                   }
                 } catch (e) {
                   return Promise.reject(intl.get('Subscription表达式格式有误'));

@@ -39,7 +39,9 @@ for (const conflict of ['stop', 'newer-queue', 'stop-requeue']) {
         pid: DataTypes.INTEGER,
       });
       await db.sync();
-  await db.transaction((tx) => require('../../back/shared/triggerHistory').installTriggerHistory(db, tx));
+      await db.transaction((tx) =>
+        require('../../back/cron/history').installTriggerHistory(db, tx),
+      );
       await crons.create({
         id: 1,
         status: 3,
@@ -75,7 +77,7 @@ for (const conflict of ['stop', 'newer-queue', 'stop-requeue']) {
         },
         '../config/const': {},
         '../schedule/client': {},
-        '../shared/pLimit': {
+        '../cron/execution/cronLimit': {
           manualRunWithCronLimit: async (fn) => {
             try {
               return await fn();
@@ -112,7 +114,8 @@ for (const conflict of ['stop', 'newer-queue', 'stop-requeue']) {
         await service.stop([1]);
         // Queue again through the real API; leave the new runner pending.
         const pendingRuns = [];
-        service.runSingle = async (id, token) => pendingRuns.push({ id, token });
+        service.runSingle = async (id, token) =>
+          pendingRuns.push({ id, token });
         await service.run([1]);
         assert.equal(pendingRuns.length, 1);
         assert.equal(
@@ -176,7 +179,9 @@ test('a runner waiting for a concurrency slot cannot adopt a newer queued genera
     last_execution_time: DataTypes.INTEGER,
   });
   await db.sync();
-  await db.transaction((tx) => require('../../back/shared/triggerHistory').installTriggerHistory(db, tx));
+  await db.transaction((tx) =>
+    require('../../back/cron/history').installTriggerHistory(db, tx),
+  );
   await crons.create({ id: 1, status: 1, log_path: 'same.log' });
   const waiting = [];
   const CronService = load('back/services/cron.ts', {
@@ -194,7 +199,7 @@ test('a runner waiting for a concurrency slot cannot adopt a newer queued genera
     },
     '../config/const': {},
     '../schedule/client': {},
-    '../shared/pLimit': {
+    '../cron/execution/cronLimit': {
       manualRunWithCronLimit: (fn) => {
         waiting.push(fn);
         return Promise.resolve();

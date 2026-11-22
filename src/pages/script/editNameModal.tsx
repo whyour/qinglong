@@ -1,15 +1,7 @@
 import { FilePicker } from '@/components/fileBrowser';
 import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  message,
-  Input,
-  Form,
-  Select,
-  Upload,
-  Radio,
-} from 'antd';
+import { Modal, message, Input, Form, Select, Upload, Radio } from 'antd';
 import { request } from '@/utils/http';
 import config from '@/utils/config';
 import { UploadOutlined } from '@ant-design/icons';

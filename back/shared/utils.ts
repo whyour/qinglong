@@ -1,8 +1,15 @@
 import { lock } from 'proper-lockfile';
 import os from 'os';
 import path from 'path';
-import { writeFile, open, chmod } from 'fs/promises';
-import { fileExist } from '../config/util';
+import { writeFile, open, chmod, access } from 'fs/promises';
+export async function fileExist(file: any) {
+  try {
+    await access(file);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
 
 export function getUniqueLockPath(filePath: string) {
   const sanitizedPath = filePath

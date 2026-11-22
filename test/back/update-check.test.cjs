@@ -17,7 +17,7 @@ function service(request) {
     '../data/dependence': {},
     '../data/notify': {},
     '../data/system': {},
-    '../shared/pLimit': {},
+    '../cron/execution/cronLimit': {},
     '../schedule/client': {},
     '../shared/i18n': { t: (key) => key },
     './notify': class {},

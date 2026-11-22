@@ -212,14 +212,18 @@ async function smokeDependencies(source, signal) {
   `;
   // Match the server's normal runtime. Node 20.18's built-in HTTP parser needs
   // WebAssembly, which --jitless disables; only archive workers need that flag.
-  await execute(process.execPath, [...serverRuntimeArgs(process), '-e', probe], {
-    cwd: source,
-    env: { ...process.env, NODE_PATH: '', NODE_OPTIONS: '' },
-    // ARM1176 devices need the same startup allowance as the backend probe.
-    // Keep this bounded and cancellable without forcing an unnecessary repair.
-    timeout: nodeRuntimeArgs().length ? 300000 : 30000,
-    signal,
-  });
+  await execute(
+    process.execPath,
+    [...serverRuntimeArgs(process), '-e', probe],
+    {
+      cwd: source,
+      env: { ...process.env, NODE_PATH: '', NODE_OPTIONS: '' },
+      // ARM1176 devices need the same startup allowance as the backend probe.
+      // Keep this bounded and cancellable without forcing an unnecessary repair.
+      timeout: nodeRuntimeArgs().length ? 300000 : 30000,
+      signal,
+    },
+  );
 }
 
 async function extractArchive(archive, destination) {

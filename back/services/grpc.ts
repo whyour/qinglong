@@ -27,20 +27,29 @@ export class GrpcServerService {
   async initialize() {
     try {
       this.server.addService(HealthService, { check });
-      this.server.addService(CronService, { addCron: registeredAdd, delCron: registeredDelete, setConcurrency });
+      this.server.addService(CronService, {
+        addCron: registeredAdd,
+        delCron: registeredDelete,
+        setConcurrency,
+      });
       this.server.addService(ApiService, Api);
 
       const tlsConfig = await initGrpcCerts();
       const credentials = ServerCredentials.createSsl(
         Buffer.from(tlsConfig.caCert),
-        [{ cert_chain: Buffer.from(tlsConfig.serverCert), private_key: Buffer.from(tlsConfig.serverKey) }],
+        [
+          {
+            cert_chain: Buffer.from(tlsConfig.serverCert),
+            private_key: Buffer.from(tlsConfig.serverKey),
+          },
+        ],
         true,
       );
 
       const grpcPort = config.grpcPort;
       const hostsToTry = [
         config.bindHostGrpc,
-        ...(config.bindHostGrpc === '::' ? ['0.0.0.0'] : [])
+        ...(config.bindHostGrpc === '::' ? ['0.0.0.0'] : []),
       ];
       const bindAsync = promisify(this.server.bindAsync).bind(this.server);
 
@@ -50,15 +59,20 @@ export class GrpcServerService {
         try {
           const address = this.formatGrpcAddress(host, grpcPort);
           const boundPort = await bindAsync(address, credentials);
-          Logger.debug(`[boot] gRPC service started successfully on ${address}`);
+          Logger.debug(
+            `[boot] gRPC service started successfully on ${address}`,
+          );
           metricsService.record('grpc_service_start', 1, {
             port: grpcPort.toString(),
-            host
+            host,
           });
           return boundPort;
         } catch (err) {
           lastError = err as Error;
-          Logger.warn(`Failed to bind gRPC on ${host}:${grpcPort}, trying next...`, err);
+          Logger.warn(
+            `Failed to bind gRPC on ${host}:${grpcPort}, trying next...`,
+            err,
+          );
         }
       }
 

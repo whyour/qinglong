@@ -10,7 +10,8 @@ export function init(version: string) {
     },
     'vs/nls': {
       availableLanguages: {
-        '*': intl.getInitOptions().currentLocale === 'en' ? 'i-default' : 'zh-cn',
+        '*':
+          intl.getInitOptions().currentLocale === 'en' ? 'i-default' : 'zh-cn',
       },
     },
   });

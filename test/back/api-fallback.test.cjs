@@ -12,7 +12,7 @@ test('unknown API requests return JSON 404 while env.js and SPA deep links work'
   fs.writeFileSync(path.join(dir, 'static/dist/index.html'), 'SPA');
   const app = express();
   load('back/loaders/express.ts', {
-    '../api': () => express.Router(),
+    '../api/index': () => express.Router(),
     './logger': { error() {} },
     '../config': {
       rootPath: dir,

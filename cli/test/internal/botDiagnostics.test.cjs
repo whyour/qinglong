@@ -6,14 +6,26 @@ const vm = require('node:vm');
 
 test('bot integration failure does not print environment-derived error details', async () => {
   const messages = [];
-  const childProcess = { env: { QL_PANEL_INTEGRATION: '1', QL_CLIENT_SECRET: 'sensitive-marker' }, exitCode: 0 };
-  const source = fs.readFileSync(path.join(__dirname, '../linux/bot-install.cjs'), 'utf8');
+  const childProcess = {
+    env: { QL_PANEL_INTEGRATION: '1', QL_CLIENT_SECRET: 'sensitive-marker' },
+    exitCode: 0,
+  };
+  const source = fs.readFileSync(
+    path.join(__dirname, '../linux/bot-install.cjs'),
+    'utf8',
+  );
   vm.runInNewContext(source, {
     process: childProcess,
     console: { error: (message) => messages.push(message) },
     require: (name) => {
-      if (name === 'node:fs/promises') return { mkdtemp: async () => '/fixture' };
-      if (name === '../../dist/internal/runtime/context') return { createContext: () => { throw new Error(childProcess.env.QL_CLIENT_SECRET); } };
+      if (name === 'node:fs/promises')
+        return { mkdtemp: async () => '/fixture' };
+      if (name === '../../dist/internal/runtime/context')
+        return {
+          createContext: () => {
+            throw new Error(childProcess.env.QL_CLIENT_SECRET);
+          },
+        };
       if (name === '../../dist/internal/maintenance/bot') return {};
       return require(name);
     },

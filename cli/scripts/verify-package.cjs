@@ -30,9 +30,23 @@ try {
       { cwd: root },
     ),
   )[0];
-  for (const name of ['README.md', 'README.en.md', 'LICENSE', 'dist/npm/commander-LICENSE'])
-    assert.ok(manifest.files.some((file) => file.path === name), name);
-  assert.ok(manifest.files.every((file) => /^(dist\/npm\/|skills\/qinglong-cli\/|README(?:\.en)?\.md$|LICENSE$|package\.json$)/.test(file.path)));
+  for (const name of [
+    'README.md',
+    'README.en.md',
+    'LICENSE',
+    'dist/npm/commander-LICENSE',
+  ])
+    assert.ok(
+      manifest.files.some((file) => file.path === name),
+      name,
+    );
+  assert.ok(
+    manifest.files.every((file) =>
+      /^(dist\/npm\/|skills\/qinglong-cli\/|README(?:\.en)?\.md$|LICENSE$|package\.json$)/.test(
+        file.path,
+      ),
+    ),
+  );
   assert.ok(
     manifest.files.some((file) => file.path === 'skills/qinglong-cli/SKILL.md'),
   );
@@ -64,10 +78,16 @@ try {
   );
   assert.equal(Object.keys(metadata.dependencies || {}).length, 0);
   assert.equal(metadata.bin['ql-dev-cli'], undefined);
-  assert.ok(!manifest.files.some(file => /^dist\/developer(?:\/|\.)/.test(file.path)));
+  assert.ok(
+    !manifest.files.some((file) => /^dist\/developer(?:\/|\.)/.test(file.path)),
+  );
   assert.deepEqual(metadata.bin, { ql: 'dist/npm/ql.js' });
   for (const reference of ['panel.md', 'openapi.md'])
-    assert.ok(fs.existsSync(path.join(installed, 'skills/qinglong-cli/references', reference)));
+    assert.ok(
+      fs.existsSync(
+        path.join(installed, 'skills/qinglong-cli/references', reference),
+      ),
+    );
 
   assert.equal(
     fs.readFileSync(
@@ -90,12 +110,32 @@ try {
     assert.match(output, /Usage:|用法|usage/i);
     entries.push(name);
   }
-  assert.ok(!manifest.files.some(file => file.path.includes('qinglong-local')));
-  for (const args of [['reload'], ['resetpwd', 'fixture'], ['local', 'check'], ['task', 'exec', 'fixture.js'], ['task', 'fixture.js'], ['repo', 'fixture'], ['dev', 'release']]) {
-    const result = spawnSync(process.execPath, [path.join(installed, metadata.bin.ql), ...args, '--json'], {
-      cwd: temp, encoding: 'utf8', timeout: 10000,
-      env: { PATH: process.env.PATH, QL_CLI_CONFIG: path.join(temp, 'missing.json'), QL_DIR: '/nonexistent-panel' },
-    });
+  assert.ok(
+    !manifest.files.some((file) => file.path.includes('qinglong-local')),
+  );
+  for (const args of [
+    ['reload'],
+    ['resetpwd', 'fixture'],
+    ['local', 'check'],
+    ['task', 'exec', 'fixture.js'],
+    ['task', 'fixture.js'],
+    ['repo', 'fixture'],
+    ['dev', 'release'],
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      [path.join(installed, metadata.bin.ql), ...args, '--json'],
+      {
+        cwd: temp,
+        encoding: 'utf8',
+        timeout: 10000,
+        env: {
+          PATH: process.env.PATH,
+          QL_CLI_CONFIG: path.join(temp, 'missing.json'),
+          QL_DIR: '/nonexistent-panel',
+        },
+      },
+    );
     assert.equal(result.status, 2, JSON.stringify(args) + result.stderr);
     assert.equal(result.stdout, '');
     assert.equal(JSON.parse(result.stderr).code, 2);
@@ -104,7 +144,10 @@ try {
   if (process.env.QL_CLI_PACKAGE_OUTPUT) {
     const output = path.resolve(process.env.QL_CLI_PACKAGE_OUTPUT);
     fs.mkdirSync(output, { recursive: true });
-    fs.copyFileSync(path.join(temp, manifest.filename), path.join(output, manifest.filename));
+    fs.copyFileSync(
+      path.join(temp, manifest.filename),
+      path.join(output, manifest.filename),
+    );
   }
   process.stdout.write(
     JSON.stringify(

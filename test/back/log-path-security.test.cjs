@@ -66,6 +66,11 @@ test('log initialization rejects unsafe paths before mkdir or file writes', asyn
     './share': {},
     '../loaders/logger': {},
     '../shared/utils': {
+      fileExist: (file) =>
+        fs.access(file).then(
+          () => true,
+          () => false,
+        ),
       writeFileWithLock: (file, data) => fs.writeFile(file, data),
     },
     '../data/dependence': { DependenceTypes: {} },
@@ -103,7 +108,7 @@ test('manual execution rejects escaping log names before creating directories or
     '../config/util': {},
     '../config/const': {},
     '../schedule/client': {},
-    '../shared/pLimit': {
+    '../cron/execution/cronLimit': {
       manualRunWithCronLimit: async (fn) => {
         try {
           return await fn();
@@ -157,48 +162,89 @@ test('manual execution rejects escaping log names before creating directories or
   assert.deepEqual(await fs.readdir(outside), ['victim.log']);
 });
 
-test('creating log folders normalizes valid absolute paths and rejects sibling or symlink escapes before mkdir', async t => {
+test('creating log folders normalizes valid absolute paths and rejects sibling or symlink escapes before mkdir', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-log-root-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const logs = path.join(root, 'log'), outside = path.join(root, 'log-other');
+  const logs = path.join(root, 'log'),
+    outside = path.join(root, 'log-other');
   await Promise.all([fs.mkdir(logs), fs.mkdir(outside)]);
   await fs.symlink(outside, path.join(logs, 'escape'));
   const Service = load(path.resolve('back/services/cron.ts'), {
-    '../config': { logPath: logs }, '../config/util': {}, '../data/cron': {},
-    '../data/runningInstance': {}, '../schedule/client': {}, '../shared/pLimit': {},
-    '../shared/logStreamManager': {}, '../loaders/logger': {},
+    '../config': { logPath: logs },
+    '../config/util': {},
+    '../data/cron': {},
+    '../data/runningInstance': {},
+    '../schedule/client': {},
+    '../cron/execution/cronLimit': {},
+    '../shared/logStreamManager': {},
+    '../loaders/logger': {},
   }).default;
   const service = new Service({});
-  for (const candidate of [path.join(outside, 'new'), 'escape/new', '../log-other/new'])
-    await assert.rejects(service.getLogName({ log_name: candidate }), { status: 400 });
+  for (const candidate of [
+    path.join(outside, 'new'),
+    'escape/new',
+    '../log-other/new',
+  ])
+    await assert.rejects(service.getLogName({ log_name: candidate }), {
+      status: 400,
+    });
   assert.deepEqual(await fs.readdir(outside), []);
-  assert.equal(await service.getLogName({ log_name: path.join(logs, 'safe') }), 'safe');
+  assert.equal(
+    await service.getLogName({ log_name: path.join(logs, 'safe') }),
+    'safe',
+  );
   assert.ok((await fs.stat(path.join(logs, 'safe'))).isDirectory());
 });
 
-test('a cursor from the previous run reads the tail of the current log instead of splicing two files', async t => {
+test('a cursor from the previous run reads the tail of the current log instead of splicing two files', async (t) => {
   const { root } = await fixture(t);
   const Service = load(path.resolve('back/services/cron.ts'), {
-    '../config': {logPath: root}, '../config/util': {fileExist: async p => (await fs.stat(p)).isFile()},
-    '../data/cron': {CrontabStatus: {running: 0, queued: 3}}, '../data/runningInstance': {},
-    '../schedule/client': {}, '../shared/pLimit': {}, '../shared/logStreamManager': {}, '../loaders/logger': {},
+    '../config': { logPath: root },
+    '../config/util': { fileExist: async (p) => (await fs.stat(p)).isFile() },
+    '../data/cron': { CrontabStatus: { running: 0, queued: 3 } },
+    '../data/runningInstance': {},
+    '../schedule/client': {},
+    '../cron/execution/cronLimit': {},
+    '../shared/logStreamManager': {},
+    '../loaders/logger': {},
   }).default;
   const service = new Service({});
-  service.getDb = async () => ({status: 0, log_path: 'current.log'});
+  service.getDb = async () => ({ status: 0, log_path: 'current.log' });
   await fs.writeFile(path.join(root, 'current.log'), 'current example');
-  const resumed = await service.log(1, {offset: 3, previousPath: 'current.log', limit: 7});
+  const resumed = await service.log(1, {
+    offset: 3,
+    previousPath: 'current.log',
+    limit: 7,
+  });
   assert.equal(resumed.content, 'rent ex');
-  const switched = await service.log(1, {offset: 3, previousPath: '../previous.log', limit: 7});
+  const switched = await service.log(1, {
+    offset: 3,
+    previousPath: '../previous.log',
+    limit: 7,
+  });
   assert.equal(switched.content, 'example');
   assert.equal(switched.logPath, 'current.log');
-  const followed = await service.log(1, { offset: 3, previousPath: 'previous.log', limit: 7, follow: true });
+  const followed = await service.log(1, {
+    offset: 3,
+    previousPath: 'previous.log',
+    limit: 7,
+    follow: true,
+  });
   assert.equal(followed.offset, 0);
   assert.equal(followed.content, 'current');
-  const rest = await service.log(1, { offset: followed.nextOffset, cursor: followed.cursor, previousPath: followed.logPath });
+  const rest = await service.log(1, {
+    offset: followed.nextOffset,
+    cursor: followed.cursor,
+    previousPath: followed.logPath,
+  });
   assert.equal(rest.reset, false);
   assert.equal(followed.content + rest.content, 'current example');
 
-  service.getDb = async () => ({ status: 3, queued_token: 'new-run', log_path: 'current.log' });
+  service.getDb = async () => ({
+    status: 3,
+    queued_token: 'new-run',
+    log_path: 'current.log',
+  });
   const queued = await service.log(1, { follow: true, tail: true });
   assert.equal(queued.status, 'running');
   assert.equal(queued.nextOffset, 0);

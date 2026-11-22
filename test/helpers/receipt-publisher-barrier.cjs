@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { writeExit } = require('../../back/shared/managedExit.cjs');
+const { writeExit } = require('../../back/cron/settlement/exitReceipt.cjs');
 const [stage, time] = process.argv.slice(2);
 const write = fs.writeFileSync;
 function checkpoint(point) {

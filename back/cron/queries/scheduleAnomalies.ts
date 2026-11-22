@@ -23,7 +23,11 @@ export class AnomalyPage {
   private selected: ScheduleAnomaly[] = [];
   static readonly size = 25;
 
-  constructor(readonly kind: AnomalyKind, private page: number, private previous?: string) {}
+  constructor(
+    readonly kind: AnomalyKind,
+    private page: number,
+    private previous?: string,
+  ) {}
 
   add(row: ScheduleAnomaly) {
     this.hash.update(JSON.stringify(row)).update('\n');
@@ -36,7 +40,13 @@ export class AnomalyPage {
     const revision = this.hash.digest('hex');
     const changed = !!this.previous && revision !== this.previous;
     const reset = changed || (this.page > 1 && !this.selected.length);
-    return { rows: reset ? this.first : this.selected, total: this.total,
-      page: reset ? 1 : this.page, pageSize: AnomalyPage.size, revision, changed };
+    return {
+      rows: reset ? this.first : this.selected,
+      total: this.total,
+      page: reset ? 1 : this.page,
+      pageSize: AnomalyPage.size,
+      revision,
+      changed,
+    };
   }
 }

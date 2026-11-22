@@ -59,15 +59,21 @@ require(entry).main(JSON.parse(process.argv[2])).then(code => {
     if (args.includes('--help'))
       assert.ok(
         !result.modules.some((module) =>
-          /^remote[/\\](commands[/\\](auth|open|task|subscription)\.js|api[/\\](client|download)\.js|auth[/\\])/.test(module),
+          /^remote[/\\](commands[/\\](auth|open|task|subscription)\.js|api[/\\](client|download)\.js|auth[/\\])/.test(
+            module,
+          ),
         ),
         'Help eagerly loaded command implementation',
       );
     if (args[0] === 'task' && !args.includes('--help'))
-      assert.ok(result.modules.includes(path.join('remote', 'commands', 'task.js')));
+      assert.ok(
+        result.modules.includes(path.join('remote', 'commands', 'task.js')),
+      );
     if (args[0] === 'subscription')
       assert.ok(
-        result.modules.includes(path.join('remote', 'commands', 'subscription.js')),
+        result.modules.includes(
+          path.join('remote', 'commands', 'subscription.js'),
+        ),
       );
   }
 });

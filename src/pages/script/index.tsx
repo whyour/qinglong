@@ -72,7 +72,9 @@ const Script = () => {
   const savedContentRef = useRef('');
   const currentKeyRef = useRef(currentNode?.key);
   const detailRequest = useRef<AbortController>();
-  const [readState, setReadState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const [readState, setReadState] = useState<'loading' | 'ready' | 'failed'>(
+    'loading',
+  );
   useEffect(() => () => detailRequest.current?.abort(), []);
   currentKeyRef.current = currentNode?.key;
 
@@ -84,7 +86,8 @@ const Script = () => {
     const content =
       !isPhone && editorRef.current ? editorRef.current.getValue() : value;
     return (
-      isEditing && readState === 'ready' &&
+      isEditing &&
+      readState === 'ready' &&
       content.replace(/\r\n/g, '\n') !==
         savedContentRef.current.replace(/\r\n/g, '\n')
     );
@@ -103,10 +106,12 @@ const Script = () => {
       .get(
         `${config.apiPrefix}scripts/detail?file=${encodeURIComponent(
           node.title,
-        )}&path=${encodeURIComponent(node.parent || '')}`, { signal: controller.signal, retryInPlace: true },
+        )}&path=${encodeURIComponent(node.parent || '')}`,
+        { signal: controller.signal, retryInPlace: true },
       )
       .then(({ code, data }) => {
-        if (controller.signal.aborted || currentKeyRef.current !== node.key) return;
+        if (controller.signal.aborted || currentKeyRef.current !== node.key)
+          return;
         if (code === 200) {
           setReadState('ready');
           savedContentRef.current = data;
@@ -115,7 +120,10 @@ const Script = () => {
             options.callback();
           }
         } else setReadState('failed');
-      }).catch(() => { if (!controller.signal.aborted) setReadState('failed'); });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setReadState('failed');
+      });
   };
 
   const downloadScript = () => {
@@ -175,7 +183,11 @@ const Script = () => {
         : value;
       const originalContent = savedContentRef.current.replace(/\r\n/g, '\n');
 
-      if (currentContent !== originalContent && isEditing && readState === 'ready') {
+      if (
+        currentContent !== originalContent &&
+        isEditing &&
+        readState === 'ready'
+      ) {
         Modal.confirm({
           title: intl.get('确认离开'),
           content: <>{intl.get('当前文件未保存，确认离开吗')}</>,
@@ -228,7 +240,12 @@ const Script = () => {
           content,
         },
       );
-      if (result?.code === 200 && currentKeyRef.current === node.key && selection === detailRequest.current && !selection?.signal.aborted) {
+      if (
+        result?.code === 200 &&
+        currentKeyRef.current === node.key &&
+        selection === detailRequest.current &&
+        !selection?.signal.aborted
+      ) {
         savedContentRef.current = content;
         setValue(content);
         handleIsEditing(node.title, false);
@@ -268,7 +285,7 @@ const Script = () => {
           .then(({ code }) => {
             if (code === 200) {
               message.success(intl.get('删除成功'));
-              setRevision(n => n + 1);
+              setRevision((n) => n + 1);
               initState();
             }
           });
@@ -282,7 +299,7 @@ const Script = () => {
 
   const handleRenameFileCancel = () => {
     setIsRenameFileModalVisible(false);
-    setRevision(n => n + 1);
+    setRevision((n) => n + 1);
     initState();
   };
 
@@ -306,7 +323,7 @@ const Script = () => {
       const parts = key.split('/');
       const item = { key, title: parts.pop()!, parent: parts.join('/'), type };
       setDirectory(item.parent);
-      setRevision(n => n + 1);
+      setRevision((n) => n + 1);
       onSelect(key, item);
       handleIsEditing(item.title, true);
     }
@@ -466,7 +483,11 @@ const Script = () => {
       title={
         <>
           {select}
-          {currentNode && readState === 'failed' && <Button type="link" onClick={() => getDetail(currentNode)}>{intl.get('重试')}</Button>}
+          {currentNode && readState === 'failed' && (
+            <Button type="link" onClick={() => getDetail(currentNode)}>
+              {intl.get('重试')}
+            </Button>
+          )}
           {currentNode?.size != null && (
             <span
               style={{
@@ -505,14 +526,25 @@ const Script = () => {
           : []),
         ...(isPhone
           ? [
-              <FilePicker source="scripts" value={select} revision={revision} initialDirectory={directory} onSelect={node => onTreeSelect([node.key], { node })} />,
+              <FilePicker
+                source="scripts"
+                value={select}
+                revision={revision}
+                initialDirectory={directory}
+                onSelect={(node) => onTreeSelect([node.key], { node })}
+              />,
               <Dropdown menu={menu} trigger={['click']}>
                 <Button type="primary" icon={<EllipsisOutlined />} />
               </Dropdown>,
             ]
           : isEditing
           ? [
-              <Button type="primary" onClick={saveFile} loading={saving} disabled={readState !== 'ready'}>
+              <Button
+                type="primary"
+                onClick={saveFile}
+                loading={saving}
+                disabled={readState !== 'ready'}
+              >
                 {intl.get('保存')}
               </Button>,
               <Button type="primary" onClick={cancelEdit}>
@@ -598,7 +630,14 @@ const Script = () => {
           /*// @ts-ignore*/
           <SplitPane split="vertical" size={200} maxSize={-100}>
             <div className={styles['left-tree-container']}>
-              <FileBrowser source="scripts" value={select} revision={revision} initialDirectory={directory} onSelect={node => onTreeSelect([node.key], { node })} onDoubleClick={node => onDoubleClick(null, node)} />
+              <FileBrowser
+                source="scripts"
+                value={select}
+                revision={revision}
+                initialDirectory={directory}
+                onSelect={(node) => onTreeSelect([node.key], { node })}
+                onDoubleClick={(node) => onDoubleClick(null, node)}
+              />
             </div>
             {showMonaco ? (
               <Editor
@@ -648,9 +687,7 @@ const Script = () => {
           />
         )}
         {isAddFileModalVisible && (
-          <EditScriptNameModal
-            handleCancel={addFileModalClose}
-          />
+          <EditScriptNameModal handleCancel={addFileModalClose} />
         )}
         {isRenameFileModalVisible && (
           <RenameModal

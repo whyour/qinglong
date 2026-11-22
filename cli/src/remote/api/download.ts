@@ -14,7 +14,10 @@ export async function saveResponse(
   try {
     if (!response.body) throw new Error('Missing response body');
     const stream = handle.createWriteStream();
-    await pipeline(Readable.fromWeb(response.body as ReadableStream<Uint8Array>), stream);
+    await pipeline(
+      Readable.fromWeb(response.body as ReadableStream<Uint8Array>),
+      stream,
+    );
     return { code: 200, data: { path, bytes: stream.bytesWritten } };
   } catch (error) {
     await unlink(path).catch(() => undefined);

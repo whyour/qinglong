@@ -165,13 +165,14 @@ async function loadExistingCerts(): Promise<GrpcTlsConfig | null> {
     return null;
   }
 
-  const [caCert, serverCert, serverKey, clientCert, clientKey] = await Promise.all([
-    fs.readFile(caCertPath, 'utf-8'),
-    fs.readFile(serverCertPath, 'utf-8'),
-    fs.readFile(serverKeyPath, 'utf-8'),
-    fs.readFile(clientCertPath, 'utf-8'),
-    fs.readFile(clientKeyPath, 'utf-8'),
-  ]);
+  const [caCert, serverCert, serverKey, clientCert, clientKey] =
+    await Promise.all([
+      fs.readFile(caCertPath, 'utf-8'),
+      fs.readFile(serverCertPath, 'utf-8'),
+      fs.readFile(serverKeyPath, 'utf-8'),
+      fs.readFile(clientCertPath, 'utf-8'),
+      fs.readFile(clientKeyPath, 'utf-8'),
+    ]);
 
   Logger.info('[boot] Loaded existing gRPC mTLS certificates from disk');
   return { caCert, serverCert, serverKey, clientCert, clientKey };

@@ -74,7 +74,9 @@ export function isAllowedTaskEnvName(name: unknown): name is string {
   );
 }
 
-export function assertAllowedTaskEnvName(name: unknown): asserts name is string {
+export function assertAllowedTaskEnvName(
+  name: unknown,
+): asserts name is string {
   if (!isAllowedTaskEnvName(name)) {
     throw Object.assign(new Error(t('环境变量名称不可使用')), {
       status: 400,

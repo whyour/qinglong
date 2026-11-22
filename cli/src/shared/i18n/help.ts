@@ -1,6 +1,8 @@
 const chinese: Record<string, string> = {
-  'Query object as JSON, @file or - for stdin': '查询参数 JSON；支持 @文件或 - 从 stdin 读取',
-  'Request body as JSON, @file or - for stdin': '请求体 JSON；支持 @文件或 - 从 stdin 读取',
+  'Query object as JSON, @file or - for stdin':
+    '查询参数 JSON；支持 @文件或 - 从 stdin 读取',
+  'Request body as JSON, @file or - for stdin':
+    '请求体 JSON；支持 @文件或 - 从 stdin 读取',
   'Request timeout in seconds': '请求超时秒数（默认 30，最多 3600）',
   'Local file to upload': '要上传的本机文件',
   'Save response to a new local file': '响应保存到新文件（不覆盖已有文件）',
@@ -8,9 +10,11 @@ const chinese: Record<string, string> = {
   'Command executed by the remote panel': '由远程面板执行的命令',
   'Cron schedule': '定时规则',
   'Comma-separated application permissions': '应用权限，用逗号分隔',
-  'Explicitly include application credentials in output': '显式输出应用密钥（默认隐藏）',
+  'Explicitly include application credentials in output':
+    '显式输出应用密钥（默认隐藏）',
   'Call a registered OpenAPI route': '调用已登记的 OpenAPI 路由',
-  'List supported OpenAPI routes and commands': '列出支持的 OpenAPI 路由和对应命令',
+  'List supported OpenAPI routes and commands':
+    '列出支持的 OpenAPI 路由和对应命令',
   'Subscription type': '订阅类型：public-repo/private-repo/file',
   'Subscription url': '订阅地址',
   'Subscription alias': '订阅别名',
@@ -32,6 +36,12 @@ const chinese: Record<string, string> = {
   'Page number': '页码',
   'Page size': '每页数量',
   'Read the latest task log': '读取最新任务日志',
+  'Maximum wait in seconds (default 300; does not stop the task)':
+    '最长等待秒数（默认 300；不会停止任务）',
+  'Exact trigger ID returned by task run': 'task run 返回的本轮触发 ID',
+  'Wait for this run to finish successfully': '等待本轮执行成功完成',
+  'Wait for an existing trigger without running the task again':
+    '等待已有触发结果，不会重新运行任务',
   'Last N lines': '最后 N 行',
   'List panel subscriptions': '列出面板订阅',
   'Search subscriptions': '搜索订阅',

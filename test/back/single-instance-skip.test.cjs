@@ -8,8 +8,8 @@ function fixture(row, { claim = true, onSpawn = () => {} } = {}) {
     cronWrites = [],
     instanceWrites = [],
     instanceReads = [];
-  const { runCron } = load('back/shared/runCron.ts', {
-    './i18n': { t: (s) => s },
+  const { runCron } = load('back/cron/execution/runCron.ts', {
+    '../../shared/i18n': { t: (s) => s },
     'cross-spawn': {
       spawn: (cmd) => {
         spawned.push(cmd);
@@ -17,12 +17,12 @@ function fixture(row, { claim = true, onSpawn = () => {} } = {}) {
         return { pid: process.pid };
       },
     },
-    './pLimit': {
+    './cronLimit': {
       runWithCronLimit: (_cron, execute) => execute(),
       removeQueuedCron() {},
     },
-    '../loaders/logger': { info() {}, error() {} },
-    '../data/cron': {
+    '../../loaders/logger': { info() {}, error() {} },
+    '../../data/cron': {
       CrontabModel: {
         findOne: async () => row,
         update: async (...args) => {
@@ -34,7 +34,7 @@ function fixture(row, { claim = true, onSpawn = () => {} } = {}) {
       },
       CrontabStatus: { running: 0, idle: 1, queued: 3 },
     },
-    '../data/runningInstance': {
+    '../../data/runningInstance': {
       RunningInstanceModel: {
         findAll: async (options) => {
           instanceReads.push(options);
@@ -45,7 +45,7 @@ function fixture(row, { claim = true, onSpawn = () => {} } = {}) {
       InstanceStatus: { running: 0, stopped: 2 },
     },
     dayjs: () => ({ unix: () => 123 }),
-    './childProcess': {
+    '../../shared/childProcess': {
       observeChildProcess: () => ({ completed: Promise.resolve({ code: 0 }) }),
       asError: (e) => e,
     },

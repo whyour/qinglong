@@ -30,7 +30,7 @@ async function fixture(t) {
     './schedule': class {},
     './sock': class {},
     './notify': class {},
-    '../shared/pLimit': {},
+    '../cron/execution/cronLimit': {},
     '../schedule/client': {},
     '../config/index': {},
     '../shared/store': {},
@@ -47,12 +47,11 @@ async function fixture(t) {
         NotifyStatus: { success: 0, fail: 1 },
       },
       '../shared/i18n': { t: (s) => s },
-      './user': {},
+      '../data/notificationSettings': {
+        readNotificationMode: async () => ({ type: 'email' }),
+      },
     }).default)(),
   });
-  service.notificationService.userService = {
-    getNotificationMode: async () => ({ type: 'email' }),
-  };
   service.notificationService.modeMap.set('email', async () => true);
   service.getDb = async () => ({ info: { type: 'email' } });
   return { rows, service };

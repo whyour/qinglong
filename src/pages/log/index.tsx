@@ -8,13 +8,7 @@ import { PageContainer } from '@ant-design/pro-layout';
 import Editor from '@monaco-editor/react';
 import CodeMirror from '@uiw/react-codemirror';
 import { useOutletContext } from '@umijs/max';
-import {
-  Button,
-  message,
-  Modal,
-  Tooltip,
-  Typography,
-} from 'antd';
+import { Button, message, Modal, Tooltip, Typography } from 'antd';
 import { saveAs } from 'file-saver';
 import prettyBytes from 'pretty-bytes';
 import { useEffect, useRef, useState } from 'react';
@@ -41,14 +35,25 @@ const Log = () => {
     detailRequest.current = controller;
     setReadFailed(false);
     request
-      .get(
-        `${config.apiPrefix}logs/detail`, { signal: controller.signal, retryInPlace: true, params: { file: node.title, path: node.parent || '', tail: true, limit: 1024 * 1024 } },
-      )
+      .get(`${config.apiPrefix}logs/detail`, {
+        signal: controller.signal,
+        retryInPlace: true,
+        params: {
+          file: node.title,
+          path: node.parent || '',
+          tail: true,
+          limit: 1024 * 1024,
+        },
+      })
       .then(({ code, data }) => {
-        if (controller.signal.aborted || selectedKey.current !== node.key) return;
+        if (controller.signal.aborted || selectedKey.current !== node.key)
+          return;
         if (code === 200) setValue(data);
         else setReadFailed(true);
-      }).catch(() => { if (!controller.signal.aborted) setReadFailed(true); });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setReadFailed(true);
+      });
   };
 
   const downloadLog = () => {
@@ -113,7 +118,7 @@ const Log = () => {
           .then(({ code }) => {
             if (code === 200) {
               message.success(intl.get('删除成功'));
-              setRevision(n => n + 1);
+              setRevision((n) => n + 1);
               initState();
             }
           });
@@ -134,8 +139,16 @@ const Log = () => {
       className="ql-container-wrapper log-wrapper"
       title={
         <>
-          {currentNode?.type === 'file' ? <span title={select}>{readableLogName(currentNode.title)}</span> : select}
-          {currentNode?.type === 'file' && readFailed && <Button type="link" onClick={() => getLog(currentNode)}>{intl.get('重试')}</Button>}
+          {currentNode?.type === 'file' ? (
+            <span title={select}>{readableLogName(currentNode.title)}</span>
+          ) : (
+            select
+          )}
+          {currentNode?.type === 'file' && readFailed && (
+            <Button type="link" onClick={() => getLog(currentNode)}>
+              {intl.get('重试')}
+            </Button>
+          )}
           {currentNode?.type === 'file' && (
             <span
               style={{
@@ -154,7 +167,12 @@ const Log = () => {
       extra={
         isPhone
           ? [
-              <FilePicker source="logs" value={select} revision={revision} onSelect={node => onSelect(node.key, node)} />,
+              <FilePicker
+                source="logs"
+                value={select}
+                revision={revision}
+                onSelect={(node) => onSelect(node.key, node)}
+              />,
             ]
           : [
               <Tooltip title={intl.get('下载')}>
@@ -184,7 +202,12 @@ const Log = () => {
           /*// @ts-ignore*/
           <SplitPane split="vertical" size={200} maxSize={-100}>
             <div className={styles['left-tree-container']}>
-              <FileBrowser source="logs" value={select} revision={revision} onSelect={node => onSelect(node.key, node)} />
+              <FileBrowser
+                source="logs"
+                value={select}
+                revision={revision}
+                onSelect={(node) => onSelect(node.key, node)}
+              />
             </div>
             <Editor
               language="shell"

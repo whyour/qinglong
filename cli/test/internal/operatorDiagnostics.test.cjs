@@ -5,7 +5,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { createContext } = require('../../dist/internal/runtime/context');
-const { replaceAndReload, reloadPanel } = require('../../dist/internal/maintenance/upgrade');
+const {
+  replaceAndReload,
+  reloadPanel,
+} = require('../../dist/internal/maintenance/upgrade');
 const { installCronEntrypoint } = require('../../dist/local/cronEntrypoint');
 
 for (const language of ['zh', 'en', 'unsupported']) {

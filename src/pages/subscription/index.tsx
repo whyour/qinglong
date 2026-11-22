@@ -121,7 +121,10 @@ const Subscription = () => {
       render: (text: string, record: any) => {
         if (record.schedule_type === 'interval') {
           const { type, value } = record.interval_schedule;
-          return intl.get('间隔定时规则', { value, unit: intl.get((IntervalSchedule as any)[type]) });
+          return intl.get('间隔定时规则', {
+            value,
+            unit: intl.get((IntervalSchedule as any)[type]),
+          });
         }
         return record.schedule;
       },
@@ -375,7 +378,11 @@ const Subscription = () => {
       }),
       content: (
         <>
-          {intl.get('确认操作对象', { operation: record.is_disabled === 1 ? intl.get('启用') : intl.get('禁用'), object: intl.get('定时订阅') })}{' '}
+          {intl.get('确认操作对象', {
+            operation:
+              record.is_disabled === 1 ? intl.get('启用') : intl.get('禁用'),
+            object: intl.get('定时订阅'),
+          })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}

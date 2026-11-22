@@ -111,9 +111,22 @@ URL 使用面板根地址，可包含代理路径前缀，不附加 `/open`。�
 - `task run/stop`：`{code:200,data:{taskId:12,action:"run",accepted:true}}`。仅表示请求被接受，不表示任务成功完成。
 - 错误：`{code:1,message:"..."}`；退出码 1 为 API/网络/配置错误，2 为参数错误，3 为未登录、HTTP/API 401/403 或需要双因素验证；成功退出码 0。
 
-ID 必须为正整数，运行/停止一次操作一个任务。2.x 没有为此提供独立运行 ID 或幂等键，失败响应可能意味着执行结果未知，应先查询状态，禁止盲目重试。CLI 不自动重试 HTTP 请求。
+ID 必须为正整数，运行/停止一次操作一个任务。新面板的运行响应附带本轮 `triggerId`、受理时的 `state`（queued/skipped）和 `reason`，原 `taskId/action/accepted` 字段保留。旧面板不返回触发 ID 时，普通 run 保持原输出。运行请求尚无幂等键，失败响应可能意味着执行结果未知，应先查询状态，禁止盲目重试。CLI 不自动重试 HTTP 请求。
 
-日志是该任务最新日志，可能属于先前运行；`completed` 不代表成功。`--tail` 在客户端截取，不减少服务端读取量或网络传输量。日志与任务字段不自动脱敏，应按需读取并避免向聊天中暴露敏感信息。
+### 等待本轮执行与指定日志
+
+```sh
+ql task run 12 --wait --timeout 300 --json
+# 使用上述输出中的 triggerId；继续等待不会重新运行任务
+ql task wait 12 --trigger-id <triggerId> --timeout 300 --json
+ql task logs 12 --trigger-id <triggerId> --tail 200 --json
+```
+
+`run --wait` 只提交一次运行请求，随后每秒查询该触发。`task wait` 只读取已有触发，支持 `crons:read` 权限。等待超时默认 300 秒，范围 1–86400 秒，从取得运行响应后开始计算；run 的 `--timeout` 需与 `--wait` 同用。每次查询至多等待 30 秒，并受剩余等待时间限制。超时、鉴权或网络失败只结束本次等待，不会停止任务或重放运行；可凭输出中的触发 ID 再次调用 wait。等待期间令牌失效会退出，下次调用按原认证规则重新取得会话。
+
+成功确认 `finished` 且退出码为 0 时，stdout 返回 `{code:200,data:{taskId,action,triggerId,state,reason,exitCode}}`；run 发起的等待还保留 `accepted:true`。失败、跳过、停止或结果未知返回退出码 1；`--json` 错误写 stderr，原 `{code,message}` 外附 `data`，保留同一触发 ID、状态与退出码。等待超时或查询异常的 data 使用 `waitStatus`（timeout/interrupted/notFound/invalidResponse），不会编造任务终态；鉴权失败仍使用退出码 3。
+
+旧面板若未返回 triggerId，`run --wait` 在提交后明确报错，不会猜测最新一轮或重试。指定日志的响应必须确认相同 triggerId，否则拒绝输出；触发或日志被清理后也不会回退到其他轮次。普通 `task logs` 仍读取最新日志，可能属于先前运行；`completed` 不代表成功。`--tail` 在客户端截取，不减少服务端读取量或网络传输量。日志与任务字段不自动脱敏，应按需读取并避免向聊天中暴露敏感信息。
 
 ## Skill、构建与验证
 

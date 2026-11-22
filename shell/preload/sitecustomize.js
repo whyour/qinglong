@@ -84,7 +84,11 @@ function run() {
     ].filter(Boolean);
 
     if (task_before) {
-      console.log(process.env.QL_LANG === 'en' ? 'Executing before command\n' : '执行前置命令\n');
+      console.log(
+        process.env.QL_LANG === 'en'
+          ? 'Executing before command\n'
+          : '执行前置命令\n',
+      );
     }
 
     const res = execSync(commands.join(' && '), {
@@ -124,7 +128,11 @@ function run() {
       console.log(output);
     }
     if (task_before) {
-      console.log(process.env.QL_LANG === 'en' ? 'Before command finished\n' : '执行前置命令结束\n');
+      console.log(
+        process.env.QL_LANG === 'en'
+          ? 'Before command finished\n'
+          : '执行前置命令结束\n',
+      );
     }
   } catch (error) {
     if (!error.message.includes('spawnSync /bin/bash E2BIG')) {
@@ -133,7 +141,11 @@ function run() {
       // environment variable is too large
     }
     if (task_before) {
-      console.log(process.env.QL_LANG === 'en' ? 'Before command finished\n' : '执行前置命令结束\n');
+      console.log(
+        process.env.QL_LANG === 'en'
+          ? 'Before command finished\n'
+          : '执行前置命令结束\n',
+      );
     }
   }
 
@@ -175,5 +187,8 @@ try {
 }
 
 if (process.env.QL_SCRIPT_ENTRY && process.env.QL_SCRIPT_START_FILE) {
-  require('./script-start.cjs')(process.env.QL_SCRIPT_ENTRY, process.env.QL_SCRIPT_START_FILE);
+  require('./script-start.cjs')(
+    process.env.QL_SCRIPT_ENTRY,
+    process.env.QL_SCRIPT_START_FILE,
+  );
 }

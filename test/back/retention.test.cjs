@@ -107,7 +107,8 @@ test('cleanup previews first, protects running instances, and uses explicit opti
   CrontabStatModel.destroy = async () => 3;
   sequelize.transaction = async (callback) => callback({});
   sequelize.query = async (query) => {
-    if (query.startsWith('SELECT COUNT(*) AS count FROM CronTriggers')) return [{count: 4}];
+    if (query.startsWith('SELECT COUNT(*) AS count FROM CronTriggers'))
+      return [{ count: 4 }];
     if (query.startsWith('DELETE FROM CronTriggers')) return 4;
     vacuumed = query === 'VACUUM';
     return [];

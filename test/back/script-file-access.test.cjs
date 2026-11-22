@@ -47,7 +47,7 @@ test('script file operations allow token.json while protecting panel configurati
     './sock': {},
     './cron': {},
     './schedule': {},
-    '../shared/pLimit': {},
+    '../cron/execution/cronLimit': {},
     typedi: { Service: () => (x) => x, Inject: () => () => {} },
   };
   const cache = new Map();

@@ -8,7 +8,10 @@ import {
 import { addCron } from './addCron';
 import { delCron } from './delCron';
 import { randomUUID } from 'crypto';
-import { saveSchedulePlan, confirmSchedulePlan } from '../shared/scheduleAudit';
+import {
+  saveSchedulePlan,
+  confirmSchedulePlan,
+} from '../cron/scheduling/scheduleAudit';
 
 // Keep acknowledgement, publication and timer replacement in request order,
 // even if the client times out and sends a replacement snapshot.

@@ -4,7 +4,10 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { execFileSync, spawnSync } = require('node:child_process');
-const { createContext, sourceEnvironment } = require('../../dist/internal/runtime/context');
+const {
+  createContext,
+  sourceEnvironment,
+} = require('../../dist/internal/runtime/context');
 const { executeTask } = require('../../dist/internal/execution/taskRunner');
 
 test('Shell and CLI agree on isolated script state and account modes', async (t) => {
@@ -31,7 +34,14 @@ test('Shell and CLI agree on isolated script state and account modes', async (t)
     path.join(root, 'static/build'),
   ])
     await fs.mkdir(directory, { recursive: true });
-  for (const name of ['task.sh', 'task-timeout.sh', 'otask.sh', 'share.sh', 'api.sh', 'env.sh'])
+  for (const name of [
+    'task.sh',
+    'task-timeout.sh',
+    'otask.sh',
+    'share.sh',
+    'api.sh',
+    'env.sh',
+  ])
     await fs.copyFile(
       path.resolve(__dirname, '../../../shell', name),
       path.join(context.paths.dir_shell, name),
@@ -406,9 +416,12 @@ test('configuration shell options survive the environment bridge for pipeline an
   assert.ok(env.SHELLOPTS.split(':').includes('pipefail'));
   assert.ok(!env.SHELLOPTS.split(':').includes('allexport'));
   // Bash 3.x cannot import BASHOPTS itself; exercise the actual CLI bridge.
-  const execution = await require('../../dist/internal/runtime/process').runProcess(
-    'bash', ['--noprofile', '--norc', '-c', probe], { env, capture: true },
-  );
+  const execution =
+    await require('../../dist/internal/runtime/process').runProcess(
+      'bash',
+      ['--noprofile', '--norc', '-c', probe],
+      { env, capture: true },
+    );
   assert.equal(execution.code, 0);
   const modern = execution.stdout;
   assert.equal(modern, legacy);

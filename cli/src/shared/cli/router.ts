@@ -10,14 +10,25 @@ export async function routeCommands(
   fallback: () => Promise<number>,
 ): Promise<number> {
   let result: number | undefined;
-  const root = quietCommand(name).enablePositionalOptions()
-    .passThroughOptions().allowUnknownOption().argument('[arguments...]');
-  root.action(async () => { result = await fallback(); });
+  const root = quietCommand(name)
+    .enablePositionalOptions()
+    .passThroughOptions()
+    .allowUnknownOption()
+    .argument('[arguments...]');
+  root.action(async () => {
+    result = await fallback();
+  });
   for (const [command, handler] of Object.entries(handlers)) {
-    root.addCommand(quietCommand(command).allowUnknownOption()
-      .allowExcessArguments(true).passThroughOptions()
-      .action(async () => { result = await handler(args.slice(1)); }));
+    root.addCommand(
+      quietCommand(command)
+        .allowUnknownOption()
+        .allowExcessArguments(true)
+        .passThroughOptions()
+        .action(async () => {
+          result = await handler(args.slice(1));
+        }),
+    );
   }
-  await root.parseAsync(args, { from:'user' });
-  return result ?? await fallback();
+  await root.parseAsync(args, { from: 'user' });
+  return result ?? (await fallback());
 }

@@ -27,7 +27,8 @@ export default function UpgradeNotice({
     : intl.get(upgradeStatusLabel(job));
   const label =
     activeStatuses.includes(job.status) &&
-    job.phase === 'downloading' && job.percent != null
+    job.phase === 'downloading' &&
+    job.percent != null
       ? `${text} ${job.percent}%`
       : text;
   return (

@@ -66,9 +66,12 @@ export class SchedulerReadiness {
         }),
       ]);
       if (!available) {
-        throw Object.assign(new Error('Scheduler is recovering; try again later'), {
-          status: 503,
-        });
+        throw Object.assign(
+          new Error('Scheduler is recovering; try again later'),
+          {
+            status: 503,
+          },
+        );
       }
     } finally {
       clearTimeout(timer);

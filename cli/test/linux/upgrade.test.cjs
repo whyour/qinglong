@@ -5,7 +5,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { fork } = require('node:child_process');
 const { createContext } = require('../../dist/internal/runtime/context');
-const { startPanel, stopPanel } = require('../../dist/internal/maintenance/operator');
+const {
+  startPanel,
+  stopPanel,
+} = require('../../dist/internal/maintenance/operator');
 const { runProcess } = require('../../dist/internal/runtime/process');
 
 test(

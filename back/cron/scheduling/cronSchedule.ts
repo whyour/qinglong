@@ -1,6 +1,6 @@
 import CronExpressionParser from 'cron-parser';
 import { validate } from 'node-cron';
-import { ScheduleType } from '../interface/schedule';
+import { ScheduleType } from '../../interface/schedule';
 
 const aliases: Record<string, string> = {
   '@yearly': '0 0 0 1 1 *',

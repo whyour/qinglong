@@ -1,10 +1,10 @@
 services:
   web:
-    image: whyour/qinglong:latest # 基于 Debian 的版本：whyour/qinglong:debian  
+    image: whyour/qinglong:latest # 基于 Debian 的版本：whyour/qinglong:debian
     volumes:
       - ./data:/ql/data
     ports:
-      - "5700:5700"
+      - '5700:5700'
     environment:
       QlBaseUrl: '/' # 部署路径非必须，以斜杠开头和结尾，比如 /test/
     restart: unless-stopped

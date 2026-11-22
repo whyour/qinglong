@@ -37,12 +37,17 @@ function fixture(t, initialTokens = []) {
   });
   let now = START;
   let app = {
-    name: 'system', client_id: 'system-client', client_secret: 'system-secret',
-    scopes: ['crons', 'system', 'dashboard'], tokens: initialTokens,
+    name: 'system',
+    client_id: 'system-client',
+    client_secret: 'system-secret',
+    scopes: ['crons', 'system', 'dashboard'],
+    tokens: initialTokens,
   };
   t.mock.method(Date, 'now', () => now * 1000);
   t.mock.method(shareStore, 'getApps', async () => [app]);
-  t.mock.method(shareStore, 'updateApps', async (apps) => { [app] = apps; });
+  t.mock.method(shareStore, 'updateApps', async (apps) => {
+    [app] = apps;
+  });
   t.mock.method(AppModel, 'findOne', async ({ where }) => {
     if (where.name) assert.equal(where.name, app.name);
     else {
@@ -58,8 +63,12 @@ function fixture(t, initialTokens = []) {
   t.mock.method(AppModel, 'findAll', async () => [{ get: () => app }]);
   return {
     service: new OpenService({}),
-    atDay(day) { now = START + day * DAY; },
-    tokens() { return app.tokens; },
+    atDay(day) {
+      now = START + day * DAY;
+    },
+    tokens() {
+      return app.tokens;
+    },
   };
 }
 
@@ -93,7 +102,8 @@ test('startup generation renews before a restarted 28-day interval', async (t) =
 
 test('generation at the five-token limit extends the reused token without revoking active tokens', async (t) => {
   const initial = Array.from({ length: 5 }, (_, index) => ({
-    value: `token-${index}`, expiration: START + 2 * DAY,
+    value: `token-${index}`,
+    expiration: START + 2 * DAY,
   }));
   const state = fixture(t, initial);
   const renewed = await state.service.generateSystemToken(true);
@@ -117,7 +127,9 @@ test('ordinary acquisition reuses the newest valid database token and republishe
   assert.equal(token.value, 'newer-token');
   assert.deepEqual(state.tokens(), initial);
   assert.deepEqual(
-    JSON.parse(fs.readFileSync(path.join(config.configPath, 'token.json'), 'utf8')),
+    JSON.parse(
+      fs.readFileSync(path.join(config.configPath, 'token.json'), 'utf8'),
+    ),
     token,
   );
 });
@@ -125,10 +137,21 @@ test('ordinary acquisition reuses the newest valid database token and republishe
 test('a failed generation releases its lock and does not publish a token', async (t) => {
   const state = fixture(t);
   const update = AppModel.update;
-  AppModel.update = async () => { throw new Error('generation failed'); };
-  await assert.rejects(state.service.generateSystemToken(), /generation failed/);
-  assert.equal(fs.existsSync(path.join(config.configPath, 'token.json')), false);
-  assert.equal(fs.existsSync(path.join(config.configPath, 'token.json.refresh.lock')), false);
+  AppModel.update = async () => {
+    throw new Error('generation failed');
+  };
+  await assert.rejects(
+    state.service.generateSystemToken(),
+    /generation failed/,
+  );
+  assert.equal(
+    fs.existsSync(path.join(config.configPath, 'token.json')),
+    false,
+  );
+  assert.equal(
+    fs.existsSync(path.join(config.configPath, 'token.json.refresh.lock')),
+    false,
+  );
   AppModel.update = update;
   const token = await state.service.generateSystemToken();
   assert.ok(state.tokens().some((current) => current.value === token.value));
@@ -142,8 +165,14 @@ test('acquisition recovers an authentication cache failure after the database co
     if (++attempts === 1) throw new Error('authentication cache failed');
     return updateCache(apps);
   };
-  await assert.rejects(state.service.generateSystemToken(), /authentication cache failed/);
-  assert.equal(fs.existsSync(path.join(config.configPath, 'token.json')), false);
+  await assert.rejects(
+    state.service.generateSystemToken(),
+    /authentication cache failed/,
+  );
+  assert.equal(
+    fs.existsSync(path.join(config.configPath, 'token.json')),
+    false,
+  );
   const committed = state.tokens()[0];
   const token = await state.service.generateSystemToken();
   assert.equal(token.value, committed.value);
@@ -156,12 +185,20 @@ async function processFixture(t, initialTokens = []) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-token-process-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const databaseFile = path.join(directory, 'database.json');
-  fs.writeFileSync(databaseFile, JSON.stringify({
-    name: 'system', client_id: 'system-client', client_secret: 'system-secret',
-    scopes: ['crons', 'system', 'dashboard'], tokens: initialTokens,
-  }));
+  fs.writeFileSync(
+    databaseFile,
+    JSON.stringify({
+      name: 'system',
+      client_id: 'system-client',
+      client_secret: 'system-secret',
+      scopes: ['crons', 'system', 'dashboard'],
+      tokens: initialTokens,
+    }),
+  );
   const worker = path.join(directory, 'worker.cjs');
-  fs.writeFileSync(worker, `
+  fs.writeFileSync(
+    worker,
+    `
     const fs = require('node:fs/promises');
     const path = require('node:path');
     const root = process.cwd();
@@ -195,26 +232,46 @@ async function processFixture(t, initialTokens = []) {
     shareStore.getApps = async () => { throw new Error('stale cache must not be read'); };
     shareStore.updateApps = async () => {};
     require(path.join(root, 'back/token'));
-  `);
+  `,
+  );
   return {
     directory,
     run(renew = false, fail = false, hold = false) {
-      return execute(process.execPath, [
-        '-r', require.resolve('ts-node/register/transpile-only'), worker,
-        ...(renew ? ['--renew'] : []),
-      ], {
-        cwd: root, timeout: 20_000,
-        env: { ...process.env, QL_TOKEN_TEST_FAIL: fail ? '1' : '0', QL_TOKEN_TEST_HOLD: hold ? '1' : '0' },
-      });
+      return execute(
+        process.execPath,
+        [
+          '-r',
+          require.resolve('ts-node/register/transpile-only'),
+          worker,
+          ...(renew ? ['--renew'] : []),
+        ],
+        {
+          cwd: root,
+          timeout: 20_000,
+          env: {
+            ...process.env,
+            QL_TOKEN_TEST_FAIL: fail ? '1' : '0',
+            QL_TOKEN_TEST_HOLD: hold ? '1' : '0',
+          },
+        },
+      );
     },
-    tokens() { return JSON.parse(fs.readFileSync(databaseFile, 'utf8')).tokens; },
-    cached() { return JSON.parse(fs.readFileSync(path.join(directory, 'token.json'), 'utf8')); },
+    tokens() {
+      return JSON.parse(fs.readFileSync(databaseFile, 'utf8')).tokens;
+    },
+    cached() {
+      return JSON.parse(
+        fs.readFileSync(path.join(directory, 'token.json'), 'utf8'),
+      );
+    },
   };
 }
 
 test('four independent token processes converge on one usable token when the cache is missing', async (t) => {
   const state = await processFixture(t);
-  const results = await Promise.all(Array.from({ length: 4 }, () => state.run()));
+  const results = await Promise.all(
+    Array.from({ length: 4 }, () => state.run()),
+  );
   const issued = results.map(({ stdout, stderr }) => {
     assert.equal(stderr, '');
     return stdout.trim();
@@ -223,13 +280,24 @@ test('four independent token processes converge on one usable token when the cac
   assert.equal(state.tokens().length, 1);
   assert.equal(state.tokens()[0].value, issued[0]);
   assert.equal(state.cached().value, issued[0]);
-  assert.equal(fs.existsSync(path.join(state.directory, 'token.json.refresh.lock')), false);
+  assert.equal(
+    fs.existsSync(path.join(state.directory, 'token.json.refresh.lock')),
+    false,
+  );
 });
 
 test('concurrent scheduled renewal and ordinary acquisition preserve all returned tokens', async (t) => {
-  const original = { value: 'original-token', expiration: Math.round(Date.now() / 1000) + DAY };
+  const original = {
+    value: 'original-token',
+    expiration: Math.round(Date.now() / 1000) + DAY,
+  };
   const state = await processFixture(t, [original]);
-  const results = await Promise.all([state.run(true), state.run(), state.run(true), state.run()]);
+  const results = await Promise.all([
+    state.run(true),
+    state.run(),
+    state.run(true),
+    state.run(),
+  ]);
   const tokens = state.tokens();
   assert.equal(tokens.length, 3);
   assert.ok(tokens.some((token) => token.value === original.value));
@@ -258,16 +326,23 @@ test('startup configures the 28-day token task with explicit renewal', async (t)
   const initialize = require('../../back/loaders/initTask').default;
   const SystemService = require('../../back/services/system').default;
   const ScheduleService = require('../../back/services/schedule').default;
-  const SubscriptionService = require('../../back/services/subscription').default;
+  const SubscriptionService =
+    require('../../back/services/subscription').default;
   const SshKeyService = require('../../back/services/sshKey').default;
   const scheduled = [];
   const services = new Map([
     [SystemService, { getSystemConfig: async () => undefined }],
-    [ScheduleService, {
-      cancelIntervalTask: async () => {},
-      createIntervalTask: (...args) => scheduled.push(args),
-    }],
-    [SubscriptionService, { setSshConfig: async () => {}, list: async () => [] }],
+    [
+      ScheduleService,
+      {
+        cancelIntervalTask: async () => {},
+        createIntervalTask: (...args) => scheduled.push(args),
+      },
+    ],
+    [
+      SubscriptionService,
+      { setSshConfig: async () => {}, list: async () => [] },
+    ],
     [SshKeyService, {}],
   ]);
   t.mock.method(Container, 'get', (service) => {
@@ -285,7 +360,9 @@ test('startup configures the 28-day token task with explicit renewal', async (t)
 
 function appsFixture(t) {
   const previousConfigPath = config.configPath;
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-apps-concurrency-'));
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ql-apps-concurrency-'),
+  );
   config.configPath = directory;
   t.after(() => {
     config.configPath = previousConfigPath;
@@ -294,14 +371,28 @@ function appsFixture(t) {
   t.mock.method(Date, 'now', () => START * 1000);
   const clone = (value) => JSON.parse(JSON.stringify(value));
   let apps = [
-    { id: 1, name: 'system', client_id: 'system-client', client_secret: 'system-secret',
-      scopes: ['crons', 'system', 'dashboard'], tokens: [{ value: 'system-token', expiration: START + DAY }] },
-    { id: 2, name: 'external', client_id: 'external-client', client_secret: 'external-secret',
-      scopes: ['crons'], tokens: [] },
+    {
+      id: 1,
+      name: 'system',
+      client_id: 'system-client',
+      client_secret: 'system-secret',
+      scopes: ['crons', 'system', 'dashboard'],
+      tokens: [{ value: 'system-token', expiration: START + DAY }],
+    },
+    {
+      id: 2,
+      name: 'external',
+      client_id: 'external-client',
+      client_secret: 'external-secret',
+      scopes: ['crons'],
+      tokens: [],
+    },
   ];
   let cached = clone(apps);
-  const matches = (app, where) => Object.entries(where).every(([key, value]) =>
-    Array.isArray(value) ? value.includes(app[key]) : app[key] === value);
+  const matches = (app, where) =>
+    Object.entries(where).every(([key, value]) =>
+      Array.isArray(value) ? value.includes(app[key]) : app[key] === value,
+    );
   t.mock.method(AppModel, 'findOne', async ({ where }) => {
     const app = apps.find((app) => matches(app, where));
     if (!app) return null;
@@ -309,22 +400,36 @@ function appsFixture(t) {
     await new Promise((resolve) => setTimeout(resolve, 10));
     return { ...snapshot, get: () => snapshot };
   });
-  t.mock.method(AppModel, 'findAll', async () => clone(apps).map((app) => ({ get: () => app })));
+  t.mock.method(AppModel, 'findAll', async () =>
+    clone(apps).map((app) => ({ get: () => app })),
+  );
   t.mock.method(AppModel, 'update', async (values, { where }) => {
-    apps = apps.map((app) => matches(app, where) ? { ...app, ...clone(values) } : app);
+    apps = apps.map((app) =>
+      matches(app, where) ? { ...app, ...clone(values) } : app,
+    );
     return [1];
   });
   t.mock.method(AppModel, 'destroy', async ({ where }) => {
     apps = apps.filter((app) => !matches(app, where));
   });
   t.mock.method(AppModel, 'create', async (values) => {
-    const app = { id: Math.max(0, ...apps.map((app) => app.id)) + 1, tokens: [], ...values };
+    const app = {
+      id: Math.max(0, ...apps.map((app) => app.id)) + 1,
+      tokens: [],
+      ...values,
+    };
     apps.push(app);
     return { get: () => clone(app) };
   });
-  t.mock.method(shareStore, 'updateApps', async (values) => { cached = clone(values); });
+  t.mock.method(shareStore, 'updateApps', async (values) => {
+    cached = clone(values);
+  });
   t.mock.method(shareStore, 'getApps', async () => clone(cached));
-  return { service: new OpenService({}), apps: () => clone(apps), cached: () => clone(cached) };
+  return {
+    service: new OpenService({}),
+    apps: () => clone(apps),
+    cached: () => clone(cached),
+  };
 }
 
 for (const operation of ['acquisition', 'startup refresh']) {
@@ -332,8 +437,12 @@ for (const operation of ['acquisition', 'startup refresh']) {
     const state = appsFixture(t);
     let resume;
     let entered;
-    const paused = new Promise((resolve) => { entered = resolve; });
-    const barrier = new Promise((resolve) => { resume = resolve; });
+    const paused = new Promise((resolve) => {
+      entered = resolve;
+    });
+    const barrier = new Promise((resolve) => {
+      resume = resolve;
+    });
     const findAll = AppModel.findAll;
     let first = true;
     AppModel.findAll = async (...args) => {
@@ -345,30 +454,48 @@ for (const operation of ['acquisition', 'startup refresh']) {
       }
       return snapshot;
     };
-    const publication = operation === 'acquisition'
-      ? state.service.generateSystemToken() : state.service.refreshApps();
+    const publication =
+      operation === 'acquisition'
+        ? state.service.generateSystemToken()
+        : state.service.refreshApps();
     await paused;
-    const issuance = state.service.authToken({ client_id: 'external-client', client_secret: 'external-secret' });
+    const issuance = state.service.authToken({
+      client_id: 'external-client',
+      client_secret: 'external-secret',
+    });
     await new Promise((resolve) => setTimeout(resolve, 150));
     resume();
     const [, response] = await Promise.all([publication, issuance]);
     assert.equal(response.code, 200);
-    assert.ok(state.apps()[1].tokens.some((token) => token.value === response.data.token));
+    assert.ok(
+      state
+        .apps()[1]
+        .tokens.some((token) => token.value === response.data.token),
+    );
     assert.deepEqual(state.cached(), state.apps());
   });
 }
 
 test('concurrent token API calls and scheduled generation preserve every issued token', async (t) => {
   const state = appsFixture(t);
-  const credentials = { client_id: 'system-client', client_secret: 'system-secret' };
+  const credentials = {
+    client_id: 'system-client',
+    client_secret: 'system-secret',
+  };
   const results = await Promise.all([
-    state.service.authToken(credentials), state.service.generateSystemToken(true),
-    state.service.authToken(credentials), state.service.generateSystemToken(true),
+    state.service.authToken(credentials),
+    state.service.generateSystemToken(true),
+    state.service.authToken(credentials),
+    state.service.generateSystemToken(true),
   ]);
   const tokens = state.apps()[0].tokens;
   assert.equal(tokens.length, 5);
   for (const response of results) {
-    assert.ok(tokens.some((token) => token.value === (response.value || response.data.token)));
+    assert.ok(
+      tokens.some(
+        (token) => token.value === (response.value || response.data.token),
+      ),
+    );
   }
   assert.deepEqual(state.cached(), state.apps());
 });
@@ -376,17 +503,40 @@ test('concurrent token API calls and scheduled generation preserve every issued 
 for (const mutation of ['resetSecret', 'remove', 'update', 'create']) {
   test(`concurrent cache refresh and ${mutation} retain the latest application state`, async (t) => {
     const state = appsFixture(t);
-    await state.service.authToken({ client_id: 'external-client', client_secret: 'external-secret' });
-    const change = () => mutation === 'resetSecret' ? state.service.resetSecret(2)
-      : mutation === 'remove' ? state.service.remove([2])
-      : mutation === 'update' ? state.service.update({ id: 2, name: 'external', scopes: ['dashboard'] })
-      : state.service.create({ name: 'created', scopes: ['crons'] });
-    await Promise.all([state.service.refreshApps(), change(), state.service.generateSystemToken()]);
+    await state.service.authToken({
+      client_id: 'external-client',
+      client_secret: 'external-secret',
+    });
+    const change = () =>
+      mutation === 'resetSecret'
+        ? state.service.resetSecret(2)
+        : mutation === 'remove'
+        ? state.service.remove([2])
+        : mutation === 'update'
+        ? state.service.update({
+            id: 2,
+            name: 'external',
+            scopes: ['dashboard'],
+          })
+        : state.service.create({ name: 'created', scopes: ['crons'] });
+    await Promise.all([
+      state.service.refreshApps(),
+      change(),
+      state.service.generateSystemToken(),
+    ]);
     assert.deepEqual(state.cached(), state.apps());
     if (mutation === 'resetSecret') {
       assert.equal(state.cached()[1].tokens.length, 0);
       assert.notEqual(state.cached()[1].client_secret, 'external-secret');
-      assert.equal((await state.service.authToken({ client_id: 'external-client', client_secret: 'external-secret' })).code, 400);
+      assert.equal(
+        (
+          await state.service.authToken({
+            client_id: 'external-client',
+            client_secret: 'external-secret',
+          })
+        ).code,
+        400,
+      );
     } else if (mutation === 'remove') {
       assert.equal(state.cached().length, 1);
     } else if (mutation === 'update') {
@@ -416,7 +566,10 @@ test('application mutations cannot change or expose the built-in system app', as
 test('system initialization preserves active tokens while migrating dashboard scope', async (t) => {
   const state = appsFixture(t);
   await AppModel.update({ scopes: ['crons', 'system'] }, { where: { id: 1 } });
-  await Promise.all([state.service.initializeSystemApp(), state.service.generateSystemToken(true)]);
+  await Promise.all([
+    state.service.initializeSystemApp(),
+    state.service.generateSystemToken(true),
+  ]);
   assert.deepEqual(state.cached(), state.apps());
   assert.deepEqual(state.apps()[0].scopes, ['crons', 'system', 'dashboard']);
   assert.equal(state.apps()[0].tokens.length, 2);
@@ -424,13 +577,19 @@ test('system initialization preserves active tokens while migrating dashboard sc
 
 test('failed atomic token-file publication releases the application lock for recovery', async (t) => {
   const state = appsFixture(t);
-  const temporary = path.join(config.configPath, `token.json.${process.pid}.tmp`);
+  const temporary = path.join(
+    config.configPath,
+    `token.json.${process.pid}.tmp`,
+  );
   fs.mkdirSync(temporary);
   await assert.rejects(state.service.generateSystemToken(), /EISDIR/);
   fs.rmSync(temporary, { recursive: true });
   const token = await state.service.generateSystemToken();
   assert.equal(token.value, 'system-token');
-  assert.equal(fs.existsSync(path.join(config.configPath, '.apps-state.lock')), false);
+  assert.equal(
+    fs.existsSync(path.join(config.configPath, '.apps-state.lock')),
+    false,
+  );
 });
 
 test('real SQLite and authentication cache retain concurrent process updates', async (t) => {
@@ -438,10 +597,15 @@ test('real SQLite and authentication cache retain concurrent process updates', a
   await AppModel.sync({ force: true });
   const service = new OpenService({});
   await service.initializeSystemApp();
-  const external = await service.create({ name: 'sqlite-external', scopes: ['crons'] });
+  const external = await service.create({
+    name: 'sqlite-external',
+    scopes: ['crons'],
+  });
   const worker = path.join(environment, 'sqlite-worker.cjs');
   const root = path.resolve(__dirname, '../..');
-  fs.writeFileSync(worker, `
+  fs.writeFileSync(
+    worker,
+    `
     require(${JSON.stringify(require.resolve('reflect-metadata'))});
     const path = require('node:path');
     const root = process.cwd();
@@ -458,12 +622,33 @@ test('real SQLite and authentication cache retain concurrent process updates', a
       console.log(JSON.stringify(result || {}));
     })().catch(error => { console.error(error); process.exitCode = 1; })
       .finally(async () => { await keyvStore.disconnect(); await sequelize.close(); });
-  `);
-  const actions = ['renew', 'acquire', 'auth', 'refresh', 'renew', 'auth', 'auth'];
-  const outcomes = await Promise.allSettled(actions.map((action) => execute(process.execPath, [
-    '-r', require.resolve('ts-node/register/transpile-only'), worker, action,
-    external.client_id, external.client_secret,
-  ], { cwd: root, timeout: 20_000, env: process.env })));
+  `,
+  );
+  const actions = [
+    'renew',
+    'acquire',
+    'auth',
+    'refresh',
+    'renew',
+    'auth',
+    'auth',
+  ];
+  const outcomes = await Promise.allSettled(
+    actions.map((action) =>
+      execute(
+        process.execPath,
+        [
+          '-r',
+          require.resolve('ts-node/register/transpile-only'),
+          worker,
+          action,
+          external.client_id,
+          external.client_secret,
+        ],
+        { cwd: root, timeout: 20_000, env: process.env },
+      ),
+    ),
+  );
   const results = outcomes.map((outcome) => {
     assert.equal(outcome.status, 'fulfilled', outcome.reason?.stderr);
     return outcome.value;
@@ -475,13 +660,26 @@ test('real SQLite and authentication cache retain concurrent process updates', a
     assert.equal(results[index].stderr, '');
     const result = JSON.parse(results[index].stdout.trim());
     const value = result.value || result.data?.token;
-    if (value) assert.ok(cached.some((app) => app.tokens?.some((token) => token.value === value)));
+    if (value)
+      assert.ok(
+        cached.some((app) =>
+          app.tokens?.some((token) => token.value === value),
+        ),
+      );
   }
-  assert.equal(database.find((app) => app.name === 'sqlite-external').tokens.length, 3);
-  const file = JSON.parse(fs.readFileSync(path.join(config.configPath, 'token.json'), 'utf8'));
-  assert.ok(cached.find((app) => app.name === 'system').tokens.some((token) => token.value === file.value));
+  assert.equal(
+    database.find((app) => app.name === 'sqlite-external').tokens.length,
+    3,
+  );
+  const file = JSON.parse(
+    fs.readFileSync(path.join(config.configPath, 'token.json'), 'utf8'),
+  );
+  assert.ok(
+    cached
+      .find((app) => app.name === 'system')
+      .tokens.some((token) => token.value === file.value),
+  );
 });
-
 
 test('atomic publication preserves restricted token-file permissions', async (t) => {
   const state = fixture(t, [{ value: 'current', expiration: START + DAY }]);
@@ -492,7 +690,6 @@ test('atomic publication preserves restricted token-file permissions', async (t)
   await state.service.generateSystemToken(true);
   assert.equal(fs.statSync(file).mode & 0o777, 0o640);
 });
-
 
 test('a SIGKILLed generator leaves a lock that the next acquisition recovers', async (t) => {
   const state = await processFixture(t);
@@ -505,9 +702,15 @@ test('a SIGKILLed generator leaves a lock that the next acquisition recovers', a
   }
   running.child.kill('SIGKILL');
   assert.equal((await stopped).signal, 'SIGKILL');
-  assert.equal(fs.existsSync(path.join(state.directory, '.apps-state.lock')), true);
+  assert.equal(
+    fs.existsSync(path.join(state.directory, '.apps-state.lock')),
+    true,
+  );
   const recovered = await state.run();
   assert.equal(recovered.stderr, '');
   assert.equal(recovered.stdout.trim(), state.cached().value);
-  assert.equal(fs.existsSync(path.join(state.directory, '.apps-state.lock')), false);
+  assert.equal(
+    fs.existsSync(path.join(state.directory, '.apps-state.lock')),
+    false,
+  );
 });

@@ -32,5 +32,7 @@ export type Command =
   | { kind: 'logout' }
   | { kind: 'list'; search?: string; page: number; size: number }
   | { kind: 'get'; id: number }
-  | { kind: 'logs'; id: number; tail: number }
-  | { kind: 'run' | 'stop'; id: number };
+  | { kind: 'logs'; id: number; tail: number; triggerId?: string }
+  | { kind: 'run'; id: number; wait?: boolean; timeout?: number }
+  | { kind: 'wait'; id: number; triggerId: string; timeout: number }
+  | { kind: 'stop'; id: number };

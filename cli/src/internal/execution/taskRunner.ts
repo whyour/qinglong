@@ -188,7 +188,15 @@ async function prepareProgram(
     // Keep command/arguments as argv data, never interpolate or eval them.
     args: program
       ? adjusted
-      : ['--noprofile', '--norc', '-c', '"$@"', 'ql-command', executable, ...adjusted.slice(1)],
+      : [
+          '--noprofile',
+          '--norc',
+          '-c',
+          '"$@"',
+          'ql-command',
+          executable,
+          ...adjusted.slice(1),
+        ],
     cwd,
     languagePreload,
     shellScript,
@@ -217,7 +225,12 @@ export async function executeTask(
     folder === '/dev/null'
       ? '/dev/null'
       : context.env.real_log_path ||
-        path.join(folder, `${timestamp(new Date(start))}${triggerId ? "-" + triggerId : ""}.log`);
+        path.join(
+          folder,
+          `${timestamp(new Date(start))}${
+            triggerId ? '-' + triggerId : ''
+          }.log`,
+        );
   const fullLog =
     logPath === '/dev/null'
       ? logPath
@@ -244,14 +257,17 @@ export async function executeTask(
   const report = async (final: boolean, code = 0, duration = 0) => {
     if (!taskId) return;
     try {
-      await receipt.status({
-        ids: [taskId],
-        status: final ? '1' : '0',
-        pid: String(process.pid),
-        log_path: logPath,
-        last_execution_time: started,
-        last_running_time: duration,
-      }, final ? code : undefined);
+      await receipt.status(
+        {
+          ids: [taskId],
+          status: final ? '1' : '0',
+          pid: String(process.pid),
+          log_path: logPath,
+          last_execution_time: started,
+          last_running_time: duration,
+        },
+        final ? code : undefined,
+      );
     } catch {
       output(
         Buffer.from(
@@ -401,11 +417,17 @@ export async function executeTask(
           }
         }
       }
-      const timeoutMs = durationMs(options.timeout ?? env.CommandTimeoutTime, env);
-      const timeoutDirectory = sharedShell && timeoutMs
-        ? await fs.mkdtemp(path.join(os.tmpdir(), 'ql-task-timeout-'))
-        : undefined;
-      const timeoutMarker = timeoutDirectory ? path.join(timeoutDirectory, 'expired') : '';
+      const timeoutMs = durationMs(
+        options.timeout ?? env.CommandTimeoutTime,
+        env,
+      );
+      const timeoutDirectory =
+        sharedShell && timeoutMs
+          ? await fs.mkdtemp(path.join(os.tmpdir(), 'ql-task-timeout-'))
+          : undefined;
+      const timeoutMarker = timeoutDirectory
+        ? path.join(timeoutDirectory, 'expired')
+        : '';
       try {
         return await runProcess(
           program.program,
@@ -427,12 +449,15 @@ export async function executeTask(
             // Legacy concurrent children merge stderr into their per-account log.
             stderrOutput: mode === 'conc' ? undefined : stderrOutput,
             timeoutMs,
-            ...(timeoutMarker ? { timeoutControl: { marker: timeoutMarker } } : {}),
+            ...(timeoutMarker
+              ? { timeoutControl: { marker: timeoutMarker } }
+              : {}),
             signal: options.signal,
           },
         );
       } finally {
-        if (timeoutDirectory) await fs.rm(timeoutDirectory, { recursive: true, force: true });
+        if (timeoutDirectory)
+          await fs.rm(timeoutDirectory, { recursive: true, force: true });
       }
     };
     const results =
@@ -446,7 +471,10 @@ export async function executeTask(
         : [await invoke(mode === 'desi' ? accounts : undefined)];
     exitCode = results.find((result) => result.code !== 0)?.code ?? 0;
     timedOut = results.some((result) => result.timedOut);
-    if (!sharedShell || results.some((result) => result.timedOut && !result.cleanupStarted)) {
+    if (
+      !sharedShell ||
+      results.some((result) => result.timedOut && !result.cleanupStarted)
+    ) {
       // JS/Python pre-task hooks run inside the preloader; after hooks run once per task.
       const afterEnv: NodeJS.ProcessEnv = {
         ...env,
@@ -494,10 +522,7 @@ export async function executeTask(
   } finally {
     if (languageDirectory)
       await fs.rm(languageDirectory, { recursive: true, force: true });
-    durationSeconds = Math.max(
-      1,
-      Math.floor((Date.now() - start) / 1000),
-    );
+    durationSeconds = Math.max(1, Math.floor((Date.now() - start) / 1000));
     await report(true, exitCode, durationSeconds);
     output(
       Buffer.from(

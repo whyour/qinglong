@@ -19,26 +19,42 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     finished_at: DataTypes.INTEGER,
     exit_code: DataTypes.INTEGER,
   });
-  const crons = db.define('Crontab', { status: DataTypes.INTEGER, pid: DataTypes.INTEGER, queued_token: DataTypes.STRING, command: DataTypes.STRING });
+  const crons = db.define('Crontab', {
+    status: DataTypes.INTEGER,
+    pid: DataTypes.INTEGER,
+    queued_token: DataTypes.STRING,
+    command: DataTypes.STRING,
+  });
   await db.sync();
-  await db.transaction(tx => require('../../back/shared/triggerHistory').installTriggerHistory(db, tx));
+  await db.transaction((tx) =>
+    require('../../back/cron/history').installTriggerHistory(db, tx),
+  );
   await instances.bulkCreate([
     { id: 1, status: 0, started_at: 100 },
     { id: 2, status: 1, started_at: 100, finished_at: 110, exit_code: 0 },
     { id: 3, status: 2, started_at: 100, finished_at: 120, exit_code: 143 },
     { id: 4, status: 3, started_at: 100, finished_at: 130, exit_code: 7 },
   ]);
-  const {TriggerHistory, systemOwner} = require('../../back/shared/triggerHistory');
+  const { TriggerHistory, systemOwner } = require('../../back/cron/history');
   const history = new TriggerHistory(db);
-  await crons.create({id: 9, status: 0, pid: process.pid, command: 'task live.sh'});
-  await instances.create({id: 9, status: 0, started_at: 100});
-  await db.query("INSERT INTO CronTriggers(id,cron_id,source,state,owner,instance_id,observed_at) VALUES ('live',9,'system','running',$owner,9,100)",
-    {bind:{owner:systemOwner(process.pid)}});
+  await crons.create({
+    id: 9,
+    status: 0,
+    pid: process.pid,
+    command: 'task live.sh',
+  });
+  await instances.create({ id: 9, status: 0, started_at: 100 });
+  await db.query(
+    "INSERT INTO CronTriggers(id,cron_id,source,state,owner,instance_id,observed_at) VALUES ('live',9,'system','running',$owner,9,100)",
+    { bind: { owner: systemOwner(process.pid) } },
+  );
   await history.interrupt('http');
   const systemConfig = { info: { lang: 'en-US' } };
   const startupEvents = [];
   const service = {
-    set_envs: async () => { startupEvents.push('environment'); },
+    set_envs: async () => {
+      startupEvents.push('environment');
+    },
     getAuthInfo: async () => ({}),
     initializeSystemApp: async () => {},
     refreshApps: async () => {},
@@ -52,7 +68,11 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     '../services/user': class {},
     '../services/open': class {},
     '../data/cron': {
-      CrontabModel: { sequelize: db, update: async () => {}, findAll: async () => [] },
+      CrontabModel: {
+        sequelize: db,
+        update: async () => {},
+        findAll: async () => [],
+      },
       CrontabStatus: { idle: 1 },
     },
     '../data/dependence': {
@@ -85,7 +105,9 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     '../schedule/client': {
       readiness: {
         configure() {},
-        recover: async () => { startupEvents.push('scheduler'); },
+        recover: async () => {
+          startupEvents.push('scheduler');
+        },
       },
     },
   }).default;
@@ -99,9 +121,13 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     global.setTimeout = originalTimeout;
   }
   assert.deepEqual(startupEvents, ['environment', 'scheduler']);
-  assert.equal((await instances.findByPk(9)).status,0);
-  assert.equal((await crons.findByPk(9)).pid,process.pid);
-  const rows = await instances.findAll({ where:{id:[1,2,3,4]}, order: [['id', 'ASC']], raw: true });
+  assert.equal((await instances.findByPk(9)).status, 0);
+  assert.equal((await crons.findByPk(9)).pid, process.pid);
+  const rows = await instances.findAll({
+    where: { id: [1, 2, 3, 4] },
+    order: [['id', 'ASC']],
+    raw: true,
+  });
   assert.equal(rows[0].status, 2);
   assert.ok(
     rows[0].finished_at >= before &&
@@ -129,10 +155,17 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     global.setTimeout = originalTimeout;
   }
   assert.deepEqual(startupEvents, [
-    'environment', 'scheduler', 'environment', 'scheduler',
+    'environment',
+    'scheduler',
+    'environment',
+    'scheduler',
   ]);
   assert.deepEqual(
-    await instances.findAll({ where:{id:[1,2,3,4]}, order: [['id', 'ASC']], raw: true }),
+    await instances.findAll({
+      where: { id: [1, 2, 3, 4] },
+      order: [['id', 'ASC']],
+      raw: true,
+    }),
     rows,
   );
 });

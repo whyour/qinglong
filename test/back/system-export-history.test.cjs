@@ -23,7 +23,7 @@ async function fixture(t) {
     '../data/dependence': {},
     '../data/notify': {},
     '../data/system': {},
-    '../shared/pLimit': {},
+    '../cron/execution/cronLimit': {},
     '../schedule/client': {},
     '../shared/i18n': { t: (x) => x },
     './notify': class {},

@@ -17,13 +17,15 @@ test('saved login works on the host filesystem', async (t) => {
     if (url.pathname === '/panel/open/auth/token') {
       assert.equal(url.searchParams.get('client_id'), 'smoke-id');
       assert.equal(url.searchParams.get('client_secret'), 'smoke-secret');
-      res.end(JSON.stringify({
-        code: 200,
-        data: {
-          token: 'smoke-token',
-          expiration: Math.floor(Date.now() / 1000) + 3600,
-        },
-      }));
+      res.end(
+        JSON.stringify({
+          code: 200,
+          data: {
+            token: 'smoke-token',
+            expiration: Math.floor(Date.now() / 1000) + 3600,
+          },
+        }),
+      );
       return;
     }
     assert.equal(req.headers.authorization, 'Bearer smoke-token');
@@ -48,18 +50,19 @@ test('saved login works on the host filesystem', async (t) => {
     QL_URL: '',
     QL_ACCESS_TOKEN: '',
   };
-  const invoke = (args) => new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [entry, ...args], {
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+  const invoke = (args) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [entry, ...args], {
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let out = '';
+      let err = '';
+      child.stdout.on('data', (data) => (out += data));
+      child.stderr.on('data', (data) => (err += data));
+      child.once('error', reject);
+      child.once('close', (code) => resolve({ code, out, err }));
     });
-    let out = '';
-    let err = '';
-    child.stdout.on('data', (data) => (out += data));
-    child.stderr.on('data', (data) => (err += data));
-    child.once('error', reject);
-    child.once('close', (code) => resolve({ code, out, err }));
-  });
   const url = `http://127.0.0.1:${server.address().port}/panel`;
   const login = await invoke(['login', '--url', url, '--json']);
   assert.equal(login.code, 0, login.err);

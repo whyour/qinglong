@@ -10,7 +10,7 @@ import config from '../config';
 import { getGrpcCerts } from '../config/grpcCerts';
 
 import { HealthService } from '../protos/health';
-import { SchedulerReadiness } from '../shared/schedulerReadiness';
+import { SchedulerReadiness } from '../cron/scheduling/schedulerReadiness';
 
 class Client {
   readonly readiness = new SchedulerReadiness(() => this.probe());
@@ -19,14 +19,14 @@ class Client {
     try {
       await new Promise<void>((resolve, reject) => {
         this.client.waitForReady(Date.now() + timeoutMs, (err) =>
-          err ? reject(err) : resolve()
+          err ? reject(err) : resolve(),
         );
       });
     } catch (error) {
       this.readiness.invalidate();
       throw Object.assign(
         error instanceof Error ? error : new Error(String(error)),
-        { status: 503 }
+        { status: 503 },
       );
     }
   }
@@ -40,7 +40,12 @@ class Client {
         HealthService.check.responseDeserialize,
         { service: 'scheduler' },
         { deadline: Date.now() + 1000 },
-        (err, res) => err ? reject(err) : res?.status === 1 ? resolve() : reject(new Error('Scheduler unavailable')),
+        (err, res) =>
+          err
+            ? reject(err)
+            : res?.status === 1
+            ? resolve()
+            : reject(new Error('Scheduler unavailable')),
       );
     });
   }
@@ -66,10 +71,15 @@ class Client {
     await this.waitForReady(2000);
     return new Promise((resolve, reject) => {
       this.client.setConcurrency(
-        { concurrency }, new Metadata(), { deadline: Date.now() + 5000 },
+        { concurrency },
+        new Metadata(),
+        { deadline: Date.now() + 5000 },
         (err) => {
           if (err) {
-            if (err.code === status.UNAVAILABLE || err.code === status.DEADLINE_EXCEEDED) {
+            if (
+              err.code === status.UNAVAILABLE ||
+              err.code === status.DEADLINE_EXCEEDED
+            ) {
               this.readiness.invalidate();
               Object.assign(err, { status: 503 });
             }
@@ -83,7 +93,7 @@ class Client {
 
   async addCron(
     request: AddCronRequest['crons'],
-    replace = false
+    replace = false,
   ): Promise<AddCronResponse> {
     await this.waitForReady(2000);
     // Include every rule in a recovery snapshot, but bound a stuck worker.
@@ -99,7 +109,10 @@ class Client {
         { deadline: Date.now() + registrationTimeoutMs },
         (err, res) => {
           if (err) {
-            if (err.code === status.UNAVAILABLE || err.code === status.DEADLINE_EXCEEDED) {
+            if (
+              err.code === status.UNAVAILABLE ||
+              err.code === status.DEADLINE_EXCEEDED
+            ) {
               // A timed-out write may already have reached the scheduler.
               // Reconcile its state from the DB instead of replaying the RPC.
               this.readiness.invalidate();
@@ -108,24 +121,34 @@ class Client {
             return reject(err);
           }
           resolve(res);
-        }
+        },
       );
     });
   }
 
-  async delCron(request: DeleteCronRequest['ids']): Promise<DeleteCronResponse> {
+  async delCron(
+    request: DeleteCronRequest['ids'],
+  ): Promise<DeleteCronResponse> {
     await this.waitForReady(2000);
     return new Promise((resolve, reject) => {
-      this.client.delCron({ ids: request }, new Metadata(), { deadline: Date.now() + 5000 }, (err, res) => {
-        if (err) {
-          if (err.code === status.UNAVAILABLE || err.code === status.DEADLINE_EXCEEDED) {
-            this.readiness.invalidate();
-            Object.assign(err, { status: 503 });
+      this.client.delCron(
+        { ids: request },
+        new Metadata(),
+        { deadline: Date.now() + 5000 },
+        (err, res) => {
+          if (err) {
+            if (
+              err.code === status.UNAVAILABLE ||
+              err.code === status.DEADLINE_EXCEEDED
+            ) {
+              this.readiness.invalidate();
+              Object.assign(err, { status: 503 });
+            }
+            return reject(err);
           }
-          return reject(err);
-        }
-        resolve(res);
-      });
+          resolve(res);
+        },
+      );
     });
   }
 }

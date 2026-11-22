@@ -1,4 +1,4 @@
-import { CronJob } from '../shared/cronScheduler';
+import { CronJob } from '../cron/scheduling/cronScheduler';
 import { ToadScheduler } from 'toad-scheduler';
 
 export const scheduleStacks = new Map<string, CronJob[]>();

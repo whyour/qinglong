@@ -50,12 +50,7 @@ import CronDetailModal from './detail';
 import './index.less';
 import CronLogModal from './logModal';
 import CronModal, { CronLabelModal } from './modal';
-import {
-  CrontabStatus,
-  ICrontab,
-  OperationName,
-  OperationPath,
-} from './type';
+import { CrontabStatus, ICrontab, OperationName, OperationPath } from './type';
 import ViewCreateModal from './viewCreateModal';
 import ViewManageModal from './viewManageModal';
 
@@ -169,12 +164,16 @@ const Crontab = () => {
               )}
             </>
           )}
-          {record.saved === false && <Tag color="warning">{intl.get('规则待同步')}</Tag>}
-          {record.saved !== false && record.isDisabled === 1 && record.status === CrontabStatus.idle && (
-            <Tag icon={<CloseCircleOutlined />} color="error">
-              {intl.get('已禁用')}
-            </Tag>
+          {record.saved === false && (
+            <Tag color="warning">{intl.get('规则待同步')}</Tag>
           )}
+          {record.saved !== false &&
+            record.isDisabled === 1 &&
+            record.status === CrontabStatus.idle && (
+              <Tag icon={<CloseCircleOutlined />} color="error">
+                {intl.get('已禁用')}
+              </Tag>
+            )}
         </>
       ),
     },
@@ -248,8 +247,8 @@ const Crontab = () => {
           >
             {record.last_execution_time
               ? dayjs(record.last_execution_time * 1000).format(
-                'YYYY-MM-DD HH:mm:ss',
-              )
+                  'YYYY-MM-DD HH:mm:ss',
+                )
               : '-'}
           </span>
         );
@@ -378,7 +377,7 @@ const Crontab = () => {
 
   const [reload, setReload] = useState(0);
   const [listFailed, setListFailed] = useState(false);
-  const getCrons = () => setReload(n => n + 1);
+  const getCrons = () => setReload((n) => n + 1);
 
   useEffect(() => {
     if (!pageConf.size) return;
@@ -386,29 +385,51 @@ const Crontab = () => {
     const { signal } = controller;
     const { page, size, sorter, filters = {} } = pageConf;
     const params = {
-      searchValue: searchText, page, size, filters: JSON.stringify(filters),
-      ...(sorter?.column && sorter.order && { sorter: JSON.stringify({
-        field: sorter.column.key, type: sorter.order === 'ascend' ? 'ASC' : 'DESC',
-      }) }),
-      ...(viewConf && { queryString: JSON.stringify({
-        filters: viewConf.filters, sorts: viewConf.sorts,
-        filterRelation: viewConf.filterRelation || 'and',
-      }) }),
+      searchValue: searchText,
+      page,
+      size,
+      filters: JSON.stringify(filters),
+      ...(sorter?.column &&
+        sorter.order && {
+          sorter: JSON.stringify({
+            field: sorter.column.key,
+            type: sorter.order === 'ascend' ? 'ASC' : 'DESC',
+          }),
+        }),
+      ...(viewConf && {
+        queryString: JSON.stringify({
+          filters: viewConf.filters,
+          sorts: viewConf.sorts,
+          filterRelation: viewConf.filterRelation || 'and',
+        }),
+      }),
     };
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const { code, data } = await request.get(`${config.apiPrefix}crons`, { params, signal, retryInPlace: true });
+        const { code, data } = await request.get(`${config.apiPrefix}crons`, {
+          params,
+          signal,
+          retryInPlace: true,
+        });
         if (signal.aborted) return;
         if (code !== 200) throw new Error('Task list read failed');
         const { data: rows, total } = data;
-        const ids = [...new Set(rows.map(row => row.sub_id).filter(Boolean))];
-        const subscriptions = ids.length ? await request.get(`${config.apiPrefix}subscriptions`, {
-          params: { ids: JSON.stringify(ids) }, signal, retryInPlace: true,
-        }).catch(() => undefined) : undefined;
+        const ids = [...new Set(rows.map((row) => row.sub_id).filter(Boolean))];
+        const subscriptions = ids.length
+          ? await request
+              .get(`${config.apiPrefix}subscriptions`, {
+                params: { ids: JSON.stringify(ids) },
+                signal,
+                retryInPlace: true,
+              })
+              .catch(() => undefined)
+          : undefined;
         if (signal.aborted) return;
-        const byId = new Map(subscriptions?.data?.map(row => [row.id, row]));
-        setValue(rows.map(row => ({ ...row, subscription: byId.get(row.sub_id) })));
+        const byId = new Map(subscriptions?.data?.map((row) => [row.id, row]));
+        setValue(
+          rows.map((row) => ({ ...row, subscription: byId.get(row.sub_id) })),
+        );
         setTotal(total);
         setListFailed(false);
       } catch {
@@ -501,12 +522,11 @@ const Crontab = () => {
         </>
       ),
       onOk() {
-        return stop()
-          .then(({ code, data }) => {
-            if (code === 200) {
-              getCrons();
-            }
-          });
+        return stop().then(({ code, data }) => {
+          if (code === 200) {
+            getCrons();
+          }
+        });
       },
     });
   };
@@ -519,7 +539,11 @@ const Crontab = () => {
       }),
       content: (
         <>
-          {intl.get('确认操作对象', { operation: record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用'), object: intl.get('定时任务') })}{' '}
+          {intl.get('确认操作对象', {
+            operation:
+              record.isDisabled === 1 ? intl.get('启用') : intl.get('禁用'),
+            object: intl.get('定时任务'),
+          })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
@@ -529,7 +553,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${record.isDisabled === 1 ? 'enable' : 'disable'
+            `${config.apiPrefix}crons/${
+              record.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             [record.id],
           )
@@ -550,7 +575,11 @@ const Crontab = () => {
       }),
       content: (
         <>
-          {intl.get('确认操作对象', { operation: record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'), object: intl.get('定时任务') })}{' '}
+          {intl.get('确认操作对象', {
+            operation:
+              record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'),
+            object: intl.get('定时任务'),
+          })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {record.name}
           </Text>{' '}
@@ -560,7 +589,8 @@ const Crontab = () => {
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${record.isPinned === 1 ? 'unpin' : 'pin'
+            `${config.apiPrefix}crons/${
+              record.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             [record.id],
           )
@@ -643,7 +673,7 @@ const Crontab = () => {
   const onSearch = (value: string) => {
     const text = value.trim();
     if (text !== searchText) {
-      setPageConf(previous => ({ ...previous, page: 1 }));
+      setPageConf((previous) => ({ ...previous, page: 1 }));
       setSearchText(text);
     }
   };
@@ -676,14 +706,20 @@ const Crontab = () => {
   };
 
   const operateCrons = (operationStatus: number) => {
-    const stop = operationStatus === OperationPath.stop ? createStopRequest(selectedRowIds) : undefined;
+    const stop =
+      operationStatus === OperationPath.stop
+        ? createStopRequest(selectedRowIds)
+        : undefined;
     Modal.confirm({
       title: intl.get('确认操作', {
         operation: intl.get(OperationName[operationStatus]),
       }),
       content: (
         <>
-          {intl.get('确认批量操作', { operation: intl.get(OperationName[operationStatus]), object: intl.get('定时任务') })}
+          {intl.get('确认批量操作', {
+            operation: intl.get(OperationName[operationStatus]),
+            object: intl.get('定时任务'),
+          })}
         </>
       ),
       onOk() {
@@ -744,7 +780,7 @@ const Crontab = () => {
           setAllSubscriptions(data || []);
         }
       })
-      .catch(() => { });
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -960,10 +996,14 @@ const Crontab = () => {
             </span>
           </div>
         )}
-        {listFailed && <div role="status">
-          {intl.get('任务列表刷新失败')}
-          <Button type="link" loading={loading} onClick={getCrons}>{intl.get('重试')}</Button>
-        </div>}
+        {listFailed && (
+          <div role="status">
+            {intl.get('任务列表刷新失败')}
+            <Button type="link" loading={loading} onClick={getCrons}>
+              {intl.get('重试')}
+            </Button>
+          </div>
+        )}
         <Table
           columns={columns}
           sortDirections={['descend', 'ascend']}
@@ -997,7 +1037,7 @@ const Crontab = () => {
             getCrons();
           }}
           key={logCron.id}
-          cron={value.find(row => row.id === logCron.id) ?? logCron}
+          cron={value.find((row) => row.id === logCron.id) ?? logCron}
         />
       )}
       {isModalVisible && (

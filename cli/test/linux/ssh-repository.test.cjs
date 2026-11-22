@@ -7,7 +7,9 @@ const net = require('node:net');
 const { execFileSync, spawn } = require('node:child_process');
 const { setTimeout: delay } = require('node:timers/promises');
 const { createContext } = require('../../dist/internal/runtime/context');
-const { syncRepository } = require('../../dist/internal/subscription/subscriptionRunner');
+const {
+  syncRepository,
+} = require('../../dist/internal/subscription/subscriptionRunner');
 
 test(
   'real SSH subscriptions require the configured identity and pinned host key',

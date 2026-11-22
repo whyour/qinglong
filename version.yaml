@@ -1,6 +1,6 @@
 version: 2.25.0-rc.3
 changeLogLink: https://github.com/whyour/qinglong/blob/develop/docs/releases/2.25.0-rc.3.md
-publishTime: "2026-11-21 19:00:16"
+publishTime: '2026-11-21 19:00:16'
 changeLog: |
   1. 补齐 OpenAPI 可执行配置、脚本写入、趋势查询和 Perl 环境变量的安全边界。
   2. 修复 HTTP 工作进程异常退出后的任务日志保留，完善正常退出与失败任务的日志记录。

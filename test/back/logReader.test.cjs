@@ -57,7 +57,10 @@ test('log reader preserves UTF-8 characters across byte boundaries', async (t) =
   });
 
   assert.equal(first.content + second.content + third.content, 'aaaaa中文日志');
-  assert.equal((first.content + second.content + third.content).includes('�'), false);
+  assert.equal(
+    (first.content + second.content + third.content).includes('�'),
+    false,
+  );
 });
 
 test('missing logs return an empty chunk', async () => {
@@ -71,14 +74,15 @@ test('missing logs return an empty chunk', async () => {
   });
 });
 
-test('following a file distinguishes append, same-inode rewrites, and replacement', async t => {
+test('following a file distinguishes append, same-inode rewrites, and replacement', async (t) => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ql-log-follow-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
   const file = path.join(dir, 'run.log');
   const original = 'A\n' + '相同内容🚀\n'.repeat(80);
   await fs.writeFile(file, original);
   const first = await readLogChunk(file, { follow: true, offset: 0 });
-  const resume = chunk => readLogChunk(file, { cursor: chunk.cursor, offset: chunk.nextOffset });
+  const resume = (chunk) =>
+    readLogChunk(file, { cursor: chunk.cursor, offset: chunk.nextOffset });
   assert.equal((await resume(first)).cursor, first.cursor);
   await fs.appendFile(file, '追加\n');
   const appended = await resume(first);

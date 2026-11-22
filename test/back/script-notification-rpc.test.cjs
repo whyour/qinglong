@@ -131,7 +131,11 @@ assert len(children[0])==3,children
       .filter((x) => x.title === 'Concurrent cold startup')
       .map((x) => [x.notifyType, x.success])
       .sort(),
-    [['accepted', true], ['no_result', false], ['rejected', false]],
+    [
+      ['accepted', true],
+      ['no_result', false],
+      ['rejected', false],
+    ],
   );
   // Missing certificates and an older/unavailable backend must not kill scripts.
   await run(

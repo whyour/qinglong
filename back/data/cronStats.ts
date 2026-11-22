@@ -26,7 +26,9 @@ export class CrontabStat {
   }
 }
 
-export interface CrontabStatInstance extends Model<CrontabStat, CrontabStat>, CrontabStat {}
+export interface CrontabStatInstance
+  extends Model<CrontabStat, CrontabStat>,
+    CrontabStat {}
 
 export const CrontabStatModel = sequelize.define<CrontabStatInstance>(
   'CrontabStat',

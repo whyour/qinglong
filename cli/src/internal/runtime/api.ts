@@ -78,9 +78,11 @@ export class LocalApi {
     const port = this.context.env.QlPort || '5700';
     if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535)
       fail(translate(this.context.env, '本机面板端口无效。'), 2);
-    const retryReceipt = isRecord(body) && !!(body.execution_id || body.trigger_id) &&
+    const retryReceipt =
+      isRecord(body) &&
+      !!(body.execution_id || body.trigger_id) &&
       ((method === 'PUT' && endpoint === 'crons/status') ||
-       (method === 'POST' && endpoint === 'dashboard/record'));
+        (method === 'POST' && endpoint === 'dashboard/record'));
     const payload = body === undefined ? undefined : JSON.stringify(body);
     let result: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -92,7 +94,9 @@ export class LocalApi {
             method,
             headers: {
               Authorization: `Bearer ${token}`,
-              ...(finishedAt !== undefined && { 'X-QL-Finished-At': String(finishedAt) }),
+              ...(finishedAt !== undefined && {
+                'X-QL-Finished-At': String(finishedAt),
+              }),
               ...(body !== undefined
                 ? { 'Content-Type': 'application/json' }
                 : {}),
@@ -103,12 +107,24 @@ export class LocalApi {
           },
         );
         if (!response.ok) {
-          if (attempt === 0 && method === 'PUT' && endpoint === 'crons/status' && response.status === 400) {
+          if (
+            attempt === 0 &&
+            method === 'PUT' &&
+            endpoint === 'crons/status' &&
+            response.status === 400
+          ) {
             const rejection: unknown = await response.json();
             const validation = isRecord(rejection) && rejection.validation;
             const detail = isRecord(validation) && validation.body;
-            if (isRecord(detail) && detail.source === 'body' && Array.isArray(detail.keys) &&
-                detail.keys.length === 1 && ['trigger_id', 'execution_id', 'exit_code'].includes(detail.keys[0])) {
+            if (
+              isRecord(detail) &&
+              detail.source === 'body' &&
+              Array.isArray(detail.keys) &&
+              detail.keys.length === 1 &&
+              ['trigger_id', 'execution_id', 'exit_code'].includes(
+                detail.keys[0],
+              )
+            ) {
               throw new ReceiptValidationError(detail.keys[0]);
             }
           } else {
@@ -126,7 +142,13 @@ export class LocalApi {
         break;
       } catch (error) {
         if (error instanceof ReceiptValidationError) throw error;
-        if (attempt === 0 && retryReceipt && request.signal.aborted && !operationSignal()?.aborted) continue;
+        if (
+          attempt === 0 &&
+          retryReceipt &&
+          request.signal.aborted &&
+          !operationSignal()?.aborted
+        )
+          continue;
         fail(
           translate(
             this.context.env,

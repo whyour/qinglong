@@ -1,7 +1,7 @@
 import { t } from '../shared/i18n';
 import { Service, Inject } from 'typedi';
 import winston from 'winston';
-import { createCronJob, CronJob } from '../shared/cronScheduler';
+import { createCronJob, CronJob } from '../cron/scheduling/cronScheduler';
 import { ChildProcessWithoutNullStreams } from 'child_process';
 import {
   ToadScheduler,

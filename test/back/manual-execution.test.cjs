@@ -36,7 +36,7 @@ test(
       '../config/util': { getUniqPath: async () => 'task' },
       '../config/const': { TASK_PREFIX: 'task ', QL_PREFIX: 'ql ' },
       '../schedule/client': {},
-      '../shared/pLimit': {
+      '../cron/execution/cronLimit': {
         manualRunWithCronLimit: async (fn) => {
           active++;
           try {

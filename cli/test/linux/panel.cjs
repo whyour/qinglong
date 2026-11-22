@@ -43,10 +43,21 @@ let restoreEntrypoints;
   const switched = process.env.QL_PANEL_ENTRYPOINTS === '1';
   if (switched && process.env.QL_PANEL_PACKAGED === '1') {
     assert.equal(process.env.QL_CLI_ROOT, '/opt/qinglong-cli');
-    for (const [name, module] of [['task', 'task'], ['ql', 'ql']]) {
-      const target = require('node:path').join(require('node:os').homedir(), 'bin', name);
+    for (const [name, module] of [
+      ['task', 'task'],
+      ['ql', 'ql'],
+    ]) {
+      const target = require('node:path').join(
+        require('node:os').homedir(),
+        'bin',
+        name,
+      );
       assert.equal((await fs.lstat(target)).isSymbolicLink(), false);
-      assert.ok((await fs.readFile(target, 'utf8')).includes(Buffer.from(`/opt/qinglong-cli/dist/${module}.js`).toString('base64')));
+      assert.ok(
+        (await fs.readFile(target, 'utf8')).includes(
+          Buffer.from(`/opt/qinglong-cli/dist/${module}.js`).toString('base64'),
+        ),
+      );
     }
   } else if (switched)
     restoreEntrypoints =
@@ -214,7 +225,9 @@ let restoreEntrypoints;
 })()
   .catch(() => {
     // Assertions can embed environment values or subprocess output in their message.
-    console.error('Disposable panel integration failed; inspect the failing scenario locally.');
+    console.error(
+      'Disposable panel integration failed; inspect the failing scenario locally.',
+    );
     process.exitCode = 1;
   })
   .finally(async () => {

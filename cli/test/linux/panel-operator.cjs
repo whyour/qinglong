@@ -38,7 +38,10 @@ exports.verifyOperator = async function verifyOperator(api) {
       last_execution_time: start,
       log_path: 'cli-retention/2000-01-01-kept.log',
     });
-    assert.equal((await api(`crons/${task.id}`)).data.log_path, 'cli-retention/2000-01-01-kept.log');
+    assert.equal(
+      (await api(`crons/${task.id}`)).data.log_path,
+      'cli-retention/2000-01-01-kept.log',
+    );
     const result = invoke(['rmlog', '7']);
     assert.ok(result.removed.includes('cli-retention/2000-01-01-unused.log'));
     assert.ok(result.retained.includes('cli-retention/2000-01-01-kept.log'));

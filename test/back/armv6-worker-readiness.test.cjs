@@ -37,9 +37,9 @@ for (const [arch, armVersion, mode, timeout] of [
   ['x64', undefined, 'development', 120000],
   ['arm64', undefined, 'development', 120000],
 ]) {
-  test(`${arch} v${
-    armVersion ?? ''
-  } ${mode ?? 'default'} waits for scheduler readiness before HTTP and job recovery`, async () => {
+  test(`${arch} v${armVersion ?? ''} ${
+    mode ?? 'default'
+  } waits for scheduler readiness before HTTP and job recovery`, async () => {
     const cluster = new EventEmitter();
     const module = { exports: {} };
     const logger = { info() {}, warn() {}, error() {} };

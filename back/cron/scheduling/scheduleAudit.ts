@@ -1,8 +1,8 @@
-import { AnomalyPage } from './scheduleAnomalies';
+import { AnomalyPage } from '../queries/scheduleAnomalies';
 import { QueryTypes, Sequelize, Transaction } from 'sequelize';
-import { AddCronRequest, DeleteCronRequest } from '../protos/cron';
+import { AddCronRequest, DeleteCronRequest } from '../../protos/cron';
 import { upcomingSlots } from './cronScheduler';
-import { slotId } from './triggerHistory';
+import { slotId } from '../identity';
 
 type Rule = {
   cron_id: string;
@@ -189,10 +189,14 @@ export async function auditSchedule(
         { transaction, bind, type: QueryTypes.SELECT },
       );
       const receipts = await db.query<Receipt>(
-        `SELECT id,cron_id,scheduled_at,observed_at,state,${details ? 'source,reason,log_path,' : ''}
+        `SELECT id,cron_id,scheduled_at,observed_at,state,${
+          details ? 'source,reason,log_path,' : ''
+        }
       command_started_at,script_started_at,queued_at,COALESCE(dequeued_at,started_at) AS started_at,
       EXISTS(SELECT 1 FROM CronLegacyExitBookings b WHERE b.trigger_id=CronTriggers.id AND b.bound=1) AS verified_exit FROM CronTriggers
-      WHERE scheduled_at BETWEEN $since AND $through AND source IN ('node','recovery') ${details ? 'ORDER BY cron_id,scheduled_at,id' : ''}`,
+      WHERE scheduled_at BETWEEN $since AND $through AND source IN ('node','recovery') ${
+        details ? 'ORDER BY cron_id,scheduled_at,id' : ''
+      }`,
         { transaction, bind, type: QueryTypes.SELECT },
       );
       return { since: coverage.since, rules, receipts };
@@ -240,7 +244,8 @@ export async function auditSchedule(
       );
       if (certain < possible) partial = true;
       expected += certain;
-      const received = details?.kind === 'missing' && certain ? new Set<number>() : null;
+      const received =
+        details?.kind === 'missing' && certain ? new Set<number>() : null;
       for (const row of byTaskBlock.get(rule.cron_id + '/' + block) ?? []) {
         const time = row.scheduled_at;
         if (
@@ -267,21 +272,46 @@ export async function auditSchedule(
         } else {
           const kind = row.state === 'skipped' ? 'skipped' : 'unconfirmed';
           if (kind === 'skipped') skipped++;
-          if (details?.kind === kind) details.add({
-            task: row.cron_id, rule: rule.schedule, ruleIndex: rule.rule_index, time, source: row.source,
-            trigger: row.id, observed: row.observed_at, reason: row.reason, logPath: row.log_path,
-          });
+          if (details?.kind === kind)
+            details.add({
+              task: row.cron_id,
+              rule: rule.schedule,
+              ruleIndex: rule.rule_index,
+              time,
+              source: row.source,
+              trigger: row.id,
+              observed: row.observed_at,
+              reason: row.reason,
+              logPath: row.log_path,
+            });
         }
         if (row.script_started_at != null && row.script_started_at >= time)
           entries.push(row.script_started_at - time);
-        if (row.started_at != null && row.queued_at != null && row.started_at >= row.queued_at)
+        if (
+          row.started_at != null &&
+          row.queued_at != null &&
+          row.started_at >= row.queued_at
+        )
           waits.push(row.started_at - row.queued_at);
       }
       if (details && received && received.size < certain) {
-        for (let i = lowerBound(times, certainFirst); i < times.length && times[i] <= certainLast; i++) {
-          if (!received.has(times[i])) details.add({ task: Number(rule.cron_id), rule: rule.schedule,
-            ruleIndex: rule.rule_index, time: times[i], source: 'node', trigger: null,
-            observed: null, reason: null, logPath: null });
+        for (
+          let i = lowerBound(times, certainFirst);
+          i < times.length && times[i] <= certainLast;
+          i++
+        ) {
+          if (!received.has(times[i]))
+            details.add({
+              task: Number(rule.cron_id),
+              rule: rule.schedule,
+              ruleIndex: rule.rule_index,
+              time: times[i],
+              source: 'node',
+              trigger: null,
+              observed: null,
+              reason: null,
+              logPath: null,
+            });
         }
       }
     }

@@ -19,7 +19,7 @@ async function fixture(t) {
     '../data/dependence': {},
     '../data/notify': {},
     '../data/system': {},
-    '../shared/pLimit': {},
+    '../cron/execution/cronLimit': {},
     '../schedule/client': {},
     '../shared/i18n': { t: (x) => x },
     './notify': class {},
@@ -36,7 +36,10 @@ test('clearing system logs preserves append handles used by existing workers', a
   await fs.writeFile(active, 'old active logs\n');
   await fs.writeFile(rotated, 'old rotated logs\n');
   await fs.writeFile(path.join(root, 'audit.json'), 'rotation metadata');
-  const workers = await Promise.all([fs.open(active, 'a'), fs.open(active, 'a')]);
+  const workers = await Promise.all([
+    fs.open(active, 'a'),
+    fs.open(active, 'a'),
+  ]);
   t.after(async () => {
     await Promise.all(workers.map((worker) => worker.close()));
   });

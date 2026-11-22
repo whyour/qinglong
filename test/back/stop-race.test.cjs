@@ -35,7 +35,9 @@ async function fixture(t, onKill = async () => {}) {
   });
   load('back/data/cronStats.ts', { '.': { sequelize: db } });
   await db.sync();
-  await db.transaction(tx => require('../../back/shared/triggerHistory').installTriggerHistory(db, tx));
+  await db.transaction((tx) =>
+    require('../../back/cron/history').installTriggerHistory(db, tx),
+  );
   await crons.bulkCreate([
     { id: 1, command: 'task one.js', status: 0, pid: 101, log_path: 'one.log' },
     { id: 2, command: 'task two.js', status: 0, pid: 201, log_path: 'two.log' },
@@ -59,8 +61,9 @@ async function fixture(t, onKill = async () => {}) {
       RunningInstanceModel: instances,
       InstanceStatus: { running: 0, finished: 1, stopped: 2, error: 3 },
     },
-    '../shared/cronProcess': {
-      pidNamespaceOwner: require('../../back/shared/cronProcess').pidNamespaceOwner,
+    '../cron/execution/cronProcess': {
+      pidNamespaceOwner: require('../../back/cron/execution/cronProcess')
+        .pidNamespaceOwner,
       verifyCronProcess() {},
     },
     '../config/util': {
@@ -75,7 +78,7 @@ async function fixture(t, onKill = async () => {}) {
     },
     '../config/const': {},
     '../schedule/client': {},
-    '../shared/pLimit': {},
+    '../cron/execution/cronLimit': {},
     '../shared/utils': {},
     '../shared/i18n': { t: (s) => s },
     '../shared/logReader': {},
@@ -180,19 +183,21 @@ test('failed termination is not finalized as stopped', async (t) => {
 });
 
 test('stop instance verifies cron ownership, waits for exit and never confirms a failed signal', async (t) => {
-  const f = await fixture(t, async ({pid}) => { if (pid===102) throw Error('still alive'); });
-  assert.equal((await f.service.stopInstance(2,1)).code,404);
+  const f = await fixture(t, async ({ pid }) => {
+    if (pid === 102) throw Error('still alive');
+  });
+  assert.equal((await f.service.stopInstance(2, 1)).code, 404);
   await f.instances.create({ id: 6, cron_id: 1, status: 0, pid: null });
-  assert.equal((await f.service.stopInstance(1,6)).code,409);
-  assert.deepEqual(f.killed,[]);
-  await assert.rejects(f.service.stopInstance(1,2), /still alive/);
-  assert.equal((await f.instances.findByPk(2)).status,0);
-  assert.equal((await f.service.stopInstance(1,1)).code,200);
-  assert.equal((await f.service.stopInstance(1,1)).data.outcome,'stopped');
-  assert.equal((await f.instances.findByPk(1)).status,2);
+  assert.equal((await f.service.stopInstance(1, 6)).code, 409);
+  assert.deepEqual(f.killed, []);
+  await assert.rejects(f.service.stopInstance(1, 2), /still alive/);
+  assert.equal((await f.instances.findByPk(2)).status, 0);
+  assert.equal((await f.service.stopInstance(1, 1)).code, 200);
+  assert.equal((await f.service.stopInstance(1, 1)).data.outcome, 'stopped');
+  assert.equal((await f.instances.findByPk(1)).status, 2);
 });
 
-test('legacy instances sharing a numeric PID cannot be individually signalled', async t => {
+test('legacy instances sharing a numeric PID cannot be individually signalled', async (t) => {
   const f = await fixture(t);
   await f.instances.create({ id: 6, cron_id: 1, pid: 101, status: 0 });
   assert.equal((await f.service.stopInstance(1, 1)).code, 409);
@@ -200,40 +205,68 @@ test('legacy instances sharing a numeric PID cannot be individually signalled', 
   assert.equal((await f.instances.findByPk(6)).status, 0);
 });
 
-test('concurrent single stops join only the same task and instance; failures release a retry', async t => {
-  let release, entered, fail = true;
-  const waiting = new Promise(resolve => { entered = resolve; });
-  const gate = new Promise(resolve => { release = resolve; });
+test('concurrent single stops join only the same task and instance; failures release a retry', async (t) => {
+  let release,
+    entered,
+    fail = true;
+  const waiting = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
   const f = await fixture(t, async ({ pid }) => {
-    if (pid === 101 && fail) { entered(); await gate; throw Error('denied'); }
+    if (pid === 101 && fail) {
+      entered();
+      await gate;
+      throw Error('denied');
+    }
   });
   const first = f.service.stopInstance(1, 1);
-  const duplicates = Array.from({ length: 8 }, () => f.service.stopInstance(1, 1));
+  const duplicates = Array.from({ length: 8 }, () =>
+    f.service.stopInstance(1, 1),
+  );
   await waiting;
   assert.equal((await f.service.stopInstance(2, 1)).code, 404);
   assert.equal((await f.instances.findByPk(2)).status, 0);
   assert.deepEqual(f.killed, [101]);
   fail = false;
   release();
-  for (const r of await Promise.allSettled([first, ...duplicates])) assert.match(r.reason.message, /denied/);
-  const second = await Promise.all([f.service.stopInstance(1, 1), f.service.stopInstance(1, 1)]);
-  assert.deepEqual(second.map(r => r.data.outcome), ['stopped', 'stopped']);
+  for (const r of await Promise.allSettled([first, ...duplicates]))
+    assert.match(r.reason.message, /denied/);
+  const second = await Promise.all([
+    f.service.stopInstance(1, 1),
+    f.service.stopInstance(1, 1),
+  ]);
+  assert.deepEqual(
+    second.map((r) => r.data.outcome),
+    ['stopped', 'stopped'],
+  );
   assert.deepEqual(f.killed, [101, 101]);
   assert.equal((await f.service.stopInstance(1, 3)).data.outcome, 'ended');
   assert.equal((await f.instances.findByPk(3)).exit_code, 0);
 });
 
-test('single and batch stop share the in-flight termination and keep the batch snapshot across retries', async t => {
+test('single and batch stop share the in-flight termination and keep the batch snapshot across retries', async (t) => {
   let release, entered;
-  const gate = new Promise(resolve => { release = resolve; });
-  const firstSignal = new Promise(resolve => { entered = resolve; });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const firstSignal = new Promise((resolve) => {
+    entered = resolve;
+  });
   const f = await fixture(t, async ({ pid }) => {
-    if (pid === 101) { entered(); await gate; }
+    if (pid === 101) {
+      entered();
+      await gate;
+    }
   });
   const single = f.service.stopInstance(1, 1);
   await firstSignal;
   let captured;
-  const batchJoined = new Promise(resolve => { captured = resolve; });
+  const batchJoined = new Promise((resolve) => {
+    captured = resolve;
+  });
   const stopInstance = f.service.stopInstance.bind(f.service);
   f.service.stopInstance = (cronId, id) => {
     if (id === 1) captured();
@@ -241,24 +274,41 @@ test('single and batch stop share the in-flight termination and keep the batch s
   };
   const bulk = f.service.stop([1]);
   await batchJoined;
-  const history = new (require('../../back/shared/triggerHistory').TriggerHistory)(f.crons.sequelize);
-  assert.deepEqual((await history.pendingStops()).map(r => r.instance_id), [1, 2]);
+  const history = new (require('../../back/cron/history').TriggerHistory)(
+    f.crons.sequelize,
+  );
+  assert.deepEqual(
+    (await history.pendingStops()).map((r) => r.instance_id),
+    [1, 2],
+  );
   await f.instances.create({ id: 6, cron_id: 1, pid: 103, status: 0 });
   const duplicate = stopInstance(1, 1);
   release();
   await Promise.all([single, bulk, duplicate]);
   assert.deepEqual(f.killed, [101, 102]);
-  assert.deepEqual((await f.instances.findAll({ order: [['id', 'ASC']] })).map(r => r.status), [2, 2, 1, 3, 0, 0]);
+  assert.deepEqual(
+    (await f.instances.findAll({ order: [['id', 'ASC']] })).map(
+      (r) => r.status,
+    ),
+    [2, 2, 1, 3, 0, 0],
+  );
   assert.deepEqual(await history.pendingStops(), []);
 });
 
-test('a single stop is durable before asynchronous tree traversal and a replacement worker resumes it', async t => {
+test('a single stop is durable before asynchronous tree traversal and a replacement worker resumes it', async (t) => {
   let interrupted = true;
-  const f = await fixture(t, async () => { if (interrupted) throw Error('interrupted while enumerating tree'); });
+  const f = await fixture(t, async () => {
+    if (interrupted) throw Error('interrupted while enumerating tree');
+  });
   await assert.rejects(f.service.stopInstance(1, 2), /interrupted/);
-  const history = new (require('../../back/shared/triggerHistory').TriggerHistory)(f.crons.sequelize);
+  const history = new (require('../../back/cron/history').TriggerHistory)(
+    f.crons.sequelize,
+  );
   const pending = await history.pendingStops();
-  assert.deepEqual(pending.map(r => [r.cron_id, r.instance_id, r.pid, r.targets]), [[1, 2, 102, null]]);
+  assert.deepEqual(
+    pending.map((r) => [r.cron_id, r.instance_id, r.pid, r.targets]),
+    [[1, 2, 102, null]],
+  );
   interrupted = false;
   const replacement = new f.service.constructor({ error() {}, warn() {} });
   await replacement.resumePendingStops(history, pending);
@@ -267,10 +317,14 @@ test('a single stop is durable before asynchronous tree traversal and a replacem
   assert.equal((await f.instances.findByPk(1)).status, 0);
 });
 
-test('an interrupted batch replays its original instances and leaves later queued and live runs alone', async t => {
+test('an interrupted batch replays its original instances and leaves later queued and live runs alone', async (t) => {
   let blocked = true;
-  const f = await fixture(t, async ({ pid }) => { if (pid === 102 && blocked) throw Error('interrupted'); });
-  const history = new (require('../../back/shared/triggerHistory').TriggerHistory)(f.crons.sequelize);
+  const f = await fixture(t, async ({ pid }) => {
+    if (pid === 102 && blocked) throw Error('interrupted');
+  });
+  const history = new (require('../../back/cron/history').TriggerHistory)(
+    f.crons.sequelize,
+  );
   const key = require('node:crypto').randomUUID();
   await history.enqueue('before', 1, 'manual', null);
   await assert.rejects(f.service.stop([1], key), /interrupted/);
@@ -278,10 +332,18 @@ test('an interrupted batch replays its original instances and leaves later queue
   assert.deepEqual(pending, [{ request_id: key, cron_ids: '[1]' }]);
   await history.enqueue('after', 1, 'manual', null);
   await f.instances.create({ id: 6, cron_id: 1, pid: 103, status: 0 });
-  await f.crons.update({ status: 3, queued_token: 'later' }, { where: { id: 1 } });
+  await f.crons.update(
+    { status: 3, queued_token: 'later' },
+    { where: { id: 1 } },
+  );
   blocked = false;
-  const replacement = () => new f.service.constructor({ warn() {}, error() {} });
-  await replacement().resumePendingStops(history, await history.pendingStops(), pending);
+  const replacement = () =>
+    new f.service.constructor({ warn() {}, error() {} });
+  await replacement().resumePendingStops(
+    history,
+    await history.pendingStops(),
+    pending,
+  );
   await replacement().resumePendingStops(history, [], pending);
   await replacement().stop([1, 1], key);
   await assert.rejects(replacement().stop([2], key), { status: 409 });
@@ -290,14 +352,17 @@ test('an interrupted batch replays its original instances and leaves later queue
   assert.equal((await f.instances.findByPk(6)).status, 0);
   assert.equal((await f.crons.findByPk(1)).queued_token, 'later');
   const rows = await history.recent(1, 0);
-  assert.equal(rows.find(r => r.id === 'before').state, 'stopped');
-  assert.equal(rows.find(r => r.id === 'after').state, 'queued');
+  assert.equal(rows.find((r) => r.id === 'before').state, 'stopped');
+  assert.equal(rows.find((r) => r.id === 'after').state, 'queued');
   await replacement().stop([1], require('node:crypto').randomUUID());
   assert.equal((await f.instances.findByPk(6)).status, 2);
-  assert.equal((await history.recent(1, 0)).find(r => r.id === 'after').state, 'stopped');
+  assert.equal(
+    (await history.recent(1, 0)).find((r) => r.id === 'after').state,
+    'stopped',
+  );
 });
 
-test('replaying an empty original snapshot never targets the first later run', async t => {
+test('replaying an empty original snapshot never targets the first later run', async (t) => {
   const f = await fixture(t);
   const key = require('node:crypto').randomUUID();
   await f.service.stop([3], key);
@@ -309,12 +374,16 @@ test('replaying an empty original snapshot never targets the first later run', a
   assert.deepEqual(f.killed, [301]);
 });
 
-test('a second restart rolls back receipt deletion when settling a legacy instance fails', async t => {
+test('a second restart rolls back receipt deletion when settling a legacy instance fails', async (t) => {
   const f = await fixture(t);
-  const history = new (require('../../back/shared/triggerHistory').TriggerHistory)(f.crons.sequelize);
+  const history = new (require('../../back/cron/history').TriggerHistory)(
+    f.crons.sequelize,
+  );
   await history.queueInstanceStop(1, 1, 101);
   const stop = () => f.service.stopInstance(1, 1);
-  const transactionError = () => { throw Error('interrupted during settlement'); };
+  const transactionError = () => {
+    throw Error('interrupted during settlement');
+  };
   f.instances.addHook('beforeBulkUpdate', 'crash', transactionError);
   await assert.rejects(stop(), /interrupted during settlement/);
   f.instances.removeHook('beforeBulkUpdate', 'crash');
@@ -324,31 +393,47 @@ test('a second restart rolls back receipt deletion when settling a legacy instan
   assert.deepEqual(await history.pendingStops(), []);
 });
 
-test('simultaneous first submissions share a partial failure, then retry only the original instances', async t => {
-  let entered, release, fail = true;
-  const reached = new Promise(resolve => { entered = resolve; });
-  const gate = new Promise(resolve => { release = resolve; });
+test('simultaneous first submissions share a partial failure, then retry only the original instances', async (t) => {
+  let entered,
+    release,
+    fail = true;
+  const reached = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
   const f = await fixture(t, async ({ pid }) => {
-    if (pid === 102 && fail) { entered(); await gate; throw Error('partial failure'); }
+    if (pid === 102 && fail) {
+      entered();
+      await gate;
+      throw Error('partial failure');
+    }
   });
   const key = require('node:crypto').randomUUID();
-  const calls = Array.from({ length: 6 }, (_, i) => f.service.stop(i % 2 ? [1, 1] : [1], key));
+  const calls = Array.from({ length: 6 }, (_, i) =>
+    f.service.stop(i % 2 ? [1, 1] : [1], key),
+  );
   const results = Promise.allSettled(calls);
   await reached;
   await assert.rejects(f.service.stop([2], key), { status: 409 });
   await f.instances.create({ id: 6, cron_id: 1, pid: 103, status: 0 });
   release();
-  for (const result of await results) assert.match(result.reason.message, /partial failure/);
+  for (const result of await results)
+    assert.match(result.reason.message, /partial failure/);
   assert.deepEqual(f.killed, [101, 102]);
   fail = false;
   const replacement = new f.service.constructor({ error() {}, warn() {} });
-  await Promise.all([replacement.stop([1], key), replacement.stop([1, 1], key)]);
+  await Promise.all([
+    replacement.stop([1], key),
+    replacement.stop([1, 1], key),
+  ]);
   assert.deepEqual(f.killed, [101, 102, 102]);
   assert.equal((await f.instances.findByPk(6)).status, 0);
   assert.equal((await f.instances.findByPk(5)).status, 0);
 });
 
-test('a legacy task pointing to a different task’s PID cannot consume its stop result', async t => {
+test('a legacy task pointing to a different task’s PID cannot consume its stop result', async (t) => {
   const f = await fixture(t);
   await f.crons.create({ id: 3, status: 0, pid: 101 });
   const key = require('node:crypto').randomUUID();

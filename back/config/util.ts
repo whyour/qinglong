@@ -1,5 +1,9 @@
-import { cronOperand } from '../shared/cronOperand';
-import { finishStoppedTree, isProcessDescendant, systemOwner } from '../shared/cronProcess';
+import { cronOperand } from '../cron/execution/cronOperand';
+import {
+  finishStoppedTree,
+  isProcessDescendant,
+  systemOwner,
+} from '../cron/execution/cronProcess';
 import * as fs from 'fs/promises';
 import { statSync } from 'fs';
 import * as path from 'path';
@@ -10,7 +14,7 @@ import { load } from 'js-yaml';
 import config from './index';
 import { PYTHON_INSTALL_DIR, PYTHON_VENV_DIR } from './const';
 import Logger from '../loaders/logger';
-import { writeFileWithLock } from '../shared/utils';
+import { fileExist, writeFileWithLock } from '../shared/utils';
 import { DependenceTypes } from '../data/dependence';
 import { FormData } from 'undici';
 import os from 'os';
@@ -136,14 +140,7 @@ export function getPlatform(userAgent: string): 'mobile' | 'desktop' {
   return platform as 'mobile' | 'desktop';
 }
 
-export async function fileExist(file: any) {
-  try {
-    await fs.access(file);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
+export { fileExist } from '../shared/utils';
 
 export async function createFile(file: string, data: string = '') {
   await fs.mkdir(path.dirname(file), { recursive: true });
@@ -498,8 +495,15 @@ export function psTree(pid: number): Promise<number[]> {
   });
 }
 
-export async function killTask(pid: number, waitForExit = false, verifyOwner?: () => void,
-  withStopRequest?: (signalTree: () => Error | void, targets: string[]) => Promise<void | { targets: string[]; signalledAt: number | null }>) {
+export async function killTask(
+  pid: number,
+  waitForExit = false,
+  verifyOwner?: () => void,
+  withStopRequest?: (
+    signalTree: () => Error | void,
+    targets: string[],
+  ) => Promise<void | { targets: string[]; signalledAt: number | null }>,
+) {
   const descendants = await psTree(pid);
   verifyOwner?.();
   const signal = (target: number, sig: NodeJS.Signals) => {
@@ -526,9 +530,13 @@ export async function killTask(pid: number, waitForExit = false, verifyOwner?: (
     for (const target of pids) {
       try {
         const birth = systemOwner(target);
-        if (target === pid || isProcessDescendant(target, pid)) births.set(target, birth);
+        if (target === pid || isProcessDescendant(target, pid))
+          births.set(target, birth);
       } catch (error) {
-        if (!['ENOENT', 'ESRCH'].includes((error as NodeJS.ErrnoException).code!)) throw error;
+        if (
+          !['ENOENT', 'ESRCH'].includes((error as NodeJS.ErrnoException).code!)
+        )
+          throw error;
       }
     }
     verifyOwner();
@@ -536,9 +544,11 @@ export async function killTask(pid: number, waitForExit = false, verifyOwner?: (
   const sameProcess = (target: number) => {
     if (!verifyOwner) return true;
     if (!births.has(target)) return false;
-    try { return births.get(target) === systemOwner(target); }
-    catch (error) {
-      if (['ENOENT', 'ESRCH'].includes((error as NodeJS.ErrnoException).code!)) return false;
+    try {
+      return births.get(target) === systemOwner(target);
+    } catch (error) {
+      if (['ENOENT', 'ESRCH'].includes((error as NodeJS.ErrnoException).code!))
+        return false;
       throw error;
     }
   };
@@ -547,7 +557,9 @@ export async function killTask(pid: number, waitForExit = false, verifyOwner?: (
     // The root owns the command's result. An ESRCH here must roll back the
     // stop claim even if a descendant is still draining the output pipe.
     if (verifyOwner && (!sameProcess(pid) || !signal(pid, 'SIGTERM'))) {
-      throw Object.assign(new Error('Command already exited'), { code: 'ESRCH' });
+      throw Object.assign(new Error('Command already exited'), {
+        code: 'ESRCH',
+      });
     }
     let deliveryError: Error | undefined;
     for (const target of pids) {
@@ -685,7 +697,9 @@ export async function getUniqPath(
     str = `${tempStr}_${str.slice(slashIndex + 1)}`;
   }
 
-  const base = str.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5.-]+/g, '_').slice(0, 100 - suffix.length);
+  const base = str
+    .replace(/[^a-zA-Z0-9_\u4e00-\u9fa5.-]+/g, '_')
+    .slice(0, 100 - suffix.length);
   return `${base && !/^\.+$/.test(base) ? base : 'task'}${suffix}`;
 }
 
@@ -917,7 +931,10 @@ export function getUninstallCommand(
   if ((linuxOsType || getOsTypeSync()) === 'Alpine') {
     // apk del accepts package names, not the version constraints or repository
     // tags accepted by apk add. Keep apt's version/architecture selectors intact.
-    const packageName = name.trim().split(/[<>=~@]/, 1)[0].trim();
+    const packageName = name
+      .trim()
+      .split(/[<>=~@]/, 1)[0]
+      .trim();
     const argument = /^[a-z0-9][a-z0-9+_.-]*$/i.test(packageName)
       ? packageName
       : shellQuote(packageName);

@@ -1,9 +1,8 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const protectedPathCase = require(
-  '../../back/middlewares/protectedPathCase',
-).default;
+const protectedPathCase =
+  require('../../back/middlewares/protectedPathCase').default;
 
 function runMiddleware(path) {
   let status;

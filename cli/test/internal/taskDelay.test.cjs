@@ -4,7 +4,9 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
-const { matchesDelayExtension } = require('../../dist/internal/execution/taskDelay');
+const {
+  matchesDelayExtension,
+} = require('../../dist/internal/execution/taskDelay');
 const { createContext } = require('../../dist/internal/runtime/context');
 const { executeTask } = require('../../dist/internal/execution/taskRunner');
 

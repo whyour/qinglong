@@ -1,4 +1,4 @@
-import { upcomingSlots } from './cronScheduler';
+import { upcomingSlots } from '../scheduling/cronScheduler';
 
 type Definition = {
   schedule?: string;

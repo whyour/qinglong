@@ -27,7 +27,7 @@ for (const scenario of [
   test(`Linux mirror persistence follows the process result: ${scenario.name}`, async () => {
     const logger = { info() {}, error() {} };
     const ScheduleService = load('back/services/schedule.ts', {
-      '../shared/cronScheduler': {},
+      '../cron/scheduling/cronScheduler': {},
       '../shared/pLimit': { runWithSystemLimit: async (_params, fn) => fn() },
       'cross-spawn': {
         spawn: () =>
@@ -53,9 +53,9 @@ for (const scenario of [
       '../data/notify': {},
       '../data/system': {},
       '../schedule/client': {},
-      '../shared/pLimit': {},
+      '../cron/execution/cronLimit': {},
       '../shared/i18n': {},
-      '../shared/schedulerMutationLock': {},
+      '../cron/scheduling/schedulerMutationLock': {},
       './notify': class {},
       './schedule': ScheduleService,
       './sock': class {},

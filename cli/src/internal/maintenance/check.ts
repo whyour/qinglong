@@ -88,22 +88,28 @@ export async function inspectPanel(
     probe(port, `${basePath}/`, (body) =>
       /<div\s+id=["']root["']\s*>\s*<\/div>/.test(body),
     ),
-    probe(port, `${basePath}/api/health?t=${Math.floor(Date.now() / 1000)}`, (body) => {
-      try {
-        const response: unknown = JSON.parse(body);
-        return (
-          !!response &&
-          typeof response === 'object' &&
-          'code' in response &&
-          response.code === 200 &&
-          'data' in response && !!response.data &&
-          typeof response.data === 'object' &&
-          'status' in response.data && response.data.status === 'ok'
-        );
-      } catch {
-        return false;
-      }
-    }),
+    probe(
+      port,
+      `${basePath}/api/health?t=${Math.floor(Date.now() / 1000)}`,
+      (body) => {
+        try {
+          const response: unknown = JSON.parse(body);
+          return (
+            !!response &&
+            typeof response === 'object' &&
+            'code' in response &&
+            response.code === 200 &&
+            'data' in response &&
+            !!response.data &&
+            typeof response.data === 'object' &&
+            'status' in response.data &&
+            response.data.status === 'ok'
+          );
+        } catch {
+          return false;
+        }
+      },
+    ),
   ]);
   return { panel, backend };
 }

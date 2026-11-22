@@ -6,19 +6,44 @@ const load = require('../helpers/load-security-module.cjs');
 test('debugger keeps the selected script when an older read completes after it', async () => {
   const ts = require('typescript');
   const file = path.resolve(__dirname, '../../src/pages/script/editModal.tsx');
-  const source = ts.createSourceFile(file, require('fs').readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+  const source = ts.createSourceFile(
+    file,
+    require('fs').readFileSync(file, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+  );
   let read;
   function visit(node) {
-    if (ts.isVariableDeclaration(node) && node.name.getText(source) === 'getDetail')
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.name.getText(source) === 'getDetail'
+    )
       read = node.initializer.getText(source);
     ts.forEachChild(node, visit);
   }
   visit(source);
-  const js = ts.transpile('const read = ' + read, { target: ts.ScriptTarget.ES2022 });
-  const responses = [], ready = [], contents = [];
-  const get = Function('request', 'pendingFile', 'setFileReady', 'setValue', 'config', js + '\nreturn read;')(
-    { get: (_url, { signal }) => new Promise(resolve => responses.push({ resolve, signal })) },
-    { current: undefined }, state => ready.push(state), text => contents.push(text), { apiPrefix: '/api/' },
+  const js = ts.transpile('const read = ' + read, {
+    target: ts.ScriptTarget.ES2022,
+  });
+  const responses = [],
+    ready = [],
+    contents = [];
+  const get = Function(
+    'request',
+    'pendingFile',
+    'setFileReady',
+    'setValue',
+    'config',
+    js + '\nreturn read;',
+  )(
+    {
+      get: (_url, { signal }) =>
+        new Promise((resolve) => responses.push({ resolve, signal })),
+    },
+    { current: undefined },
+    (state) => ready.push(state),
+    (text) => contents.push(text),
+    { apiPrefix: '/api/' },
   );
   get({ title: 'slow.js' });
   get({ title: 'current.js' });

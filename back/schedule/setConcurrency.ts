@@ -1,7 +1,7 @@
 import { ServerUnaryCall, sendUnaryData, status } from '@grpc/grpc-js';
 import os from 'os';
 import { AddCronResponse, SetConcurrencyRequest } from '../protos/cron';
-import taskLimit from '../shared/pLimit';
+import taskLimit from '../cron/execution/cronLimit';
 
 export async function setConcurrency(
   call: ServerUnaryCall<SetConcurrencyRequest, AddCronResponse>,

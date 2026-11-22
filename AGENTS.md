@@ -1,3 +1,9 @@
+# 代码格式
+
+- 每次修改代码后，必须按项目的 `.prettierrc`、`.editorconfig` 和 `.prettierignore` 完成格式化，覆盖新增文件、静态及动态导入、`require()` 和测试代码。
+- 在项目根目录执行 `npm run prettier`，随后执行 `npm run prettier:check`。检查必须通过；发现格式问题时须修复并重新检查，才能结束任务或提交代码。
+- 检查通过后若再次修改代码，必须重新完成格式化和检查。不得以手动调整格式、编辑器设置或提交钩子代替上述验证。
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

@@ -5,14 +5,21 @@ const path = require('node:path');
 const [operation, stage, side, id] = process.argv.slice(2);
 const root = process.env.QL_DATA_DIR;
 const load = require('./load-security-module.cjs');
-const db = load('back/data/index.ts', { '../config/index': { dbPath: root } }).sequelize;
-const { TriggerHistory } = require('../../back/shared/triggerHistory');
+const db = load('back/data/index.ts', {
+  '../config/index': { dbPath: root },
+}).sequelize;
+const { TriggerHistory } = require('../../back/cron/history');
 const history = new TriggerHistory(db);
 const stats = load('back/data/cronStats.ts', { '.': { sequelize: db } });
-const running = load('back/data/runningInstance.ts', { '.': { sequelize: db } });
+const running = load('back/data/runningInstance.ts', {
+  '.': { sequelize: db },
+});
 const Retention = load('back/services/retention.ts', {
-  '../data': { sequelize: db }, '../data/cronStats': stats, '../data/runningInstance': running,
-  '../data/system': {}, '../config': {},
+  '../data': { sequelize: db },
+  '../data/cronStats': stats,
+  '../data/runningInstance': running,
+  '../data/system': {},
+  '../config': {},
 }).default;
 
 function barrier() {
@@ -45,7 +52,8 @@ function intercept(object, method, matches) {
     return result;
   };
 }
-const captured = file => path.basename(file).startsWith('.pending.' + id + '.r-');
+const captured = (file) =>
+  path.basename(file).startsWith('.pending.' + id + '.r-');
 if (stage === 'readClaim') {
   const open = fs.promises.open.bind(fs.promises);
   fs.promises.open = async (file, ...options) => {
@@ -53,16 +61,34 @@ if (stage === 'readClaim') {
     if (captured(file)) {
       if (side === 'before') barrier();
       const close = handle.close.bind(handle);
-      handle.close = async () => { await close(); if (side === 'after') barrier(); };
+      handle.close = async () => {
+        await close();
+        if (side === 'after') barrier();
+      };
     }
     return handle;
   };
-} else if (stage === 'move') intercept(fs.promises, 'rename', (src) => path.basename(src) === id);
+} else if (stage === 'move')
+  intercept(fs.promises, 'rename', (src) => path.basename(src) === id);
 else if (stage === 'unlink') intercept(fs.promises, 'unlink', captured);
-else intercept(db, 'query', sql => String(sql).replace(/[`"]/g, '').startsWith(statements[stage].replace(/"/g, '')));
+else
+  intercept(db, 'query', (sql) =>
+    String(sql)
+      .replace(/[`"]/g, '')
+      .startsWith(statements[stage].replace(/"/g, '')),
+  );
 
 (async () => {
-  if (operation === 'prune') await new Retention().cleanup({ runningInstanceRetentionDays: 1, cronStatRetentionDays: 1 });
+  if (operation === 'prune')
+    await new Retention().cleanup({
+      runningInstanceRetentionDays: 1,
+      cronStatRetentionDays: 1,
+    });
   else await history.complete(id, 'unknown', null, null);
   throw Error('Expected barrier was never reached: ' + operation + '/' + stage);
-})().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => db.close());
+})()
+  .catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(() => db.close());

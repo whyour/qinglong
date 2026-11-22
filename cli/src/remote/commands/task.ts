@@ -4,10 +4,11 @@ import { fail } from '../../shared/errors';
 import type { ApiResponse, LogResponse } from '../../shared/types';
 import type { Command, Task } from '../types';
 import { session } from './auth';
+import { runReceipt, waitForTrigger } from './taskRun';
 
 type TaskCommand = Extract<
   Command,
-  { kind: 'list' | 'get' | 'logs' | 'run' | 'stop' }
+  { kind: 'list' | 'get' | 'logs' | 'run' | 'stop' | 'wait' }
 >;
 
 function isTask(value: unknown): value is Task {
@@ -23,6 +24,15 @@ export async function task(
   command: TaskCommand,
 ): Promise<ApiResponse<unknown> | LogResponse> {
   const config = await session();
+  if (command.kind === 'wait') {
+    return waitForTrigger(
+      config,
+      command.id,
+      command.triggerId,
+      command.timeout,
+      'wait',
+    );
+  }
   if (command.kind === 'list') {
     const query = new URLSearchParams({
       page: String(command.page),
@@ -50,7 +60,18 @@ export async function task(
     return { code: 200, data: result.data };
   }
   if (command.kind === 'logs') {
-    const result = await request(config, `crons/${command.id}/log`);
+    const query = command.triggerId
+      ? `?${new URLSearchParams({ triggerId: command.triggerId })}`
+      : '';
+    const result = await request(config, `crons/${command.id}/log${query}`);
+    if (command.triggerId && result.triggerId !== command.triggerId) {
+      fail(
+        translate(
+          process.env,
+          '面板未确认日志所属的触发 ID，已拒绝返回可能属于其他轮次的日志。',
+        ),
+      );
+    }
     if (
       typeof result.data !== 'string' ||
       (result.logStatus !== undefined && typeof result.logStatus !== 'string')
@@ -63,14 +84,39 @@ export async function task(
       data: lines.slice(-command.tail).join('\n'),
       logStatus: result.logStatus as string | undefined,
       truncated: result.truncated === true || lines.length > command.tail,
+      ...(command.triggerId ? { triggerId: command.triggerId } : {}),
     };
   }
-  await request(config, `crons/${command.kind}`, {
+  const result = await request(config, `crons/${command.kind}`, {
     method: 'PUT',
     body: [command.id],
   });
+  const receipt =
+    command.kind === 'run' ? runReceipt(result, command.id) : undefined;
+  if (command.kind === 'run' && command.wait) {
+    if (!receipt) {
+      fail(
+        translate(
+          process.env,
+          '运行请求已提交，但面板未返回 triggerId，无法等待本轮执行。请检查任务状态，不要直接重试运行。',
+        ),
+      );
+    }
+    return waitForTrigger(
+      config,
+      command.id,
+      receipt.triggerId,
+      command.timeout ?? 300,
+      'run',
+    );
+  }
   return {
     code: 200,
-    data: { taskId: command.id, action: command.kind, accepted: true },
+    data: {
+      taskId: command.id,
+      action: command.kind,
+      accepted: true,
+      ...receipt,
+    },
   };
 }

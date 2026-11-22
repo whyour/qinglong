@@ -6,12 +6,15 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const startup = fs.readFileSync('shell/start-simplify.sh', 'utf8');
-const runtimeLoader = fs.readFileSync('shell/share.sh', 'utf8')
+const runtimeLoader = fs
+  .readFileSync('shell/share.sh', 'utf8')
   .match(/^load_node_runtime_args\(\) \{[\s\S]*?^\}/m)[0];
-const preparation = `${runtimeLoader}\ndir_root="$QL_DIR"\n` + startup.slice(
-  startup.indexOf('\nfix_config\n'),
-  startup.indexOf('log_with_style "INFO" "$(t \'🔄'),
-);
+const preparation =
+  `${runtimeLoader}\ndir_root="$QL_DIR"\n` +
+  startup.slice(
+    startup.indexOf('\nfix_config\n'),
+    startup.indexOf('log_with_style "INFO" "$(t \'🔄'),
+  );
 for (const fails of [false, true]) {
   test(`manual startup ${
     fails

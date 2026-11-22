@@ -66,7 +66,7 @@ async function fixture(t) {
     '../config/util': { isDemoEnv: () => false },
     '../config/const': {},
     '../schedule/client': client,
-    '../shared/pLimit': {},
+    '../cron/execution/cronLimit': {},
     '../shared/utils': {},
     '../shared/i18n': { t: (s) => s },
     '../shared/logReader': {},
@@ -179,7 +179,8 @@ for (const operation of ['create', 'update', 'enabled']) {
     await assert.rejects(
       mutation,
       (err) =>
-        err.status === 503 && err.cause === cause &&
+        err.status === 503 &&
+        err.cause === cause &&
         (operation === 'update' ? /原调度未能恢复/ : /回滚/).test(err.message),
     );
     if (operation === 'create') assert.equal(await crons.count(), 0);
@@ -204,8 +205,8 @@ test(
     t.after(() => fs.rm(root, { recursive: true, force: true }));
     const config = { crontabFile: path.join(root, 'crontab.list') };
     const { withSchedulerMutation } = load(
-      'back/shared/schedulerMutationLock.ts',
-      { '../config': config },
+      'back/cron/scheduling/schedulerMutationLock.ts',
+      { '../../config/index': config },
     );
     const entered = gate(),
       release = gate();
@@ -220,7 +221,7 @@ test(
         '-e',
         `
     const load = require('./test/helpers/load-security-module.cjs');
-    const { withSchedulerMutation } = load('back/shared/schedulerMutationLock.ts', {'../config': JSON.parse(process.argv[1])});
+    const { withSchedulerMutation } = load('back/cron/scheduling/schedulerMutationLock.ts', {"../../config/index": JSON.parse(process.argv[1])});
     process.send('attempting');
     withSchedulerMutation(async () => process.send('entered')).then(() => process.disconnect()).catch(err => { console.error(err); process.exit(1); });
   `,
@@ -257,13 +258,20 @@ for (const operation of ['update', 'remove', 'disabled']) {
       test(`${operation} aborts on RPC ${code} with deletion applied=${applied} and reconciles the original DB`, async (t) => {
         const { service, crons, client, jobs } = await fixture(t);
         await crons.create({
-          id: 1, command: 'old', schedule: '* * * * *', isDisabled: 0,
+          id: 1,
+          command: 'old',
+          schedule: '* * * * *',
+          isDisabled: 0,
         });
         jobs.set('1', 'old');
         // Only a handoff out of Node needs a deletion RPC before the DB write.
-        if (operation === 'update') service.shouldUseCronClient = row => row.schedule !== '@once';
+        if (operation === 'update')
+          service.shouldUseCronClient = (row) => row.schedule !== '@once';
         const before = await crons.findAll({ raw: true });
-        const failure = Object.assign(Error('uncertain deletion'), { code, status: 503 });
+        const failure = Object.assign(Error('uncertain deletion'), {
+          code,
+          status: 503,
+        });
         let deletes = 0;
         client.delCron = async (ids) => {
           deletes++;
@@ -271,8 +279,10 @@ for (const operation of ['update', 'remove', 'disabled']) {
           throw failure;
         };
         const add = client.addCron;
-        client.addCron = async () => assert.fail('must not register after failed deletion');
-        service.setCrontab = async () => assert.fail('must not publish after failed deletion');
+        client.addCron = async () =>
+          assert.fail('must not register after failed deletion');
+        service.setCrontab = async () =>
+          assert.fail('must not publish after failed deletion');
         await assert.rejects(
           operation === 'update'
             ? service.update({ id: 1, command: 'new', schedule: '@once' })

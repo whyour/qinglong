@@ -199,8 +199,15 @@ async function reconcile(
     await api.call(
       'crons',
       'DELETE',
-      obsolete.map((row) => ({ id: row.id, command: row.command, script: taskPath(row.command), sub_id: row.sub_id ?? null,
-        ...(typeof row.recovery_from === 'number' && { revision: row.recovery_from }) })),
+      obsolete.map((row) => ({
+        id: row.id,
+        command: row.command,
+        script: taskPath(row.command),
+        sub_id: row.sub_id ?? null,
+        ...(typeof row.recovery_from === 'number' && {
+          revision: row.recovery_from,
+        }),
+      })),
     );
     for (const row of obsolete) {
       await fs.rm(
@@ -239,7 +246,11 @@ async function reconcile(
 
 // Branches can contain slashes. Reject a linked namespace component before
 // reading an old checkout or moving the staged tree into place.
-async function checkNamespace(root: string, name: string, env: NodeJS.ProcessEnv) {
+async function checkNamespace(
+  root: string,
+  name: string,
+  env: NodeJS.ProcessEnv,
+) {
   let current = root;
   for (const part of name.split('/')) {
     current = path.join(current, part);
@@ -260,8 +271,12 @@ export async function syncRepository(
   const name = repositoryName(input.url, input.branch, context.env);
   const destination = within(context.paths.dir_scripts!, name, context.env);
   const repoDestination = within(context.paths.dir_repo!, name, context.env);
-  const checkPaths = () => Promise.all([context.paths.dir_scripts!, context.paths.dir_repo!]
-    .map(root => checkNamespace(root, name, context.env)));
+  const checkPaths = () =>
+    Promise.all(
+      [context.paths.dir_scripts!, context.paths.dir_repo!].map((root) =>
+        checkNamespace(root, name, context.env),
+      ),
+    );
   await checkPaths();
   const extensions = (
     input.extensions ||

@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
-import { installTriggerHistory } from './triggerHistory';
-import { repairLegacyDailyStatistics } from './legacyDailyStatistics';
+import { installTriggerHistory } from '../cron/schema';
+import { repairLegacyDailyStatistics } from '../cron/settlement/legacyDailyStatistics';
 import { QueryTypes, Sequelize } from 'sequelize';
 
 export const prunedExitMigrationId = 'preserve-pruned-bound-exits-v1';
@@ -35,7 +35,11 @@ const columns = [
   { table: 'Crontabs', column: 'skip_if_pending', type: 'BOOLEAN' },
   { table: 'Crontabs', column: 'recovery_from', type: 'BIGINT' },
   { table: 'Crontabs', column: 'last_instance_id', type: 'INTEGER' },
-  { table: 'CrontabStats', column: 'untimed_count', type: 'INTEGER NOT NULL DEFAULT 0' },
+  {
+    table: 'CrontabStats',
+    column: 'untimed_count',
+    type: 'INTEGER NOT NULL DEFAULT 0',
+  },
   { table: 'CrontabStats', column: 'fixed_max_time', type: 'NUMBER' },
 ];
 
@@ -81,39 +85,58 @@ export async function migrateSchema(database: Sequelize): Promise<void> {
     }
 
     const repairId = 'repair-legacy-daily-statistics-v3';
-    const prior = appliedIds.has('repair-legacy-daily-statistics-v2') ? 2
-      : appliedIds.has('repair-legacy-daily-statistics-v1') ? 1 : 0;
+    const prior = appliedIds.has('repair-legacy-daily-statistics-v2')
+      ? 2
+      : appliedIds.has('repair-legacy-daily-statistics-v1')
+      ? 1
+      : 0;
     const retentionId = 'preserve-cron-stat-retention-v1';
     if (!appliedIds.has(retentionId)) {
       if (prior || appliedIds.has(repairId)) {
         // Old cleanup removed complete date prefixes but kept no cutoff. Every
         // surviving date and yesterday (the minimum supported retention) is
         // safe to keep. Older empty dates cannot be distinguished from deletions.
-        await database.query(`INSERT OR IGNORE INTO CronStatRetention(id,first_day)
+        await database.query(
+          `INSERT OR IGNORE INTO CronStatRetention(id,first_day)
           SELECT 1, MIN(COALESCE(MIN(date),$yesterday),$yesterday) FROM CrontabStats`,
-          { bind: { yesterday: dayjs().subtract(1,'day').format('YYYY-MM-DD') }, transaction });
+          {
+            bind: {
+              yesterday: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
+            },
+            transaction,
+          },
+        );
       }
-      await database.query('INSERT INTO SchemaMigrations(id,applied_at) VALUES ($id,CURRENT_TIMESTAMP)',
-        { bind: { id: retentionId }, transaction });
+      await database.query(
+        'INSERT INTO SchemaMigrations(id,applied_at) VALUES ($id,CURRENT_TIMESTAMP)',
+        { bind: { id: retentionId }, transaction },
+      );
     }
     if (!appliedIds.has(repairId)) {
       await repairLegacyDailyStatistics(database, transaction, prior);
       // This reconciliation includes v1 and v2. Record all on fresh installations
       // so rolling back and upgrading again cannot replay the superseded repair.
-      await database.query(`INSERT OR IGNORE INTO SchemaMigrations(id,applied_at)
+      await database.query(
+        `INSERT OR IGNORE INTO SchemaMigrations(id,applied_at)
         VALUES ('repair-legacy-daily-statistics-v1',CURRENT_TIMESTAMP),('repair-legacy-daily-statistics-v2',CURRENT_TIMESTAMP),($id,CURRENT_TIMESTAMP)`,
-        { transaction, bind: { id: repairId } });
+        { transaction, bind: { id: repairId } },
+      );
     }
 
     if (!appliedIds.has(prunedExitMigrationId)) {
       // Earlier versions could reclaim the last file before upgrading. The
       // surviving bound booking still identifies the original exit exactly.
-      await database.query(`INSERT OR IGNORE INTO CronUnmatchedBoundExits(trigger_id,outcome,finished_at)
+      await database.query(
+        `INSERT OR IGNORE INTO CronUnmatchedBoundExits(trigger_id,outcome,finished_at)
         SELECT b.trigger_id,b.outcome,b.finished_at FROM CronLegacyExitBookings b
         WHERE b.bound=1 AND NOT EXISTS (SELECT 1 FROM CronTriggers WHERE id=b.trigger_id)
-          AND NOT EXISTS (SELECT 1 FROM CronBoundExitConflicts WHERE trigger_id=b.trigger_id)`, { transaction });
-      await database.query('INSERT INTO SchemaMigrations(id,applied_at) VALUES ($id,CURRENT_TIMESTAMP)',
-        { bind: { id: prunedExitMigrationId }, transaction });
+          AND NOT EXISTS (SELECT 1 FROM CronBoundExitConflicts WHERE trigger_id=b.trigger_id)`,
+        { transaction },
+      );
+      await database.query(
+        'INSERT INTO SchemaMigrations(id,applied_at) VALUES ($id,CURRENT_TIMESTAMP)',
+        { bind: { id: prunedExitMigrationId }, transaction },
+      );
     }
 
     // Older databases can contain non-JSON values in Envs.labels. Sequelize

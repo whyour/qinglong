@@ -1,23 +1,24 @@
 import config from '../config';
 import { stat } from 'fs/promises';
 import { resolveFileAccess } from '../shared/fileAccess';
-import { AnomalyPage, AnomalyKind } from '../shared/scheduleAnomalies';
-import { auditSchedule } from '../shared/scheduleAudit';
-import { systemScheduleAudit } from '../shared/systemScheduleAudit';
+import { AnomalyPage, AnomalyKind } from '../cron/queries/scheduleAnomalies';
+import { auditSchedule } from '../cron/scheduling/scheduleAudit';
+import { systemScheduleAudit } from '../cron/scheduling/systemScheduleAudit';
 import { celebrate, Joi } from 'celebrate';
-import { executionIdPattern, executionTriggerId, receiptFinishTime } from '../shared/executionIdentity';
-import { oldestQueued } from '../shared/queueDiagnostics';
+import {
+  executionIdPattern,
+  executionTriggerId,
+  receiptFinishTime,
+} from '../cron/identity';
+import { oldestQueued } from '../cron/queries/queueDiagnostics';
 import { containerResources } from '../shared/containerResources';
-import { TriggerHistory } from '../shared/triggerHistory';
+import { TriggerHistory } from '../cron/history';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { fn, col, where, Op, QueryTypes } from 'sequelize';
 import { CrontabModel } from '../data/cron';
 import { CrontabStatModel } from '../data/cronStats';
-import {
-  RunningInstanceModel,
-  InstanceStatus,
-} from '../data/runningInstance';
+import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
 import dayjs from 'dayjs';
 import os from 'os';
 import { isEmpty } from 'lodash';
@@ -38,21 +39,49 @@ export default (app: Router) => {
       const { ref_id, code, elapsed, trigger_id, execution_id } = req.body;
       if (!ref_id) return res.send({ code: 400, message: 'ref_id required' });
 
-      if (trigger_id != null && (typeof trigger_id !== 'string' || !/^[a-z0-9-]{1,120}$/.test(trigger_id))) {
+      if (
+        trigger_id != null &&
+        (typeof trigger_id !== 'string' ||
+          !/^[a-z0-9-]{1,120}$/.test(trigger_id))
+      ) {
         return res.send({ code: 400 });
       }
-      if (execution_id !== undefined && (trigger_id !== undefined ||
-          typeof execution_id !== 'string' || !executionIdPattern.test(execution_id))) return res.send({ code: 400 });
+      if (
+        execution_id !== undefined &&
+        (trigger_id !== undefined ||
+          typeof execution_id !== 'string' ||
+          !executionIdPattern.test(execution_id))
+      )
+        return res.send({ code: 400 });
       const id = execution_id ? executionTriggerId(execution_id) : trigger_id;
       // Old wrappers also send a status receipt with the process identity.
       // A stats-only retry cannot be distinguished from another identical run.
-      if (!id) return res.send({ code: 200, data: { counted: false, reason: 'missing_execution_identity' } });
-      const exitCode = typeof code === 'string' && /^-?\d+$/.test(code) ? Number(code) : code;
+      if (!id)
+        return res.send({
+          code: 200,
+          data: { counted: false, reason: 'missing_execution_identity' },
+        });
+      const exitCode =
+        typeof code === 'string' && /^-?\d+$/.test(code) ? Number(code) : code;
       const elapsedMs = Number(elapsed ?? 0) * 1000;
-      if (!Number.isInteger(exitCode) || !Number.isSafeInteger(elapsedMs) || elapsedMs < 0) {
-        return res.send({ code: 400, message: 'invalid exit code or elapsed time' });
+      if (
+        !Number.isInteger(exitCode) ||
+        !Number.isSafeInteger(elapsedMs) ||
+        elapsedMs < 0
+      ) {
+        return res.send({
+          code: 400,
+          message: 'invalid exit code or elapsed time',
+        });
       }
-      await new TriggerHistory(CrontabStatModel.sequelize!).recordShellResult(id, Number(ref_id), exitCode, elapsedMs, Date.now(), receiptFinishTime(req.get('X-QL-Finished-At')));
+      await new TriggerHistory(CrontabStatModel.sequelize!).recordShellResult(
+        id,
+        Number(ref_id),
+        exitCode,
+        elapsedMs,
+        Date.now(),
+        receiptFinishTime(req.get('X-QL-Finished-At')),
+      );
       res.send({ code: 200 });
     } catch (e) {
       res.send({ code: 500 });
@@ -82,7 +111,9 @@ export default (app: Router) => {
             where: { date: today },
             raw: true,
           }),
-          new TriggerHistory(CrontabStatModel.sequelize!).metrics(day.valueOf()),
+          new TriggerHistory(CrontabStatModel.sequelize!).metrics(
+            day.valueOf(),
+          ),
         ]);
 
         const row = stats as any;
@@ -104,8 +135,11 @@ export default (app: Router) => {
             todaySuccess: totalSuccess,
             todayFail: totalFail,
             todayStopped: totalRuns - totalSuccess - totalFail,
-            successRate: totalRuns > 0 ? ((totalSuccess / totalRuns) * 100).toFixed(1) : '0',
-            avgTime: averageElapsed(totalTime,totalRuns,row?.untimed_count),
+            successRate:
+              totalRuns > 0
+                ? ((totalSuccess / totalRuns) * 100).toFixed(1)
+                : '0',
+            avgTime: averageElapsed(totalTime, totalRuns, row?.untimed_count),
           },
         });
       } catch (e) {
@@ -114,55 +148,115 @@ export default (app: Router) => {
     },
   );
 
-  route.get('/schedule-anomalies', celebrate({ query: Joi.object({
-    source: Joi.string().valid('panel', 'system').required(),
-    kind: Joi.string().valid('missing', 'skipped', 'unconfirmed').required(),
-    at: Joi.number().integer().positive().required(),
-    page: Joi.number().integer().min(1).default(1),
-    revision: Joi.string().hex().length(64),
-    live: Joi.boolean().default(false),
-  }).unknown(true) }), async (req, res, next) => {
-    try {
-      const { source, kind, page, at, revision, live } = req.query;
-      const until = Number(at);
-      const serverNow = Date.now();
-      const expiresAt = dayjs(until).startOf('day').add(1, 'day').valueOf();
-      if (live && serverNow >= expiresAt)
-        return res.send({ code: 200, data: { status: 'expired' } });
-      if (until > Date.now() || until < dayjs().subtract(1, 'day').startOf('day').valueOf())
-        return res.status(400).send({ code: 400 });
-      const [snapshotRetention] = live ? await CrontabStatModel.sequelize!.query<{ cutoff: number }>(
-        'SELECT cutoff FROM CronHistoryRetention WHERE id=1', { type: QueryTypes.SELECT },
-      ) : [];
-      const details = new AnomalyPage(kind as AnomalyKind, Number(page), revision as string | undefined);
-      const audit = source === 'panel' ? auditSchedule : systemScheduleAudit;
-      const summary = await audit(CrontabStatModel.sequelize!, dayjs(until).startOf('day').valueOf(), until, details);
-      if (live && (!summary || summary.since > summary.through))
-        return res.send({ code: 200, data: { status: 'unavailable' } });
-      if (!summary) return res.status(409).send({ code: 409 });
-      const result = details.result();
-      const ids = [...new Set(result.rows.filter(row => !row.name).map(row => row.task))];
-      const tasks = ids.length ? await CrontabModel.findAll({ where: { id: ids }, attributes: ['id','name','command'], raw: true }) : [];
-      const names = new Map(tasks.map(task => [task.id, task.name || task.command]));
-      const rows = await Promise.all(result.rows.map(async ({ logPath, ...row }) => {
-        const path = logPath && resolveFileAccess(config.logPath, [logPath]);
-        const hasLog = path ? await stat(path).then(file => file.isFile(), () => false) : false;
-        return { ...row, name: row.name || names.get(row.task), hasLog };
-      }));
-      // Log checks can yield after the audit transaction. Do not publish that
-      // snapshot if history cleanup has since removed part of its plan window.
-      if (live) {
-        const [retention] = await CrontabStatModel.sequelize!.query<{ cutoff: number }>(
-          'SELECT cutoff FROM CronHistoryRetention WHERE id=1', { type: QueryTypes.SELECT },
+  route.get(
+    '/schedule-anomalies',
+    celebrate({
+      query: Joi.object({
+        source: Joi.string().valid('panel', 'system').required(),
+        kind: Joi.string()
+          .valid('missing', 'skipped', 'unconfirmed')
+          .required(),
+        at: Joi.number().integer().positive().required(),
+        page: Joi.number().integer().min(1).default(1),
+        revision: Joi.string().hex().length(64),
+        live: Joi.boolean().default(false),
+      }).unknown(true),
+    }),
+    async (req, res, next) => {
+      try {
+        const { source, kind, page, at, revision, live } = req.query;
+        const until = Number(at);
+        const serverNow = Date.now();
+        const expiresAt = dayjs(until).startOf('day').add(1, 'day').valueOf();
+        if (live && serverNow >= expiresAt)
+          return res.send({ code: 200, data: { status: 'expired' } });
+        if (
+          until > Date.now() ||
+          until < dayjs().subtract(1, 'day').startOf('day').valueOf()
+        )
+          return res.status(400).send({ code: 400 });
+        const [snapshotRetention] = live
+          ? await CrontabStatModel.sequelize!.query<{ cutoff: number }>(
+              'SELECT cutoff FROM CronHistoryRetention WHERE id=1',
+              { type: QueryTypes.SELECT },
+            )
+          : [];
+        const details = new AnomalyPage(
+          kind as AnomalyKind,
+          Number(page),
+          revision as string | undefined,
         );
-        if (retention && retention.cutoff > (snapshotRetention?.cutoff ?? 0))
+        const audit = source === 'panel' ? auditSchedule : systemScheduleAudit;
+        const summary = await audit(
+          CrontabStatModel.sequelize!,
+          dayjs(until).startOf('day').valueOf(),
+          until,
+          details,
+        );
+        if (live && (!summary || summary.since > summary.through))
           return res.send({ code: 200, data: { status: 'unavailable' } });
+        if (!summary) return res.status(409).send({ code: 409 });
+        const result = details.result();
+        const ids = [
+          ...new Set(
+            result.rows.filter((row) => !row.name).map((row) => row.task),
+          ),
+        ];
+        const tasks = ids.length
+          ? await CrontabModel.findAll({
+              where: { id: ids },
+              attributes: ['id', 'name', 'command'],
+              raw: true,
+            })
+          : [];
+        const names = new Map(
+          tasks.map((task) => [task.id, task.name || task.command]),
+        );
+        const rows = await Promise.all(
+          result.rows.map(async ({ logPath, ...row }) => {
+            const path =
+              logPath && resolveFileAccess(config.logPath, [logPath]);
+            const hasLog = path
+              ? await stat(path).then(
+                  (file) => file.isFile(),
+                  () => false,
+                )
+              : false;
+            return { ...row, name: row.name || names.get(row.task), hasLog };
+          }),
+        );
+        // Log checks can yield after the audit transaction. Do not publish that
+        // snapshot if history cleanup has since removed part of its plan window.
+        if (live) {
+          const [retention] = await CrontabStatModel.sequelize!.query<{
+            cutoff: number;
+          }>('SELECT cutoff FROM CronHistoryRetention WHERE id=1', {
+            type: QueryTypes.SELECT,
+          });
+          if (retention && retention.cutoff > (snapshotRetention?.cutoff ?? 0))
+            return res.send({ code: 200, data: { status: 'unavailable' } });
+        }
+        if (live && Date.now() >= expiresAt)
+          return res.send({ code: 200, data: { status: 'expired' } });
+        return res.send({
+          code: 200,
+          data: {
+            ...result,
+            rows,
+            serverNow,
+            expiresAt,
+            summary:
+              source === 'panel'
+                ? { audit: summary }
+                : { systemAudit: summary },
+            zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
+        });
+      } catch (error) {
+        next(error);
       }
-      if (live && Date.now() >= expiresAt)
-        return res.send({ code: 200, data: { status: 'expired' } });
-      return res.send({ code: 200, data: { ...result, rows, serverNow, expiresAt, summary: source === 'panel' ? { audit: summary } : { systemAudit: summary }, zone: Intl.DateTimeFormat().resolvedOptions().timeZone } });
-    } catch (error) { next(error); }
-  });
+    },
+  );
 
   for (const isSuccess of [false, true]) {
     route.get(
@@ -171,17 +265,31 @@ export default (app: Router) => {
         try {
           const countColumn = isSuccess ? 'success_count' : 'fail_count';
           const rows = (await CrontabStatModel.findAll({
-            attributes: ['ref_id', [fn('SUM', col(countColumn)), 'result_count']],
-            where: { date: dayjs().format('YYYY-MM-DD'), [countColumn]: { [Op.gt]: 0 } },
+            attributes: [
+              'ref_id',
+              [fn('SUM', col(countColumn)), 'result_count'],
+            ],
+            where: {
+              date: dayjs().format('YYYY-MM-DD'),
+              [countColumn]: { [Op.gt]: 0 },
+            },
             group: ['ref_id'],
-            order: [[fn('SUM', col(countColumn)), 'DESC'], ['ref_id', 'ASC']],
+            order: [
+              [fn('SUM', col(countColumn)), 'DESC'],
+              ['ref_id', 'ASC'],
+            ],
             raw: true,
           })) as any[];
-          const crons = rows.length > 0 ? await CrontabModel.findAll({
-            attributes: ['id', 'name', 'command'],
-            where: { id: { [Op.in]: rows.map((row) => Number(row.ref_id)) } },
-            raw: true,
-          }) : [];
+          const crons =
+            rows.length > 0
+              ? await CrontabModel.findAll({
+                  attributes: ['id', 'name', 'command'],
+                  where: {
+                    id: { [Op.in]: rows.map((row) => Number(row.ref_id)) },
+                  },
+                  raw: true,
+                })
+              : [];
           const cronMap = new Map(crons.map((cron) => [cron.id, cron]));
           res.send({
             code: 200,
@@ -192,7 +300,9 @@ export default (app: Router) => {
                 id,
                 name: cron?.name || cron?.command || tf('任务#%s', id),
                 command: cron?.command || '',
-                [isSuccess ? 'successCount' : 'failCount']: Number(row.result_count),
+                [isSuccess ? 'successCount' : 'failCount']: Number(
+                  row.result_count,
+                ),
                 deleted: !cron,
               };
             }),
@@ -212,9 +322,10 @@ export default (app: Router) => {
         const days =
           requestedDays === undefined
             ? 7
-            : typeof requestedDays === 'string' && /^[1-9]\d{0,2}$/.test(requestedDays)
-              ? Number(requestedDays)
-              : NaN;
+            : typeof requestedDays === 'string' &&
+              /^[1-9]\d{0,2}$/.test(requestedDays)
+            ? Number(requestedDays)
+            : NaN;
         if (!Number.isInteger(days) || days > 365) {
           return res.status(400).send({ code: 400, message: t('无效的天数') });
         }
@@ -286,12 +397,14 @@ export default (app: Router) => {
           raw: true,
         });
         const nameMap: Record<number, string> = {};
-        crons.forEach((c: any) => { nameMap[c.id] = c.name || c.command; });
+        crons.forEach((c: any) => {
+          nameMap[c.id] = c.name || c.command;
+        });
 
         const data = rows.map((r: any, i) => ({
           rank: i + 1,
           name: nameMap[Number(r.ref_id)] || tf('任务#%s', r.ref_id),
-          avgTime: averageElapsed(r.total_time,r.run_count,r.untimed_count),
+          avgTime: averageElapsed(r.total_time, r.run_count, r.untimed_count),
           maxTime: Number(r.max_time),
         }));
 
@@ -329,16 +442,20 @@ export default (app: Router) => {
           raw: true,
         });
         const nameMap: Record<number, string> = {};
-        crons.forEach((c: any) => { nameMap[c.id] = c.name || c.command; });
+        crons.forEach((c: any) => {
+          nameMap[c.id] = c.name || c.command;
+        });
 
         const data = rows.map((r: any, i) => ({
           rank: i + 1,
           name: nameMap[Number(r.ref_id)] || tf('任务#%s', r.ref_id),
           runCount: Number(r.run_count),
-          avgTime: averageElapsed(r.total_time,r.run_count,r.untimed_count),
+          avgTime: averageElapsed(r.total_time, r.run_count, r.untimed_count),
           successRate:
             Number(r.run_count) > 0
-              ? ((Number(r.success_count) / Number(r.run_count)) * 100).toFixed(1)
+              ? ((Number(r.success_count) / Number(r.run_count)) * 100).toFixed(
+                  1,
+                )
               : '0',
         }));
 
@@ -353,7 +470,9 @@ export default (app: Router) => {
     '/runtime',
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const queued = await new TriggerHistory(CrontabModel.sequelize!).queueCounts();
+        const queued = await new TriggerHistory(
+          CrontabModel.sequelize!,
+        ).queueCounts();
         const runningInstances = await RunningInstanceModel.findAll({
           where: {
             status: InstanceStatus.running,
@@ -368,9 +487,9 @@ export default (app: Router) => {
         const crons =
           cronIds.length > 0
             ? await CrontabModel.findAll({
-              where: { id: cronIds },
-              raw: true,
-            })
+                where: { id: cronIds },
+                raw: true,
+              })
             : [];
         const cronMap = new Map(crons.map((c: any) => [c.id, c]));
 
@@ -405,7 +524,9 @@ export default (app: Router) => {
             runningCount: running.length,
             queuedCount: queued.triggers,
             queuedTasks: queued.tasks,
-            oldestQueued: queued.triggers ? await oldestQueued(CrontabModel.sequelize!) : [],
+            oldestQueued: queued.triggers
+              ? await oldestQueued(CrontabModel.sequelize!)
+              : [],
             running,
             idleTasks: idleTasks.map((c: any) => ({
               id: c.id,
@@ -427,27 +548,49 @@ export default (app: Router) => {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const today = dayjs().format('YYYY-MM-DD');
-        const [crons, stats] = (await Promise.all([
+        const [crons, stats] = await Promise.all([
           CrontabModel.findAll({ where: { isDisabled: 0 }, raw: true }),
           CrontabStatModel.findAll({ where: { date: today }, raw: true }),
-        ]));
+        ]);
 
         const statMap: Record<number, any> = {};
-        stats.forEach((s: any) => { statMap[s.ref_id] = s; });
+        stats.forEach((s: any) => {
+          statMap[s.ref_id] = s;
+        });
 
-        const labelMap: Record<string, { count: number; runs: number; success: number; untimed: number; totalTime: number }> = {};
+        const labelMap: Record<
+          string,
+          {
+            count: number;
+            runs: number;
+            success: number;
+            untimed: number;
+            totalTime: number;
+          }
+        > = {};
         crons.forEach((c) => {
           let rawLabels = c.labels;
           if (typeof rawLabels === 'string') rawLabels = JSON.parse(rawLabels);
           const labels: string[] = Array.isArray(rawLabels)
-            ? [...new Set((rawLabels as string[]).filter((l: string) => !isEmpty(l)))]
+            ? [
+                ...new Set(
+                  (rawLabels as string[]).filter((l: string) => !isEmpty(l)),
+                ),
+              ]
             : [];
           if (labels.length === 0) {
             labels.push(t('未分类'));
           }
           const st = statMap[c.id!];
           labels.forEach((label: string) => {
-            if (!labelMap[label]) labelMap[label] = { count: 0, runs: 0, success: 0, untimed: 0, totalTime: 0 };
+            if (!labelMap[label])
+              labelMap[label] = {
+                count: 0,
+                runs: 0,
+                success: 0,
+                untimed: 0,
+                totalTime: 0,
+              };
             labelMap[label].count += 1;
             if (st) {
               labelMap[label].runs += Number(st.run_count) || 0;
@@ -463,8 +606,9 @@ export default (app: Router) => {
             label,
             count: v.count,
             todayRuns: v.runs,
-            successRate: v.runs > 0 ? ((v.success / v.runs) * 100).toFixed(1) : '0',
-            avgTime: averageElapsed(v.totalTime,v.runs,v.untimed),
+            successRate:
+              v.runs > 0 ? ((v.success / v.runs) * 100).toFixed(1) : '0',
+            avgTime: averageElapsed(v.totalTime, v.runs, v.untimed),
           }))
           .sort((a, b) => b.todayRuns - a.todayRuns);
 

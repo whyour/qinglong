@@ -41,7 +41,9 @@ const { Text } = Typography;
 
 function instanceTitle(item: { id: number; log_path?: string | null }) {
   const filename = item.log_path?.split('/').pop();
-  return filename ? readableLogName(filename) : intl.get('执行实例 #{id}', { id: String(item.id) });
+  return filename
+    ? readableLogName(filename)
+    : intl.get('执行实例 #{id}', { id: String(item.id) });
 }
 
 const tabList = [
@@ -67,7 +69,9 @@ const CronDetailModal = ({
 }) => {
   const [activeTabKey, setActiveTabKey] = useState('runningHistory');
   const [value, setValue] = useState('');
-  const [scriptState, setScriptState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const [scriptState, setScriptState] = useState<
+    'loading' | 'ready' | 'failed'
+  >('loading');
   const editorRef = useRef<any>(null);
   const [scriptInfo, setScriptInfo] = useState<any>({});
   const [validTabs, setValidTabs] = useState(tabList);
@@ -94,12 +98,13 @@ const CronDetailModal = ({
         setRefreshFailed(false);
       }
     } catch {
-      if (!signal.aborted && version === refreshVersion.current) setRefreshFailed(true);
+      if (!signal.aborted && version === refreshVersion.current)
+        setRefreshFailed(true);
     }
   };
   const refreshAfterChange = () => {
     needRefreshRef.current = true;
-    setHistoryRevision(n => n + 1);
+    setHistoryRevision((n) => n + 1);
     return refreshDetails();
   };
 
@@ -122,111 +127,138 @@ const CronDetailModal = ({
 
   const contentList: any = {
     daily: <DailyResults key={cron.id} id={cron.id} />,
-    triggers: activeTabKey === 'triggers' && <TriggerList key={cron.id} id={cron.id} onViewLog={(row) => viewInstanceLog(row, row.id)} />,
-    script: scriptState === 'failed' ? (
-      <span role="status">{intl.get('加载失败')} <Button type="link" onClick={() => getScript()}>{intl.get('重试')}</Button></span>
-    ) : scriptState === 'loading' ? intl.get('加载中...') : scriptInfo.filename && (
-      <Editor
-        language={getEditorMode(scriptInfo.filename)}
-        theme={theme}
-        value={value}
-        options={{
-          fontSize: 12,
-          minimap: { enabled: false },
-          lineNumbersMinChars: 3,
-          glyphMargin: false,
-          accessibilitySupport: 'off',
-        }}
-        onMount={(editor, monaco) => {
-          editorRef.current = editor;
-        }}
+    triggers: activeTabKey === 'triggers' && (
+      <TriggerList
+        key={cron.id}
+        id={cron.id}
+        onViewLog={(row) => viewInstanceLog(row, row.id)}
       />
     ),
+    script:
+      scriptState === 'failed' ? (
+        <span role="status">
+          {intl.get('加载失败')}{' '}
+          <Button type="link" onClick={() => getScript()}>
+            {intl.get('重试')}
+          </Button>
+        </span>
+      ) : scriptState === 'loading' ? (
+        intl.get('加载中...')
+      ) : (
+        scriptInfo.filename && (
+          <Editor
+            language={getEditorMode(scriptInfo.filename)}
+            theme={theme}
+            value={value}
+            options={{
+              fontSize: 12,
+              minimap: { enabled: false },
+              lineNumbersMinChars: 3,
+              glyphMargin: false,
+              accessibilitySupport: 'off',
+            }}
+            onMount={(editor, monaco) => {
+              editorRef.current = editor;
+            }}
+          />
+        )
+      ),
     runningHistory: activeTabKey === 'runningHistory' && (
       <InstanceHistory key={cron.id} id={cron.id} revision={historyRevision}>
-            {(item) => (
-              <List.Item
-                className="log-item"
-                onClick={() => item.log_path && viewInstanceLog(item)}
-                style={{ cursor: item.log_path ? 'pointer' : 'default' }}
-                actions={[
-                  item.log_path && (
-                    <Tooltip title={intl.get('查看日志')} key="log">
-                      <Button
-                        type="link"
-                        size="small"
-                        icon={<FileOutlined />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          viewInstanceLog(item);
-                        }}
-                      />
-                    </Tooltip>
-                  ),
-                  item.status === 0 && (
-                    <Tooltip title={intl.get('停止')} key="stop">
-                      <Button
-                        type="link"
-                        size="small"
-                        icon={<StopOutlined />}
-                        danger
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          stopRunningInstance(item);
-                        }}
-                      />
-                    </Tooltip>
-                  ),
-                ].filter(Boolean)}
-              >
-                <List.Item.Meta
-                  title={
+        {(item) => (
+          <List.Item
+            className="log-item"
+            onClick={() => item.log_path && viewInstanceLog(item)}
+            style={{ cursor: item.log_path ? 'pointer' : 'default' }}
+            actions={[
+              item.log_path && (
+                <Tooltip title={intl.get('查看日志')} key="log">
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<FileOutlined />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      viewInstanceLog(item);
+                    }}
+                  />
+                </Tooltip>
+              ),
+              item.status === 0 && (
+                <Tooltip title={intl.get('停止')} key="stop">
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<StopOutlined />}
+                    danger
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      stopRunningInstance(item);
+                    }}
+                  />
+                </Tooltip>
+              ),
+            ].filter(Boolean)}
+          >
+            <List.Item.Meta
+              title={
+                <span>
+                  <span
+                    style={{ marginRight: 8 }}
+                    title={item.log_path || undefined}
+                  >
+                    {instanceTitle(item)}
+                  </span>
+                  {item.status === 0 && (
+                    <Tag
+                      icon={<Loading3QuartersOutlined spin />}
+                      color="processing"
+                    >
+                      {intl.get('运行中')}
+                    </Tag>
+                  )}
+                  {item.status === 1 && (
+                    <Tag color="success">{intl.get('已完成')}</Tag>
+                  )}
+                  {item.status === 2 && (
+                    <Tag color="default">{intl.get('已停止')}</Tag>
+                  )}
+                  {item.status === 4 && <Tag>{intl.get('结果未知')}</Tag>}
+                  {item.status === 3 && (
+                    <Tag color="error">{intl.get('错误')}</Tag>
+                  )}
+                </span>
+              }
+              description={
+                <span style={{ color: '#999' }}>
+                  {item.status === 0 && item.pid && (
                     <span>
-                      <span style={{ marginRight: 8 }} title={item.log_path || undefined}>
-                        {instanceTitle(item)}
-                      </span>
-                      {item.status === 0 && (
-                        <Tag icon={<Loading3QuartersOutlined spin />} color="processing">
-                          {intl.get('运行中')}
-                        </Tag>
-                      )}
-                      {item.status === 1 && (
-                        <Tag color="success">{intl.get('已完成')}</Tag>
-                      )}
-                      {item.status === 2 && (
-                        <Tag color="default">{intl.get('已停止')}</Tag>
-                      )}
-                      {item.status === 4 && (
-                        <Tag>{intl.get('结果未知')}</Tag>
-                      )}
-                      {item.status === 3 && (
-                        <Tag color="error">{intl.get('错误')}</Tag>
-                      )}
+                      PID: {item.pid}
+                      {' | '}
                     </span>
-                  }
-                  description={
-                    <span style={{ color: '#999' }}>
-                      {item.status === 0 && item.pid && (
-                        <span>
-                          PID: {item.pid}{' | '}
-                        </span>
-                      )}
-                      {intl.get('启动')}: {dayjs.unix(item.started_at).format('YYYY-MM-DD HH:mm:ss')}
-                      {item.finished_at && (
-                        <span>
-                          {' | '}{intl.get('结束')}: {dayjs.unix(item.finished_at).format('YYYY-MM-DD HH:mm:ss')}
-                        </span>
-                      )}
-                      {item.exit_code != null && item.exit_code !== 0 && (
-                        <span>
-                          {' | '}{intl.get('退出码')}: {item.exit_code}
-                        </span>
-                      )}
+                  )}
+                  {intl.get('启动')}:{' '}
+                  {dayjs.unix(item.started_at).format('YYYY-MM-DD HH:mm:ss')}
+                  {item.finished_at && (
+                    <span>
+                      {' | '}
+                      {intl.get('结束')}:{' '}
+                      {dayjs
+                        .unix(item.finished_at)
+                        .format('YYYY-MM-DD HH:mm:ss')}
                     </span>
-                  }
-                />
-              </List.Item>
-            )}
+                  )}
+                  {item.exit_code != null && item.exit_code !== 0 && (
+                    <span>
+                      {' | '}
+                      {intl.get('退出码')}: {item.exit_code}
+                    </span>
+                  )}
+                </span>
+              }
+            />
+          </List.Item>
+        )}
       </InstanceHistory>
     ),
   };
@@ -240,16 +272,18 @@ const CronDetailModal = ({
       title: intl.get('确认停止实例'),
       content: (
         <>
-          {intl.get('确认停止运行实例')} PID: {instance.pid}{' '}
-          {intl.get('吗')}
+          {intl.get('确认停止运行实例')} PID: {instance.pid} {intl.get('吗')}
         </>
       ),
       onOk() {
         return request
-          .post(`${config.apiPrefix}crons/${cron.id}/instances/${instance.id}/stop`)
+          .post(
+            `${config.apiPrefix}crons/${cron.id}/instances/${instance.id}/stop`,
+          )
           .then(({ code, data }) => {
             if (code === 200) {
-              if (data?.outcome === 'ended') message.info(intl.get('实例已结束'));
+              if (data?.outcome === 'ended')
+                message.info(intl.get('实例已结束'));
               else message.success(intl.get('实例已停止'));
               return refreshAfterChange();
             }
@@ -263,11 +297,17 @@ const CronDetailModal = ({
     const base = `${config.apiPrefix}crons/${cron.id}/log`;
     let url: string;
     if (triggerId) url = `${base}?${new URLSearchParams({ triggerId })}`;
-    else if (instance.id) url = `${base}?${new URLSearchParams({ instanceId: String(instance.id) })}`;
+    else if (instance.id)
+      url = `${base}?${new URLSearchParams({
+        instanceId: String(instance.id),
+      })}`;
     else {
       const parts = instance.log_path.split('/');
       const file = parts.pop()!;
-      url = `${config.apiPrefix}logs/detail?${new URLSearchParams({ file, path: parts.join('/') })}`;
+      url = `${config.apiPrefix}logs/detail?${new URLSearchParams({
+        file,
+        path: parts.join('/'),
+      })}`;
     }
     setLogUrl(url);
     setIsLogModalVisible(true);
@@ -287,13 +327,18 @@ const CronDetailModal = ({
       setScriptInfo({ parent: p, filename: s });
       setScriptState('loading');
       request
-        .get(`${config.apiPrefix}scripts/detail`, { params: { file: s, path: p || '' }, signal, retryInPlace: true })
+        .get(`${config.apiPrefix}scripts/detail`, {
+          params: { file: s, path: p || '' },
+          signal,
+          retryInPlace: true,
+        })
         .then(({ code, data }) => {
           if (signal?.aborted) return;
           if (code !== 200) throw new Error('Script read failed');
           setValue(data);
           setScriptState('ready');
-        }).catch(() => {
+        })
+        .catch(() => {
           if (!signal?.aborted) setScriptState('failed');
         });
     } else {
@@ -377,22 +422,30 @@ const CronDetailModal = ({
         </>
       ),
       onOk() {
-        return stop()
-          .then(({ code, data }) => {
-            if (code === 200) {
-              return refreshAfterChange();
-            }
-          });
+        return stop().then(({ code, data }) => {
+          if (code === 200) {
+            return refreshAfterChange();
+          }
+        });
       },
     });
   };
 
   const enabledOrDisabledCron = () => {
     Modal.confirm({
-      title: intl.get('确认操作', { operation: currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用') }),
+      title: intl.get('确认操作', {
+        operation:
+          currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用'),
+      }),
       content: (
         <>
-          {intl.get('确认操作对象', { operation: currentCron.isDisabled === 1 ? intl.get('启用') : intl.get('禁用'), object: intl.get('定时任务') })}{' '}
+          {intl.get('确认操作对象', {
+            operation:
+              currentCron.isDisabled === 1
+                ? intl.get('启用')
+                : intl.get('禁用'),
+            object: intl.get('定时任务'),
+          })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {currentCron.name}
           </Text>{' '}
@@ -402,7 +455,8 @@ const CronDetailModal = ({
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${currentCron.isDisabled === 1 ? 'enable' : 'disable'
+            `${config.apiPrefix}crons/${
+              currentCron.isDisabled === 1 ? 'enable' : 'disable'
             }`,
             [currentCron.id],
           )
@@ -417,10 +471,19 @@ const CronDetailModal = ({
 
   const pinOrUnPinCron = () => {
     Modal.confirm({
-      title: intl.get('确认操作', { operation: currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶') }),
+      title: intl.get('确认操作', {
+        operation:
+          currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'),
+      }),
       content: (
         <>
-          {intl.get('确认操作对象', { operation: currentCron.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'), object: intl.get('定时任务') })}{' '}
+          {intl.get('确认操作对象', {
+            operation:
+              currentCron.isPinned === 1
+                ? intl.get('取消置顶')
+                : intl.get('置顶'),
+            object: intl.get('定时任务'),
+          })}{' '}
           <Text style={{ wordBreak: 'break-all' }} type="warning">
             {currentCron.name}
           </Text>{' '}
@@ -430,7 +493,8 @@ const CronDetailModal = ({
       onOk() {
         request
           .put(
-            `${config.apiPrefix}crons/${currentCron.isPinned === 1 ? 'unpin' : 'pin'
+            `${config.apiPrefix}crons/${
+              currentCron.isPinned === 1 ? 'unpin' : 'pin'
             }`,
             [currentCron.id],
           )
@@ -572,36 +636,44 @@ const CronDetailModal = ({
           <div className="cron-detail-info-item">
             <div className="cron-detail-info-title">{intl.get('状态')}</div>
             <div className="cron-detail-info-value">
-              {refreshFailed && <span role="status">
-                {intl.get('任务状态刷新失败')}
-                <Button type="link" size="small" onClick={() => {
-                  setRefreshFailed(false);
-                  void refreshDetails();
-                }}>{intl.get('重试')}</Button>
-              </span>}
+              {refreshFailed && (
+                <span role="status">
+                  {intl.get('任务状态刷新失败')}
+                  <Button
+                    type="link"
+                    size="small"
+                    onClick={() => {
+                      setRefreshFailed(false);
+                      void refreshDetails();
+                    }}
+                  >
+                    {intl.get('重试')}
+                  </Button>
+                </span>
+              )}
               {(!currentCron.isDisabled ||
                 currentCron.status !== CrontabStatus.idle) && (
-                  <>
-                    {currentCron.status === CrontabStatus.idle && (
-                      <Tag icon={<ClockCircleOutlined />} color="default">
-                        {intl.get('空闲中')}
-                      </Tag>
-                    )}
-                    {currentCron.status === CrontabStatus.running && (
-                      <Tag
-                        icon={<Loading3QuartersOutlined spin />}
-                        color="processing"
-                      >
-                        {intl.get('运行中')}
-                      </Tag>
-                    )}
-                    {currentCron.status === CrontabStatus.queued && (
-                      <Tag icon={<FieldTimeOutlined />} color="default">
-                        {intl.get('队列中')}
-                      </Tag>
-                    )}
-                  </>
-                )}
+                <>
+                  {currentCron.status === CrontabStatus.idle && (
+                    <Tag icon={<ClockCircleOutlined />} color="default">
+                      {intl.get('空闲中')}
+                    </Tag>
+                  )}
+                  {currentCron.status === CrontabStatus.running && (
+                    <Tag
+                      icon={<Loading3QuartersOutlined spin />}
+                      color="processing"
+                    >
+                      {intl.get('运行中')}
+                    </Tag>
+                  )}
+                  {currentCron.status === CrontabStatus.queued && (
+                    <Tag icon={<FieldTimeOutlined />} color="default">
+                      {intl.get('队列中')}
+                    </Tag>
+                  )}
+                </>
+              )}
               {currentCron.isDisabled === 1 &&
                 currentCron.status === CrontabStatus.idle && (
                   <Tag icon={<CloseCircleOutlined />} color="error">
@@ -626,8 +698,8 @@ const CronDetailModal = ({
             <div className="cron-detail-info-value">
               {currentCron.last_execution_time
                 ? dayjs(currentCron.last_execution_time * 1000).format(
-                  'YYYY-MM-DD HH:mm:ss',
-                )
+                    'YYYY-MM-DD HH:mm:ss',
+                  )
                 : '-'}
             </div>
           </div>
@@ -636,7 +708,8 @@ const CronDetailModal = ({
               {intl.get('最后运行时长')}
             </div>
             <div className="cron-detail-info-value">
-              {currentCron.last_execution_time && currentCron.last_running_time != null
+              {currentCron.last_execution_time &&
+              currentCron.last_running_time != null
                 ? diffTime(currentCron.last_running_time)
                 : '-'}
             </div>
@@ -659,7 +732,8 @@ const CronDetailModal = ({
             onTabChange(key);
           }}
           tabBarExtraContent={
-            activeTabKey === 'script' && scriptState === 'ready' && (
+            activeTabKey === 'script' &&
+            scriptState === 'ready' && (
               <>
                 <Button
                   type="primary"

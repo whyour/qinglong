@@ -15,41 +15,99 @@ async function fixture(t) {
   const server = http.createServer(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
-    const record = { method: req.method, url: req.url, headers: req.headers, body: Buffer.concat(chunks).toString() };
+    const record = {
+      method: req.method,
+      url: req.url,
+      headers: req.headers,
+      body: Buffer.concat(chunks).toString(),
+    };
     requests.push(record);
     if (reply) return reply(req, res);
     if (/\/(download|data\/export|command-run)$/.test(req.url)) {
-      res.writeHead(200, { 'content-type': 'application/json', 'content-disposition': 'attachment; filename="fixture.json"' });
+      res.writeHead(200, {
+        'content-type': 'application/json',
+        'content-disposition': 'attachment; filename="fixture.json"',
+      });
       res.end('{"fixture":true}');
     } else if (req.url === '/panel/open/system/log') {
-      res.writeHead(200, { 'content-type': 'text/plain' }); res.end('log content');
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.end('log content');
     } else {
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ code: 200, data: { id: 7, name: 'fixture', client_secret: 'SECRET-MARKER', tokens: [{ value: 'TOKEN-MARKER' }] } }));
+      res.end(
+        JSON.stringify({
+          code: 200,
+          data: {
+            id: 7,
+            name: 'fixture',
+            client_secret: 'SECRET-MARKER',
+            tokens: [{ value: 'TOKEN-MARKER' }],
+          },
+        }),
+      );
     }
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await fs.rm(root, { recursive: true, force: true }); });
-  const url = `http://127.0.0.1:${server.address().port}/panel`;
-  const run = (args, stdin = '', extra = {}) => new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [entry, ...args, '--json'], {
-      env: { PATH: process.env.PATH, QL_URL: url, QL_ACCESS_TOKEN: 'fixture-token', QL_LANG: 'en', ...extra },
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    let out = '', err = '';
-    const timer = setTimeout(() => { child.kill(); reject(new Error('CLI timeout')); }, 12000);
-    child.stdout.on('data', data => { out += data; }); child.stderr.on('data', data => { err += data; });
-    child.on('error', reject); child.on('close', code => { clearTimeout(timer); resolve({ code, out, err }); });
-    child.stdin.end(stdin);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+    await fs.rm(root, { recursive: true, force: true });
   });
-  return { root, requests, run, reply: value => { reply = value; } };
+  const url = `http://127.0.0.1:${server.address().port}/panel`;
+  const run = (args, stdin = '', extra = {}) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [entry, ...args, '--json'], {
+        env: {
+          PATH: process.env.PATH,
+          QL_URL: url,
+          QL_ACCESS_TOKEN: 'fixture-token',
+          QL_LANG: 'en',
+          ...extra,
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      let out = '',
+        err = '';
+      const timer = setTimeout(() => {
+        child.kill();
+        reject(new Error('CLI timeout'));
+      }, 12000);
+      child.stdout.on('data', (data) => {
+        out += data;
+      });
+      child.stderr.on('data', (data) => {
+        err += data;
+      });
+      child.on('error', reject);
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        resolve({ code, out, err });
+      });
+      child.stdin.end(stdin);
+    });
+  return {
+    root,
+    requests,
+    run,
+    reply: (value) => {
+      reply = value;
+    },
+  };
 }
-function success(result) { assert.equal(result.code, 0, result.err); return JSON.parse(result.out); }
+function success(result) {
+  assert.equal(result.code, 0, result.err);
+  return JSON.parse(result.out);
+}
 
-test('dashboard record sends execution statistics and rejects a missing body before HTTP', async t => {
+test('dashboard record sends execution statistics and rejects a missing body before HTTP', async (t) => {
   const f = await fixture(t);
   const payload = { ref_id: 7, code: 0, elapsed: 1.5 };
-  success(await f.run(['dashboard', 'record', '--data', '-'], JSON.stringify(payload)));
+  success(
+    await f.run(
+      ['dashboard', 'record', '--data', '-'],
+      JSON.stringify(payload),
+    ),
+  );
   assert.equal(f.requests.length, 1);
   assert.equal(f.requests[0].method, 'POST');
   assert.equal(f.requests[0].url, '/panel/open/dashboard/record');
@@ -58,7 +116,7 @@ test('dashboard record sends execution statistics and rejects a missing body bef
   assert.equal(f.requests.length, 1);
 });
 
-test('schedule anomaly commands preserve sources, pagination and expired responses', async t => {
+test('schedule anomaly commands preserve sources, pagination and expired responses', async (t) => {
   const f = await fixture(t);
   const response = { code: 200, data: { status: 'expired' } };
   f.reply((_req, res) => {
@@ -67,19 +125,38 @@ test('schedule anomaly commands preserve sources, pagination and expired respons
   });
   for (const source of ['panel', 'system']) {
     for (const kind of ['missing', 'skipped', 'unconfirmed']) {
-      const query = { source, kind, at: 1795046400000, page: 3, revision: 'a'.repeat(64), live: true };
+      const query = {
+        source,
+        kind,
+        at: 1795046400000,
+        page: 3,
+        revision: 'a'.repeat(64),
+        live: true,
+      };
       for (const command of [
         ['dashboard', 'schedule-anomalies'],
         ['api', 'request', 'GET', '/open/dashboard/schedule-anomalies'],
       ]) {
         const before = f.requests.length;
-        assert.deepEqual(success(await f.run([...command, '--query', JSON.stringify(query)])), response);
-        assert.equal(f.requests.length, before + 1, 'expired responses must not be retried');
-        const req = f.requests.at(-1), url = new URL(req.url, 'http://localhost');
+        assert.deepEqual(
+          success(await f.run([...command, '--query', JSON.stringify(query)])),
+          response,
+        );
+        assert.equal(
+          f.requests.length,
+          before + 1,
+          'expired responses must not be retried',
+        );
+        const req = f.requests.at(-1),
+          url = new URL(req.url, 'http://localhost');
         assert.equal(req.method, 'GET');
         assert.equal(url.pathname, '/panel/open/dashboard/schedule-anomalies');
-        assert.deepEqual(Object.fromEntries(url.searchParams),
-          Object.fromEntries(Object.entries(query).map(([key, value]) => [key, String(value)])));
+        assert.deepEqual(
+          Object.fromEntries(url.searchParams),
+          Object.fromEntries(
+            Object.entries(query).map(([key, value]) => [key, String(value)]),
+          ),
+        );
         assert.equal(req.body, '');
         assert.equal(req.headers.authorization, 'Bearer fixture-token');
       }
@@ -87,7 +164,7 @@ test('schedule anomaly commands preserve sources, pagination and expired respons
   }
 });
 
-test('script history commands send exact query parameters and restore payloads', async t => {
+test('script history commands send exact query parameters and restore payloads', async (t) => {
   const f = await fixture(t);
   const identity = { filename: '中文 script.js', path: 'nested folder' };
   const version = { ...identity, id: '32ec8b22-2c48-4bcf-85d4-b394198417ba' };
@@ -96,25 +173,38 @@ test('script history commands send exact query parameters and restore payloads',
     ['history-detail', 'scripts/history/detail', version],
   ]) {
     success(await f.run(['script', command, '--query', JSON.stringify(query)]));
-    const req = f.requests.at(-1), url = new URL(req.url, 'http://localhost');
+    const req = f.requests.at(-1),
+      url = new URL(req.url, 'http://localhost');
     assert.equal(req.method, 'GET');
     assert.equal(url.pathname, '/panel/open/' + endpoint);
-    for (const [key, value] of Object.entries(query)) assert.equal(url.searchParams.get(key), value);
+    for (const [key, value] of Object.entries(query))
+      assert.equal(url.searchParams.get(key), value);
     assert.equal(req.body, '');
   }
   const payload = { ...version, expectedHash: 'a'.repeat(64) };
-  success(await f.run(['script', 'history-restore', '--data', '-'], JSON.stringify(payload)));
+  success(
+    await f.run(
+      ['script', 'history-restore', '--data', '-'],
+      JSON.stringify(payload),
+    ),
+  );
   assert.equal(f.requests.at(-1).method, 'PUT');
   assert.equal(f.requests.at(-1).url, '/panel/open/scripts/history/restore');
   assert.deepEqual(JSON.parse(f.requests.at(-1).body), payload);
   const count = f.requests.length;
   assert.equal((await f.run(['script', 'history-restore'])).code, 2);
-  assert.equal(f.requests.length, count, 'missing restore payload must not issue a request');
+  assert.equal(
+    f.requests.length,
+    count,
+    'missing restore payload must not issue a request',
+  );
 });
 
-test('dependency refresh commands send the dependency type and address background jobs', async t => {
+test('dependency refresh commands send the dependency type and address background jobs', async (t) => {
   const f = await fixture(t);
-  success(await f.run(['dependency', 'refresh', '--data', '{"type":"python3"}']));
+  success(
+    await f.run(['dependency', 'refresh', '--data', '{"type":"python3"}']),
+  );
   assert.equal(f.requests[0].method, 'POST');
   assert.equal(f.requests[0].url, '/panel/open/dependencies/refresh');
   assert.deepEqual(JSON.parse(f.requests[0].body), { type: 'python3' });
@@ -125,164 +215,378 @@ test('dependency refresh commands send the dependency type and address backgroun
   success(await f.run(['dependency', 'refresh-active']));
   assert.equal(f.requests[2].method, 'GET');
   assert.equal(f.requests[2].url, '/panel/open/dependencies/refresh/active');
-  success(await f.run(['api', 'request', 'GET', `/open/dependencies/refresh/${id}`]));
+  success(
+    await f.run(['api', 'request', 'GET', `/open/dependencies/refresh/${id}`]),
+  );
   assert.equal(f.requests[3].url, `/panel/open/dependencies/refresh/${id}`);
   assert.equal((await f.run(['dependency', 'refresh-status', '7'])).code, 2);
-  assert.equal((await f.run(['api', 'request', 'GET', '/open/dependencies/refresh/7'])).code, 2);
+  assert.equal(
+    (await f.run(['api', 'request', 'GET', '/open/dependencies/refresh/7']))
+      .code,
+    2,
+  );
   assert.equal((await f.run(['dependency', 'refresh'])).code, 2);
-  assert.equal(f.requests.length, 4, 'invalid arguments must not issue a request');
+  assert.equal(
+    f.requests.length,
+    4,
+    'invalid arguments must not issue a request',
+  );
 });
 
 test('OpenAPI catalogue covers every active registered backend route; retired 410 routes are explicit', async () => {
   const root = path.resolve(__dirname, '../../../back/api');
   const expected = [];
-  const retired = new Set(['GET configs/:file', 'GET scripts/:file', 'GET logs/:file']);
+  const retired = new Set([
+    'GET configs/:file',
+    'GET scripts/:file',
+    'GET logs/:file',
+  ]);
   const index = await fs.readFile(path.join(root, 'index.ts'), 'utf8');
   for (const filename of await fs.readdir(root)) {
     if (!filename.endsWith('.ts') || filename === 'index.ts') continue;
     const source = await fs.readFile(path.join(root, filename), 'utf8');
-    assert.ok(index.includes(`'./${filename.slice(0, -3)}'`), `Unregistered API module ${filename}`);
+    assert.ok(
+      index.includes(`'./${filename.slice(0, -3)}'`),
+      `Unregistered API module ${filename}`,
+    );
     const mount = /app\.use\(['"]([^'"]+)['"]/.exec(source);
     assert.ok(mount, filename);
-    for (const m of source.matchAll(/route\.(get|post|put|delete|patch)\(\s*['"]([^'"]+)['"]/g)) {
-      const endpoint = [mount[1], m[2]].join('/').split('/').filter(Boolean).join('/');
+    for (const m of source.matchAll(
+      /route\.(get|post|put|delete|patch)\(\s*['"]([^'"]+)['"]/g,
+    )) {
+      const endpoint = [mount[1], m[2]]
+        .join('/')
+        .split('/')
+        .filter(Boolean)
+        .join('/');
       const key = `${m[1].toUpperCase()} ${endpoint}`;
       if (!retired.has(key)) expected.push(key);
       else assert.match(source.slice(m.index, m.index + 200), /code: 410/);
     }
   }
-  const actual = openOperations.map(op => `${op.method} ${op.path}`);
+  const actual = openOperations.map((op) => `${op.method} ${op.path}`);
   assert.equal(new Set(actual).size, actual.length);
-  assert.equal(new Set(openOperations.map(op => op.name)).size, openOperations.length);
+  assert.equal(
+    new Set(openOperations.map((op) => op.name)).size,
+    openOperations.length,
+  );
   assert.deepEqual(actual.sort(), expected.sort());
 });
 
-test('task, subscription and app CRUD produce exact 2.x requests and protect app credentials', async t => {
+test('task, subscription and app CRUD produce exact 2.x requests and protect app credentials', async (t) => {
   const f = await fixture(t);
-  success(await f.run(['task', 'create', '--name', 'demo', '--command', 'task demo.js', '--schedule', '0 0 * * *']));
-  assert.deepEqual(JSON.parse(f.requests.at(-1).body), { name: 'demo', command: 'task demo.js', schedule: '0 0 * * *' });
-  assert.equal(f.requests.at(-1).method, 'POST'); assert.equal(f.requests.at(-1).url, '/panel/open/crons');
-  success(await f.run(['task', 'update', '7', '--data', '-', '--name', 'updated'], '{"command":"task demo.js","schedule":"0 1 * * *"}'));
-  assert.deepEqual(JSON.parse(f.requests.at(-1).body), { id: 7, name: 'updated', command: 'task demo.js', schedule: '0 1 * * *' });
-  success(await f.run(['task', 'delete', '7', '8'])); assert.deepEqual(JSON.parse(f.requests.at(-1).body), [7, 8]);
+  success(
+    await f.run([
+      'task',
+      'create',
+      '--name',
+      'demo',
+      '--command',
+      'task demo.js',
+      '--schedule',
+      '0 0 * * *',
+    ]),
+  );
+  assert.deepEqual(JSON.parse(f.requests.at(-1).body), {
+    name: 'demo',
+    command: 'task demo.js',
+    schedule: '0 0 * * *',
+  });
+  assert.equal(f.requests.at(-1).method, 'POST');
+  assert.equal(f.requests.at(-1).url, '/panel/open/crons');
+  success(
+    await f.run(
+      ['task', 'update', '7', '--data', '-', '--name', 'updated'],
+      '{"command":"task demo.js","schedule":"0 1 * * *"}',
+    ),
+  );
+  assert.deepEqual(JSON.parse(f.requests.at(-1).body), {
+    id: 7,
+    name: 'updated',
+    command: 'task demo.js',
+    schedule: '0 1 * * *',
+  });
+  success(await f.run(['task', 'delete', '7', '8']));
+  assert.deepEqual(JSON.parse(f.requests.at(-1).body), [7, 8]);
   assert.equal(f.requests.at(-1).method, 'DELETE');
-  success(await f.run(['subscription', 'create', '--type', 'public-repo', '--url', 'https://example.com/repo.git', '--alias', 'demo', '--schedule-type', 'crontab', '--schedule', '0 0 * * *']));
+  success(
+    await f.run([
+      'subscription',
+      'create',
+      '--type',
+      'public-repo',
+      '--url',
+      'https://example.com/repo.git',
+      '--alias',
+      'demo',
+      '--schedule-type',
+      'crontab',
+      '--schedule',
+      '0 0 * * *',
+    ]),
+  );
   assert.equal(f.requests.at(-1).url, '/panel/open/subscriptions');
   assert.equal(JSON.parse(f.requests.at(-1).body).schedule_type, 'crontab');
-  const app = success(await f.run(['app', 'create', '--name', 'worker', '--scopes', 'crons,subscriptions']));
-  assert.deepEqual(JSON.parse(f.requests.at(-1).body), { name: 'worker', scopes: ['crons', 'subscriptions'] });
-  assert.equal(app.data.client_secret, undefined); assert.equal(app.data.tokens, undefined);
-  assert.equal(success(await f.run(['app', 'reset-secret', '7', '--show-secrets'])).data.client_secret, 'SECRET-MARKER');
+  const app = success(
+    await f.run([
+      'app',
+      'create',
+      '--name',
+      'worker',
+      '--scopes',
+      'crons,subscriptions',
+    ]),
+  );
+  assert.deepEqual(JSON.parse(f.requests.at(-1).body), {
+    name: 'worker',
+    scopes: ['crons', 'subscriptions'],
+  });
+  assert.equal(app.data.client_secret, undefined);
+  assert.equal(app.data.tokens, undefined);
+  assert.equal(
+    success(await f.run(['app', 'reset-secret', '7', '--show-secrets'])).data
+      .client_secret,
+    'SECRET-MARKER',
+  );
   assert.equal(f.requests.at(-1).url, '/panel/open/apps/7/reset-secret');
-  for (const req of f.requests) assert.equal(req.headers.authorization, 'Bearer fixture-token');
+  for (const req of f.requests)
+    assert.equal(req.headers.authorization, 'Bearer fixture-token');
 });
 
-test('all added named operations reach their registered method/path, including upload/download and anonymous routes', async t => {
+test('all added named operations reach their registered method/path, including upload/download and anonymous routes', async (t) => {
   const f = await fixture(t);
-  const file = path.join(f.root, 'fixture.json'); await fs.writeFile(file, '{}');
-  for (const op of openOperations.filter(op => !op.existing)) {
+  const file = path.join(f.root, 'fixture.json');
+  await fs.writeFile(file, '{}');
+  for (const op of openOperations.filter((op) => !op.existing)) {
     const args = op.name.split(' ');
-    const parameter = name => op.uuidParams?.includes(name) ? '32ec8b22-2c48-4bcf-85d4-b394198417ba' : '7';
+    const parameter = (name) =>
+      op.uuidParams?.includes(name)
+        ? '32ec8b22-2c48-4bcf-85d4-b394198417ba'
+        : '7';
     for (const name of op.params ?? []) args.push(parameter(name));
     if (op.body === 'ids') args.push('7', '8');
     else if (op.body) {
-      const data = op.name.startsWith('task ') ? { command: 'echo fixture', schedule: '0 0 * * *' }
-        : op.name.startsWith('subscription ') ? { type: 'file', url: 'https://example.com/job.js', alias: 'job', schedule_type: 'crontab' } : {};
+      const data = op.name.startsWith('task ')
+        ? { command: 'echo fixture', schedule: '0 0 * * *' }
+        : op.name.startsWith('subscription ')
+        ? {
+            type: 'file',
+            url: 'https://example.com/job.js',
+            alias: 'job',
+            schedule_type: 'crontab',
+          }
+        : {};
       args.push('--data', JSON.stringify(data));
     }
     if (op.upload) args.push('--file', file);
-    if (op.download) args.push('--output', path.join(f.root, op.name.replace(' ', '-') + '.out'));
+    if (op.download)
+      args.push(
+        '--output',
+        path.join(f.root, op.name.replace(' ', '-') + '.out'),
+      );
     success(await f.run(args));
     const last = f.requests.at(-1);
     assert.equal(last.method, op.method, op.name);
-    assert.equal(last.url, '/panel/open/' + op.path.replace(/:([A-Za-z]+)/g, (_match, name) => parameter(name)), op.name);
-    assert.equal(last.headers.authorization, op.anonymous ? undefined : 'Bearer fixture-token', op.name);
-    if (op.upload) assert.ok(last.body.includes(`name="${op.upload}"; filename="fixture.json"`), op.name);
+    assert.equal(
+      last.url,
+      '/panel/open/' +
+        op.path.replace(/:([A-Za-z]+)/g, (_match, name) => parameter(name)),
+      op.name,
+    );
+    assert.equal(
+      last.headers.authorization,
+      op.anonymous ? undefined : 'Bearer fixture-token',
+      op.name,
+    );
+    if (op.upload)
+      assert.ok(
+        last.body.includes(`name="${op.upload}"; filename="fixture.json"`),
+        op.name,
+      );
   }
 });
 
-test('raw route access retains query/body capabilities and rejects unsupported paths before authentication', async t => {
+test('raw route access retains query/body capabilities and rejects unsupported paths before authentication', async (t) => {
   const f = await fixture(t);
-  success(await f.run(['api', 'request', 'GET', '/open/crons', '--query', '{"searchValue":"a & b","page":2}']));
-  assert.equal(f.requests.at(-1).url, '/panel/open/crons?searchValue=a+%26+b&page=2');
-  const bodyFile = path.join(f.root, 'env.json'); await fs.writeFile(bodyFile, '[{"name":"A","value":"B"}]');
+  success(
+    await f.run([
+      'api',
+      'request',
+      'GET',
+      '/open/crons',
+      '--query',
+      '{"searchValue":"a & b","page":2}',
+    ]),
+  );
+  assert.equal(
+    f.requests.at(-1).url,
+    '/panel/open/crons?searchValue=a+%26+b&page=2',
+  );
+  const bodyFile = path.join(f.root, 'env.json');
+  await fs.writeFile(bodyFile, '[{"name":"A","value":"B"}]');
   success(await f.run(['env', 'create', '--data', '@' + bodyFile]));
   assert.equal(f.requests.at(-1).body, '[{"name":"A","value":"B"}]');
   const count = f.requests.length;
   for (const args of [
-    ['api', 'request', 'GET', 'https://example.com'], ['api', 'request', 'DELETE', 'auth/token'],
-    ['api', 'request', 'GET', '../api/user'], ['api', 'request', 'GET', 'crons/0'], ['api', 'request', 'GET', 'crons/9007199254740993'],
-    ['task', 'create', '--data', '{'], ['task', 'create', '--command', 'echo fixture'],
-    ['task', 'update', '7', '--data', '{"id":8}'], ['task', 'delete', '-1'],
+    ['api', 'request', 'GET', 'https://example.com'],
+    ['api', 'request', 'DELETE', 'auth/token'],
+    ['api', 'request', 'GET', '../api/user'],
+    ['api', 'request', 'GET', 'crons/0'],
+    ['api', 'request', 'GET', 'crons/9007199254740993'],
+    ['task', 'create', '--data', '{'],
+    ['task', 'create', '--command', 'echo fixture'],
+    ['task', 'update', '7', '--data', '{"id":8}'],
+    ['task', 'delete', '-1'],
     ['env', 'list', '--query', '{"secret":{"value":1}}'],
     ['app', 'create', '--data', '{"name":"A"}', '--name', 'B'],
     ['log', 'download', '--data', '{}', '--output', bodyFile],
-  ]) { const result = await f.run(args); assert.equal(result.code, 2, JSON.stringify(args) + result.err); assert.equal(result.out, ''); }
+  ]) {
+    const result = await f.run(args);
+    assert.equal(result.code, 2, JSON.stringify(args) + result.err);
+    assert.equal(result.out, '');
+  }
   assert.equal(f.requests.length, count);
   const output = path.join(f.root, 'download.json');
-  success(await f.run(['log', 'download', '--data', '{"filename":"fixture.json"}', '--output', output]));
+  success(
+    await f.run([
+      'log',
+      'download',
+      '--data',
+      '{"filename":"fixture.json"}',
+      '--output',
+      output,
+    ]),
+  );
   assert.equal(await fs.readFile(output, 'utf8'), '{"fixture":true}');
   assert.equal((await fs.stat(output)).mode & 0o777, 0o600);
 });
 
-test('POST/DELETE uncertainty and permission failures never retry or print server secrets', async t => {
+test('POST/DELETE uncertainty and permission failures never retry or print server secrets', async (t) => {
   const f = await fixture(t);
-  f.reply((_req, res) => { res.writeHead(503); res.end('SERVER-SECRET'); });
-  for (const args of [['task', 'create', '--command', 'echo fixture', '--schedule', '0 0 * * *'], ['task', 'delete', '7']]) {
-    const count = f.requests.length; const result = await f.run(args);
-    assert.equal(result.code, 1); assert.match(result.err, /unknown|retry/i);
-    assert.doesNotMatch(result.err, /SERVER-SECRET/); assert.equal(f.requests.length, count + 1);
+  f.reply((_req, res) => {
+    res.writeHead(503);
+    res.end('SERVER-SECRET');
+  });
+  for (const args of [
+    ['task', 'create', '--command', 'echo fixture', '--schedule', '0 0 * * *'],
+    ['task', 'delete', '7'],
+  ]) {
+    const count = f.requests.length;
+    const result = await f.run(args);
+    assert.equal(result.code, 1);
+    assert.match(result.err, /unknown|retry/i);
+    assert.doesNotMatch(result.err, /SERVER-SECRET/);
+    assert.equal(f.requests.length, count + 1);
   }
-  f.reply((_req, res) => { res.writeHead(403); res.end('SERVER-SECRET'); });
-  const result = await f.run(['app', 'list']); assert.equal(result.code, 3); assert.match(result.err, /apps/);
+  f.reply((_req, res) => {
+    res.writeHead(403);
+    res.end('SERVER-SECRET');
+  });
+  const result = await f.run(['app', 'list']);
+  assert.equal(result.code, 3);
+  assert.match(result.err, /apps/);
   assert.doesNotMatch(result.err, /SERVER-SECRET/);
 });
 
-test('failed downloads leave no partial files and timed-out mutations are not replayed', async t => {
+test('failed downloads leave no partial files and timed-out mutations are not replayed', async (t) => {
   const f = await fixture(t);
   const output = path.join(f.root, 'partial.log');
   f.reply((_req, res) => {
-    res.writeHead(200, { 'content-type': 'application/octet-stream' }); res.write('partial');
+    res.writeHead(200, { 'content-type': 'application/octet-stream' });
+    res.write('partial');
     setTimeout(() => res.destroy(), 50);
   });
-  const failed = await f.run(['log', 'download', '--data', '{"filename":"fixture.log"}', '--output', output]);
-  assert.equal(failed.code, 1); assert.equal(failed.out, '');
+  const failed = await f.run([
+    'log',
+    'download',
+    '--data',
+    '{"filename":"fixture.log"}',
+    '--output',
+    output,
+  ]);
+  assert.equal(failed.code, 1);
+  assert.equal(failed.out, '');
   await assert.rejects(fs.stat(output), { code: 'ENOENT' });
   f.reply(() => {});
   const count = f.requests.length;
-  const timeout = await f.run(['app', 'create', '--name', 'fixture', '--scopes', 'crons', '--timeout', '1']);
-  assert.equal(timeout.code, 1); assert.match(timeout.err, /unknown/);
+  const timeout = await f.run([
+    'app',
+    'create',
+    '--name',
+    'fixture',
+    '--scopes',
+    'crons',
+    '--timeout',
+    '1',
+  ]);
+  assert.equal(timeout.code, 1);
+  assert.match(timeout.err, /unknown/);
   assert.equal(f.requests.length, count + 1);
 });
 
-test('owner two-factor challenge remains actionable without exposing server messages', async t => {
+test('owner two-factor challenge remains actionable without exposing server messages', async (t) => {
   const f = await fixture(t);
-  f.reply((_req, res) => { res.setHeader('content-type', 'application/json'); res.end('{"code":420,"message":"SERVER-SECRET"}'); });
-  const result = await f.run(['user', 'login', '--data', '{"username":"fixture","password":"fixture"}']);
-  assert.equal(result.code, 3); assert.match(result.err, /two-factor-login/); assert.doesNotMatch(result.err, /SERVER-SECRET/);
-  assert.equal(f.requests.length, 1); assert.equal(f.requests[0].headers.authorization, undefined);
+  f.reply((_req, res) => {
+    res.setHeader('content-type', 'application/json');
+    res.end('{"code":420,"message":"SERVER-SECRET"}');
+  });
+  const result = await f.run([
+    'user',
+    'login',
+    '--data',
+    '{"username":"fixture","password":"fixture"}',
+  ]);
+  assert.equal(result.code, 3);
+  assert.match(result.err, /two-factor-login/);
+  assert.doesNotMatch(result.err, /SERVER-SECRET/);
+  assert.equal(f.requests.length, 1);
+  assert.equal(f.requests[0].headers.authorization, undefined);
 });
 
-test('node mirror configuration accepts the real empty response for named and raw API commands', async t => {
+test('node mirror configuration accepts the real empty response for named and raw API commands', async (t) => {
   const f = await fixture(t);
-  f.reply((_req, res) => { res.writeHead(200, { 'content-type': 'application/octet-stream' }); res.end(); });
+  f.reply((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/octet-stream' });
+    res.end();
+  });
   for (const args of [
     ['system', 'config-node-mirror'],
     ['api', 'request', 'PUT', '/open/system/config/node-mirror'],
   ]) {
-    const reply = success(await f.run([...args, '--data', '{"nodeMirror":"https://registry.npmmirror.com"}']));
+    const reply = success(
+      await f.run([
+        ...args,
+        '--data',
+        '{"nodeMirror":"https://registry.npmmirror.com"}',
+      ]),
+    );
     assert.equal(reply.code, 200);
     assert.equal(f.requests.at(-1).method, 'PUT');
-    assert.equal(f.requests.at(-1).url, '/panel/open/system/config/node-mirror');
+    assert.equal(
+      f.requests.at(-1).url,
+      '/panel/open/system/config/node-mirror',
+    );
   }
-  assert.equal(f.requests.length, 2, 'configuration writes must not be retried');
+  assert.equal(
+    f.requests.length,
+    2,
+    'configuration writes must not be retried',
+  );
 });
 
-test('empty node mirror responses still reject authentication and server failures without retries', async t => {
+test('empty node mirror responses still reject authentication and server failures without retries', async (t) => {
   const f = await fixture(t);
   for (const status of [401, 403, 500]) {
-    f.reply((_req, res) => { res.writeHead(status, { 'content-type': 'application/octet-stream' }); res.end(); });
-    const result = await f.run(['system', 'config-node-mirror', '--data', '{}']);
+    f.reply((_req, res) => {
+      res.writeHead(status, { 'content-type': 'application/octet-stream' });
+      res.end();
+    });
+    const result = await f.run([
+      'system',
+      'config-node-mirror',
+      '--data',
+      '{}',
+    ]);
     assert.notEqual(result.code, 0);
     assert.equal(result.out, '');
   }

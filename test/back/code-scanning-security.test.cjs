@@ -19,7 +19,11 @@ test('config saves share a rate limit across API mounts before writing files', a
     '../config/const': { SAMPLE_FILES: [] },
     '../services/config': {},
     '../shared/i18n': { t: (x) => x },
-    '../shared/utils': { writeFileWithLock: async () => { writes++; } },
+    '../shared/utils': {
+      writeFileWithLock: async () => {
+        writes++;
+      },
+    },
     typedi: { Container: { get: () => ({}) } },
   }).default(router);
   app.use('/api', router);
@@ -30,11 +34,14 @@ test('config saves share a rate limit across API mounts before writing files', a
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const base = `http://127.0.0.1:${server.address().port}`;
   for (let i = 0; i < 601; i++) {
-    const response = await fetch(`${base}/${i % 2 ? 'api' : 'open'}/configs/save`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'settings.json', content: '{}' }),
-    });
+    const response = await fetch(
+      `${base}/${i % 2 ? 'api' : 'open'}/configs/save`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'settings.json', content: '{}' }),
+      },
+    );
     if (i < 600) {
       assert.equal(response.status, 200);
       assert.equal((await response.json()).code, 200);
@@ -81,7 +88,9 @@ test('Python environment generation escapes backslashes and triple quotes togeth
 });
 
 test('cron lookup treats regex and shell metacharacters as literal command text', () => {
-  const { findCronId } = load(path.resolve('back/shared/cronCommand.ts'));
+  const { findCronId } = load(
+    path.resolve('back/cron/execution/cronCommand.ts'),
+  );
   const command = 'task file[1].js --value "$(touch ignored)"';
   const crontab =
     `* * * * * real_time=false no_tee=true ID=17 ${command}\n` +

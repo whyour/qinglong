@@ -1,16 +1,19 @@
 import { hasLiveCronProcess } from './cronProcess';
 import { EventEmitter } from 'events';
 import PQueue from 'p-queue-cjs';
-import { triggerHistory, TriggerState } from './triggerHistory';
-import { t } from './i18n';
+import { triggerHistory, TriggerState } from '../history';
+import { t } from '../../shared/i18n';
 import { spawnCronCommand, releaseCronCommand } from './cronCommandProcess';
-import taskLimit from './pLimit';
-import Logger from '../loaders/logger';
-import { ICron } from '../protos/cron';
-import { CrontabModel, CrontabStatus } from '../data/cron';
-import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
+import taskLimit from './cronLimit';
+import Logger from '../../loaders/logger';
+import { ICron } from '../../protos/cron';
+import { CrontabModel, CrontabStatus } from '../../data/cron';
+import {
+  RunningInstanceModel,
+  InstanceStatus,
+} from '../../data/runningInstance';
 import dayjs from 'dayjs';
-import { observeChildProcess, asError } from './childProcess';
+import { observeChildProcess, asError } from '../../shared/childProcess';
 
 const waiting = new Map<string, () => void>();
 // A backlog of missed timers can otherwise open hundreds of competing SQLite
@@ -30,16 +33,33 @@ export async function runCron(
   const queuedAt = Date.now();
   if (trigger && history) {
     const cronId = Number(cron.id);
-    const admitted = await historyWrites.add(() => cron.skip_if_pending
-      ? history.enqueueUnlessPending(trigger.id, cronId, trigger.source, trigger.time, queuedAt, cron.recovery_from)
-      : history.enqueue(trigger.id, cronId, trigger.source, trigger.time, queuedAt));
+    const admitted = await historyWrites.add(() =>
+      cron.skip_if_pending
+        ? history.enqueueUnlessPending(
+            trigger.id,
+            cronId,
+            trigger.source,
+            trigger.time,
+            queuedAt,
+            cron.recovery_from,
+          )
+        : history.enqueue(
+            trigger.id,
+            cronId,
+            trigger.source,
+            trigger.time,
+            queuedAt,
+          ),
+    );
     if (!admitted) return;
   }
   let reason = 'capacity';
   let state: TriggerState = 'skipped';
   let exitCode: number | null = null;
   let claimed = false;
-  const deadline = cron.max_queue_wait ? queuedAt + cron.max_queue_wait * 1000 : Infinity;
+  const deadline = cron.max_queue_wait
+    ? queuedAt + cron.max_queue_wait * 1000
+    : Infinity;
   let timer: NodeJS.Timeout | undefined;
   const expiry = trigger ? new EventEmitter() : undefined;
   const alive = () => isCurrent() && Date.now() < deadline;
@@ -55,7 +75,10 @@ export async function runCron(
     if (trigger) waiting.delete(trigger.id);
     reason = 'changed';
     try {
-      if (!alive()) { reason = isCurrent() ? 'queue_timeout' : 'changed'; return; }
+      if (!alive()) {
+        reason = isCurrent() ? 'queue_timeout' : 'changed';
+        return;
+      }
       let multiple = false;
       // A single-instance trigger must not interrupt work already in progress.
       try {
@@ -176,25 +199,42 @@ export async function runCron(
       }
       if (trigger) {
         claimed = await history!.start(trigger.id, Date.now(), multiple);
-        if (!claimed) { reason = 'overlap'; return; }
+        if (!claimed) {
+          reason = 'overlap';
+          return;
+        }
       }
       if (!isCurrent() || Date.now() >= deadline) {
         reason = isCurrent() ? 'queue_timeout' : 'changed';
         return;
       }
       let saveStart: Promise<void> | undefined;
-      const cp = spawnCronCommand(cmd, trigger?.id, trigger && history ? at => {
-        saveStart = history.recordCommandStart(trigger.id, at).catch(error => {
-          Logger.warn('[schedule] Could not record command start: %s', asError(error).message);
-        });
-      } : undefined);
+      const cp = spawnCronCommand(
+        cmd,
+        trigger?.id,
+        trigger && history
+          ? (at) => {
+              saveStart = history
+                .recordCommandStart(trigger.id, at)
+                .catch((error) => {
+                  Logger.warn(
+                    '[schedule] Could not record command start: %s',
+                    asError(error).message,
+                  );
+                });
+            }
+          : undefined,
+      );
 
       let denied: string | undefined;
       const { completed } = observeChildProcess(cp, {
         onStart: async () => {
           if (!trigger) return;
           try {
-            if (await history!.bindCommand(trigger.id, cp.pid!) && !await history!.shouldStop(trigger.id)) {
+            if (
+              (await history!.bindCommand(trigger.id, cp.pid!)) &&
+              !(await history!.shouldStop(trigger.id))
+            ) {
               if (!alive()) denied = isCurrent() ? 'queue_timeout' : 'changed';
               else await releaseCronCommand(cp);
             }
@@ -212,8 +252,15 @@ export async function runCron(
       });
       const result = await completed;
       await saveStart;
-      if (denied) { reason = denied; return; }
-      state = result.signal ? 'stopped' : result.error || result.code !== 0 ? 'failed' : 'finished';
+      if (denied) {
+        reason = denied;
+        return;
+      }
+      state = result.signal
+        ? 'stopped'
+        : result.error || result.code !== 0
+        ? 'failed'
+        : 'finished';
       reason = result.error ? 'spawn' : result.signal || '';
       exitCode = result.code;
       if (result.error) {
@@ -242,21 +289,43 @@ export async function runCron(
     }
   };
   try {
-    if (trigger && expiry) waiting.set(trigger.id, () => {
-      taskLimit.removeQueuedCron(cron.id, execute);
-      expiry.emit('expired');
-    });
-    return await taskLimit.runWithCronLimit(cron, execute, undefined, isCurrent, () => { reason = 'pending'; }, expiry, trigger?.id, CrontabModel.sequelize);
+    if (trigger && expiry)
+      waiting.set(trigger.id, () => {
+        taskLimit.removeQueuedCron(cron.id, execute);
+        expiry.emit('expired');
+      });
+    return await taskLimit.runWithCronLimit(
+      cron,
+      execute,
+      undefined,
+      isCurrent,
+      () => {
+        reason = 'pending';
+      },
+      expiry,
+      trigger?.id,
+      CrontabModel.sequelize,
+    );
   } finally {
     clearTimeout(timer);
     if (trigger) waiting.delete(trigger.id);
     if (trigger && history) {
-      const outcomeReason = state === 'skipped' && !isCurrent() ? 'changed' : reason;
+      const outcomeReason =
+        state === 'skipped' && !isCurrent() ? 'changed' : reason;
       const finishedAt = Date.now();
-      await historyWrites.add(() => state === 'skipped' && !claimed
-        ? history.skipQueued(trigger.id, outcomeReason, finishedAt)
-        : history.complete(trigger.id, state, outcomeReason || null, exitCode, finishedAt),
-      { priority: 1 });
+      await historyWrites.add(
+        () =>
+          state === 'skipped' && !claimed
+            ? history.skipQueued(trigger.id, outcomeReason, finishedAt)
+            : history.complete(
+                trigger.id,
+                state,
+                outcomeReason || null,
+                exitCode,
+                finishedAt,
+              ),
+        { priority: 1 },
+      );
     }
   }
 }

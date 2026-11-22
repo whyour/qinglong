@@ -35,8 +35,27 @@ export async function dispatchRemote(
       });
     const id = Number(positionals[0]);
     if (name === 'task logs')
-      return task({ kind: 'logs', id, tail: Number(values.tail) });
-    return task({ kind: name.slice(5) as 'get' | 'run' | 'stop', id });
+      return task({
+        kind: 'logs',
+        id,
+        tail: Number(values.tail),
+        triggerId: values['trigger-id'] as string | undefined,
+      });
+    if (name === 'task run')
+      return task({
+        kind: 'run',
+        id,
+        wait: values.wait === true,
+        timeout: values.timeout === undefined ? 300 : Number(values.timeout),
+      });
+    if (name === 'task wait')
+      return task({
+        kind: 'wait',
+        id,
+        triggerId: values['trigger-id'] as string,
+        timeout: Number(values.timeout),
+      });
+    return task({ kind: name.slice(5) as 'get' | 'stop', id });
   }
   if (name.startsWith('subscription ')) {
     const { subscription } = await import('./subscription');

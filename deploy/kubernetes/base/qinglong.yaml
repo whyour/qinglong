@@ -46,7 +46,7 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: QlBaseUrl
-              value: "/"
+              value: '/'
             - name: TZ
               value: Asia/Shanghai
           ports:

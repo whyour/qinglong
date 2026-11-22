@@ -50,7 +50,11 @@ test('environment API rejects execution controls and legacy rows stay out of tas
   const legacy = [
     { id: 1, name: 'task_before', value: 'touch /tmp/untrusted' },
     { id: 2, name: 'NODE_OPTIONS', value: '--require /tmp/untrusted.js' },
-    { id: 3, name: 'PREV_NODE_OPTIONS', value: '--import=data:text/javascript,bad' },
+    {
+      id: 3,
+      name: 'PREV_NODE_OPTIONS',
+      value: '--import=data:text/javascript,bad',
+    },
     { id: 4, name: 'GIT_SSH_COMMAND', value: 'sh -c bad' },
     { id: 5, name: 'PATH', value: '/tmp/untrusted' },
     { id: 6, name: 'file_task_before', value: '/tmp/untrusted.sh' },
@@ -72,7 +76,11 @@ test('environment API rejects execution controls and legacy rows stay out of tas
     typedi: decorators,
     '../config': { envFile: 'sh', jsEnvFile: 'js', pyEnvFile: 'py' },
     '../data/env': {
-      Env: class { constructor(value) { Object.assign(this, value); } },
+      Env: class {
+        constructor(value) {
+          Object.assign(this, value);
+        }
+      },
       EnvModel: {
         update: async (value, query) => {
           writes++;
@@ -83,7 +91,9 @@ test('environment API rejects execution controls and legacy rows stay out of tas
     },
     '../data': { sequelize: { literal: (value) => value } },
     '../shared/utils': {
-      writeFileWithLock: async (file, value) => { output[file] = value; },
+      writeFileWithLock: async (file, value) => {
+        output[file] = value;
+      },
     },
   }).default;
   const service = new Env({
@@ -91,15 +101,30 @@ test('environment API rejects execution controls and legacy rows stay out of tas
     warn: (...args) => warnings.push(args),
   });
   service.envs = async () => legacy;
-  service.insert = async () => { writes++; return []; };
+  service.insert = async () => {
+    writes++;
+    return [];
+  };
   service.getDb = async () => ({ id: 1, name: 'SAFE_VALUE', value: 'kept' });
-  service.updateDb = async () => { writes++; return {}; };
+  service.updateDb = async () => {
+    writes++;
+    return {};
+  };
 
   for (const name of [
-    'task_before', 'PREV_NODE_OPTIONS', 'GIT_SSH_COMMAND', 'work_dir',
-    'task_shell_params', 'which_program', 'script_params', 'LOG_DIR',
+    'task_before',
+    'PREV_NODE_OPTIONS',
+    'GIT_SSH_COMMAND',
+    'work_dir',
+    'task_shell_params',
+    'which_program',
+    'script_params',
+    'LOG_DIR',
     'EXPORTED_VARIABLES',
-    'begin_timestamp', 'is_macos', 'RandomDelayIgnoredMinutes', 'ID',
+    'begin_timestamp',
+    'is_macos',
+    'RandomDelayIgnoredMinutes',
+    'ID',
     'BASH_XTRACEFD',
   ]) {
     await assert.rejects(
@@ -252,11 +277,11 @@ function cronService(config, updates = []) {
     '../config/util': { fileExist: async (p) => fs.existsSync(p) },
     '../config/const': {},
     '../schedule/client': {},
-    '../shared/pLimit': {},
-    '../shared/utils': {},
+    '../cron/execution/cronLimit': {},
+    '../shared/utils': { fileExist: async (p) => fs.existsSync(p) },
     '../shared/i18n': translate,
     '../shared/logStreamManager': {},
-    '../shared/cronSchedule': {},
+    '../cron/scheduling/cronSchedule': {},
   }).default;
   return new Cron(logger);
 }
@@ -364,7 +389,7 @@ function systemService(config, overrides = {}) {
       DependenceStatus: {},
     },
     '../data/system': {},
-    '../shared/pLimit': {},
+    '../cron/execution/cronLimit': {},
     '../schedule/client': {},
     '../shared/i18n': { ...translate, setLang() {} },
     './notify': {},

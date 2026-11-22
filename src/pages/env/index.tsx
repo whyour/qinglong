@@ -300,7 +300,13 @@ const Env = () => {
       }),
       content: (
         <>
-          {intl.get('确认操作对象', { operation: record.status === Status.已禁用 ? intl.get('启用') : intl.get('禁用'), object: 'Env' })}{' '}
+          {intl.get('确认操作对象', {
+            operation:
+              record.status === Status.已禁用
+                ? intl.get('启用')
+                : intl.get('禁用'),
+            object: 'Env',
+          })}{' '}
           <Paragraph
             style={{ wordBreak: 'break-all', display: 'inline' }}
             ellipsis={{ rows: 6, expandable: true }}
@@ -361,7 +367,11 @@ const Env = () => {
       }),
       content: (
         <>
-          {intl.get('确认操作对象', { operation: record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'), object: 'Env' })}{' '}
+          {intl.get('确认操作对象', {
+            operation:
+              record.isPinned === 1 ? intl.get('取消置顶') : intl.get('置顶'),
+            object: 'Env',
+          })}{' '}
           <Paragraph
             style={{ wordBreak: 'break-all', display: 'inline' }}
             ellipsis={{ rows: 6, expandable: true }}
@@ -555,7 +565,9 @@ const Env = () => {
   const operateEnvs = (operationStatus: number) => {
     if (
       operationStatus === 0 &&
-      value.some((env) => selectedRowIds.includes(env.id) && env.securityBlocked)
+      value.some(
+        (env) => selectedRowIds.includes(env.id) && env.securityBlocked,
+      )
     ) {
       message.error(intl.get('请先修改环境变量名称'));
       return;
@@ -566,7 +578,10 @@ const Env = () => {
       }),
       content: (
         <>
-          {intl.get('确认批量操作', { operation: intl.get(OperationName[operationStatus]), object: intl.get('环境变量') })}
+          {intl.get('确认批量操作', {
+            operation: intl.get(OperationName[operationStatus]),
+            object: intl.get('环境变量'),
+          })}
         </>
       ),
       onOk() {
@@ -762,10 +777,7 @@ const Env = () => {
         />
       )}
       {isLabelModalVisible && (
-        <EnvLabelModal
-          handleCancel={handleLabelCancel}
-          ids={selectedRowIds}
-        />
+        <EnvLabelModal handleCancel={handleLabelCancel} ids={selectedRowIds} />
       )}
     </PageContainer>
   );

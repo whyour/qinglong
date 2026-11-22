@@ -49,13 +49,14 @@ class Application {
       process.env.NODE_ENV === 'development' ||
       (process.arch === 'arm' &&
         Number(
-          (process.config.variables as { arm_version?: string | number }).arm_version,
+          (process.config.variables as { arm_version?: string | number })
+            .arm_version,
         ) === 6)
         ? 120000
         : 30000;
     // Fork gRPC worker first and wait for it to be ready
     const grpcWorker = this.forkWorker('grpc');
-    
+
     // Wait for gRPC worker to signal it's ready before starting HTTP worker
     this.waitForWorkerReady(grpcWorker, readyTimeout)
       .then(() => {
@@ -63,7 +64,9 @@ class Application {
         this.httpWorker = this.forkWorker('http');
       })
       .catch((error) => {
-        Logger.error(`[boot] Failed to wait for gRPC worker:\n${errStack(error)}`);
+        Logger.error(
+          `[boot] Failed to wait for gRPC worker:\n${errStack(error)}`,
+        );
         process.exit(1);
       });
 
@@ -72,7 +75,8 @@ class Application {
       if (metadata) {
         if (!this.isShuttingDown) {
           Logger.error(
-            `${metadata.serviceType} worker ${worker.process.pid} died (${signal || code
+            `${metadata.serviceType} worker ${worker.process.pid} died (${
+              signal || code
             }). Restarting...`,
           );
           // If gRPC worker died, restart it and wait for it to be ready
@@ -92,19 +96,27 @@ class Application {
                     this.httpWorker.send('reregister-crons');
                     Logger.info('Sent reregister-crons message to HTTP worker');
                   } catch (error) {
-                    Logger.error(`Failed to send reregister-crons message:\n${errStack(error)}`);
+                    Logger.error(
+                      `Failed to send reregister-crons message:\n${errStack(
+                        error,
+                      )}`,
+                    );
                   }
                 }
               })
               .catch((error) => {
-                Logger.error(`Failed to restart gRPC worker:\n${errStack(error)}`);
+                Logger.error(
+                  `Failed to restart gRPC worker:\n${errStack(error)}`,
+                );
                 process.exit(1);
               });
           } else {
             // For HTTP worker, just restart it
             const newWorker = this.forkWorker(metadata.serviceType);
             this.httpWorker = newWorker;
-            Logger.info(`Restarted ${metadata.serviceType} worker (PID: ${newWorker.process.pid})`);
+            Logger.info(
+              `Restarted ${metadata.serviceType} worker (PID: ${newWorker.process.pid})`,
+            );
           }
         }
 
@@ -125,11 +137,15 @@ class Application {
         }
       };
       worker.on('message', messageHandler);
-      
+
       // Timeout after specified milliseconds
       const timeoutId = setTimeout(() => {
         worker.removeListener('message', messageHandler);
-        reject(new Error(`Worker failed to start within ${timeoutMs / 1000} seconds`));
+        reject(
+          new Error(
+            `Worker failed to start within ${timeoutMs / 1000} seconds`,
+          ),
+        );
       }, timeoutMs);
     });
   }
@@ -139,23 +155,32 @@ class Application {
     // PM2's fork launcher is inherited by our own cluster workers. Their APM
     // messages go to this primary, not PM2, and duplicate its sampling work.
     // Keep primary monitoring and allow restoring the inherited worker APM.
-    if (process.env.pm_id !== undefined && process.env.QL_WORKER_APM !== 'true') {
+    if (
+      process.env.pm_id !== undefined &&
+      process.env.QL_WORKER_APM !== 'true'
+    ) {
       workerEnv.pmx = 'false';
     }
     const worker = cluster.fork(workerEnv);
-    if (serviceType === 'grpc') worker.on('message', (msg) => {
-      if (msg === 'crontab-install-failed' && this.httpWorker?.isConnected()) {
-        this.httpWorker.send('reregister-crons');
-      }
-    });
+    if (serviceType === 'grpc')
+      worker.on('message', (msg) => {
+        if (
+          msg === 'crontab-install-failed' &&
+          this.httpWorker?.isConnected()
+        ) {
+          this.httpWorker.send('reregister-crons');
+        }
+      });
 
-    if (serviceType === 'http') worker.on('message', (msg) => {
-      if (msg?.type !== 'cancel-queued-triggers') return;
-      for (const [id, meta] of this.workerMetadataMap) {
-        const target = cluster.workers?.[id];
-        if (meta.serviceType === 'grpc' && target?.isConnected()) target.send(msg);
-      }
-    });
+    if (serviceType === 'http')
+      worker.on('message', (msg) => {
+        if (msg?.type !== 'cancel-queued-triggers') return;
+        for (const [id, meta] of this.workerMetadataMap) {
+          const target = cluster.workers?.[id];
+          if (meta.serviceType === 'grpc' && target?.isConnected())
+            target.send(msg);
+        }
+      });
     this.workerMetadataMap.set(worker.id, {
       id: worker.id,
       pid: worker.process.pid!,
@@ -195,7 +220,11 @@ class Application {
             try {
               worker.send('shutdown');
             } catch (error) {
-              Logger.warn(`Failed to send shutdown to worker ${worker.process.pid}:\n${errStack(error)}`);
+              Logger.warn(
+                `Failed to send shutdown to worker ${
+                  worker.process.pid
+                }:\n${errStack(error)}`,
+              );
             }
           });
 
@@ -234,16 +263,23 @@ class Application {
     Logger.info(`[boot] ${serviceType} worker started (PID: ${process.pid})`);
 
     try {
-      const { triggerHistory } = await startupStage('history.import', () => import('./shared/triggerHistory'));
+      const { triggerHistory } = await startupStage(
+        'history.import',
+        () => import('./cron/history'),
+      );
       const history = triggerHistory();
-      await startupStage('history.recover', () => history.interrupt(serviceType));
+      await startupStage('history.recover', () =>
+        history.interrupt(serviceType),
+      );
       if (serviceType === 'http') {
         await this.startHttpService();
         const retryExits = async () => {
           try {
             await history.retryPendingExits();
           } catch (error) {
-            Logger.error(`[scheduler] Exit receipt retry failed: ${errStack(error)}`);
+            Logger.error(
+              `[scheduler] Exit receipt retry failed: ${errStack(error)}`,
+            );
           } finally {
             if (!this.isShuttingDown) setTimeout(retryExits, 15000).unref();
           }
@@ -262,21 +298,26 @@ class Application {
 
   private async startHttpService() {
     // 在导入任何 gRPC 客户端模块之前初始化 mTLS 证书
-    const { initGrpcCerts } = await startupStage('certificates.import', () => import('./config/grpcCerts'));
+    const { initGrpcCerts } = await startupStage(
+      'certificates.import',
+      () => import('./config/grpcCerts'),
+    );
     await startupStage('certificates.initialize', () => initGrpcCerts());
 
-    const app = await startupStage('http.middleware', () => this.setupMiddlewares());
+    const app = await startupStage('http.middleware', () =>
+      this.setupMiddlewares(),
+    );
 
     const { HttpServerService } = await import('./services/http');
     this.httpServerService = Container.get(HttpServerService);
 
-    const appLoader = await startupStage('http.import', () => import('./loaders/app'));
+    const appLoader = await startupStage(
+      'http.import',
+      () => import('./loaders/app'),
+    );
     await startupStage('http.initialize', () => appLoader.default({ app }));
 
-    const server = await this.httpServerService.initialize(
-      app,
-      config.port,
-    );
+    const server = await this.httpServerService.initialize(app, config.port);
 
     const serverLoader = await import('./loaders/server');
     await (serverLoader.default as any)({ server });
@@ -284,10 +325,15 @@ class Application {
   }
 
   private async startGrpcService() {
-    const { GrpcServerService } = await startupStage('grpc.import', () => import('./services/grpc'));
+    const { GrpcServerService } = await startupStage(
+      'grpc.import',
+      () => import('./services/grpc'),
+    );
     this.grpcServerService = Container.get(GrpcServerService);
 
-    await startupStage('grpc.initialize', () => this.grpcServerService!.initialize());
+    await startupStage('grpc.initialize', () =>
+      this.grpcServerService!.initialize(),
+    );
     this.setupWorkerShutdown('grpc');
   }
 
@@ -295,12 +341,23 @@ class Application {
     process.on('message', async (msg) => {
       if (msg === 'shutdown') {
         this.gracefulShutdown(serviceType);
-      } else if (serviceType === 'grpc' && typeof msg === 'object' && msg &&
-        'type' in msg && msg.type === 'cancel-queued-triggers' && 'ids' in msg && Array.isArray(msg.ids)) {
-        const { cancelWaitingTriggers } = await import('./shared/runCron');
+      } else if (
+        serviceType === 'grpc' &&
+        typeof msg === 'object' &&
+        msg &&
+        'type' in msg &&
+        msg.type === 'cancel-queued-triggers' &&
+        'ids' in msg &&
+        Array.isArray(msg.ids)
+      ) {
+        const { cancelWaitingTriggers } = await import(
+          './cron/execution/runCron'
+        );
         cancelWaitingTriggers(msg.ids);
-      } else if (serviceType === 'http' &&
-        (msg === 'reregister-crons' || msg === 'scheduler-unavailable')) {
+      } else if (
+        serviceType === 'http' &&
+        (msg === 'reregister-crons' || msg === 'scheduler-unavailable')
+      ) {
         const { default: cronClient } = await import('./schedule/client');
         cronClient.readiness.invalidate();
       }
@@ -316,7 +373,7 @@ class Application {
     this.isShuttingDown = true;
 
     try {
-      const { triggerHistory } = await import('./shared/triggerHistory');
+      const { triggerHistory } = await import('./cron/history');
       await triggerHistory().interrupt(serviceType);
       if (serviceType === 'http') {
         await this.httpServerService?.shutdown();
@@ -325,7 +382,9 @@ class Application {
       }
       process.exit(0);
     } catch (error) {
-      Logger.error(`[${serviceType}] Error during shutdown:\n${errStack(error)}`);
+      Logger.error(
+        `[${serviceType}] Error during shutdown:\n${errStack(error)}`,
+      );
       process.exit(1);
     }
   }

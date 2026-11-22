@@ -1,4 +1,4 @@
-import intl from 'react-intl-universal'
+import intl from 'react-intl-universal';
 import React, { useEffect, useState } from 'react';
 import { Modal, message, Input, Form } from 'antd';
 import { request } from '@/utils/http';
@@ -55,7 +55,9 @@ const EditNameModal = ({
       <Form form={form} layout="vertical" name="edit_name_modal">
         <Form.Item
           name="name"
-          rules={[{ required: true, message: intl.get('请输入新的环境变量名称') }]}
+          rules={[
+            { required: true, message: intl.get('请输入新的环境变量名称') },
+          ]}
         >
           <Input placeholder={intl.get('请输入新的环境变量名称')} />
         </Form.Item>

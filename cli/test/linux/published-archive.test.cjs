@@ -7,7 +7,9 @@ const { createHash } = require('node:crypto');
 const { createContext } = require('../../dist/internal/runtime/context');
 const operator = require('../../dist/internal/maintenance/operator');
 const { stageUpgrade } = require('../../dist/internal/maintenance/upgrade');
-const { cancellableOperation } = require('../../dist/internal/runtime/cancellation');
+const {
+  cancellableOperation,
+} = require('../../dist/internal/runtime/cancellation');
 
 test(
   'published master archives pass actual HTTPS download and staging validation',
@@ -43,7 +45,9 @@ test(
           context.paths.dir_tmp,
         );
         installations.push(directory);
-        await fs.mkdir(path.join(directory, 'node_modules'), { recursive: true });
+        await fs.mkdir(path.join(directory, 'node_modules'), {
+          recursive: true,
+        });
       },
     );
     const controller = new AbortController();

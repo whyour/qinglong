@@ -1,7 +1,9 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const { spawnSync } = require('node:child_process');
-const { createContext } = require('/opt/qinglong-cli/dist/internal/runtime/context');
+const {
+  createContext,
+} = require('/opt/qinglong-cli/dist/internal/runtime/context');
 const { LocalApi } = require('/opt/qinglong-cli/dist/internal/runtime/api');
 assert.equal(process.env.QL_PANEL_INTEGRATION, '1');
 (async () => {

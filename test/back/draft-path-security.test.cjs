@@ -104,11 +104,13 @@ test('script creation supports root and nested parents in both writable director
   for (const root of [config.scriptPath, config.configPath]) {
     for (const filename of ['ordinary.js', 'nested/deeper/script.js']) {
       assert.equal(
-        (await invoke('post', '/', {
-          path: root,
-          filename,
-          content: 'safe',
-        })).code,
+        (
+          await invoke('post', '/', {
+            path: root,
+            filename,
+            content: 'safe',
+          })
+        ).code,
         200,
       );
       assert.equal(fs.readFileSync(path.join(root, filename), 'utf8'), 'safe');
@@ -124,11 +126,13 @@ test('script parent creation rejects sibling prefixes and external symlinks', as
   fs.symlinkSync(outside, path.join(config.scriptPath, 'escape'));
   for (const parent of [sibling, path.join(config.scriptPath, 'escape')]) {
     assert.equal(
-      (await invoke('post', '/', {
-        path: parent,
-        filename: 'nested/poc.js',
-        content: 'blocked',
-      })).code,
+      (
+        await invoke('post', '/', {
+          path: parent,
+          filename: 'nested/poc.js',
+          content: 'blocked',
+        })
+      ).code,
       403,
     );
   }

@@ -36,12 +36,25 @@ test('emulated Node probes have a bounded two-minute budget and reject a timeout
   t.mock.method(childProcess, 'spawnSync', (_program, args, options) => {
     assert.equal(options.timeout, 120000);
     assert.equal(options.env.NODE_OPTIONS, '');
-    return { status: null, signal: 'SIGTERM', error: Object.assign(new Error('probe timed out'), { code: 'ETIMEDOUT' }) };
+    return {
+      status: null,
+      signal: 'SIGTERM',
+      error: Object.assign(new Error('probe timed out'), { code: 'ETIMEDOUT' }),
+    };
   });
   delete require.cache[modulePath];
-  t.after(() => { delete require.cache[modulePath]; });
+  t.after(() => {
+    delete require.cache[modulePath];
+  });
   const probe = require(modulePath).probeNodeRuntime;
-  assert.throws(() => probe(), /Node URL runtime probe failed.*SIGTERM.*probe timed out/);
+  assert.throws(
+    () => probe(),
+    /Node URL runtime probe failed.*SIGTERM.*probe timed out/,
+  );
   assert.ok(directory);
-  assert.equal(fs.existsSync(directory), false, 'Timed-out probes must remove their temporary source files');
+  assert.equal(
+    fs.existsSync(directory),
+    false,
+    'Timed-out probes must remove their temporary source files',
+  );
 });

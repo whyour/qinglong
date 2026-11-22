@@ -82,10 +82,15 @@ async function fixture(t) {
           data: { data: [{ id: 12, name: 'example' }], total: 1 },
         });
       else if (
-        ['/panel/open/envs', '/panel/open/configs/files', '/panel/open/scripts',
-          '/panel/open/subscriptions', '/panel/open/dependencies',
-          '/panel/open/logs', '/panel/open/dashboard/overview']
-          .includes(url.pathname)
+        [
+          '/panel/open/envs',
+          '/panel/open/configs/files',
+          '/panel/open/scripts',
+          '/panel/open/subscriptions',
+          '/panel/open/dependencies',
+          '/panel/open/logs',
+          '/panel/open/dashboard/overview',
+        ].includes(url.pathname)
       )
         json({ code: 200, data: [] });
       else if (
@@ -172,7 +177,13 @@ test('compiled entry: login aliases, private storage, status, refresh and local 
     ['logs:read', '/panel/open/logs'],
     ['dashboard:read', '/panel/open/dashboard/overview'],
   ]) {
-    const checked = await f.invoke(['auth', 'status', '--scope', scope, '--json']);
+    const checked = await f.invoke([
+      'auth',
+      'status',
+      '--scope',
+      scope,
+      '--json',
+    ]);
     assert.equal(checked.code, 0, checked.err);
     assert.equal(JSON.parse(checked.out).data.scopeChecked, scope);
     assert.equal(f.requests.at(-1).url.pathname, pathname);
@@ -338,7 +349,10 @@ test('config content and symlinks are checked independently of permission bits',
   fs.symlinkSync(target, f.file);
   const linked = await f.invoke(['task', 'list', '--json'], { QL_LANG: 'en' });
   failure(linked, 1);
-  assert.match(JSON.parse(linked.err).message, /regular file, not a symbolic link/);
+  assert.match(
+    JSON.parse(linked.err).message,
+    /regular file, not a symbolic link/,
+  );
   await f.login();
   assert.equal(fs.lstatSync(f.file).isSymbolicLink(), false);
   assert.equal(JSON.parse(fs.readFileSync(target)).clientId, 123);

@@ -21,7 +21,7 @@ import {
 
 @Service()
 export default class EnvService {
-  constructor(@Inject('logger') private logger: winston.Logger) { }
+  constructor(@Inject('logger') private logger: winston.Logger) {}
 
   public async create(payloads: Env[]): Promise<Env[]> {
     payloads.forEach((payload) => assertAllowedTaskEnvName(payload.name));
@@ -277,9 +277,9 @@ export default class EnvService {
             .replace(/'/g, "'\\''")
             .trim();
           env_string += `export ${key}='${value}'\n`;
-          js_env_string += `process.env[${JSON.stringify(key)}]=${JSON.stringify(
-            group.map((x) => x.value).join('&'),
-          )};\n`;
+          js_env_string += `process.env[${JSON.stringify(
+            key,
+          )}]=${JSON.stringify(group.map((x) => x.value).join('&'))};\n`;
           // Serialize data instead of constructing an escaped Python literal.
           py_env_string += `os.environ['${key}']=json.loads(${JSON.stringify(
             JSON.stringify(group.map((x) => x.value).join('&')),

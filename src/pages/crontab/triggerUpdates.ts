@@ -49,8 +49,11 @@ export function createTriggerPoll(
     try {
       const [latest] = await read(new URLSearchParams({ limit: '1' }));
       if (!active()) return;
-      onHead(!!latest && (latest.observed_at > head.observed_at ||
-        (latest.observed_at === head.observed_at && latest.id > head.id)));
+      onHead(
+        !!latest &&
+          (latest.observed_at > head.observed_at ||
+            (latest.observed_at === head.observed_at && latest.id > head.id)),
+      );
       headFailed = false;
     } catch {
       headFailed = true;
@@ -95,16 +98,28 @@ export function createTriggerPoll(
     }
   }
 
-  return function poll(rows: TriggerEntry[], action: 'poll' | 'retry' | ReadonlySet<string> = 'poll') {
+  return function poll(
+    rows: TriggerEntry[],
+    action: 'poll' | 'retry' | ReadonlySet<string> = 'poll',
+  ) {
     if (!active()) return;
     const previousOpen = openIds;
     if (typeof action !== 'string') openIds = action;
-    watched = new Set(rows.filter(row =>
-      openIds.has(row.id) || row.state === 'running' || row.state === 'queued' ||
-      row.reason === 'exit_pending' || row.reason === 'exit_conflict' ||
-      row.legacy_exit_booking === 1 ||
-      (row.reason === 'restart' && (row.state === 'skipped' || row.state === 'unknown')),
-    ).map(row => row.id));
+    watched = new Set(
+      rows
+        .filter(
+          (row) =>
+            openIds.has(row.id) ||
+            row.state === 'running' ||
+            row.state === 'queued' ||
+            row.reason === 'exit_pending' ||
+            row.reason === 'exit_conflict' ||
+            row.legacy_exit_booking === 1 ||
+            (row.reason === 'restart' &&
+              (row.state === 'skipped' || row.state === 'unknown')),
+        )
+        .map((row) => row.id),
+    );
 
     const previousFailures = failed.size;
     for (const id of failed) if (!watched.has(id)) failed.delete(id);
@@ -120,7 +135,8 @@ export function createTriggerPoll(
       }
       if (!inFlight.has(id)) waiting.add(id);
     }
-    if (action === 'poll' || (action === 'retry' && headFailed)) void checkHead();
+    if (action === 'poll' || (action === 'retry' && headFailed))
+      void checkHead();
     while (active() && waiting.size && workers < 2) void refreshBatches();
   };
 }

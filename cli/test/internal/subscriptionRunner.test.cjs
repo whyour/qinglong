@@ -164,7 +164,14 @@ test('subscription reconciliation scopes removals to canonical paths and the cur
   });
   assert.equal(result.added, 1);
   assert.equal(result.removed, 1);
-  assert.deepEqual(requests.find((r) => r.method === 'DELETE').body, [{ id: 1, script: 'owner_repository/old.js', command: rows[0].command, sub_id: 7 }]);
+  assert.deepEqual(requests.find((r) => r.method === 'DELETE').body, [
+    {
+      id: 1,
+      script: 'owner_repository/old.js',
+      command: rows[0].command,
+      sub_id: 7,
+    },
+  ]);
   assert.deepEqual(requests.find((r) => r.method === 'POST').body, {
     name: 'New task',
     schedule: '0 9 * * *',
@@ -180,7 +187,9 @@ test('subscription reconciliation scopes removals to canonical paths and the cur
 });
 
 test('raw download failure preserves the last script and does not reconcile tasks', async (t) => {
-  const { syncRaw } = require('../../dist/internal/subscription/subscriptionRunner');
+  const {
+    syncRaw,
+  } = require('../../dist/internal/subscription/subscriptionRunner');
   const http = require('node:http');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-raw-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -215,7 +224,9 @@ test('raw download failure preserves the last script and does not reconcile task
 
 test('directory replacement stages on the destination filesystem before switching old files', async (t) => {
   const fsp = require('node:fs/promises');
-  const { replaceDirectory } = require('../../dist/internal/subscription/subscriptionRunner');
+  const {
+    replaceDirectory,
+  } = require('../../dist/internal/subscription/subscriptionRunner');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-cross-device-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const staged = path.join(root, 'staged'),
@@ -251,7 +262,9 @@ test('directory replacement stages on the destination filesystem before switchin
 
 test('cross-filesystem preparation failure leaves the old subscription directory untouched', async (t) => {
   const fsp = require('node:fs/promises');
-  const { replaceDirectory } = require('../../dist/internal/subscription/subscriptionRunner');
+  const {
+    replaceDirectory,
+  } = require('../../dist/internal/subscription/subscriptionRunner');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-copy-failure-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const staged = path.join(root, 'staged'),
@@ -433,7 +446,7 @@ test('cron metadata precedence agrees with unchanged legacy add_cron', (t) => {
   }
 });
 
-test('a slash in a branch cannot publish through a linked namespace parent', async t => {
+test('a slash in a branch cannot publish through a linked namespace parent', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-nested-namespace-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const context = createContext({ root }, { PATH: process.env.PATH });
@@ -444,9 +457,13 @@ test('a slash in a branch cannot publish through a linked namespace parent', asy
     fs.mkdirSync(dir, { recursive: true });
     const link = path.join(dir, 'owner_repo_feature');
     fs.symlinkSync(outside, link);
-    await assert.rejects(syncRepository(context, {
-      url: 'https://example.invalid/owner/repo.git', branch: 'feature/branch',
-    }), /管理目录|managed directory/);
+    await assert.rejects(
+      syncRepository(context, {
+        url: 'https://example.invalid/owner/repo.git',
+        branch: 'feature/branch',
+      }),
+      /管理目录|managed directory/,
+    );
     assert.deepEqual(fs.readdirSync(outside), ['sentinel']);
     fs.unlinkSync(link);
   }

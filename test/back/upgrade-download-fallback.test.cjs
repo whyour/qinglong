@@ -107,7 +107,10 @@ test('explicit CLI GitHub selection does not switch providers', async (t) => {
 });
 test('checksum validation failure never retries from another mirror', async (t) => {
   const f = await fixture(t, () => false, 'gitee', true);
-  await assert.rejects(f.operation, /checksum mismatch|构建文件缺失、损坏或混入旧文件/);
+  await assert.rejects(
+    f.operation,
+    /checksum mismatch|构建文件缺失、损坏或混入旧文件/,
+  );
   assert.equal(f.urls.length, 2);
   assert.deepEqual(fs.readdirSync(f.tmp), []);
 });

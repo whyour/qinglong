@@ -39,7 +39,9 @@ const Diff = () => {
 
   const getSample = () => {
     request
-      .get(`${config.apiPrefix}configs/detail?path=${encodeURIComponent(origin)}`)
+      .get(
+        `${config.apiPrefix}configs/detail?path=${encodeURIComponent(origin)}`,
+      )
       .then(({ code, data }) => {
         if (code === 200) {
           setOriginValue(data);

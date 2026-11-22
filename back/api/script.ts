@@ -56,7 +56,8 @@ function writablePath(targetPath: string, req?: Request): string {
   if (
     /(?:^|\/)open\/scripts(?:\/|\?|$)/.test(req?.originalUrl || '') &&
     !resolveFileAccess(config.scriptPath, [normalized])
-  ) return '';
+  )
+    return '';
   if (!isPathAllowed(normalized)) return '';
   for (const writableRoot of config.writePathList) {
     const root = resolve(writableRoot) + sep;
@@ -554,7 +555,8 @@ export default (app: Router) => {
         }
         const { name, ext } = parse(filename);
         const filePath = writablePath(
-          join(config.scriptPath, path, `${name}.swap${ext}`), req,
+          join(config.scriptPath, path, `${name}.swap${ext}`),
+          req,
         );
         if (!filePath) {
           return res.send({ code: 403, message: t('暂无权限') });
@@ -587,7 +589,8 @@ export default (app: Router) => {
         }
         const { name, ext } = parse(filename);
         const filePath = writablePath(
-          join(config.scriptPath, path, `${name}.swap${ext}`), req,
+          join(config.scriptPath, path, `${name}.swap${ext}`),
+          req,
         );
         if (!filePath) {
           return res.send({ code: 403, message: t('暂无权限') });
@@ -635,7 +638,10 @@ export default (app: Router) => {
         if (!path) {
           path = '';
         }
-        const filePath = writablePath(join(config.scriptPath, path, filename), req);
+        const filePath = writablePath(
+          join(config.scriptPath, path, filename),
+          req,
+        );
         const newPath = writablePath(
           join(config.scriptPath, path, newFilename),
           req,

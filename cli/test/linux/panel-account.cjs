@@ -38,7 +38,11 @@ exports.verifyAccountMaintenance = async function verifyAccountMaintenance(
   assert.equal((await login()).code, 200, 'New credentials were not saved');
   const incorrect = randomUUID();
   for (let attempt = 0; attempt < 3; attempt++) {
-    assert.equal((await login(incorrect)).code, 400, 'Expected a rejected password before throttling');
+    assert.equal(
+      (await login(incorrect)).code,
+      400,
+      'Expected a rejected password before throttling',
+    );
   }
   assert.equal(
     (await login()).code,
@@ -49,7 +53,12 @@ exports.verifyAccountMaintenance = async function verifyAccountMaintenance(
   const session = await login();
   assert.equal(session.code, 200, 'Login limit was not cleared');
   assert.ok(session.data.token, 'Fresh owner session required');
-  await api('system/auth/reset', 'PUT', { twoFactorActivated: true }, session.data.token);
+  await api(
+    'system/auth/reset',
+    'PUT',
+    { twoFactorActivated: true },
+    session.data.token,
+  );
   assert.equal(
     (await login()).code,
     420,

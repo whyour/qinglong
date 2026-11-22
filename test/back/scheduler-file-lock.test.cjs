@@ -17,9 +17,9 @@ for (const failOperation of [false, true]) {
     const config = { crontabFile: path.join(root, 'crontab.list') };
     await fs.writeFile(config.crontabFile, '');
     const { withSchedulerMutation } = load(
-      'back/shared/schedulerMutationLock.ts',
+      'back/cron/scheduling/schedulerMutationLock.ts',
       {
-        '../config': config,
+        '../../config/index': config,
       },
     );
     const { writeFileWithLock } = load('back/shared/utils.ts', {

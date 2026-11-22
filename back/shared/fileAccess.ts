@@ -28,7 +28,9 @@ export function resolveFileAccess(
   // of the same entry. Check every protected name without case sensitivity.
   const blockedNames = new Set(blacklist.map((part) => part.toLowerCase()));
   const isBlocked = (relative: string) =>
-    relative.split(path.sep).some((part) => blockedNames.has(part.toLowerCase()));
+    relative
+      .split(path.sep)
+      .some((part) => blockedNames.has(part.toLowerCase()));
   if (isBlocked(path.relative(resolvedRoot, target))) return '';
   try {
     const realRoot = fs.realpathSync(resolvedRoot);

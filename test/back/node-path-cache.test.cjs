@@ -70,14 +70,26 @@ test('alternating Node/crond working directories retain independent cached roots
   fs.mkdirSync(path.join(f.root, 'child'));
   fs.writeFileSync(path.join(f.root, 'child', '.npmrc'), 'global-dir=/child\n');
   for (let i = 0; i < 4; i++) {
-    assert.equal(f.run({ ANSWER: '/parent/modules' }).stdout.trim(), '/parent/modules');
     assert.equal(
-      f.run({ ANSWER: '/child/modules' }, 'cd child; ' + f.command).stdout.trim(),
+      f.run({ ANSWER: '/parent/modules' }).stdout.trim(),
+      '/parent/modules',
+    );
+    assert.equal(
+      f
+        .run({ ANSWER: '/child/modules' }, 'cd child; ' + f.command)
+        .stdout.trim(),
       '/child/modules',
     );
   }
-  assert.equal(f.count(), 2, 'each working directory should discover only once');
-  assert.equal(fs.readdirSync(f.env.dir_tmp).filter((x) => x.endsWith('.cache')).length, 2);
+  assert.equal(
+    f.count(),
+    2,
+    'each working directory should discover only once',
+  );
+  assert.equal(
+    fs.readdirSync(f.env.dir_tmp).filter((x) => x.endsWith('.cache')).length,
+    2,
+  );
 });
 test('refresh retires old per-environment records without removing locks or unrelated files', (t) => {
   const f = fixture(t);
@@ -92,7 +104,8 @@ test('refresh retires old per-environment records without removing locks or unre
   }
   assert.equal(f.run().status, 0);
   assert.equal(fs.existsSync(path.join(f.env.dir_tmp, names[0])), false);
-  for (const name of names.slice(1)) assert.ok(fs.existsSync(path.join(f.env.dir_tmp, name)));
+  for (const name of names.slice(1))
+    assert.ok(fs.existsSync(path.join(f.env.dir_tmp, name)));
 });
 test('expired or malformed records refresh and failed lookups are not cached', (t) => {
   const f = fixture(t);
