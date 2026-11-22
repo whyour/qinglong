@@ -37,6 +37,7 @@ def expand_range(range_str, max_value):
 
 
 def run():
+    task_before = os.getenv("task_before", "")
     try:
         prev_pythonpath = os.getenv("PREV_PYTHONPATH", "")
         os.environ["PYTHONPATH"] = prev_pythonpath
@@ -47,27 +48,20 @@ def run():
         # 创建临时文件路径
         temp_file = f"/tmp/env_{os.getpid()}.json"
         
-        # 构建命令数组
-        commands = [
-            f'source {os.getenv("file_task_before")} {file_name}'
-        ]
-        
-        task_before = os.getenv("task_before")
         if task_before:
-            escaped_task_before = task_before.replace('"', '\\"').replace("$", "\\$")
-            commands.append(f"eval '{escaped_task_before}'")
             print("Executing before command\n" if os.environ.get("QL_LANG") == "en" else "执行前置命令\n")
-            
-        commands.append(f"echo -e '{split_str}'")
-        
-        # 修改 Python 命令，使用单行并正确处理引号
-        python_cmd = f"python3 -c 'import os,json; f=open(\\\"{temp_file}\\\",\\\"w\\\"); json.dump(dict(os.environ),f); f.close()'"
-        commands.append(python_cmd)
-        
-        command = " && ".join(cmd for cmd in commands if cmd)
-        command = f'bash -c "{command}"'
-
-        res = subprocess.check_output(command, shell=True, encoding="utf-8")
+        # Pass paths as arguments, without interpreting filename shell syntax.
+        command = """file="$1"; output="$2"; inline="$3"; shift 3
+source "$file" "$@" &&
+{ if [ -n "$inline" ]; then eval "$inline"; fi; } &&
+printf '%s\\n' '__sitecustomize__' &&
+python3 -c 'import os,json,sys; f=open(sys.argv[1],"w"); json.dump(dict(os.environ),f); f.close()' "$output"
+"""
+        res = subprocess.check_output(
+            ["/bin/bash", "-c", command, "ql-before", os.environ["file_task_before"],
+             temp_file, task_before, file_name],
+            encoding="utf-8",
+        )
         output = res.split(split_str)[0]
 
         try:

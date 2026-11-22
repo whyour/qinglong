@@ -115,7 +115,9 @@ test('script navigation preserves filenames as data without injecting query para
   ];
   for (const [parent, file] of files) {
     const n = navigation();
-    n.go({ command: `task ${parent ? `${parent}/` : ''}${file}` });
+    n.go({
+      command: `task ${JSON.stringify(parent ? `${parent}/${file}` : file)}`,
+    });
     assert.equal(n.paths.length, 1);
     const target = new URL(n.paths[0], 'https://panel.example');
     assert.equal(target.origin, 'https://panel.example');
@@ -153,5 +155,71 @@ test('SSH repository addresses remain intact without being treated as browser UR
     n.go({ command });
     assert.deepEqual(n.external, []);
     assert.deepEqual(n.paths, []);
+  }
+});
+
+test('quoted script operands navigate to the same literal file used by the task editor', () => {
+  const cases = [
+    ['task "脚本.js"', '脚本.js', ''],
+    [
+      "task 'my dir/脚本 #?&%+.py' -- 'arg with spaces'",
+      '脚本 #?&%+.py',
+      'my dir',
+    ],
+    ['task "my dir"/script.js now', 'script.js', 'my dir'],
+    [String.raw`task my\ dir/script\ name.sh`, 'script name.sh', 'my dir'],
+    [String.raw`task "repo/a\"b.js"`, 'a"b.js', 'repo'],
+    [String.raw`task 'repo/a'\''b.js'`, "a'b.js", 'repo'],
+    [String.raw`task 'repo/a\b.js'`, String.raw`a\b.js`, 'repo'],
+    [String.raw`task "repo/a\b.js"`, String.raw`a\b.js`, 'repo'],
+    ['task\t-l\t"/ql/data/scripts/my dir/main.mjs"', 'main.mjs', '/my dir'],
+    ['node "repo/main.cjs"', 'main.cjs', 'repo'],
+    ['task "" "script.ts"', 'script.ts', ''],
+  ];
+  for (const [command, file, parent] of cases) {
+    assert.deepEqual(getCommandScript(command), [file, parent], command);
+    const n = navigation();
+    n.go({ command });
+    assert.equal(n.paths.length, 1, command);
+    const target = new URL(n.paths[0], 'https://panel.example');
+    assert.equal(target.searchParams.get('s'), file, command);
+    assert.equal(target.searchParams.get('p'), parent, command);
+    assert.equal(target.hash, '');
+  }
+});
+
+test('incomplete quoting does not navigate to a different script', () => {
+  for (const command of [
+    'task "script.js',
+    "task 'script.js",
+    'task script.js\\',
+    'task script.js\necho other',
+    'task "script.js" "unfinished',
+  ]) {
+    assert.equal(getCommandScript(command), undefined, command);
+    const n = navigation();
+    n.go({ command });
+    assert.deepEqual(n.paths, [], command);
+    assert.deepEqual(n.external, [], command);
+  }
+});
+
+test('quoted repository targets retain the web navigation safety checks', () => {
+  for (const quote of ["'", '"']) {
+    const safe = navigation();
+    safe.go({
+      command: `ql repo ${quote}https://example.com/a?x=1&y=2${quote}`,
+    });
+    assert.deepEqual(safe.external, ['https://example.com/a?x=1&y=2']);
+    for (const target of [
+      'javascript:alert(1)',
+      'data:text/html,hello',
+      'https://trusted.example\\@attacker.example/a.js',
+    ]) {
+      const n = navigation();
+      n.go({ command: `ql raw ${quote}${target}${quote}` });
+      assert.deepEqual(n.paths, []);
+      assert.deepEqual(n.external, []);
+    }
   }
 });

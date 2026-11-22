@@ -308,12 +308,55 @@ export function logEnded(log: string): boolean {
 export function getCommandScript(
   command: string,
 ): [string, string] | string | undefined {
-  const cmd = command.split(' ') as string[];
+  // Read shell arguments without evaluating substitutions or expanding paths.
+  // Quoted and unquoted fragments can form one argument (task 'my dir'/a.js).
+  const cmd: string[] = [];
+  const raw: string[] = [];
+  let value = '',
+    source = '',
+    quote = '',
+    active = false;
+  for (let i = 0; i < command.length; i++) {
+    const c = command[i];
+    if (c === '\n' || c === '\r') return;
+    if (!quote && /\s/.test(c)) {
+      if (active) {
+        cmd.push(value);
+        raw.push(source);
+      }
+      value = source = '';
+      active = false;
+      continue;
+    }
+    source += c;
+    active = true;
+    if (c === quote) {
+      quote = '';
+    } else if (!quote && (c === "'" || c === '"')) {
+      quote = c;
+    } else if (c === '\\' && quote !== "'") {
+      const next = command[++i];
+      if (next === undefined || /[\r\n]/.test(next)) return;
+      source += next;
+      if (quote === '"' && !/[$`"\\]/.test(next)) value += '\\';
+      value += next;
+    } else {
+      value += c;
+    }
+  }
+  if (quote) return;
+  if (active) {
+    cmd.push(value);
+    raw.push(source);
+  }
   if (cmd[1] === 'repo' || cmd[1] === 'raw') {
+    // Keep ambiguous escaped URLs out of browser navigation, even if removing
+    // the shell escape would turn them into a syntactically valid web URL.
+    if (raw[2]?.includes('\\')) return;
     return cmd[2];
   }
   let scriptsPart = cmd.find((x) =>
-    ['.js', '.ts', '.sh', '.py'].some((y) => x.endsWith(y)),
+    ['.js', '.mjs', '.cjs', '.ts', '.sh', '.py'].some((y) => x.endsWith(y)),
   );
   if (!scriptsPart) return;
   const scriptDir = `${window.__ENV__QL_DIR}/data/scripts`;

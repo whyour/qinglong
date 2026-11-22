@@ -48,8 +48,12 @@ function fixture(t, language) {
     ACCOUNTS: 'first&second&third',
   };
   const write = (name, text) => fs.writeFileSync(path.join(root, name), text);
-  const run = (body, extensionOverride = extension) => {
-    const entry = path.join(root, `entry.${extensionOverride}`);
+  const run = (
+    body,
+    extensionOverride = extension,
+    filename = `entry.${extensionOverride}`,
+  ) => {
+    const entry = path.join(root, filename);
     write(path.basename(entry), body);
     const python = language === 'python';
     const result = spawnSync(
@@ -64,6 +68,58 @@ function fixture(t, language) {
   };
   return { root, env, write, run };
 }
+
+for (const extension of ['js', 'mjs', 'py']) {
+  test(`${extension} before hooks receive quoted filenames literally and preserve exported variables`, (t) => {
+    const f = fixture(t, extension === 'py' ? 'python' : 'javascript');
+    const hook = `before ' " #.sh`;
+    f.write(
+      hook,
+      'export HOOK_FILE="$1"\nexport HOOK_COUNT="$#"\nexport FROM_SHELL=before\n',
+    );
+    f.env.file_task_before = path.join(f.root, hook);
+    f.env.task_before = `export FROM_COMMAND='literal "quotes" $value'`;
+    for (const name of [
+      'space #?&%+',
+      `single' double"`,
+      'literal $(touch injected)',
+      'literal `touch injected` ;',
+    ]) {
+      const filename = `${name}.${extension}`;
+      const body =
+        extension === 'py'
+          ? `import os\nassert os.environ['HOOK_FILE'] == ${JSON.stringify(
+              filename,
+            )}\nassert os.environ['HOOK_COUNT'] == '1'\nassert os.environ['FROM_SHELL'] == 'before'\nassert os.environ['FROM_COMMAND'] == 'literal "quotes" $value'\nprint('HOOK_OK')\n`
+          : `${
+              extension === 'mjs'
+                ? 'import assert from "node:assert/strict";'
+                : 'const assert = require("node:assert/strict");'
+            }\nassert.equal(process.env.HOOK_FILE, ${JSON.stringify(
+              filename,
+            )});\nassert.equal(process.env.HOOK_COUNT, '1');\nassert.equal(process.env.FROM_SHELL, 'before');\nassert.equal(process.env.FROM_COMMAND, 'literal "quotes" $value');\nconsole.log('HOOK_OK');`;
+      const output = f.run(body, extension, filename);
+      assert.match(output, /HOOK_OK/);
+      assert.doesNotMatch(
+        output,
+        /Failed to parse environment|run task before error/,
+      );
+      assert.equal(fs.existsSync(path.join(f.root, 'injected')), false);
+    }
+  });
+}
+
+test('Node launcher preload passes the runner script entry to the before hook', (t) => {
+  const f = fixture(t, 'javascript');
+  const filename = `actual ' " #.ts`;
+  f.env.QL_SCRIPT_ENTRY = path.join(f.root, filename);
+  f.write('before.sh', 'export HOOK_FILE="$1"\n');
+  f.run(
+    `require('node:assert/strict').equal(process.env.HOOK_FILE, ${JSON.stringify(
+      filename,
+    )});`,
+  );
+});
 
 for (const extension of ['js', 'mjs']) {
   test(`${extension} startup preserves hooks, environment selection and client without importing notifications`, (t) => {

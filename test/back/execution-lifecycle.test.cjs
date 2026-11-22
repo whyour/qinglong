@@ -20,6 +20,14 @@ test(
     let releases = 0;
     let active = 0;
     const { runCron } = load(path.resolve('back/cron/execution/runCron.ts'), {
+      // This case has no trigger/history. Avoid compiling the entire history
+      // and scheduler graph inside the lifecycle timeout on constrained hosts.
+      '../history': {
+        triggerHistory: () => {
+          assert.fail('a run without a trigger must not access history');
+        },
+      },
+      '../../shared/i18n': { t: (message) => message },
       'cross-spawn': {
         spawn: () => spawn('true', { shell: '/nonexistent-ql-test-shell' }),
       },
@@ -45,8 +53,12 @@ test(
       },
       '../../config/util': { killTask: async () => {} },
     });
-    await runCron('true', { id: '1' });
-    await runCron('true', { id: '2' });
+    for (const id of ['1', '2']) {
+      const result = await runCron('true', { id });
+      assert.equal(result.error.code, 'ENOENT');
+      assert.equal(result.signal, null);
+      assert.equal(active, 0);
+    }
     assert.equal(active, 0);
     assert.equal(releases, 2);
   },

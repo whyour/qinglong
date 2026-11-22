@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const Module = require('module');
 const path = require('path');
 const client = require('./client.js');
@@ -73,15 +73,19 @@ function run() {
     process.env.NODE_OPTIONS = PREV_NODE_OPTIONS;
 
     const splitStr = '__sitecustomize__';
-    const fileName = process.argv[1].replace(`${dir_scripts}/`, '');
+    // ts-node is argv[1] during preload; the task runner knows the actual script.
+    const fileName = (process.env.QL_SCRIPT_ENTRY || process.argv[1]).replace(
+      `${dir_scripts}/`,
+      '',
+    );
     const tempFile = `/tmp/env_${process.pid}.json`;
 
-    const commands = [
-      `source ${file_task_before} ${fileName}`,
-      task_before ? `eval '${task_before.replace(/'/g, "'\\''")}'` : null,
-      `echo -e '${splitStr}'`,
-      `node -e "require('fs').writeFileSync('${tempFile}', JSON.stringify(process.env))"`,
-    ].filter(Boolean);
+    // Pass paths as arguments: shell syntax in a filename must stay literal.
+    const command = `file="$1"; output="$2"; inline="$3"; shift 3
+source "$file" "$@" &&
+{ if [ -n "$inline" ]; then eval "$inline"; fi; } &&
+printf '%s\\n' '__sitecustomize__' &&
+node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify(process.env))' "$output"`;
 
     if (task_before) {
       console.log(
@@ -91,11 +95,19 @@ function run() {
       );
     }
 
-    const res = execSync(commands.join(' && '), {
-      encoding: 'utf-8',
-      maxBuffer: 50 * 1024 * 1024,
-      shell: '/bin/bash',
-    });
+    const res = execFileSync(
+      '/bin/bash',
+      [
+        '-c',
+        command,
+        'ql-before',
+        file_task_before,
+        tempFile,
+        task_before || '',
+        fileName,
+      ],
+      { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+    );
 
     const [output] = res.split(splitStr);
 
