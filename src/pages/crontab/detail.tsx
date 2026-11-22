@@ -13,6 +13,8 @@ import {
   Divider,
   Typography,
   Tooltip,
+  Space,
+  Switch,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -69,6 +71,11 @@ const CronDetailModal = ({
 }) => {
   const [activeTabKey, setActiveTabKey] = useState('runningHistory');
   const [value, setValue] = useState('');
+  const [wordWrap, setWordWrap] = useState(
+    () =>
+      (localStorage.getItem('qinglong_editor_word_wrap') ??
+        localStorage.getItem('qinglong_config_word_wrap')) === 'true',
+  );
   const [scriptState, setScriptState] = useState<
     'loading' | 'ready' | 'failed'
   >('loading');
@@ -156,6 +163,7 @@ const CronDetailModal = ({
               lineNumbersMinChars: 3,
               glyphMargin: false,
               accessibilitySupport: 'off',
+              wordWrap: wordWrap ? 'on' : 'off',
             }}
             onMount={(editor, monaco) => {
               editorRef.current = editor;
@@ -519,6 +527,34 @@ const CronDetailModal = ({
     }
   }, [cron]);
 
+  const scriptActions = activeTabKey === 'script' &&
+    scriptState === 'ready' && (
+      <Space size={8} wrap>
+        <Space size={8} className="editor-wrap-setting">
+          <span className="editor-wrap-label">{intl.get('自动换行')}</span>
+          <Switch
+            aria-label={intl.get('自动换行')}
+            checked={wordWrap}
+            onChange={(checked) => {
+              setWordWrap(checked);
+              localStorage.setItem(
+                'qinglong_editor_word_wrap',
+                String(checked),
+              );
+            }}
+          />
+        </Space>
+        <Button type="primary" onClick={saveFile}>
+          {intl.get('保存')}
+        </Button>
+        <Button
+          type="primary"
+          icon={<FullscreenOutlined />}
+          onClick={fullscreen}
+        />
+      </Space>
+    );
+
   return (
     <Modal
       title={
@@ -731,27 +767,18 @@ const CronDetailModal = ({
           onTabChange={(key) => {
             onTabChange(key);
           }}
-          tabBarExtraContent={
-            activeTabKey === 'script' &&
-            scriptState === 'ready' && (
-              <>
-                <Button
-                  type="primary"
-                  style={{ marginRight: 8 }}
-                  onClick={saveFile}
-                >
-                  {intl.get('保存')}
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<FullscreenOutlined />}
-                  onClick={fullscreen}
-                />
-              </>
-            )
-          }
+          tabBarExtraContent={!isPhone && scriptActions}
         >
-          {contentList[activeTabKey]}
+          {isPhone && scriptActions ? (
+            <div className="cron-detail-script-panel">
+              <div className="cron-detail-script-actions">{scriptActions}</div>
+              <div className="cron-detail-script-editor">
+                {contentList[activeTabKey]}
+              </div>
+            </div>
+          ) : (
+            contentList[activeTabKey]
+          )}
         </Card>
       </div>
       {isLogModalVisible && (
