@@ -1,5 +1,6 @@
+import { defineRunningInstanceModel } from './executionModelDefinitions';
 import { sequelize } from '.';
-import { DataTypes, Model } from 'sequelize';
+import { Model } from 'sequelize';
 
 export enum InstanceStatus {
   'running' = 0,
@@ -46,43 +47,4 @@ export interface RunningInstanceModel
   extends Model<RunningInstanceAttributes, RunningInstanceAttributes>,
     RunningInstanceAttributes {}
 
-export const RunningInstanceModel = sequelize.define<RunningInstanceModel>(
-  'RunningInstance',
-  {
-    cron_id: {
-      type: DataTypes.NUMBER,
-      allowNull: false,
-    },
-    pid: {
-      type: DataTypes.NUMBER,
-      allowNull: true,
-    },
-    log_path: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    started_at: {
-      type: DataTypes.NUMBER,
-      allowNull: false,
-    },
-    finished_at: {
-      type: DataTypes.NUMBER,
-      allowNull: true,
-    },
-    status: {
-      type: DataTypes.NUMBER,
-      allowNull: false,
-      defaultValue: InstanceStatus.running,
-    },
-    exit_code: {
-      type: DataTypes.NUMBER,
-      allowNull: true,
-    },
-  },
-  {
-    indexes: [
-      { fields: ['cron_id', 'pid', 'started_at'] },
-      { fields: ['cron_id', 'id'] },
-    ],
-  },
-);
+export const RunningInstanceModel = defineRunningInstanceModel(sequelize);

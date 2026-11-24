@@ -57,12 +57,18 @@ async function runProbe({
   class HttpServerService {}
   const modules = {
     'reflect-metadata': {},
+    sequelize: { DataTypes: { INTEGER: 'INTEGER' } },
     dns: { setDefaultResultOrder: () => {} },
     '../config': {},
     '../data': {
       sequelize: {
         transaction: async (action) => action({}),
-        query: async () => [[{ value: 42 }]],
+        getQueryInterface: () => ({ createTable: async () => {} }),
+        define: () => ({
+          removeAttribute: () => {},
+          create: async () => {},
+          findOne: async () => ({ get: () => 42 }),
+        }),
         close: async () => {
           events.push('db-close');
         },

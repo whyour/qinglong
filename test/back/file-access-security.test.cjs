@@ -48,3 +48,47 @@ test('file access enforces directory boundaries, blacklist descendants and symli
     );
   }
 });
+
+for (const kind of [
+  'directory',
+  'outside-link',
+  'dangling-link',
+  'swapped-directory',
+]) {
+  test(`concurrent path creation preserves containment checks: ${kind}`, (t) => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-file-race-'));
+    t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+    const root = path.join(tmp, 'logs');
+    const directory = path.join(root, 'shared-script');
+    const outside = path.join(tmp, 'outside');
+    fs.mkdirSync(root);
+    fs.mkdirSync(outside);
+    const exists = fs.existsSync;
+    t.mock.method(fs, 'existsSync', (file) => {
+      if (file === directory && !exists(directory)) {
+        if (kind === 'outside-link') fs.symlinkSync(outside, directory);
+        else if (kind === 'dangling-link')
+          fs.symlinkSync(path.join(outside, 'missing'), directory);
+        else fs.mkdirSync(directory);
+        // Simulate an earlier existsSync result racing with another writer.
+        return false;
+      }
+      return exists(file);
+    });
+    if (kind === 'swapped-directory') {
+      const lstat = fs.lstatSync;
+      t.mock.method(fs, 'lstatSync', (file, ...args) => {
+        const entry = lstat(file, ...args);
+        if (file === directory) {
+          fs.rmdirSync(directory);
+          fs.symlinkSync(outside, directory);
+        }
+        return entry;
+      });
+    }
+    assert.equal(
+      resolveFileAccess(root, ['shared-script/task.log']),
+      kind === 'directory' ? path.join(directory, 'task.log') : '',
+    );
+  });
+}

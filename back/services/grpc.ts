@@ -5,7 +5,7 @@ import { ApiService } from '../protos/api';
 import { registeredAdd, registeredDelete } from '../schedule/registeredPlans';
 import { setConcurrency } from '../schedule/setConcurrency';
 import { check } from '../schedule/health';
-import * as Api from '../schedule/api';
+import { lazyApiHandlers } from '../schedule/lazyApiHandlers';
 import Logger from '../loaders/logger';
 import { promisify } from 'util';
 import config from '../config';
@@ -32,7 +32,7 @@ export class GrpcServerService {
         delCron: registeredDelete,
         setConcurrency,
       });
-      this.server.addService(ApiService, Api);
+      this.server.addService(ApiService, lazyApiHandlers());
 
       const tlsConfig = await initGrpcCerts();
       const credentials = ServerCredentials.createSsl(

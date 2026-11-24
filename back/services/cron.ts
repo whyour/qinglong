@@ -907,4 +907,8 @@ export default class CronService {
       );
     }
   }
+
+  public async recoverQueuedTasks() {
+    await this.execution.recoverQueued();
+  }
 }

@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { QueryTypes, Sequelize, Transaction } from 'sequelize';
 
+// This per-exit claim stays bound SQL; its affected-row count gates the increment.
 // Hold the receipt claim and the daily increment in the same write transaction.
 export async function recordCronResult(
   database: Sequelize,

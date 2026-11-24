@@ -100,7 +100,7 @@ import_config() {
   if [[ -n "${DefaultCronRule}" ]]; then
     default_cron="${DefaultCronRule}"
   else
-    default_cron="$(random_range 0 59) $(random_range 0 23) * * *"
+    default_cron="$((RANDOM % 59)) $((RANDOM % 23)) * * *"
   fi
 }
 
@@ -148,7 +148,11 @@ detect_termux() {
 }
 
 detect_macos() {
-  [[ $(uname -s) == Darwin ]] && is_macos=1 || is_macos=0
+  case ${OSTYPE:-} in
+    darwin*) is_macos=1 ;;
+    linux*) is_macos=0 ;;
+    *) [[ $(uname -s) == Darwin ]] && is_macos=1 || is_macos=0 ;;
+  esac
 }
 
 gen_random_num() {
@@ -405,7 +409,9 @@ clear_env() {
 
 handle_task_start() {
   local error_message=""
-  if [[ $ID ]]; then
+  # Manual managed launches bind the PID, instance and log before permission.
+  # Scheduled/standalone wrappers still publish their shell-selected log path.
+  if [[ $ID && ( ${QL_SUPERVISOR_LOG_BOUND:-} != 1 || -z ${QL_TRIGGER_ID:-} ) ]]; then
     local error=$(update_cron "\"$ID\"" "0" "$$" "$log_path" "$begin_timestamp")
     if [[ $error ]]; then
       error_message=$(t ', 任务状态更新失败(%s)' "$error")
@@ -436,7 +442,10 @@ run_task_after() {
 
 handle_task_end() {
   local etime end_time end_timestamp
-  if [[ $is_macos -ne 1 && $time_format == '%Y-%m-%d %H:%M:%S' ]]; then
+  if [[ $is_macos -ne 1 && ${BASH_VERSINFO[0]} -ge 5 && ${EPOCHSECONDS:-} =~ ^[0-9]+$ && $time_format == '%Y-%m-%d %H:%M:%S' ]]; then
+    end_timestamp=$EPOCHSECONDS
+    printf -v end_time '%(%Y-%m-%d %H:%M:%S)T' "$end_timestamp"
+  elif [[ $is_macos -ne 1 && $time_format == '%Y-%m-%d %H:%M:%S' ]]; then
     IFS='|' read -r end_time end_timestamp < <(date "+$time_format|%s")
   else
     etime=$(date "+$time_format")
@@ -447,6 +456,10 @@ handle_task_end() {
   local exit_code="${_task_exit_code:-0}"
   [[ "$diff_time" == 0 ]] && diff_time=1
 
+  # The authorized supervisor publishes the command exit durably, including
+  # after hooks, and the worker/recovery books its statistics exactly once.
+  # Standalone/legacy wrappers still send their identified HTTP receipts.
+  if [[ ${QL_SUPERVISOR_RECEIPT:-} != 1 || -z ${QL_TRIGGER_ID:-} ]]; then
   if [[ $ID ]]; then
     local error=$(update_cron "\"$ID\"" "1" "$$" "$log_path" "$begin_timestamp" "$diff_time" "$exit_code" "$end_timestamp")
     if [[ $error ]]; then
@@ -455,6 +468,7 @@ handle_task_end() {
   fi
 
   record_cron_stat "$ID" "${exit_code:-0}" "$diff_time" "$end_timestamp"
+  fi
 
   if [[ "${MANUAL:=}" == "true" ]]; then
     t '\n## 已停止 🛑... %s  耗时 %s 秒%s' "$end_time" "$diff_time" "${error_message:=}　　　　　"

@@ -845,6 +845,7 @@
   "下载完成，等待重启": "Download complete, restart to update",
   "升级成功": "Update successful",
   "已重新启动并运行新版本，无需再次重启。": "Restarted and running the new version. No further restart is needed.",
+  "全局执行队列": "Global execution queue",
   "手动执行队列": "Manual queue",
   "定时执行队列": "Scheduled queue",
   "执行 ID": "Execution ID",

@@ -1,7 +1,8 @@
+import { executionModel } from './executionModels';
 import dayjs from 'dayjs';
 import { installTriggerHistory } from '../cron/schema';
 import { repairLegacyDailyStatistics } from '../cron/settlement/legacyDailyStatistics';
-import { QueryTypes, Sequelize } from 'sequelize';
+import { QueryTypes, Sequelize, literal, DataTypes } from 'sequelize';
 
 export const prunedExitMigrationId = 'preserve-pruned-bound-exits-v1';
 
@@ -45,15 +46,20 @@ const columns = [
 
 export async function migrateSchema(database: Sequelize): Promise<void> {
   await database.transaction(async (transaction) => {
-    await database.query(
-      'CREATE TABLE IF NOT EXISTS "SchemaMigrations" ("id" TEXT PRIMARY KEY, "applied_at" TEXT NOT NULL)',
+    await database.getQueryInterface().createTable(
+      'SchemaMigrations',
+      {
+        id: { type: DataTypes.TEXT, primaryKey: true },
+        applied_at: { type: DataTypes.TEXT, allowNull: false },
+      },
       { transaction },
     );
     await installTriggerHistory(database, transaction);
-    const applied = await database.query<{ id: string }>(
-      'SELECT "id" FROM "SchemaMigrations"',
-      { type: QueryTypes.SELECT, transaction },
-    );
+    const applied = await executionModel(database, 'SchemaMigrations').findAll({
+      attributes: ['id'],
+      transaction,
+      raw: true,
+    });
     const appliedIds = new Set(applied.map(({ id }) => id));
     for (const { table, column, type } of columns) {
       const id = `add-${table}-${column}`;
@@ -68,18 +74,22 @@ export async function migrateSchema(database: Sequelize): Promise<void> {
         throw new Error(`Migration table is missing: ${table}`);
       if (!fields.some((field) => field.name === column)) {
         // table/column/type come only from the static migration manifest above.
-        await database.query(
-          `ALTER TABLE "${table}" ADD COLUMN "${column}" ${type}`,
+        await database.getQueryInterface().addColumn(
+          table,
+          column,
+          {
+            type: type.replace(' NOT NULL DEFAULT 0', ''),
+            ...(type.includes('NOT NULL')
+              ? { allowNull: false, defaultValue: 0 }
+              : {}),
+          },
           { transaction },
         );
       }
       if (!appliedIds.has(id)) {
-        await database.query(
-          'INSERT INTO "SchemaMigrations" ("id", "applied_at") VALUES (:id, :appliedAt)',
-          {
-            replacements: { id, appliedAt: new Date().toISOString() },
-            transaction,
-          },
+        await executionModel(database, 'SchemaMigrations').create(
+          { id, applied_at: new Date().toISOString() },
+          { transaction, silent: true, hooks: false, validate: false },
         );
       }
     }
@@ -107,19 +117,22 @@ export async function migrateSchema(database: Sequelize): Promise<void> {
           },
         );
       }
-      await database.query(
-        'INSERT INTO SchemaMigrations(id,applied_at) VALUES ($id,CURRENT_TIMESTAMP)',
-        { bind: { id: retentionId }, transaction },
+      await executionModel(database, 'SchemaMigrations').create(
+        { id: retentionId, applied_at: literal('CURRENT_TIMESTAMP') },
+        { transaction, silent: true, hooks: false, validate: false },
       );
     }
     if (!appliedIds.has(repairId)) {
       await repairLegacyDailyStatistics(database, transaction, prior);
       // This reconciliation includes v1 and v2. Record all on fresh installations
       // so rolling back and upgrading again cannot replay the superseded repair.
-      await database.query(
-        `INSERT OR IGNORE INTO SchemaMigrations(id,applied_at)
-        VALUES ('repair-legacy-daily-statistics-v1',CURRENT_TIMESTAMP),('repair-legacy-daily-statistics-v2',CURRENT_TIMESTAMP),($id,CURRENT_TIMESTAMP)`,
-        { transaction, bind: { id: repairId } },
+      await executionModel(database, 'SchemaMigrations').bulkCreate(
+        [
+          'repair-legacy-daily-statistics-v1',
+          'repair-legacy-daily-statistics-v2',
+          repairId,
+        ].map((id) => ({ id, applied_at: literal('CURRENT_TIMESTAMP') })),
+        { transaction, ignoreDuplicates: true, hooks: false },
       );
     }
 
@@ -133,9 +146,9 @@ export async function migrateSchema(database: Sequelize): Promise<void> {
           AND NOT EXISTS (SELECT 1 FROM CronBoundExitConflicts WHERE trigger_id=b.trigger_id)`,
         { transaction },
       );
-      await database.query(
-        'INSERT INTO SchemaMigrations(id,applied_at) VALUES ($id,CURRENT_TIMESTAMP)',
-        { bind: { id: prunedExitMigrationId }, transaction },
+      await executionModel(database, 'SchemaMigrations').create(
+        { id: prunedExitMigrationId, applied_at: literal('CURRENT_TIMESTAMP') },
+        { transaction, silent: true, hooks: false, validate: false },
       );
     }
 

@@ -225,6 +225,7 @@ export default async () => {
     await systemService.restoreCronConcurrency();
   });
   await cronClient.readiness.recover();
+  await cronService.recoverQueuedTasks();
 
   const authInfo = await userService.getAuthInfo();
   await shareStore.updateAuthInfo(authInfo);

@@ -8,7 +8,11 @@ export const sequelize = new Sequelize({
   storage: join(config.dbPath, 'database.sqlite'),
   logging: false,
   retry: {
-    max: 10,
+    // Keep a bounded 15-second wait in JS. Constant delays let a burst of
+    // writers make progress without exponential retries stretching the queue.
+    max: 301,
+    backoffBase: 50,
+    backoffExponent: 1,
     match: ['SQLITE_BUSY: database is locked'],
   },
   pool: {
@@ -29,6 +33,10 @@ sequelize.addHook('beforeQuery', async (_options, query) => {
   let ready = initialized.get(connection);
   if (!ready) {
     ready = new Promise<void>((resolve, reject) => {
+      // Native busy waits occupy libuv workers. Concurrent BEGINs can exhaust
+      // that pool and prevent the lock holder's next query or COMMIT from
+      // running. Let Sequelize's asynchronous SQLITE_BUSY retries wait instead.
+      connection.configure('busyTimeout', 0);
       connection.run('PRAGMA synchronous=EXTRA', (error) =>
         error ? reject(error) : resolve(),
       );

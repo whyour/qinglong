@@ -1,3 +1,28 @@
+import dayjs from 'dayjs';
+import { promises as fs } from 'fs';
+import { basename, join } from 'path';
+import {
+  Op,
+  QueryTypes,
+  Sequelize,
+  Transaction,
+  col,
+  fn,
+  literal,
+  where,
+} from 'sequelize';
+import { executionModel } from '../../data/executionModels';
+import type {
+  TriggerLifecycle,
+  TriggerLifecycleEvidence,
+} from '../execution/triggerLifecycle';
+import type {
+  Trigger,
+  TriggerSource,
+  TriggerState,
+  VerifiedSupervisorExit,
+} from '../types';
+import { addDailyExit, recordCronResult } from './cronStatistics';
 import {
   isLegacyCapture,
   isMetadataReceipt,
@@ -9,21 +34,6 @@ import {
   retiringExits,
   validExit,
 } from './exitReceipt.cjs';
-import { QueryTypes, Sequelize, Transaction } from 'sequelize';
-import dayjs from 'dayjs';
-import { addDailyExit, recordCronResult } from './cronStatistics';
-import { promises as fs } from 'fs';
-import { basename, join } from 'path';
-import type {
-  Trigger,
-  TriggerSource,
-  TriggerState,
-  VerifiedSupervisorExit,
-} from '../types';
-import type {
-  TriggerLifecycle,
-  TriggerLifecycleEvidence,
-} from '../execution/triggerLifecycle';
 
 // The lifecycle owns transition guards; settlement must use its caller's transaction.
 export type TriggerSettlementLifecycle = Pick<
@@ -56,6 +66,8 @@ function isBoundPublication(file: string) {
   );
 }
 
+// High-frequency receipt/instance updates use bound SQL to avoid model query
+// construction while the writer is held. Infrequent recovery reads stay ORM.
 // Receipt verification, disputes and statistics are one transactional unit.
 // Durable evidence is retired only after the committed outcome is checked again.
 export class TriggerSettlement implements TriggerLifecycleEvidence {
@@ -402,22 +414,24 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
           transaction,
         },
       );
-      await this.database.query(
-        'DELETE FROM CrontabStats WHERE id=$stat AND run_count=0',
-        { bind: { stat }, transaction },
-      );
+      await executionModel(this.database, 'CrontabStats').destroy({
+        where: { id: stat, run_count: 0 },
+        transaction,
+        hooks: false,
+      });
     }
   }
 
   private async invalidateBookedTrigger(id: string, transaction: Transaction) {
-    const [trigger] = await this.database.query<{
-      instance_id: number | null;
-      state: TriggerState;
-      cron_id: number;
-    }>(
-      'SELECT instance_id,state,cron_id FROM CronTriggers WHERE id=$id AND started_at IS NOT NULL',
-      { bind: { id }, type: QueryTypes.SELECT, transaction },
-    );
+    const [trigger] = await executionModel(
+      this.database,
+      'CronTriggers',
+    ).findAll({
+      attributes: ['instance_id', 'state', 'cron_id'],
+      where: { id, started_at: { [Op.not]: null } },
+      transaction,
+      raw: true,
+    });
     if (!trigger) return false;
     const ref = trigger.cron_id;
     await this.database.query(
@@ -426,13 +440,25 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
       { bind: { id }, transaction },
     );
     if (trigger.instance_id !== null && trigger.state !== 'running') {
-      await this.database.query(
-        'UPDATE RunningInstances SET status=4,exit_code=NULL,updatedAt=CURRENT_TIMESTAMP WHERE id=$instance AND cron_id=$ref',
-        { bind: { instance: trigger.instance_id, ref }, transaction },
+      await executionModel(this.database, 'RunningInstances').update(
+        { status: 4, exit_code: null, updatedAt: literal('CURRENT_TIMESTAMP') },
+        {
+          where: { id: trigger.instance_id, cron_id: ref },
+          transaction,
+          silent: true,
+          hooks: false,
+          validate: false,
+        },
       );
-      await this.database.query(
-        'UPDATE Crontabs SET last_running_time=NULL WHERE id=$ref AND last_instance_id=$instance',
-        { bind: { ref, instance: trigger.instance_id }, transaction },
+      await executionModel(this.database, 'Crontabs').update(
+        { last_running_time: null },
+        {
+          where: { id: ref, last_instance_id: trigger.instance_id },
+          transaction,
+          silent: true,
+          hooks: false,
+          validate: false,
+        },
       );
     }
     return true;
@@ -444,10 +470,13 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
     transaction: Transaction,
   ) {
     if (!tuples.length) return;
-    await this.database.query(
-      `INSERT OR IGNORE INTO CronBoundExitConflicts(trigger_id,outcome,finished_at)
-      SELECT $id,json_extract(value,'$.outcome'),json_extract(value,'$.time') FROM json_each($tuples)`,
-      { bind: { id, tuples: JSON.stringify(tuples) }, transaction },
+    await executionModel(this.database, 'CronBoundExitConflicts').bulkCreate(
+      tuples.map((tuple) => ({
+        trigger_id: id,
+        outcome: tuple.outcome,
+        finished_at: tuple.time,
+      })),
+      { transaction, ignoreDuplicates: true, hooks: false },
     );
   }
 
@@ -502,9 +531,15 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
     const retained = await this.invalidateBookedTrigger(id, transaction);
     if (!retained) {
       if (!bound) {
-        await this.database.query(
-          'UPDATE CronLegacyExitBookings SET disputed=1,stat_id=NULL WHERE trigger_id=$id',
-          { bind: { id }, transaction },
+        await executionModel(this.database, 'CronLegacyExitBookings').update(
+          { disputed: 1, stat_id: null },
+          {
+            where: { trigger_id: id },
+            transaction,
+            silent: true,
+            hooks: false,
+            validate: false,
+          },
         );
       } else {
         await this.bookPrunedExit(
@@ -516,18 +551,21 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
       }
       return false;
     }
-    await this.database.query(
-      'DELETE FROM CronLegacyExitBookings WHERE trigger_id=$id',
-      { bind: { id }, transaction },
-    );
+    await executionModel(this.database, 'CronLegacyExitBookings').destroy({
+      where: { trigger_id: id },
+      transaction,
+      hooks: false,
+    });
     if (!bound)
-      await this.database.query(
-        `INSERT OR IGNORE INTO CronExitObservations(trigger_id,outcome,finished_at)
-      VALUES($id,$outcome,$time)`,
-        {
-          bind: { id, outcome: booking.outcome, time: booking.finished_at },
-          transaction,
-        },
+      await executionModel(this.database, 'CronExitObservations').bulkCreate(
+        [
+          {
+            trigger_id: id,
+            outcome: booking.outcome,
+            finished_at: booking.finished_at,
+          },
+        ],
+        { transaction, ignoreDuplicates: true, hooks: false },
       );
     return true;
   }
@@ -575,13 +613,15 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
       // Sequelize also invokes this hook after a failed COMMIT. Verify the
       // specific tuple in a separate snapshot, including on an existing dispute.
       try {
-        const rows = await this.database.query<{
-          outcome: string;
-          finished_at: number;
-        }>(
-          'SELECT outcome,finished_at FROM CronBoundExitConflicts WHERE trigger_id=$id',
-          { bind: { id }, transaction: null, type: QueryTypes.SELECT },
-        );
+        const rows = await executionModel(
+          this.database,
+          'CronBoundExitConflicts',
+        ).findAll({
+          attributes: ['outcome', 'finished_at'],
+          where: { trigger_id: id },
+          transaction: null,
+          raw: true,
+        });
         const committed = new Set(
           rows.map((row) => JSON.stringify([row.outcome, row.finished_at])),
         );
@@ -699,11 +739,21 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
     if (unreadable.size) {
       // Retention runs this scan before deletion. Keep unresolved history for
       // later repair without ending a live process solely on damaged bytes.
-      await this.database.query(
-        `UPDATE CronTriggers SET exit_pending=1 WHERE counted=0 AND state='unknown'
-        AND exit_pending IS NOT 1 AND owner IS NOT NULL AND started_at IS NOT NULL
-        AND id IN (SELECT value FROM json_each($ids))`,
-        { transaction, bind: { ids: JSON.stringify([...unreadable]) } },
+      await executionModel(this.database, 'CronTriggers').update(
+        { exit_pending: 1 },
+        {
+          where: {
+            counted: 0,
+            state: 'unknown',
+            owner: { [Op.not]: null },
+            started_at: { [Op.not]: null },
+            id: { [Op.in]: [...unreadable] },
+            [Op.or]: [{ exit_pending: null }, { exit_pending: { [Op.ne]: 1 } }],
+          },
+          transaction,
+          hooks: false,
+          validate: false,
+        },
       );
     }
     for (const [id, copies] of byId) {
@@ -753,11 +803,23 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
     exit: ExitObservation,
     transaction?: Transaction,
   ) {
-    const [match] = await this.database.query(
-      `SELECT 1 FROM CronExitObservations WHERE trigger_id=$id GROUP BY trigger_id
-       HAVING COUNT(*)=1 AND MAX(outcome)=$outcome AND MAX(finished_at)=$time`,
-      { bind: observationKey(id, exit), type: QueryTypes.SELECT, transaction },
-    );
+    const [match] = await executionModel(
+      this.database,
+      'CronExitObservations',
+    ).findAll({
+      attributes: ['trigger_id'],
+      where: { trigger_id: id },
+      group: ['trigger_id'],
+      having: {
+        [Op.and]: [
+          where(fn('COUNT', col('trigger_id')), 1),
+          where(fn('MAX', col('outcome')), observationKey(id, exit).outcome),
+          where(fn('MAX', col('finished_at')), observationKey(id, exit).time),
+        ],
+      },
+      transaction,
+      raw: true,
+    });
     return Boolean(match);
   }
 
@@ -782,9 +844,18 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
   ) {
     if (observation)
       await this.saveExitObservation(id, observation, transaction);
-    await this.database.query(
-      'UPDATE CronTriggers SET exit_pending=1 WHERE id=$id AND exit_pending IS NOT 1',
-      { bind: { id }, transaction },
+    await executionModel(this.database, 'CronTriggers').update(
+      { exit_pending: 1 },
+      {
+        where: {
+          id,
+          [Op.or]: [{ exit_pending: { [Op.ne]: 1 } }, { exit_pending: null }],
+        },
+        transaction,
+        silent: true,
+        hooks: false,
+        validate: false,
+      },
     );
     // A signalled stop remains running until all of its descendants are gone.
     await this.database.query(
@@ -850,18 +921,15 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
     if (!files.length) return;
     // Only probe existing executions. Keep live markers in place so another
     // instrumented command in the same execution cannot replace the first sample.
-    const rows = await this.database.query<{
-      id: string;
-      counted: number;
-      script_started_at: number | null;
-    }>(
-      `SELECT id,counted,script_started_at FROM CronTriggers WHERE id IN (SELECT value FROM json_each($ids))
-       AND started_at IS NOT NULL AND (script_started_at IS NULL OR counted=1)`,
-      {
-        bind: { ids: JSON.stringify(files.map(({ id }) => id)) },
-        type: QueryTypes.SELECT,
+    const rows = await executionModel(this.database, 'CronTriggers').findAll({
+      attributes: ['id', 'counted', 'script_started_at'],
+      where: {
+        id: { [Op.in]: files.map(({ id }) => id) },
+        started_at: { [Op.not]: null },
+        [Op.or]: [{ script_started_at: null }, { counted: 1 }],
       },
-    );
+      raw: true,
+    });
     for (const row of rows) {
       const sample = await this.readScriptSample(row.id);
       if (!sample) continue;
@@ -885,14 +953,14 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
     // exit file was already deleted. An unregistered entry may still be live.
     const exits = new Set(await publishedExits());
     for (const { id, file } of await publishedScriptStarts()) {
-      const [row] = await this.database.query<{
-        counted: number;
-        script_started_at: number | null;
-      }>('SELECT counted,script_started_at FROM CronTriggers WHERE id=$id', {
-        bind: { id },
-        transaction,
-        type: QueryTypes.SELECT,
-      });
+      const [row] = await executionModel(this.database, 'CronTriggers').findAll(
+        {
+          attributes: ['counted', 'script_started_at'],
+          where: { id },
+          transaction,
+          raw: true,
+        },
+      );
       // After pruning the trigger, a matching supervisor exit still identifies
       // this panel's retired run. A start file alone cannot establish that.
       if (row ? row.counted && row.script_started_at !== null : exits.has(id)) {
@@ -1018,10 +1086,15 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
   }
 
   async hasBoundConflict(id: string, transaction: Transaction) {
-    const [conflict] = await this.database.query(
-      'SELECT 1 FROM CronBoundExitConflicts WHERE trigger_id=$id',
-      { bind: { id }, transaction, type: QueryTypes.SELECT },
-    );
+    const [conflict] = await executionModel(
+      this.database,
+      'CronBoundExitConflicts',
+    ).findAll({
+      attributes: ['trigger_id'],
+      where: { trigger_id: id },
+      transaction,
+      raw: true,
+    });
     return Boolean(conflict);
   }
 
@@ -1037,19 +1110,25 @@ export class TriggerSettlement implements TriggerLifecycleEvidence {
   ) {
     return this.database.transaction(async (transaction) => {
       if (await this.hasBoundConflict(id, transaction)) return;
-      const [row] = await this.database.query<{
-        owner: string | null;
-        state: TriggerState;
-      }>(
-        'SELECT owner,state FROM CronTriggers WHERE id=$id AND cron_id=$cronId',
-        { transaction, type: QueryTypes.SELECT, bind: { id, cronId } },
+      const [row] = await executionModel(this.database, 'CronTriggers').findAll(
+        {
+          attributes: ['owner', 'state'],
+          where: { id, cron_id: cronId },
+          transaction,
+          raw: true,
+        },
       );
       if (!row) {
         if (finishedAt && finishedAt <= now) {
-          const [pruned] = await this.database.query(
-            'SELECT 1 FROM CronHistoryRetention WHERE id=1 AND cutoff>$end',
-            { transaction, type: QueryTypes.SELECT, bind: { end: finishedAt } },
-          );
+          const [pruned] = await executionModel(
+            this.database,
+            'CronHistoryRetention',
+          ).findAll({
+            attributes: ['id'],
+            where: { id: 1, cutoff: { [Op.gt]: finishedAt } },
+            transaction,
+            raw: true,
+          });
           if (pruned) return;
         }
         throw new Error('Unknown trigger');

@@ -57,7 +57,10 @@ test('cleanup previews first, protects running instances, and uses explicit opti
   const RunningInstanceModel = {};
   const CrontabStatModel = {};
   const InstanceStatus = { running: 0 };
-  const sequelize = {};
+  const sequelize = {
+    isDefined: () => true,
+    model: () => ({ findAll: async () => [] }),
+  };
   const stubModule = (modulePath, exports) => {
     require.cache[require.resolve(modulePath)] = {
       id: require.resolve(modulePath),

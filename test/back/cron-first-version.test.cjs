@@ -35,6 +35,7 @@ async function fixture(t, usePanelDatabase = false) {
   });
   const models = load('back/data/cron.ts', { '.': { sequelize: db } });
   load('back/data/runningInstance.ts', { '.': { sequelize: db } });
+  load('back/data/system.ts', { '.': { sequelize: db } });
   const stats = load('back/data/cronStats.ts', { '.': { sequelize: db } });
   await db.sync();
   await db.transaction(async (transaction) => {
@@ -316,6 +317,10 @@ test('a wake burst settles every rejected slot without opening receipt transacti
     '../../config': {},
     '../../config/grpcCerts': {},
     '../../protos/api': {},
+    // Isolate rejection bookkeeping from durable budget admission transactions.
+    './globalCronBudget': {
+      globalCronBudget: () => ({ run: (_id, fn) => fn() }),
+    },
   }).default;
   limit.cronLimit.pause();
   limit._client = { systemNotify() {} };
@@ -6926,8 +6931,8 @@ for (const rollback of [false, true]) {
       const result = await query(sql, ...args);
       if (
         !injected &&
-        String(sql).includes(
-          'DELETE FROM CronLegacyExitBookings WHERE trigger_id=$id',
+        /^DELETE FROM CronLegacyExitBookings WHERE/.test(
+          String(sql).replace(/[`"]/g, ''),
         )
       ) {
         injected = true;
@@ -7502,7 +7507,9 @@ test('replacing the selected witness before duplicate cleanup preserves the othe
     const result = await query(sql, ...args);
     if (
       !replaced &&
-      String(sql).includes('INSERT OR IGNORE INTO CronBoundExitConflicts')
+      String(sql)
+        .replace(/[`"]/g, '')
+        .includes('INSERT OR IGNORE INTO CronBoundExitConflicts')
     ) {
       replaced = true;
       await fs.writeFile(
@@ -10095,7 +10102,7 @@ test('system crond reconciles confirmed minutes separately, preserving duplicate
   assert.equal(last.n, 2);
 });
 
-test('queue admission captures only occupants in the same execution pool and freezes the wait on dispatch', async (t) => {
+test('queue admission captures shared budget holders and freezes the wait on dispatch', async (t) => {
   const { db, history, models } = await fixture(t);
   const limit = load('back/cron/execution/cronLimit.ts', {
     '../../data/system': {
@@ -10109,6 +10116,12 @@ test('queue admission captures only occupants in the same execution pool and fre
     '../../protos/api': {},
   }).default;
   await limit.setCustomLimit(2);
+  await db.query(
+    "INSERT INTO Auths(type,info,createdAt,updatedAt) VALUES('systemConfig','{\"cronConcurrency\":2}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+  );
+  await models.CrontabModel.create({ id: 1, command: 'true' });
+  for (const id of ['A', 'B', 'scheduled-A'])
+    await history.enqueue(id, 1, 'manual', null, Date.now());
   const holders = [];
   const hold = (id, scheduled = false) => {
     const job = () => new Promise((resolve) => holders.push({ id, resolve }));
@@ -10130,7 +10143,6 @@ test('queue admission captures only occupants in the same execution pool and fre
     holders.forEach((x) => x.resolve());
     await Promise.all(work);
   });
-  await models.CrontabModel.create({ id: 1, command: 'true' });
   const queued = Date.now();
   await history.enqueue('short', 1, 'manual', null, queued);
   const short = limit.manualRunWithCronLimit(
@@ -10145,22 +10157,25 @@ test('queue admission captures only occupants in the same execution pool and fre
   const { oldestQueued } = require('../../back/cron/queries/queueDiagnostics');
   let row;
   for (let i = 0; i < 100; i++) {
-    [row] = await oldestQueued(db);
+    row = (await oldestQueued(db)).find((entry) => entry.id === 'short');
     if (row?.queue_context) break;
     await new Promise((r) => setTimeout(r, 10));
   }
   const context = JSON.parse(row.queue_context);
   assert.deepEqual(context, {
-    queue: 'manual',
+    queue: 'global',
     limit: 2,
     occupied: 2,
     holders: [
-      { id: 'A', name: 'A' },
-      { id: 'B', name: 'B' },
+      { id: 'A', name: 'true' },
+      { id: 'B', name: 'true' },
     ],
   });
   holders.find((x) => x.id === 'A').resolve();
+  holders.find((x) => x.id === 'B').resolve();
   await short;
+  holders.forEach((holder) => holder.resolve());
+  await Promise.all(work);
   const [done] = await history.recent(1, 0);
   assert.equal(done.state, 'finished');
   assert.equal(done.queue_context, row.queue_context);
@@ -10182,6 +10197,11 @@ test('changing the limit resamples remaining holders and ends waiting at dequeue
     '../../protos/api': {},
   }).default;
   await limit.setCustomLimit(3);
+  await db.query(
+    "INSERT INTO Auths(type,info,createdAt,updatedAt) VALUES('systemConfig','{\"cronConcurrency\":3}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+  );
+  for (const id of ['A', 'B', 'C'])
+    await history.enqueue(id, 1, 'manual', null, Date.now());
   await models.CrontabModel.create({ id: 1, command: 'true' });
   const gates = new Map(),
     work = [];
@@ -10222,6 +10242,9 @@ test('changing the limit resamples remaining holders and ends waiting at dequeue
   }
   await sample((r) => JSON.parse(r.queue_context)?.occupied === 3);
   await limit.setCustomLimit(1);
+  await db.query(
+    "UPDATE Auths SET info='{\"cronConcurrency\":1}' WHERE type='systemConfig'",
+  );
   gates.get('B')();
   const cut = await sample((r) => {
     const v = JSON.parse(r.queue_live_context);
@@ -10234,6 +10257,9 @@ test('changing the limit resamples remaining holders and ends waiting at dequeue
   gates.get('A')();
   await sample((r) => JSON.parse(r.queue_live_context)?.occupied === 1);
   await limit.setCustomLimit(2);
+  await db.query(
+    "UPDATE Auths SET info='{\"cronConcurrency\":2}' WHERE type='systemConfig'",
+  );
   const preparing = await sample((r) => r.dequeued_at != null);
   assert.equal(preparing.state, 'queued');
   assert.equal(preparing.started_at, null);

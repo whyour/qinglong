@@ -58,6 +58,7 @@ test('startup closes interrupted instances without inventing exit codes or rewri
     getAuthInfo: async () => ({}),
     initializeSystemApp: async () => {},
     refreshApps: async () => {},
+    recoverQueuedTasks: async () => {},
   };
   const initData = load('back/loaders/initData.ts', {
     typedi: { Container: { get: () => service } },

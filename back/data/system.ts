@@ -1,5 +1,6 @@
+import { defineSystemModel } from './executionModelDefinitions';
 import { sequelize } from '.';
-import { DataTypes, Model, ModelDefined } from 'sequelize';
+import { Model } from 'sequelize';
 import { NotificationInfo } from './notify';
 
 export class SystemInfo {
@@ -109,11 +110,4 @@ export type SystemModelInfo = SystemConfigInfo &
 export interface SystemInstance
   extends Model<SystemInfo, SystemInfo>,
     SystemInfo {}
-export const SystemModel = sequelize.define<SystemInstance>('Auth', {
-  ip: DataTypes.STRING,
-  type: DataTypes.STRING,
-  info: {
-    type: DataTypes.JSON,
-    allowNull: true,
-  },
-});
+export const SystemModel = defineSystemModel(sequelize);

@@ -1,3 +1,4 @@
+import { executionModel } from '../../data/executionModels';
 import { AnomalyPage } from '../queries/scheduleAnomalies';
 import { QueryTypes, Sequelize, Transaction } from 'sequelize';
 import { AddCronRequest, DeleteCronRequest } from '../../protos/cron';
@@ -61,14 +62,14 @@ export async function saveSchedulePlan(
       token: token ?? null,
     };
     if (token)
-      await db.query(
-        'INSERT INTO CronPlanSwitches(token,staged_at) VALUES($token,$now)',
-        { transaction, bind: { token, now } },
+      await executionModel(db, 'CronPlanSwitches').create(
+        { token, staged_at: now },
+        { transaction, silent: true, hooks: false, validate: false },
       );
     if (replace)
-      await db.query(
-        'INSERT OR IGNORE INTO CronPlanCoverage(id,since) VALUES(1,$now)',
-        { transaction, bind: { now } },
+      await executionModel(db, 'CronPlanCoverage').bulkCreate(
+        [{ id: 1, since: now }],
+        { transaction, ignoreDuplicates: true, hooks: false },
       );
     const desired = `WITH desired AS (SELECT json_extract(value,'$.task') AS task, json_extract(value,'$.index') AS idx,
       json_extract(value,'$.schedule') AS schedule FROM json_each($rules))`;
@@ -105,10 +106,15 @@ export async function confirmSchedulePlan(
   replace: boolean,
 ) {
   await db.transaction(async (transaction) => {
-    await db.query(
-      `UPDATE CronPlanSwitches SET first_at=$first,last_at=$last
-      WHERE token=$token AND last_at IS NULL`,
-      { transaction, bind: { token, first, last } },
+    await executionModel(db, 'CronPlanSwitches').update(
+      { first_at: first, last_at: last },
+      {
+        where: { token, last_at: null },
+        transaction,
+        silent: true,
+        hooks: false,
+        validate: false,
+      },
     );
     if (replace) {
       // After a crash the former worker's switch time is unknowable. A complete

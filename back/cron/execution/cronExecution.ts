@@ -1,20 +1,36 @@
-import type { Logger } from 'winston';
 import { randomUUID } from 'crypto';
+import dayjs from 'dayjs';
+import fs from 'fs/promises';
+import path from 'path';
 import {
-  Op,
-  where,
-  col as colFn,
   FindOptions,
-  QueryTypes,
+  Op,
   Transaction,
+  col,
+  col as colFn,
+  where,
 } from 'sequelize';
+import type { Logger } from 'winston';
 import config from '../../config/index';
+import { getUniqPath, killTask } from '../../config/util';
 import { Crontab, CrontabModel, CrontabStatus } from '../../data/cron';
 import {
-  RunningInstanceModel,
+  executionAssociation,
+  executionModel,
+} from '../../data/executionModels';
+import {
   InstanceStatus,
+  RunningInstanceModel,
 } from '../../data/runningInstance';
+import { asError, observeChildProcess } from '../../shared/childProcess';
+import { resolveFileAccess } from '../../shared/fileAccess';
+import { t } from '../../shared/i18n';
+import { resolveLogPath } from '../../shared/logPath';
+import { logStreamManager } from '../../shared/logStreamManager';
 import { TriggerHistory, TriggerState } from '../history';
+import { shellValue } from '../scheduling/cronScheduling';
+import { releaseCronCommand, spawnCronCommand } from './cronCommandProcess';
+import taskLimit from './cronLimit';
 import {
   finishStoppedTree,
   hasLiveCronProcess,
@@ -22,18 +38,6 @@ import {
   systemOwner,
   verifyCronProcess,
 } from './cronProcess';
-import { killTask, getUniqPath } from '../../config/util';
-import { resolveLogPath } from '../../shared/logPath';
-import { resolveFileAccess } from '../../shared/fileAccess';
-import { shellValue } from '../scheduling/cronScheduling';
-import taskLimit from './cronLimit';
-import { logStreamManager } from '../../shared/logStreamManager';
-import { spawnCronCommand, releaseCronCommand } from './cronCommandProcess';
-import { observeChildProcess, asError } from '../../shared/childProcess';
-import { t } from '../../shared/i18n';
-import fs from 'fs/promises';
-import path from 'path';
-import dayjs from 'dayjs';
 
 type BatchStopSnapshot = {
   docs: Array<
@@ -120,6 +124,17 @@ export class CronExecution {
           });
         } else {
           accepted.push(row.get({ plain: true }));
+          await database.query(
+            'INSERT INTO CronManualSubmissions(trigger_id,token,snapshot) VALUES ($id,$token,$snapshot)',
+            {
+              transaction,
+              bind: {
+                id: trigger,
+                token,
+                snapshot: JSON.stringify(row.get({ plain: true })),
+              },
+            },
+          );
           triggers.push({
             taskId: id,
             triggerId: trigger,
@@ -144,6 +159,40 @@ export class CronExecution {
         .catch((err) => this.logger.error(String(err)));
     }
     return submission.triggers;
+  }
+
+  public async recoverQueued() {
+    const rows = await executionModel(
+      CrontabModel.sequelize!,
+      'CronManualSubmissions',
+    ).findAll({
+      attributes: ['trigger_id', 'token', 'snapshot'],
+      include: [
+        {
+          association: executionAssociation(
+            CrontabModel.sequelize!,
+            'submissionTrigger',
+          ),
+          attributes: [],
+          required: true,
+          where: {
+            state: 'queued',
+            [Op.or]: [{ stop_requested: null }, { stop_requested: 0 }],
+          },
+        },
+      ],
+      order: [
+        [col('trigger.queued_at'), 'ASC'],
+        [col('trigger.id'), 'ASC'],
+      ],
+      raw: true,
+    });
+    for (const row of rows) {
+      const snapshot: Crontab = JSON.parse(row.snapshot);
+      void this.host
+        .runSingle(snapshot.id!, row.token, row.trigger_id, snapshot)
+        .catch((error) => this.logger.error(String(error)));
+    }
   }
 
   private readonly stoppingBatches = new Map<string, Promise<void>>();
@@ -171,14 +220,15 @@ export class CronExecution {
       { type: Transaction.TYPES.IMMEDIATE },
       async (transaction): Promise<BatchStopSnapshot | null> => {
         if (requestId) {
-          const [existing] = await database.query<{
-            cron_ids: string;
-            snapshot: string | null;
-            status_code: number;
-          }>(
-            'SELECT cron_ids,snapshot,status_code FROM CronStopBatches WHERE request_id=$requestId',
-            { transaction, bind: { requestId }, type: QueryTypes.SELECT },
-          );
+          const [existing] = await executionModel(
+            database,
+            'CronStopBatches',
+          ).findAll({
+            attributes: ['cron_ids', 'snapshot', 'status_code'],
+            where: { request_id: requestId },
+            transaction,
+            raw: true,
+          });
           if (existing) {
             if (existing.cron_ids !== cronIds)
               throw Object.assign(
@@ -254,12 +304,13 @@ export class CronExecution {
           identityConflict,
         };
         if (requestId) {
-          await database.query(
-            'INSERT INTO CronStopBatches(request_id,cron_ids,snapshot) VALUES ($requestId,$cronIds,$snapshot)',
+          await executionModel(database, 'CronStopBatches').create(
             {
-              transaction,
-              bind: { requestId, cronIds, snapshot: JSON.stringify(batch) },
+              request_id: requestId,
+              cron_ids: cronIds,
+              snapshot: JSON.stringify(batch),
             },
+            { transaction, silent: true, hooks: false, validate: false },
           );
         }
         return batch;
@@ -328,9 +379,14 @@ export class CronExecution {
     if (failure) throw failure;
     // Retain the key after success. Even a much later retry must never take a new snapshot.
     if (requestId)
-      await database.query(
-        'UPDATE CronStopBatches SET snapshot=NULL,status_code=$status WHERE request_id=$requestId AND snapshot IS NOT NULL',
-        { bind: { requestId, status: identityConflict ? 409 : 200 } },
+      await executionModel(database, 'CronStopBatches').update(
+        { snapshot: null, status_code: identityConflict ? 409 : 200 },
+        {
+          where: { request_id: requestId, snapshot: { [Op.not]: null } },
+          silent: true,
+          hooks: false,
+          validate: false,
+        },
       );
     if (identityConflict)
       throw Object.assign(new Error(t('实例不存在或已停止')), { status: 409 });
@@ -378,16 +434,16 @@ export class CronExecution {
         });
     }
     for (const command of commands) {
-      const pid = Number(command.command_identity.split(':')[1]);
+      const pid = Number(command.command_identity!.split(':')[1]);
       const key = command.cron_id + '/' + pid;
       if (!registered.has(key))
         legacy.set(key, {
           pid,
           cronId: command.cron_id,
           trigger: command.id,
-          identity: command.command_identity,
-          started: Math.floor(command.started_at / 1000),
-          log: command.log_path,
+          identity: command.command_identity!,
+          started: Math.floor(command.started_at! / 1000),
+          log: command.log_path ?? undefined,
         });
     }
     let identityConflict = false;
@@ -424,11 +480,14 @@ export class CronExecution {
         { transaction },
       );
       if (target.trigger)
-        await CrontabModel.sequelize!.query(
-          "UPDATE CronTriggers SET instance_id=$id,process_identity=$identity WHERE id=$trigger AND state='running'",
+        await executionModel(CrontabModel.sequelize!, 'CronTriggers').update(
+          { instance_id: row.id, process_identity: identity },
           {
+            where: { id: target.trigger, state: 'running' },
             transaction,
-            bind: { id: row.id, identity, trigger: target.trigger },
+            silent: true,
+            hooks: false,
+            validate: false,
           },
         );
       await history.queueInstanceStop(
@@ -506,9 +565,8 @@ export class CronExecution {
       where: { id: instanceId, cron_id: cronId },
     });
     if (!instance) {
-      await CrontabModel.sequelize!.query(
-        'DELETE FROM CronStopRequests WHERE instance_id=$instanceId AND cron_id=$cronId',
-        { bind: { instanceId, cronId } },
+      await executionModel(CrontabModel.sequelize!, 'CronStopRequests').destroy(
+        { where: { instance_id: instanceId, cron_id: cronId }, hooks: false },
       );
       return { code: 404, message: t('实例不存在或已停止') };
     }
@@ -736,9 +794,10 @@ export class CronExecution {
                 )
               : await getUniqPath(command, `${id}`);
             const logTime = dayjs().format('YYYY-MM-DD-HH-mm-ss-SSS');
-            logPath = `${uniqPath}/${logTime}${
-              independent ? '-' + expectedToken : ''
-            }.log`;
+            // Different tasks can share a script/log directory and start in
+            // the same millisecond. Every launch needs its own log identity.
+            // The submission token can also be shared by different tasks.
+            logPath = `${uniqPath}/${logTime}-${randomUUID()}.log`;
             absolutePath = resolveFileAccess(config.logPath, [logPath]);
             if (!absolutePath)
               throw new Error('Log path is outside the log directory');

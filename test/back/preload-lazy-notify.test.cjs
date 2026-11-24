@@ -384,3 +384,100 @@ test('the panel client defers gRPC until an API call, uses panel dependencies an
       .catch(error => { console.error(error); process.exitCode = 1; });
   `);
 });
+
+for (const language of ['python', 'javascript']) {
+  for (const fallback of [false, true]) {
+    test(`${language} hook environment preserves NUL-framed values and legacy export fallback (${fallback})`, (t) => {
+      const f = fixture(t, language);
+      if (fallback) {
+        const bin = path.join(f.root, 'bin');
+        fs.mkdirSync(bin);
+        fs.writeFileSync(path.join(bin, 'env'), '#!/bin/sh\nexit 64\n', {
+          mode: 0o755,
+        });
+        f.env.PATH = bin + path.delimiter + process.env.PATH;
+      }
+      f.env.task_before =
+        "export MULTILINE=$'首行\\nnext=值\\n'; export EMPTY=''; export EQ='a=b=c'";
+      const output = f.run(
+        language === 'python'
+          ? "import os\nassert os.environ['MULTILINE']=='首行\\nnext=值\\n'\nassert os.environ['EMPTY']==''\nassert os.environ['EQ']=='a=b=c'\nprint('VALUES_OK')\n"
+          : "const assert=require('node:assert/strict');assert.equal(process.env.MULTILINE,'首行\\nnext=值\\n');assert.equal(process.env.EMPTY,'');assert.equal(process.env.EQ,'a=b=c');console.log('VALUES_OK');",
+      );
+      assert.match(output, /VALUES_OK/);
+      assert.doesNotMatch(output, /parse environment|run task before error/);
+    });
+  }
+}
+
+for (const legacy of [false, true]) {
+  for (const extension of ['js', 'mjs']) {
+    test(`${extension} global imports preserve conditional exports and CommonJS isolation (${
+      legacy ? 'legacy' : 'synchronous'
+    } loader)`, (t) => {
+      if (
+        !legacy &&
+        typeof require('node:module').registerHooks !== 'function'
+      ) {
+        t.skip('Synchronous module hooks unavailable');
+        return;
+      }
+      const f = fixture(t, 'javascript');
+      f.write(
+        'loader-mode.cjs',
+        legacy
+          ? 'require("node:module").registerHooks = undefined;'
+          : 'require("node:module").register = () => { throw Error("unexpected loader worker"); };',
+      );
+      f.env.NODE_OPTIONS = `--require=${path.join(f.root, 'loader-mode.cjs')}`;
+      f.env.QL_NODE_GLOBAL_PATH = path.join(f.root, 'global/node_modules');
+      for (const [base, value] of [
+        [f.env.QL_NODE_GLOBAL_PATH, 'global'],
+        [path.join(f.root, 'node_modules'), 'local'],
+      ]) {
+        const dir = path.join(base, '@ql-fixture/conditional');
+        fs.mkdirSync(path.join(dir, 'sub'), { recursive: true });
+        fs.writeFileSync(
+          path.join(dir, 'package.json'),
+          JSON.stringify({
+            name: '@ql-fixture/conditional',
+            exports: {
+              '.': { import: './import.mjs', require: './require.cjs' },
+              './sub': './import.mjs',
+            },
+          }),
+        );
+        fs.writeFileSync(
+          path.join(dir, 'import.mjs'),
+          `export default '${value}-import';`,
+        );
+        fs.writeFileSync(
+          path.join(dir, 'require.cjs'),
+          `module.exports = '${value}-require';`,
+        );
+      }
+      f.write('relative.mjs', 'export default "relative";');
+      const common = `
+        const assert = require('node:assert/strict');
+        assert.equal(require('@ql-fixture/conditional'), 'global-require');
+        delete require.cache[require.resolve('@ql-fixture/conditional')];
+        const panel = require.cache[require.resolve('./client.js')];
+        panel.loadingPanelDependencies = true;
+        assert.ok(require.resolve('@ql-fixture/conditional').includes('/node_modules/@ql-fixture/conditional/'));
+        assert.equal(require('@ql-fixture/conditional'), 'local-require');
+        panel.loadingPanelDependencies = false;
+        assert.equal((await import('@ql-fixture/conditional')).default, 'global-import');
+        assert.equal((await import('@ql-fixture/conditional/sub')).default, 'global-import');
+        assert.equal((await import('./relative.mjs')).default, 'relative');
+        assert.equal((await import('node:fs')).readFileSync, require('node:fs').readFileSync);
+        await assert.rejects(import('ql-fixture-does-not-exist'), {code: 'ERR_MODULE_NOT_FOUND'});
+        console.log('IMPORTS_OK');
+      `;
+      const body =
+        extension === 'mjs'
+          ? `import value from '@ql-fixture/conditional'; import {createRequire} from 'node:module'; const require = createRequire(import.meta.url); if(value !== 'global-import') throw Error(value); ${common}`
+          : `(async () => { ${common} })().catch(e => { console.error(e); process.exitCode = 1; });`;
+      assert.match(f.run(body, extension), /IMPORTS_OK/);
+    });
+  }
+}

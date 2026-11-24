@@ -1,11 +1,15 @@
-import { QueryTypes, Sequelize, Transaction } from 'sequelize';
+import { Op, QueryTypes, Sequelize, Transaction, col, fn } from 'sequelize';
 import type { Crontab } from '../../data/cron';
+import {
+  executionAssociation,
+  executionModel,
+} from '../../data/executionModels';
+import type { readExit } from '../settlement/exitReceipt.cjs';
 import type {
   TriggerSource,
   TriggerState,
   VerifiedSupervisorExit,
 } from '../types';
-import type { readExit } from '../settlement/exitReceipt.cjs';
 import {
   hasLiveCronProcess,
   pidNamespaceOwner,
@@ -38,6 +42,8 @@ export interface TriggerLifecycleEvidence {
   replayPublishedExits(transaction: Transaction): Promise<void>;
 }
 
+// Launch/command binding uses bound SQL to keep write transactions short.
+// Preserve the state predicates and caller transaction when changing a query.
 // Persisted transitions shared by manual, Node and system-crond executions.
 // In particular, recovery may reclaim an unstarted slot, never an unknown result.
 export class TriggerLifecycle {
@@ -48,11 +54,22 @@ export class TriggerLifecycle {
 
   // Only unclaimed scheduler work can expire; its owner controls claimed runs.
   async skipQueued(id: string, reason: string, finishedAt: number) {
-    await this.database.query(
-      `UPDATE CronTriggers SET state='skipped', reason=$reason, finished_at=$finishedAt
-       WHERE id=$id AND source IN ('node','recovery') AND state='queued' AND started_at IS NULL`,
-      { bind: { id, reason, finishedAt }, type: QueryTypes.BULKUPDATE },
-    );
+    await executionModel(this.database, 'CronTriggers')
+      .update(
+        { state: 'skipped', reason, finished_at: finishedAt },
+        {
+          where: {
+            id,
+            source: { [Op.in]: ['node', 'recovery'] },
+            state: 'queued',
+            started_at: null,
+          },
+          silent: true,
+          hooks: false,
+          validate: false,
+        },
+      )
+      .then(([changed]) => changed);
   }
 
   async enqueue(
@@ -69,7 +86,7 @@ export class TriggerLifecycle {
        VALUES ($id,$cronId,$source,$scheduledAt,$now,$now,$owner,'queued')
        ON CONFLICT(id) DO UPDATE SET state='queued', reason=NULL, finished_at=NULL,
          queued_at=excluded.queued_at, dequeued_at=NULL, queue_context=NULL, queue_live_context=NULL,
-         source=excluded.source, owner=excluded.owner
+         source=excluded.source, owner=excluded.owner, resume_pending=NULL
        WHERE excluded.source='recovery' AND state='skipped' AND reason='restart' AND started_at IS NULL`,
       {
         bind: {
@@ -102,16 +119,24 @@ export class TriggerLifecycle {
       )
         return false;
       await this.recoverSystemOwners(cronId, transaction);
-      const pending = await this.database.query(
-        `SELECT 1 FROM CronTriggers WHERE cron_id=$cronId AND id<>$id
-         AND source IN ('node','recovery','system')
-         AND (state='running' OR (state='queued' AND queued_at >= $revision)) LIMIT 1`,
-        {
-          transaction,
-          bind: { cronId, id, revision },
-          type: QueryTypes.SELECT,
+      const pending = await executionModel(
+        this.database,
+        'CronTriggers',
+      ).findAll({
+        attributes: ['id'],
+        where: {
+          cron_id: cronId,
+          id: { [Op.ne]: id },
+          source: { [Op.in]: ['node', 'recovery', 'system'] },
+          [Op.or]: [
+            { state: 'running' },
+            { state: 'queued', queued_at: { [Op.gte]: revision } },
+          ],
         },
-      );
+        limit: 1,
+        transaction,
+        raw: true,
+      });
       if (!pending.length) return true;
       await this.finish(id, 'skipped', 'pending', null, transaction);
       return false;
@@ -137,10 +162,14 @@ export class TriggerLifecycle {
       );
     let changed = await claim();
     if (!changed && !multiple && !transaction) {
-      const [task] = await this.database.query<{ cron_id: number }>(
-        "SELECT cron_id FROM CronTriggers WHERE id=$id AND state='queued'",
-        { bind: { id }, type: QueryTypes.SELECT },
-      );
+      const [task] = await executionModel(
+        this.database,
+        'CronTriggers',
+      ).findAll({
+        attributes: ['cron_id'],
+        where: { id, state: 'queued' },
+        raw: true,
+      });
       if (task && (await this.recoverSystemOwners(task.cron_id)))
         changed = await claim();
     }
@@ -258,18 +287,63 @@ export class TriggerLifecycle {
   }
 
   async cancelQueuedInTransaction(ids: number[], transaction: Transaction) {
-    await this.database.query(
-      "UPDATE CronTriggers SET stop_requested=1 WHERE cron_id IN (:ids) AND state='running' AND command_identity IS NULL AND instance_id IS NULL",
-      { replacements: { ids }, transaction },
+    await executionModel(this.database, 'CronTriggers').update(
+      { stop_requested: 1 },
+      {
+        where: {
+          cron_id: { [Op.in]: ids },
+          state: 'running',
+          command_identity: null,
+          instance_id: null,
+        },
+        transaction,
+        silent: true,
+        hooks: false,
+        validate: false,
+      },
     );
-    const rows = await this.database.query<{ id: string }>(
-      "SELECT id FROM CronTriggers WHERE cron_id IN (:ids) AND state='queued'",
-      { replacements: { ids }, transaction, type: QueryTypes.SELECT },
-    );
-    await this.database.query(
-      `UPDATE CronTriggers SET state='stopped',reason='cancelled',finished_at=:now
-      WHERE cron_id IN (:ids) AND state='queued'`,
-      { replacements: { ids, now: Date.now() }, transaction },
+    const rows = await executionModel(this.database, 'CronTriggers').findAll({
+      attributes: ['id'],
+      where: {
+        cron_id: { [Op.in]: ids },
+        [Op.or]: [
+          { state: 'queued' },
+          {
+            state: 'skipped',
+            reason: 'restart',
+            resume_pending: 1,
+            started_at: null,
+          },
+        ],
+      },
+      transaction,
+      raw: true,
+    });
+    await executionModel(this.database, 'CronTriggers').update(
+      {
+        state: 'stopped',
+        reason: 'cancelled',
+        finished_at: Date.now(),
+        resume_pending: null,
+      },
+      {
+        where: {
+          cron_id: { [Op.in]: ids },
+          [Op.or]: [
+            { state: 'queued' },
+            {
+              state: 'skipped',
+              reason: 'restart',
+              resume_pending: 1,
+              started_at: null,
+            },
+          ],
+        },
+        transaction,
+        silent: true,
+        hooks: false,
+        validate: false,
+      },
     );
     return rows.map((r) => r.id);
   }
@@ -300,36 +374,38 @@ export class TriggerLifecycle {
   }
 
   async pendingStop(instanceId: number, transaction?: Transaction) {
-    const [row] = await this.database.query<{
-      targets: string | null;
-      signalled: number;
-      signalled_at: number | null;
-      root_identity: string | null;
-      namespace_owner: string | null;
-    }>(
-      'SELECT targets,signalled,signalled_at,root_identity,namespace_owner FROM CronStopRequests WHERE instance_id=$instanceId',
-      { transaction, bind: { instanceId }, type: QueryTypes.SELECT },
-    );
+    const [row] = await executionModel(
+      this.database,
+      'CronStopRequests',
+    ).findAll({
+      attributes: [
+        'targets',
+        'signalled',
+        'signalled_at',
+        'root_identity',
+        'namespace_owner',
+      ],
+      where: { instance_id: instanceId },
+      transaction,
+      raw: true,
+    });
     return row;
   }
 
   async pendingStopBatches() {
-    return this.database.query<{ request_id: string; cron_ids: string }>(
-      'SELECT request_id,cron_ids FROM CronStopBatches WHERE snapshot IS NOT NULL',
-      { type: QueryTypes.SELECT },
-    );
+    return executionModel(this.database, 'CronStopBatches').findAll({
+      attributes: ['request_id', 'cron_ids'],
+      where: { snapshot: { [Op.not]: null } },
+      raw: true,
+    });
   }
 
   async pendingStops() {
-    return this.database.query<{
-      instance_id: number;
-      cron_id: number;
-      pid: number;
-      targets: string | null;
-    }>(
-      'SELECT instance_id,cron_id,pid,targets FROM CronStopRequests ORDER BY instance_id',
-      { type: QueryTypes.SELECT },
-    );
+    return executionModel(this.database, 'CronStopRequests').findAll({
+      attributes: ['instance_id', 'cron_id', 'pid', 'targets'],
+      order: [['instance_id', 'ASC']],
+      raw: true,
+    });
   }
 
   async forgetStop(
@@ -337,10 +413,11 @@ export class TriggerLifecycle {
     onEnded?: (tx: Transaction) => Promise<void>,
   ) {
     return this.database.transaction(async (transaction) => {
-      await this.database.query(
-        'DELETE FROM CronStopRequests WHERE instance_id=$instanceId AND signalled=0',
-        { transaction, bind: { instanceId } },
-      );
+      await executionModel(this.database, 'CronStopRequests').destroy({
+        where: { instance_id: instanceId, signalled: 0 },
+        transaction,
+        hooks: false,
+      });
       const claimed = await this.pendingStop(instanceId, transaction);
       if (!claimed && onEnded) await onEnded(transaction);
       return claimed;
@@ -357,10 +434,14 @@ export class TriggerLifecycle {
 
   // The outer command can outlive any of its task wrappers.
   async recordCommandStart(id: string, at: number) {
-    await this.database.query(
-      `UPDATE CronTriggers SET command_started_at=$at
-      WHERE id=$id AND command_started_at IS NULL AND started_at IS NOT NULL`,
-      { bind: { id, at } },
+    await executionModel(this.database, 'CronTriggers').update(
+      { command_started_at: at },
+      {
+        where: { id, command_started_at: null, started_at: { [Op.not]: null } },
+        silent: true,
+        hooks: false,
+        validate: false,
+      },
     );
   }
 
@@ -383,6 +464,10 @@ export class TriggerLifecycle {
         { transaction, bind: { id }, type: QueryTypes.SELECT },
       );
       if (!row) return false;
+      await this.database.query(
+        'UPDATE CronConcurrencyLeases SET command_identity=$identity WHERE trigger_id=$id',
+        { transaction, bind: { identity, id } },
+      );
       await this.database.query(
         'UPDATE CronTriggers SET command_identity=$identity WHERE id=$id',
         { transaction, bind: { identity, id } },
@@ -448,25 +533,31 @@ export class TriggerLifecycle {
 
   async activeCommands(ids: number[], transaction?: Transaction) {
     if (!ids.length) return [];
-    return this.database.query<{
-      id: string;
-      cron_id: number;
-      command_identity: string;
-      started_at: number;
-      log_path: string;
-    }>(
-      "SELECT id,cron_id,command_identity,started_at,log_path FROM CronTriggers WHERE cron_id IN (:ids) AND state='running' AND instance_id IS NULL AND command_identity IS NOT NULL",
-      { replacements: { ids }, transaction, type: QueryTypes.SELECT },
-    );
+    return executionModel(this.database, 'CronTriggers').findAll({
+      attributes: [
+        'id',
+        'cron_id',
+        'command_identity',
+        'started_at',
+        'log_path',
+      ],
+      where: {
+        cron_id: { [Op.in]: ids },
+        state: 'running',
+        instance_id: null,
+        command_identity: { [Op.not]: null },
+      },
+      transaction,
+      raw: true,
+    });
   }
 
   async instanceIdentity(instanceId: number) {
-    const [row] = await this.database.query<{
-      process_identity: string | null;
-    }>(
-      'SELECT process_identity FROM CronTriggers WHERE instance_id=$instanceId',
-      { bind: { instanceId }, type: QueryTypes.SELECT },
-    );
+    const [row] = await executionModel(this.database, 'CronTriggers').findAll({
+      attributes: ['process_identity'],
+      where: { instance_id: instanceId },
+      raw: true,
+    });
     return row?.process_identity;
   }
 
@@ -490,17 +581,37 @@ export class TriggerLifecycle {
     const result = await this.database.transaction(
       { type: Transaction.TYPES.IMMEDIATE },
       async (transaction) => {
-        const [row] = await this.database.query<{
+        const [row] = (await executionModel(
+          this.database,
+          'RunningInstances',
+        ).findAll({
+          attributes: [
+            [col('trigger.id'), 'id'],
+            'pid',
+            'status',
+            [col('trigger.state'), 'state'],
+            [col('trigger.stop_requested'), 'stop_requested'],
+          ],
+          where: { id: instanceId },
+          include: [
+            {
+              association: executionAssociation(
+                this.database,
+                'instanceTrigger',
+              ),
+              attributes: [],
+              required: false,
+            },
+          ],
+          transaction,
+          raw: true,
+        })) as unknown as Array<{
           id: string | null;
           pid: number;
           status: number;
-          state: TriggerState | null;
+          state: string | null;
           stop_requested: number | null;
-        }>(
-          `SELECT t.id,i.pid,i.status,t.state,t.stop_requested FROM RunningInstances i
-          LEFT JOIN CronTriggers t ON t.instance_id=i.id WHERE i.id=$instanceId`,
-          { transaction, bind: { instanceId }, type: QueryTypes.SELECT },
-        );
+        }>;
         if (
           !row ||
           row.status !== 0 ||
@@ -554,14 +665,26 @@ export class TriggerLifecycle {
           );
         }
         const signalledAt = Date.now();
-        await this.database.query(
-          'UPDATE CronStopRequests SET signalled=1,signalled_at=$signalledAt WHERE instance_id=$instanceId',
-          { transaction, bind: { instanceId, signalledAt } },
+        await executionModel(this.database, 'CronStopRequests').update(
+          { signalled: 1, signalled_at: signalledAt },
+          {
+            where: { instance_id: instanceId },
+            transaction,
+            silent: true,
+            hooks: false,
+            validate: false,
+          },
         );
         if (row.state)
-          await this.database.query(
-            "UPDATE CronTriggers SET stop_requested=1 WHERE instance_id=$instanceId AND state='running'",
-            { bind: { instanceId }, transaction },
+          await executionModel(this.database, 'CronTriggers').update(
+            { stop_requested: 1 },
+            {
+              where: { instance_id: instanceId, state: 'running' },
+              transaction,
+              silent: true,
+              hooks: false,
+              validate: false,
+            },
           );
         // Root delivery failure rolls back. After successful root delivery, retain
         // the stop marker even if some descendants still need recovery.
@@ -580,10 +703,12 @@ export class TriggerLifecycle {
   }
 
   async instanceStopRequested(instanceId: number, transaction?: Transaction) {
-    const [row] = await this.database.query<{ stop_requested: number | null }>(
-      'SELECT stop_requested FROM CronTriggers WHERE instance_id=$instanceId',
-      { transaction, bind: { instanceId }, type: QueryTypes.SELECT },
-    );
+    const [row] = await executionModel(this.database, 'CronTriggers').findAll({
+      attributes: ['stop_requested'],
+      where: { instance_id: instanceId },
+      transaction,
+      raw: true,
+    });
     return row && Boolean(row.stop_requested);
   }
 
@@ -592,23 +717,28 @@ export class TriggerLifecycle {
     settleLegacy?: (transaction: Transaction) => Promise<boolean>,
   ) {
     return this.database.transaction(async (transaction) => {
-      const [row] = await this.database.query<{
-        id: string;
-        owner: string | null;
-        command_identity: string | null;
-        reason: string | null;
-        state: TriggerState;
-        stop_exit_at: number | null;
-        exit_code: number | null;
-        exit_pending: number | null;
-      }>(
-        'SELECT id,owner,command_identity,reason,state,stop_exit_at,exit_code,exit_pending FROM CronTriggers WHERE instance_id=$instanceId',
-        { transaction, bind: { instanceId }, type: QueryTypes.SELECT },
+      const [row] = await executionModel(this.database, 'CronTriggers').findAll(
+        {
+          attributes: [
+            'id',
+            'owner',
+            'command_identity',
+            'reason',
+            'state',
+            'stop_exit_at',
+            'exit_code',
+            'exit_pending',
+          ],
+          where: { instance_id: instanceId },
+          transaction,
+          raw: true,
+        },
       );
-      await this.database.query(
-        'DELETE FROM CronStopRequests WHERE instance_id=$instanceId',
-        { transaction, bind: { instanceId } },
-      );
+      await executionModel(this.database, 'CronStopRequests').destroy({
+        where: { instance_id: instanceId },
+        transaction,
+        hooks: false,
+      });
       if (!row) return settleLegacy ? settleLegacy(transaction) : false;
       if (row.state !== 'running') return row.state === 'stopped';
       const legacyCrond =
@@ -645,13 +775,14 @@ export class TriggerLifecycle {
 
   async queueCounts() {
     await this.recoverSystemOwners();
-    const [row] = await this.database.query<{
-      triggers: number;
-      tasks: number;
-    }>(
-      "SELECT COUNT(*) AS triggers, COUNT(DISTINCT cron_id) AS tasks FROM CronTriggers WHERE state='queued' AND dequeued_at IS NULL",
-      { type: QueryTypes.SELECT },
-    );
+    const [row] = (await executionModel(this.database, 'CronTriggers').findAll({
+      attributes: [
+        [fn('COUNT', col('id')), 'triggers'],
+        [fn('COUNT', fn('DISTINCT', col('cron_id'))), 'tasks'],
+      ],
+      where: { state: 'queued', dequeued_at: null },
+      raw: true,
+    })) as unknown as Array<{ triggers: number; tasks: number }>;
     return row;
   }
 
@@ -664,20 +795,21 @@ export class TriggerLifecycle {
   ) {
     // crond only tells us when the wrapper starts. It supplies no scheduled or queued time.
     return this.database.transaction(async (transaction) => {
-      const [task] = await this.database.query<{
-        allow_multiple_instances: number;
-        status: number;
-        pid: number | null;
-        isDisabled: number;
-      }>(
-        'SELECT allow_multiple_instances, status, pid, isDisabled FROM Crontabs WHERE id=$cronId',
-        { bind: { cronId }, type: QueryTypes.SELECT, transaction },
-      );
+      const [task] = await executionModel(this.database, 'Crontabs').findAll({
+        attributes: ['allow_multiple_instances', 'status', 'pid', 'isDisabled'],
+        where: { id: cronId },
+        transaction,
+        raw: true,
+      });
       if (!task || (task.isDisabled && !wrapper?.dispatch)) return false;
       const now = Date.now();
       const inserted = await this.database.query(
         `INSERT INTO CronTriggers(id,cron_id,source,state,owner,command_identity,observed_at,system_rule,system_dispatch_at)
-         VALUES ($id,$cronId,'system','queued',$owner,$commandIdentity,$observed,$rule,$dispatch) ON CONFLICT(id) DO NOTHING`,
+         VALUES ($id,$cronId,'system','queued',$owner,$commandIdentity,$observed,$rule,$dispatch)
+         ON CONFLICT(id) DO UPDATE SET command_identity=excluded.command_identity,
+           system_rule=excluded.system_rule,system_dispatch_at=excluded.system_dispatch_at
+         WHERE state='queued' AND source='system' AND owner=$owner
+           AND EXISTS (SELECT 1 FROM CronConcurrencyLeases WHERE trigger_id=$id AND command_identity=$commandIdentity)`,
         {
           bind: {
             id,
@@ -699,12 +831,22 @@ export class TriggerLifecycle {
       }
       const multiple = task.allow_multiple_instances === 1;
       const claimed =
-        (multiple || !hasLiveCronProcess(task.status, task.pid)) &&
+        (multiple ||
+          !hasLiveCronProcess(
+            task.status ?? undefined,
+            task.pid ?? undefined,
+          )) &&
         (await this.start(id, now, multiple, transaction));
       if (claimed && wrapper)
-        await this.database.query(
-          'UPDATE CronTriggers SET command_started_at=$now WHERE id=$id',
-          { transaction, bind: { id, now } },
+        await executionModel(this.database, 'CronTriggers').update(
+          { command_started_at: now },
+          {
+            where: { id },
+            transaction,
+            silent: true,
+            hooks: false,
+            validate: false,
+          },
         );
       if (claimed && owner.startsWith('crond:')) {
         await this.registerCommandInstance(
@@ -729,8 +871,12 @@ export class TriggerLifecycle {
     instanceId?: number,
   ) {
     // HTTP may restart while crond children keep running. Match process birth, including across reboots.
-    const active = await this.database.query<{ id: string; owner: string }>(
-      `SELECT id,CASE WHEN owner LIKE 'crond:%' THEN owner ELSE COALESCE(command_identity,process_identity) END AS owner FROM CronTriggers WHERE state='running' AND (owner LIKE 'crond:%' OR reason='restart')
+    const active = await this.database.query<{
+      id: string;
+      owner: string;
+      state: string;
+    }>(
+      `SELECT id,state,CASE WHEN owner LIKE 'crond:%' THEN owner ELSE COALESCE(command_identity,process_identity) END AS owner FROM CronTriggers WHERE (state='running' OR (state='queued' AND source='system' AND owner LIKE 'crond:%')) AND (owner LIKE 'crond:%' OR reason='restart')
        AND NOT EXISTS (SELECT 1 FROM CronStopRequests s WHERE s.instance_id=CronTriggers.instance_id AND s.targets IS NOT NULL)
        AND ($cronId IS NULL OR cron_id=$cronId) AND ($instanceId IS NULL OR instance_id=$instanceId)`,
       {
@@ -749,6 +895,10 @@ export class TriggerLifecycle {
         if (code !== 'ENOENT' && code !== 'ESRCH') throw error;
       }
       const close = async (tx: Transaction) => {
+        if (row.state === 'queued') {
+          await this.finish(row.id, 'skipped', 'restart', null, tx);
+          return;
+        }
         const [current] = await this.database.query<{
           stop_requested: number;
           exit_code: number | null;
@@ -788,16 +938,42 @@ export class TriggerLifecycle {
           { transaction },
         );
       // No process was bound and its launch gate closed when the worker exited.
+      await executionModel(this.database, 'CronTriggers').update(
+        {
+          state: 'stopped',
+          reason: 'cancelled',
+          started_at: null,
+          finished_at: Date.now(),
+        },
+        {
+          where: {
+            owner,
+            state: 'running',
+            stop_requested: 1,
+            instance_id: null,
+            command_identity: null,
+          },
+          transaction,
+          silent: true,
+          hooks: false,
+          validate: false,
+        },
+      );
       await this.database.query(
-        `UPDATE CronTriggers SET state='stopped',reason='cancelled',started_at=NULL,finished_at=$now
-        WHERE owner=$owner AND state='running' AND stop_requested=1 AND instance_id IS NULL AND command_identity IS NULL`,
-        { transaction, bind: { owner, now: Date.now() } },
+        `UPDATE CronTriggers SET state='queued',started_at=NULL,reason=NULL
+         WHERE owner=$owner AND state='running' AND COALESCE(stop_requested,0)=0
+         AND command_identity IS NULL AND process_identity IS NULL AND instance_id IS NULL
+         AND (EXISTS (SELECT 1 FROM CronManualSubmissions WHERE trigger_id=CronTriggers.id)
+           OR EXISTS (SELECT 1 FROM CronConcurrencyLeases WHERE trigger_id=CronTriggers.id AND command_identity IS NULL))`,
+        { transaction, bind: { owner } },
       );
       await this.database.query(
         `UPDATE CronTriggers SET reason='restart',
+        resume_pending=CASE WHEN state='queued' AND source IN ('node','recovery') THEN 1 ELSE resume_pending END,
         state=CASE WHEN state='queued' THEN 'skipped' WHEN COALESCE(command_identity,process_identity) IS NOT NULL THEN 'running' ELSE 'unknown' END,
         finished_at=CASE WHEN state='running' AND COALESCE(command_identity,process_identity) IS NOT NULL THEN NULL ELSE $now END
-        WHERE (owner=$owner OR (source IN ('system','legacy','client') AND owner IS NULL AND $owner='http')) AND state IN ('queued','running')`,
+        WHERE (owner=$owner OR (source IN ('system','legacy','client') AND owner IS NULL AND $owner='http')) AND state IN ('queued','running')
+        AND NOT (state='queued' AND EXISTS (SELECT 1 FROM CronManualSubmissions WHERE trigger_id=CronTriggers.id))`,
         { transaction, bind: { owner, now: Date.now() } },
       );
       await this.recoverSystemOwners(undefined, transaction);

@@ -1,4 +1,6 @@
+import { executionModel } from '../data/executionModels';
 import config from '../config';
+import { dashboardSnapshot } from '../shared/dashboardSnapshot';
 import { stat } from 'fs/promises';
 import { resolveFileAccess } from '../shared/fileAccess';
 import { AnomalyPage, AnomalyKind } from '../cron/queries/scheduleAnomalies';
@@ -15,7 +17,7 @@ import { containerResources } from '../shared/containerResources';
 import { TriggerHistory } from '../cron/history';
 import { Router, Request, Response, NextFunction } from 'express';
 import { Container } from 'typedi';
-import { fn, col, where, Op, QueryTypes } from 'sequelize';
+import { fn, col, where, Op } from 'sequelize';
 import { CrontabModel } from '../data/cron';
 import { CrontabStatModel } from '../data/cronStats';
 import { RunningInstanceModel, InstanceStatus } from '../data/runningInstance';
@@ -96,26 +98,33 @@ export default (app: Router) => {
         const day = dayjs(serverNow).startOf('day');
         const today = day.format('YYYY-MM-DD');
 
-        const [total, enabled, disabled, stats, triggers] = await Promise.all([
-          CrontabModel.count(),
-          CrontabModel.count({ where: { isDisabled: 0 } }),
-          CrontabModel.count({ where: { isDisabled: 1 } }),
-          CrontabStatModel.findOne({
-            attributes: [
-              [fn('SUM', col('run_count')), 'total_runs'],
-              [fn('SUM', col('success_count')), 'total_success'],
-              [fn('SUM', col('fail_count')), 'total_fail'],
-              [fn('SUM', col('untimed_count')), 'untimed_count'],
-              [fn('SUM', col('total_time')), 'total_time'],
-            ],
-            where: { date: today },
-            raw: true,
+        const snapshot = await dashboardSnapshot(
+          CrontabStatModel.sequelize!,
+          today,
+          async () => ({
+            sampledAt: Date.now(),
+            values: await Promise.all([
+              CrontabModel.count(),
+              CrontabModel.count({ where: { isDisabled: 0 } }),
+              CrontabModel.count({ where: { isDisabled: 1 } }),
+              CrontabStatModel.findOne({
+                attributes: [
+                  [fn('SUM', col('run_count')), 'total_runs'],
+                  [fn('SUM', col('success_count')), 'total_success'],
+                  [fn('SUM', col('fail_count')), 'total_fail'],
+                  [fn('SUM', col('untimed_count')), 'untimed_count'],
+                  [fn('SUM', col('total_time')), 'total_time'],
+                ],
+                where: { date: today },
+                raw: true,
+              }),
+              new TriggerHistory(CrontabStatModel.sequelize!).metrics(
+                day.valueOf(),
+              ),
+            ]),
           }),
-          new TriggerHistory(CrontabStatModel.sequelize!).metrics(
-            day.valueOf(),
-          ),
-        ]);
-
+        );
+        const [total, enabled, disabled, stats, triggers] = snapshot.values;
         const row = stats as any;
         const totalRuns = Number(row?.total_runs) || 0;
         const totalSuccess = Number(row?.total_success) || 0;
@@ -126,6 +135,7 @@ export default (app: Router) => {
           code: 200,
           data: {
             serverNow,
+            sampledAt: snapshot.sampledAt,
             expiresAt: day.add(1, 'day').valueOf(),
             total,
             enabled,
@@ -176,10 +186,10 @@ export default (app: Router) => {
         )
           return res.status(400).send({ code: 400 });
         const [snapshotRetention] = live
-          ? await CrontabStatModel.sequelize!.query<{ cutoff: number }>(
-              'SELECT cutoff FROM CronHistoryRetention WHERE id=1',
-              { type: QueryTypes.SELECT },
-            )
+          ? await executionModel(
+              CrontabStatModel.sequelize!,
+              'CronHistoryRetention',
+            ).findAll({ attributes: ['cutoff'], where: { id: 1 }, raw: true })
           : [];
         const details = new AnomalyPage(
           kind as AnomalyKind,
@@ -228,11 +238,10 @@ export default (app: Router) => {
         // Log checks can yield after the audit transaction. Do not publish that
         // snapshot if history cleanup has since removed part of its plan window.
         if (live) {
-          const [retention] = await CrontabStatModel.sequelize!.query<{
-            cutoff: number;
-          }>('SELECT cutoff FROM CronHistoryRetention WHERE id=1', {
-            type: QueryTypes.SELECT,
-          });
+          const [retention] = await executionModel(
+            CrontabStatModel.sequelize!,
+            'CronHistoryRetention',
+          ).findAll({ attributes: ['cutoff'], where: { id: 1 }, raw: true });
           if (retention && retention.cutoff > (snapshotRetention?.cutoff ?? 0))
             return res.send({ code: 200, data: { status: 'unavailable' } });
         }

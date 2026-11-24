@@ -31,7 +31,7 @@ function barrier() {
 
 const statements = {
   booking: 'INSERT OR IGNORE INTO CronLegacyExitBookings',
-  claim: 'UPDATE CronTriggers SET counted=1',
+  claim: 'UPDATE CronTriggers SET counted=',
   increment: 'INSERT INTO "CrontabStats"',
   dispute: 'INSERT OR IGNORE INTO CronBoundExitConflicts',
   debit: 'UPDATE CrontabStats SET run_count=run_count-1',
@@ -73,7 +73,7 @@ if (stage === 'readClaim') {
 else if (stage === 'unlink') intercept(fs.promises, 'unlink', captured);
 else
   intercept(db, 'query', (sql) =>
-    String(sql)
+    String(typeof sql === 'string' ? sql : sql.query)
       .replace(/[`"]/g, '')
       .startsWith(statements[stage].replace(/"/g, '')),
   );

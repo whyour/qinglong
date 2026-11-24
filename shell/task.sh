@@ -58,6 +58,7 @@ define_program() {
 
 handle_log_path() {
   local file_param=$1
+  ql_task_clock_seconds=""
 
   if [[ -z $file_param ]]; then
     file_param="task"
@@ -76,9 +77,18 @@ handle_log_path() {
   fi
 
   if [[ $is_macos -ne 1 && $mtime_format == '%Y-%m-%d %H:%M:%S.%3N' ]]; then
-    # Render both representations from one clock snapshot, without parsing it
-    # again in a second date process.
-    IFS='|' read -r time log_time < <(date "+$mtime_format|%Y-%m-%d-%H-%M-%S-%3N")
+    local clock=${EPOCHREALTIME:-}
+    if [[ ${BASH_VERSINFO[0]} -ge 5 && $clock =~ ^[0-9]+\.[0-9]{6}$ ]]; then
+      ql_task_clock_seconds=${clock%.*}
+      local millis=${clock#*.}
+      millis=${millis:0:3}
+      printf -v time '%(%Y-%m-%d %H:%M:%S)T' "$ql_task_clock_seconds"
+      printf -v log_time '%(%Y-%m-%d-%H-%M-%S)T' "$ql_task_clock_seconds"
+      time+=".$millis"; log_time+="-$millis"
+    else
+      # Older Bash retains the original external clock path.
+      IFS='|' read -r time log_time < <(date "+$mtime_format|%Y-%m-%d-%H-%M-%S-%3N")
+    fi
   else
     time=$(date "+$mtime_format")
     log_time=$(format_log_time "$mtime_format" "$time")
@@ -155,7 +165,11 @@ init_begin_time() {
   else
     begin_time=$(format_time "$time_format" "$time")
   fi
-  begin_timestamp=$(format_timestamp "$time_format" "$time")
+  if [[ ${ql_task_clock_seconds:-} =~ ^[0-9]+$ ]]; then
+    begin_timestamp=$ql_task_clock_seconds
+  else
+    begin_timestamp=$(format_timestamp "$time_format" "$time")
+  fi
 }
 
 import_config "$@"

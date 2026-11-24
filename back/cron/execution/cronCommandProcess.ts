@@ -31,7 +31,12 @@ export function spawnCronCommand(
   if (onCommandStart) args.push('report-start');
   if (outputPath) args.push('log-output', outputPath);
   const child = spawn('python3', args, {
-    env: { ...process.env, QL_TRIGGER_ID: triggerId },
+    env: {
+      ...process.env,
+      QL_TRIGGER_ID: triggerId,
+      QL_SUPERVISOR_RECEIPT: '1',
+      QL_SUPERVISOR_LOG_BOUND: outputPath ? '1' : '',
+    },
     stdio: onCommandStart ? ['pipe', 'pipe', 'pipe', 'pipe'] : 'pipe',
   }) as ChildProcessWithoutNullStreams;
   if (onCommandStart && child.stdio[3]) {

@@ -1,5 +1,6 @@
+import { defineCrontabModel } from './executionModelDefinitions';
 import { sequelize } from '.';
-import { DataTypes, Model, ModelDefined } from 'sequelize';
+import { Model } from 'sequelize';
 
 export class Crontab {
   name?: string;
@@ -72,41 +73,4 @@ export enum CrontabStatus {
 }
 
 export interface CronInstance extends Model<Crontab, Crontab>, Crontab {}
-export const CrontabModel = sequelize.define<CronInstance>('Crontab', {
-  name: {
-    unique: 'compositeIndex',
-    type: DataTypes.STRING,
-  },
-  command: {
-    unique: 'compositeIndex',
-    type: DataTypes.STRING,
-  },
-  schedule: {
-    unique: 'compositeIndex',
-    type: DataTypes.STRING,
-  },
-  timestamp: DataTypes.STRING,
-  saved: DataTypes.BOOLEAN,
-  status: DataTypes.NUMBER,
-  isSystem: DataTypes.NUMBER,
-  pid: DataTypes.NUMBER,
-  isDisabled: DataTypes.NUMBER,
-  isPinned: DataTypes.NUMBER,
-  log_path: DataTypes.STRING,
-  queued_token: DataTypes.STRING,
-  labels: DataTypes.JSON,
-  last_instance_id: DataTypes.INTEGER,
-  last_running_time: DataTypes.NUMBER,
-  last_execution_time: DataTypes.NUMBER,
-  sub_id: { type: DataTypes.NUMBER, allowNull: true },
-  extra_schedules: DataTypes.JSON,
-  task_before: DataTypes.STRING,
-  task_after: DataTypes.STRING,
-  log_name: DataTypes.STRING,
-  allow_multiple_instances: DataTypes.NUMBER,
-  skip_if_pending: DataTypes.BOOLEAN,
-  max_queue_wait: DataTypes.INTEGER,
-  catchup_seconds: DataTypes.INTEGER,
-  recovery_from: DataTypes.BIGINT,
-  work_dir: DataTypes.STRING,
-});
+export const CrontabModel = defineCrontabModel(sequelize);

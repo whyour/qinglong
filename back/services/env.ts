@@ -1,5 +1,6 @@
+import { sequelize } from '../data';
 import groupBy from 'lodash/groupBy';
-import { FindOptions, Op } from 'sequelize';
+import { FindOptions, Op, fn, col } from 'sequelize';
 import { Inject, Service } from 'typedi';
 import winston from 'winston';
 import config from '../config';
@@ -13,7 +14,6 @@ import {
   stepPosition,
 } from '../data/env';
 import { writeFileWithLock } from '../shared/utils';
-import { sequelize } from '../data';
 import {
   assertAllowedTaskEnvName,
   isAllowedTaskEnvName,
@@ -153,7 +153,7 @@ export default class EnvService {
     }
     try {
       const result = await this.find(condition, [
-        [sequelize.literal('COALESCE(`isPinned`, 0)'), 'DESC'],
+        [fn('COALESCE', col('isPinned'), 0), 'DESC'],
         ['position', 'DESC'],
         ['createdAt', 'ASC'],
       ]);

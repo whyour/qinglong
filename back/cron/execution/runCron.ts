@@ -27,10 +27,15 @@ export async function runCron(
   cmd: string,
   cron: ICron,
   isCurrent: () => boolean = () => true,
-  trigger?: { id: string; time: number; source: 'node' | 'recovery' },
+  trigger?: {
+    id: string;
+    time: number;
+    source: 'node' | 'recovery';
+    queuedAt?: number;
+  },
 ): Promise<number | void> {
   const history = trigger && triggerHistory();
-  const queuedAt = Date.now();
+  const queuedAt = trigger?.queuedAt ?? Date.now();
   if (trigger && history) {
     const cronId = Number(cron.id);
     const admitted = await historyWrites.add(() =>

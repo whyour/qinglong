@@ -1,4 +1,16 @@
-import { QueryTypes, Sequelize, Transaction } from 'sequelize';
+import {
+  executionModel,
+  executionAssociation,
+} from '../../data/executionModels';
+import {
+  QueryTypes,
+  Sequelize,
+  Transaction,
+  Op,
+  literal,
+  fn,
+  col,
+} from 'sequelize';
 import { createHash } from 'crypto';
 import { executionIdPattern } from '../identity';
 import {
@@ -113,17 +125,27 @@ export class LegacyClientAdapter {
         },
       );
     }
-    await this.database.query(
-      `UPDATE CronTriggers SET log_path=COALESCE(log_path,$log) WHERE id=$id AND cron_id=$cronId`,
-      { transaction, bind: { id, cronId, log } },
+    await executionModel(this.database, 'CronTriggers').update(
+      { log_path: fn('COALESCE', col('log_path'), log) },
+      {
+        where: { id, cron_id: cronId },
+        transaction,
+        hooks: false,
+        validate: false,
+      },
     );
     if (!running) {
       // For a managed command the wrapper may be only the first segment.
       // Only its supervisor can report the whole command's exit.
-      const [legacy] = await this.database.query(
-        'SELECT 1 FROM CronTriggers WHERE id=$id AND cron_id=$cronId AND owner IS NULL',
-        { transaction, type: QueryTypes.SELECT, bind: { id, cronId } },
-      );
+      const [legacy] = await executionModel(
+        this.database,
+        'CronTriggers',
+      ).findAll({
+        attributes: ['id'],
+        where: { id, cron_id: cronId, owner: null },
+        transaction,
+        raw: true,
+      });
       if (legacy) {
         const state = stopped
           ? 'stopped'
@@ -185,13 +207,59 @@ export class LegacyClientAdapter {
         .update(JSON.stringify([cronId, pid, seconds, log || null]))
         .digest('hex');
     // A verified child stays attached to its supervisor even after the OS recycles its PID.
-    const [bound] = await this.database.query(
-      'SELECT 1 FROM CronShellBindings WHERE receipt=$receipt',
-      { transaction, type: QueryTypes.SELECT, bind: { receipt } },
-    );
+    const [bound] = await executionModel(
+      this.database,
+      'CronShellBindings',
+    ).findAll({
+      attributes: ['receipt'],
+      where: { receipt },
+      transaction,
+      raw: true,
+    });
     if (bound) return;
 
-    const rows = await this.database.query<{
+    const rows = (await executionModel(
+      this.database,
+      'RunningInstances',
+    ).findAll({
+      attributes: [
+        [col('RunningInstance.id'), 'instance'],
+        'status',
+        'finished_at',
+        'exit_code',
+        'log_path',
+        [col('trigger.id'), 'id'],
+        [col('trigger.source'), 'source'],
+      ],
+      include: [
+        {
+          association: executionAssociation(this.database, 'instanceTrigger'),
+          attributes: [],
+          required: false,
+        },
+      ],
+      where: {
+        cron_id: cronId,
+        pid,
+        started_at: seconds,
+        [Op.and]: [
+          {
+            [Op.or]: [
+              { '$trigger.id$': null },
+              { '$trigger.source$': 'legacy' },
+              { '$trigger.owner$': { [Op.not]: null } },
+            ],
+          },
+          ...(log
+            ? [{ [Op.or]: [{ log_path: log }, { log_path: null }] }]
+            : []),
+        ],
+      },
+      limit: 2,
+      subQuery: false,
+      transaction,
+      raw: true,
+    })) as unknown as Array<{
       instance: number;
       status: number;
       finished_at: number | null;
@@ -199,29 +267,20 @@ export class LegacyClientAdapter {
       id: string | null;
       source: TriggerSource | null;
       log_path: string | null;
-    }>(
-      `SELECT i.id AS instance,i.status,i.finished_at,i.exit_code,i.log_path,t.id,t.source FROM RunningInstances i
-       LEFT JOIN CronTriggers t ON t.instance_id=i.id WHERE i.cron_id=$cronId AND i.pid=$pid
-       AND (t.id IS NULL OR t.source='legacy' OR t.owner IS NOT NULL)
-       AND i.started_at=$seconds AND (i.log_path IS $log OR $log IS NULL OR i.log_path IS NULL) LIMIT 2`,
-      {
-        transaction,
-        type: QueryTypes.SELECT,
-        bind: { cronId, pid, seconds, log: log || null },
-      },
-    );
+    }>;
     const [old] = rows;
     if (rows.length > 1) return;
     if (old) {
       if (!old.id && old.status === 4) {
-        const [expired] = await this.database.query(
-          'SELECT 1 FROM CronHistoryRetention WHERE cutoff>$end',
-          {
-            transaction,
-            type: QueryTypes.SELECT,
-            bind: { end: (old.finished_at ?? seconds) * 1000 },
-          },
-        );
+        const [expired] = await executionModel(
+          this.database,
+          'CronHistoryRetention',
+        ).findAll({
+          attributes: ['id'],
+          where: { cutoff: { [Op.gt]: (old.finished_at ?? seconds) * 1000 } },
+          transaction,
+          raw: true,
+        });
         if (expired) return;
       }
       if (old.status !== 0 && old.status !== 4) {
@@ -285,21 +344,22 @@ export class LegacyClientAdapter {
       );
       if (prior) return;
       identity = legacyProcessOwner(pid, seconds);
-      const roots = await this.database.query<{
-        id: string;
-        command_identity: string;
-      }>(
-        `SELECT id,command_identity FROM CronTriggers WHERE cron_id=$cronId AND state='running'
-         AND command_identity IS NOT NULL AND started_at < $end`,
+      const roots = await executionModel(this.database, 'CronTriggers').findAll(
         {
+          attributes: ['id', 'command_identity'],
+          where: {
+            cron_id: cronId,
+            state: 'running',
+            command_identity: { [Op.not]: null },
+            started_at: { [Op.lt]: start + 1000 },
+          },
           transaction,
-          type: QueryTypes.SELECT,
-          bind: { cronId, end: start + 1000 },
+          raw: true,
         },
       );
       for (const root of roots) {
         if (!identity) break;
-        const parent = Number(root.command_identity.split(':')[1]);
+        const parent = Number(root.command_identity!.split(':')[1]);
         try {
           if (
             !isProcessDescendant(pid, parent) ||
@@ -313,9 +373,9 @@ export class LegacyClientAdapter {
             continue;
           throw error;
         }
-        await this.database.query(
-          'INSERT INTO CronShellBindings(receipt,trigger_id) VALUES ($receipt,$id)',
-          { transaction, bind: { receipt, id: root.id } },
+        await executionModel(this.database, 'CronShellBindings').create(
+          { receipt, trigger_id: root.id },
+          { transaction, silent: true, hooks: false, validate: false },
         );
         if (running)
           await this.attachShellLog(root.id, cronId, log, transaction);
@@ -326,19 +386,30 @@ export class LegacyClientAdapter {
     const id = old?.id ?? receipt;
     if (!old?.id) {
       // A later use of the same numeric PID proves the older process is gone.
-      const others = await this.database.query<{
-        id: string;
-        started_at: number;
-      }>(
-        `SELECT t.id,i.started_at FROM RunningInstances i LEFT JOIN CronTriggers t ON t.instance_id=i.id
-         WHERE i.cron_id=$cronId AND i.pid=$pid AND i.started_at<>$seconds
-         AND (i.started_at>$seconds OR (i.status=0 AND t.source='legacy'))`,
-        {
-          transaction,
-          type: QueryTypes.SELECT,
-          bind: { cronId, pid, seconds },
+      const others = (await executionModel(
+        this.database,
+        'RunningInstances',
+      ).findAll({
+        attributes: [[col('trigger.id'), 'id'], 'started_at'],
+        include: [
+          {
+            association: executionAssociation(this.database, 'instanceTrigger'),
+            attributes: [],
+            required: false,
+          },
+        ],
+        where: {
+          cron_id: cronId,
+          pid,
+          started_at: { [Op.ne]: seconds },
+          [Op.or]: [
+            { started_at: { [Op.gt]: seconds } },
+            { status: 0, '$trigger.source$': 'legacy' },
+          ],
         },
-      );
+        transaction,
+        raw: true,
+      })) as unknown as Array<{ id: string | null; started_at: number }>;
       if (running && old) identity = legacyProcessOwner(pid, seconds);
       const historical =
         !running ||
@@ -347,46 +418,42 @@ export class LegacyClientAdapter {
 
       let instance = old?.instance;
       if (!instance) {
-        [instance] = await this.database.query(
-          `INSERT INTO RunningInstances(cron_id,pid,log_path,started_at,status,finished_at,createdAt,updatedAt)
-           VALUES ($cronId,$pid,$log,$seconds,$status,$finished,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
-          {
-            transaction,
-            type: QueryTypes.INSERT,
-            bind: {
-              cronId,
+        [instance] = await executionModel(this.database, 'RunningInstances')
+          .create(
+            {
+              cron_id: cronId,
               pid,
-              log: log || null,
-              seconds,
+              log_path: log || null,
+              started_at: seconds,
               status: historical ? 4 : 0,
-              finished: historical ? Math.floor(Date.now() / 1000) : null,
+              finished_at: historical ? Math.floor(Date.now() / 1000) : null,
+              createdAt: literal('CURRENT_TIMESTAMP'),
+              updatedAt: literal('CURRENT_TIMESTAMP'),
             },
-          },
-        );
+            { transaction, silent: true, hooks: false, validate: false },
+          )
+          .then((row) => [row.id] as const);
       }
       const unknown = historical || old?.status === 4;
-      await this.database.query(
-        `INSERT INTO CronTriggers
-        (id,cron_id,source,state,observed_at,started_at,finished_at,instance_id,log_path,process_identity,reason)
-        VALUES ($id,$cronId,'legacy',$state,$start,$start,$end,$instance,$log,$identity,$reason)`,
+      await executionModel(this.database, 'CronTriggers').create(
         {
-          transaction,
-          bind: {
-            id,
-            cronId,
-            start,
-            instance,
-            log: old?.log_path ?? (log || null),
-            identity: !unknown && running ? identity ?? null : null,
-            reason: old && running && !unknown ? 'restart' : null,
-            state: unknown ? 'unknown' : 'running',
-            end: unknown
-              ? old?.finished_at
-                ? old.finished_at * 1000
-                : Date.now()
-              : null,
-          },
+          id,
+          cron_id: cronId,
+          source: 'legacy',
+          state: unknown ? 'unknown' : 'running',
+          observed_at: start,
+          started_at: start,
+          finished_at: unknown
+            ? old?.finished_at
+              ? old.finished_at * 1000
+              : Date.now()
+            : null,
+          instance_id: instance,
+          log_path: old?.log_path ?? (log || null),
+          process_identity: !unknown && running ? identity ?? null : null,
+          reason: old && running && !unknown ? 'restart' : null,
         },
+        { transaction, silent: true, hooks: false, validate: false },
       );
       await this.lifecycle.claimSummary(
         cronId,
@@ -398,7 +465,7 @@ export class LegacyClientAdapter {
       for (const other of others) {
         if (other.started_at < seconds)
           await this.settlement.completeInTransaction(
-            other.id,
+            other.id!,
             'unknown',
             null,
             null,
@@ -441,9 +508,9 @@ export class LegacyClientAdapter {
       { transaction, type: QueryTypes.BULKUPDATE, bind: { id, cronId, log } },
     );
     if (attached) {
-      await this.database.query(
-        'UPDATE CronTriggers SET log_path=COALESCE(log_path,$log) WHERE id=$id',
-        { transaction, bind: { id, log } },
+      await executionModel(this.database, 'CronTriggers').update(
+        { log_path: fn('COALESCE', col('log_path'), log) },
+        { where: { id }, transaction, hooks: false, validate: false },
       );
       await this.database.query(
         `UPDATE Crontabs SET log_path=$log WHERE id=$cronId AND status=0 AND pid=(
@@ -484,15 +551,19 @@ export class LegacyClientAdapter {
         finishedAt,
       );
       if (accepted === false) return;
-      const [row] = await this.database.query<{
-        state: TriggerState;
-        started_at: number | null;
-        instance_id: number | null;
-        command_identity: string | null;
-        owner: string | null;
-      }>(
-        'SELECT state,started_at,instance_id,command_identity,owner FROM CronTriggers WHERE id=$id AND cron_id=$cronId',
-        { transaction, bind: { id, cronId }, type: QueryTypes.SELECT },
+      const [row] = await executionModel(this.database, 'CronTriggers').findAll(
+        {
+          attributes: [
+            'state',
+            'started_at',
+            'instance_id',
+            'command_identity',
+            'owner',
+          ],
+          where: { id, cron_id: cronId },
+          transaction,
+          raw: true,
+        },
       );
       if (!row) return;
       const startSeconds =
@@ -520,9 +591,15 @@ export class LegacyClientAdapter {
           },
         );
         if (instance) {
-          await this.database.query(
-            'UPDATE CronTriggers SET instance_id=$instance WHERE id=$id',
-            { transaction, bind: { instance, id } },
+          await executionModel(this.database, 'CronTriggers').update(
+            { instance_id: instance },
+            {
+              where: { id },
+              transaction,
+              silent: true,
+              hooks: false,
+              validate: false,
+            },
           );
           await this.lifecycle.claimSummary(
             cronId,
@@ -547,18 +624,32 @@ export class LegacyClientAdapter {
             /* A short child may have exited. */
           }
         }
-        const [instance] = await this.database.query(
-          `INSERT INTO RunningInstances(cron_id,pid,log_path,started_at,status,createdAt,updatedAt)
-           VALUES ($cronId,$pid,$log,$seconds,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+        const [instance] = await executionModel(
+          this.database,
+          'RunningInstances',
+        )
+          .create(
+            {
+              cron_id: cronId,
+              pid,
+              log_path: log,
+              started_at: startSeconds,
+              status: 0,
+              createdAt: literal('CURRENT_TIMESTAMP'),
+              updatedAt: literal('CURRENT_TIMESTAMP'),
+            },
+            { transaction, silent: true, hooks: false, validate: false },
+          )
+          .then((row) => [row.id] as const);
+        await executionModel(this.database, 'CronTriggers').update(
+          { instance_id: instance, process_identity: identity },
           {
+            where: { id },
             transaction,
-            type: QueryTypes.INSERT,
-            bind: { cronId, pid, log, seconds: startSeconds },
+            silent: true,
+            hooks: false,
+            validate: false,
           },
-        );
-        await this.database.query(
-          'UPDATE CronTriggers SET instance_id=$instance,process_identity=$identity WHERE id=$id',
-          { transaction, bind: { instance, identity, id } },
         );
         await this.lifecycle.claimSummary(
           cronId,

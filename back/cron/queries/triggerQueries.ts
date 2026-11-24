@@ -53,7 +53,11 @@ export class TriggerQueries {
       scriptStartP95: number | null;
       scriptOnTime: number;
     }>(
-      `WITH today AS (SELECT * FROM CronTriggers WHERE observed_at >= $since),
+      // Reuse a narrow snapshot: inlining this CTE makes each count/percentile
+      // revisit the wide trigger rows, including their queue diagnostics.
+      `WITH today AS MATERIALIZED (
+         SELECT state,observed_at,scheduled_at,started_at,script_started_at,dequeued_at,queued_at
+         FROM CronTriggers WHERE observed_at >= $since),
        triggers AS (SELECT ABS(observed_at - scheduled_at) AS deviation FROM today WHERE scheduled_at IS NOT NULL),
        scripts AS (SELECT script_started_at - scheduled_at AS delay FROM today
          WHERE scheduled_at IS NOT NULL AND script_started_at >= scheduled_at),

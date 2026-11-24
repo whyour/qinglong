@@ -1,8 +1,10 @@
+import { executionModel } from '../data/executionModels';
 import { storageFull, writeExit } from '../cron/settlement/exitReceipt.cjs';
 import { QueryTypes } from 'sequelize';
 import { randomUUID } from 'crypto';
 import { sequelize } from '../data';
 import { systemOwner, TriggerHistory } from '../cron/history';
+import { globalCronBudget } from '../cron/execution/globalCronBudget';
 
 async function receipt() {
   const [action, task, pid, id, status, end] = process.argv.slice(2);
@@ -23,15 +25,35 @@ async function receipt() {
       rule && Number.isSafeInteger(at) && at > 0 && at <= Date.now()
         ? { rule, at, dispatch }
         : undefined;
-    const acquired = await history.startSystem(
-      triggerId,
-      Number(task),
-      owner,
-      command,
-      wrapper,
+    const queued = await sequelize.query(
+      `INSERT INTO CronTriggers(id,cron_id,source,state,owner,queued_at,observed_at)
+       VALUES ($id,$cronId,'system','queued',$owner,$now,$now) ON CONFLICT(id) DO NOTHING`,
+      {
+        bind: { id: triggerId, cronId: Number(task), owner, now: Date.now() },
+        type: QueryTypes.BULKUPDATE,
+      },
     );
-    if (!acquired) process.exitCode = 75;
-    else if (!id) process.stdout.write(triggerId);
+    const budget = globalCronBudget(sequelize);
+    const token =
+      queued === 1 &&
+      (await budget.acquire(triggerId, {
+        owner,
+        commandIdentity: command,
+        current: () => systemOwner(Number(pid)) === owner,
+      }));
+    const acquired =
+      token &&
+      (await history.startSystem(
+        triggerId,
+        Number(task),
+        owner,
+        command,
+        wrapper,
+      ));
+    if (!acquired) {
+      if (token) await budget.release(triggerId, token);
+      process.exitCode = 75;
+    } else if (!id) process.stdout.write(triggerId);
   } else if (action === 'finish') {
     // The live wrapper inherited both IDs from the start it just claimed. A
     // standalone retry must match the registered system task before writing.
@@ -77,6 +99,15 @@ async function receipt() {
           ? undefined
           : 'legacy',
       );
+      const [lease] = await executionModel(
+        sequelize,
+        'CronConcurrencyLeases',
+      ).findAll({
+        attributes: ['token'],
+        where: { trigger_id: id },
+        raw: true,
+      });
+      if (lease) await globalCronBudget(sequelize).release(id, lease.token);
     } catch (error) {
       if (!journaled || !storageFull(error)) throw error;
       // The regular recovery pass will settle the receipt after space returns.

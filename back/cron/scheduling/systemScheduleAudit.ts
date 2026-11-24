@@ -1,3 +1,4 @@
+import { executionModel } from '../../data/executionModels';
 import { AnomalyPage } from '../queries/scheduleAnomalies';
 import { QueryTypes, Sequelize, Transaction } from 'sequelize';
 import { blockSize, blockSlots } from './scheduleAudit';
@@ -35,20 +36,29 @@ export async function stageSystemPlan(
   return db.transaction(
     { type: Transaction.TYPES.IMMEDIATE },
     async (transaction) => {
-      const [pending] = await db.query<{ id: number }>(
-        `SELECT id FROM (SELECT * FROM CronSystemPlans ORDER BY id DESC LIMIT 1)
-       WHERE confirmed IS NULL AND zone=$zone AND rules=$rules`,
-        {
-          bind: { zone: bind.zone, rules: bind.rules },
+      const [pending] = await executionModel(db, 'CronSystemPlans')
+        .findAll({
+          attributes: ['id', 'confirmed', 'zone', 'rules'],
+          order: [['id', 'DESC']],
+          limit: 1,
           transaction,
-          type: QueryTypes.SELECT,
-        },
-      );
+          raw: true,
+        })
+        .then((rows) =>
+          rows.filter(
+            (row) =>
+              row.confirmed === null &&
+              row.zone === bind.zone &&
+              row.rules === bind.rules,
+          ),
+        );
       if (pending) return pending.id;
-      const [id] = await db.query(
-        'INSERT INTO CronSystemPlans(staged,zone,rules) VALUES ($at,$zone,$rules)',
-        { bind, transaction, type: QueryTypes.INSERT },
-      );
+      const [id] = await executionModel(db, 'CronSystemPlans')
+        .create(
+          { staged: bind.at, zone: bind.zone, rules: bind.rules },
+          { transaction, silent: true, hooks: false, validate: false },
+        )
+        .then((row) => [row.id] as const);
       return id;
     },
   );
@@ -70,9 +80,15 @@ export async function confirmSystemPlan(
   at = Date.now(),
 ) {
   await db.transaction(async (transaction) => {
-    await db.query(
-      'UPDATE CronSystemPlans SET confirmed=$at WHERE id=$id AND confirmed IS NULL',
-      { transaction, bind: { id, at } },
+    await executionModel(db, 'CronSystemPlans').update(
+      { confirmed: at },
+      {
+        where: { id, confirmed: null },
+        transaction,
+        silent: true,
+        hooks: false,
+        validate: false,
+      },
     );
     // Keep the effective snapshot preceding the retention window.
     await db.query(
@@ -94,10 +110,14 @@ export async function systemScheduleAudit(
   const { since, installs, receipts } = await db.transaction(
     { type: Transaction.TYPES.DEFERRED },
     async (transaction) => {
-      const [retention] = await db.query<{ since: number }>(
-        'SELECT MAX($dayStart,COALESCE((SELECT cutoff FROM CronHistoryRetention WHERE id=1),0)) AS since',
-        { transaction, bind: { dayStart }, type: QueryTypes.SELECT },
-      );
+      const [retention] = await executionModel(db, 'CronHistoryRetention')
+        .findAll({
+          attributes: ['cutoff'],
+          where: { id: 1 },
+          transaction,
+          raw: true,
+        })
+        .then(([row]) => [{ since: Math.max(dayStart, row?.cutoff ?? 0) }]);
       const since = retention.since;
       const installs = await db.query<Install>(
         `SELECT * FROM CronSystemPlans WHERE id >= COALESCE((SELECT MAX(id) FROM CronSystemPlans

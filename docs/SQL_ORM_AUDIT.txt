@@ -1,0 +1,489 @@
+原生 SQL / ORM 审计与热点修复（2026-11-24）
+
+当前结论
+优先 ORM 适用于普通 CRUD；任务执行热路径按真实测量保留参数化 SQL。
+后端原生 query 调用点：原始 228 → 全面 ORM 后 91 → 本轮 134；恢复 43 处，仍保留 94 处 ORM 转换。
+8 个普通建表迁移继续使用 QueryInterface；环境排序继续使用 fn/col。模型定义、普通配置/历史查询、低频取消与恢复管理操作不随热点回退。
+本轮只修改 6 个执行相关源码文件中的 18 个方法，适配 1 处故障注入测试，并更新本审计文档。没有提交、发布或修改既有 dev 业务容器。
+
+定位方法
+1. 在 dev 独立采样真实执行链路。36 次触发中，预算快照 137 次、预算 pump 112 次；启动和结算关键方法通常每次任务各调用一次。插桩数据仅用于定位，不进入性能结论。
+2. 四组独立消融，每组只恢复对应方法的旧 SQL；当前 ORM 与改写前 SQL 各作基准。每个版本独立容器，预热 1 轮 + 正式 3 轮。
+3. 独立 SQLite 微基准每组 5 轮交替顺序、每轮 400 次操作，预热 40 次。沿用 DELETE journal、synchronous=EXTRA、IMMEDIATE 写事务；对比双方数据库语句次数相同。
+4. 最终候选与两个基准按 SQL → final → ORM → ORM → final → SQL 顺序交叉；每个批次预热 1 轮 + 正式 3 轮，各版本共 6 轮、54 个短任务样本。全部轮次保留。
+
+分组真实混合任务结果（初筛，非最终验收）
+版本 / 每轮 CPU 秒均值 / 短任务 P95 毫秒 / 峰值内存均值 MiB
+orm: 14.917 / 4258.0 / 370.89
+budget: 14.770 / 4195.3 / 353.11
+lifecycle: 14.650 / 3811.3 / 362.82
+settlement: 14.741 / 4104.3 / 359.08
+diagnostics: 15.486 / 4267.3 / 355.07
+sql: 14.386 / 4275.3 / 360.74
+初筛单组整批 CPU 的变化很小，诊断整组没有收益；不能把每个 P95 波动直接归因于某条 SQL。最终仅恢复诊断中的每次出队更新，其余诊断查询/采样继续 ORM。
+原始 SQL 与 ORM 的初筛 P95 接近；上轮两次采样的 +12.7% 不应视为稳定效应或每条 ORM 查询的代价。
+
+SQLite 微基准（每轮 400 次操作的平均进程 CPU 毫秒）
+全局名额快照、申请与释放: ORM 1916.7 → SQL 1519.8，-20.7%；语句数双方均为 1600。
+手动领取、进程绑定和启动摘要: ORM 2487.3 → SQL 1923.5，-22.7%；语句数双方均为 1200。
+退出回执、实例结算和幂等记账: ORM 3208.4 → SQL 2778.1，-13.4%；语句数双方均为 2000。
+每次任务出队的状态写入: ORM 969.4 → SQL 633.3，-34.7%；语句数双方均为 400。
+代表操作分别为 snapshot、claimSummary、recordCronResult、track。出队写入计时等待真实 afterQuery 完成，不能只计异步函数返回。
+相同往返数下 CPU 下降支持 ORM 模型选项处理、条件构造和 SQL 生成存在额外开销；这些操作处于执行热路径/写事务内，可能增加其他写入者等待。微基准不是端到端收益的替代指标。
+
+最终正式验收
+同一 dev 镜像、2 CPU、1536 MiB、512 PID 限制，全局预算 4。每轮 18 个真实任务，9 长 + 9 短，Python/JS/Shell 均分。
+主性能负载通过批量手动入口提交；定时、system-crond 和恢复入口的执行可靠性另做故障验收，不能把此延迟数值直接外推为所有调度入口的延迟。
+P95 使用全部正式短任务提交到脚本首行时间的 nearest-rank；CPU 为完成全部脚本后再等待相同 2 秒窗口的 cgroup CPU 秒；内存为每轮峰值的均值。预热轮不计性能，但仍验收可靠性。
+版本 / CPU 秒每轮 / 短任务 P95 秒 / 内存峰值均值 MiB / 匿名内存峰值均值 MiB
+orm: 14.784 / 4.027 / 357.47 / 308.72
+sql: 14.353 / 4.254 / 355.74 / 308.14
+final: 14.146 / 4.067 / 353.69 / 309.43
+final 相对 orm: CPU -4.32%，短任务 P95 +0.97%，内存峰值均值 -1.06%。
+final 相对 sql: CPU -1.44%，短任务 P95 -4.41%，内存峰值均值 -0.58%。
+整轮配对重采样的 95% 区间（百分比变化；6 轮样本有限，不能推断所有负载均无回退）：
+{"orm": {"cpuPct": [-5.966319710279377, -2.788924801039827], "shortP95Pct": [-16.81008413929368, 3.833051059970871]}, "sql": {"cpuPct": [-3.419302633873378, 0.12228126330489086], "shortP95Pct": [-17.235281932279577, 1.3769071086568996]}}
+详见 acceptance-metrics.json 的逐轮耗时、CPU、内存与区间；不能只选取最好的一轮。
+
+追加独立复测（代码不变）
+主验收中候选 P95 比 ORM 高约 39 毫秒（0.97%），因此事先固定追加 ORM → final → final → ORM 四个新容器，每批预热 1 轮、正式 3 轮。追加阶段与故障/回归测试不重叠。所有原始轮次都保留，不按结果排除样本。
+仅追加 6 轮：
+orm: CPU 15.020 秒/轮，短任务 P95 4.165 秒，内存峰值均值 351.49 MiB。
+final: CPU 14.481 秒/轮，短任务 P95 4.088 秒，内存峰值均值 356.50 MiB。
+final 相对 ORM: CPU -3.59%，P95 -1.85%，短任务均值 -4.06%，内存峰值均值 +1.43%。
+整轮配对重采样 95% 区间：{"cpuPct": [-5.5953269173554805, -1.0361061294987262], "shortP95Pct": [-17.222621373811485, 4.432838198416289]}
+全部 12 轮合并，双方各 108 个短任务样本：
+orm: CPU 14.902 秒/轮，短任务 P95 4.162 秒，内存峰值均值 354.48 MiB。
+final: CPU 14.314 秒/轮，短任务 P95 4.067 秒，内存峰值均值 355.10 MiB。
+final 相对 ORM: CPU -3.95%，P95 -2.30%，短任务均值 -5.42%，内存峰值均值 +0.17%。
+整轮配对重采样 95% 区间：{"cpuPct": [-5.267345407712698, -2.4305917955902534], "shortP95Pct": [-10.96587562984761, 2.724986222316317]}
+原始 SQL 的比较仍使用上面的同批 6 轮主验收；不将其 6 轮与候选合并后的 12 轮直接混比。区间仅描述有限样本，不能作为所有生产负载下严格零回退的证明。
+
+追加复测 288 次触发全部恰好执行一次，日志完整，并发峰值 <=4，每个批次结束后名额清零。最终候选在主验收、追加复测及故障容器预热共执行 306 次正常脚本，另有 140 次故障场景实际执行；7 个明确取消/排队超时触发按预期不启动。
+
+可靠性
+- 正式对比 432 次触发：独立脚本记录和账本 ID 一致，每个 ID 唯一；每轮 18 次启动、18 次完成，状态均 finished/exit_code=0，中文 UTF-8 stdout/stderr 行内容和顺序完整，并发峰值 <=4。
+- 每个正式容器结束后租约、等待表均为 0。初筛另有 432 次触发，所有轮次日志、唯一执行和并发断言通过。
+- 最终候选真实故障验证包含 HTTP 手动 worker SIGKILL、gRPC 定时 worker SIGKILL、运行中/排队取消、执行超时 124、排队超时、system-crond 与手动混合、32 次连续取消，以及 JS/Shell 对应故障和三种语言钩子。
+- Python 中断任务将已写日志行数写入独立落盘记录；与保存日志逐行相等。JS/Shell 使用独立已发出行记录核对前缀；正常完成任务要求全部行一致。故障期间采样实际进程身份，并发峰值 4；各场景结束后无 queued/running 任务、无租约和等待条目。
+- 取消和排队超时属于明确终止，要求不再启动；其余已接受任务不得漏跑、重复运行。此结论限于被测执行身份、回执记账与已发出的日志，不代表任意外部业务副作用的 exactly-once 保证。
+- 本地全量 1481 项：1461 通过、20 跳过、0 失败。Linux 专项 78/78 + 回执边界 36/36，共 114/114 通过、0 跳过。
+- npm run prettier、npm run prettier:check、后端构建和 git diff --check 通过；690 文件无格式问题。
+- GitNexus 已刷新。与 develop 比较的累计差异为 CRITICAL（40 文件、124 符号、72 流程），包括之前未提交工作；本轮独立哈希/AST 核对仅涉及选定方法，不能把累计差异全部归因于本轮。
+
+保留边界
+保留旧 SQL 的事务对象、状态/NULL 条件、受影响行数、身份 token、参数绑定、回执顺序和唯一键语义。没有缩小耐久性配置，也没有用先查后写替代条件更新。
+普通 CRUD 使用原有按连接注册的模型映射；不会让独立 worker 偷用全局连接，也不会用模型 sync 代替版本迁移。
+新增的 43 处性能例外按方法/链路分组验证，不表示每一个分支中的每一条 SQL 都独立带来可测的端到端收益。
+
+其他原生片段
+连接 PRAGMA、展示状态的 CASE/相关证据子查询、清理保护性子查询和 CURRENT_TIMESTAMP 保留原有语义。
+CLI 原生 sqlite3 探针验证驱动本身；测试和压测的 SQL 作为独立存储判据保留。Shell/Python 执行脚本没有新增数据库 SQL 入口。
+
+当前 134 处后端原生查询（逐项理由）
+
+back/bootstrap/systemCron.ts:28  receipt
+INSERT 条件抢占 + ON CONFLICT DO NOTHING，调用方必须取得该语句准确 changes；bulkCreate(ignoreDuplicates) 不提供等价单行抢占结果。
+
+back/bootstrap/systemCron.ts:63  receipt
+跨表 UNION ALL 存在性核验需一个快照；拆成多个模型查询无收益且增加往返。
+
+back/cron/compatibility/legacyClient.ts:110  shellReport
+INSERT…SELECT 将源行/保留水位/回执证据检查与写入合为一条语句；避免先查后写、额外锁持有及结果搬运。
+
+back/cron/compatibility/legacyClient.ts:296  applyLegacyReceipt
+INSERT…SELECT 将源行/保留水位/回执证据检查与写入合为一条语句；避免先查后写、额外锁持有及结果搬运。
+
+back/cron/compatibility/legacyClient.ts:341  applyLegacyReceipt
+跨表 UNION ALL 存在性核验需一个快照；拆成多个模型查询无收益且增加往返。
+
+back/cron/compatibility/legacyClient.ts:476  applyLegacyReceipt
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/compatibility/legacyClient.ts:505  attachShellLog
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/compatibility/legacyClient.ts:515  attachShellLog
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/compatibility/legacyClient.ts:580  reportInstance
+INSERT…SELECT 将源行/保留水位/回执证据检查与写入合为一条语句；避免先查后写、额外锁持有及结果搬运。
+
+back/cron/compatibility/legacyClient.ts:661  reportInstance
+更新许可同时检查 NULL 安全的状态和 queued_token || id 代次表达式；保留完整原子条件，不以 ORM 预读替代。
+
+back/cron/compatibility/legacyClient.ts:679  reconcileInstances
+CTE 去重未关联实例后 JOIN/NOT EXISTS 检查回执和停止请求；避免 N+1 恢复查询或全量载入。
+
+back/cron/compatibility/legacyClient.ts:706  reconcileInstances
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/compatibility/legacyClient.ts:713  reconcileInstances
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/compatibility/legacyClient.ts:719  reconcileInstances
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/execution/cronExecution.ts:127  run
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:106  acquire
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:132  release
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:138  release
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:169  snapshot
+租约与升级前遗留执行 UNION ALL 同快照合并，并关联存活后代；ORM 无直接 UNION API，拆开会增加读次数与快照差异。
+
+back/cron/execution/globalCronBudget.ts:182  snapshot
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:213  pump
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:227  pump
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:236  pump
+INSERT 条件抢占 + ON CONFLICT DO NOTHING，调用方必须取得该语句准确 changes；bulkCreate(ignoreDuplicates) 不提供等价单行抢占结果。
+
+back/cron/execution/globalCronBudget.ts:254  pump
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:293  pump
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:302  pump
+跨 worker 排名组合 CASE 老化、历史耗时、反连接及稳定顺序；ORM 需要保留多段原生表达式，保持完整排序 SQL 更容易审计。
+
+back/cron/execution/globalCronBudget.ts:326  pump
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/globalCronBudget.ts:361  pump
+INSERT 条件抢占 + ON CONFLICT DO NOTHING，调用方必须取得该语句准确 changes；bulkCreate(ignoreDuplicates) 不提供等价单行抢占结果。
+
+back/cron/execution/globalCronBudget.ts:378  pump
+性能例外：全局名额快照、申请与释放。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:84  enqueue
+带 WHERE 的冲突更新，并以受影响行数决定是否取得执行/停止权；普通 upsert 无法保持相同冲突条件和回执语义。
+
+back/cron/execution/triggerLifecycle.ts:153  start
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/execution/triggerLifecycle.ts:187  claimManual
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:225  finish
+单条状态机更新使用 CASE 从同一旧行计算多个字段；保留 SQL 表达式避免多次更新、ORM 预读或拆散状态转换条件。
+
+back/cron/execution/triggerLifecycle.ts:254  claimSummary
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:275  isRunning
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:358  queueInstanceStop
+带 WHERE 的冲突更新，并以受影响行数决定是否取得执行/停止权；普通 upsert 无法保持相同冲突条件和回执语义。
+
+back/cron/execution/triggerLifecycle.ts:428  shouldStop
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:458  bindCommand
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:467  bindCommand
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:471  bindCommand
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:476  bindCommand
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:480  bindCommand
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:484  bindCommand
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/execution/triggerLifecycle.ts:513  registerCommandInstance
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:522  registerCommandInstance
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:528  registerCommandInstance
+性能例外：手动领取、进程绑定和启动摘要。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/execution/triggerLifecycle.ts:573  requestInstanceStop
+条件 INSERT…SELECT + 冲突时 json_each/UNION 合并停止目标，须在同一语句去重并检查 signalled 状态。
+
+back/cron/execution/triggerLifecycle.ts:806  startSystem
+带 WHERE 的冲突更新，并以受影响行数决定是否取得执行/停止权；普通 upsert 无法保持相同冲突条件和回执语义。
+
+back/cron/execution/triggerLifecycle.ts:874  recoverSystemOwners
+证据读取组合相关 EXISTS/NOT EXISTS 和条件投影；必须同一数据库快照判断是否可恢复、可结算或可删除凭证，普通 ORM 拆查不等价。
+
+back/cron/execution/triggerLifecycle.ts:902  recoverSystemOwners
+证据读取组合相关 EXISTS/NOT EXISTS 和条件投影；必须同一数据库快照判断是否可恢复、可结算或可删除凭证，普通 ORM 拆查不等价。
+
+back/cron/execution/triggerLifecycle.ts:934  interrupt
+从执行身份提取 PID 并批量插入停止请求，含 CAST/substr 和 INSERT OR IGNORE…SELECT；保持批量执行及幂等。
+
+back/cron/execution/triggerLifecycle.ts:962  interrupt
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/execution/triggerLifecycle.ts:970  interrupt
+单条状态机更新使用 CASE 从同一旧行计算多个字段；保留 SQL 表达式避免多次更新、ORM 预读或拆散状态转换条件。
+
+back/cron/history.ts:416  countExpired
+过期条件包含对存活实例的相关 NOT EXISTS；保留同一语句中的保护条件，避免预读 ID 后竞态或批量搬运历史。
+
+back/cron/history.ts:425  deleteExpired
+清理水位采用 MAX(existing, excluded) 单调 UPSERT；Sequelize upsert 不能直接表达冲突分支累进条件。
+
+back/cron/history.ts:432  deleteExpired
+INSERT…SELECT 将源行/保留水位/回执证据检查与写入合为一条语句；避免先查后写、额外锁持有及结果搬运。
+
+back/cron/history.ts:441  deleteExpired
+过期条件包含对存活实例的相关 NOT EXISTS；保留同一语句中的保护条件，避免预读 ID 后竞态或批量搬运历史。
+
+back/cron/queries/queueDiagnostics.ts:121  track
+性能例外：每次任务出队的状态写入。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/queries/triggerQueries.ts:21  visibleTriggers
+历史投影包含退出冲突/待确认 EXISTS + CASE，分页另含二元游标比较；保留同快照投影和索引友好的分页条件。
+
+back/cron/queries/triggerQueries.ts:33  recent
+历史投影包含退出冲突/待确认 EXISTS + CASE，分页另含二元游标比较；保留同快照投影和索引友好的分页条件。
+
+back/cron/queries/triggerQueries.ts:43  metrics
+CTE/UNION/窗口函数或物化统计快照；Sequelize 6 无等价完整查询 API，改为 JS 聚合会增加历史行读取、内存及查询次数。
+
+back/cron/scheduling/scheduleAudit.ts:76  saveSchedulePlan
+desired CTE + JSON 集合 + 多列元组比较，批量关闭/插入计划规则；保留集合操作避免逐项读写。
+
+back/cron/scheduling/scheduleAudit.ts:82  saveSchedulePlan
+desired CTE + JSON 集合 + 多列元组比较，批量关闭/插入计划规则；保留集合操作避免逐项读写。
+
+back/cron/scheduling/scheduleAudit.ts:91  saveSchedulePlan
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/scheduling/scheduleAudit.ts:122  confirmSchedulePlan
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/scheduling/scheduleAudit.ts:128  confirmSchedulePlan
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/scheduling/scheduleAudit.ts:180  auditSchedule
+计划审计使用子查询确定有效区间、历史水位和未确认切换边界；避免拆查造成不一致视图。
+
+back/cron/scheduling/scheduleAudit.ts:187  auditSchedule
+计划审计使用子查询确定有效区间、历史水位和未确认切换边界；避免拆查造成不一致视图。
+
+back/cron/scheduling/scheduleAudit.ts:197  auditSchedule
+证据读取组合相关 EXISTS/NOT EXISTS 和条件投影；必须同一数据库快照判断是否可恢复、可结算或可删除凭证，普通 ORM 拆查不等价。
+
+back/cron/scheduling/systemScheduleAudit.ts:69  suspendSystemPlan
+INSERT…SELECT 将源行/保留水位/回执证据检查与写入合为一条语句；避免先查后写、额外锁持有及结果搬运。
+
+back/cron/scheduling/systemScheduleAudit.ts:94  confirmSystemPlan
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/scheduling/systemScheduleAudit.ts:122  systemScheduleAudit
+计划审计使用子查询确定有效区间、历史水位和未确认切换边界；避免拆查造成不一致视图。
+
+back/cron/scheduling/systemScheduleAudit.ts:127  systemScheduleAudit
+证据读取组合相关 EXISTS/NOT EXISTS 和条件投影；必须同一数据库快照判断是否可恢复、可结算或可删除凭证，普通 ORM 拆查不等价。
+
+back/cron/schema.ts:162  installTriggerHistory
+混合迁移列表：8 个普通 CREATE TABLE 已改为 QueryInterface；剩余为 WITHOUT ROWID、CHECK 单例约束及 CREATE INDEX IF NOT EXISTS。
+
+back/cron/schema.ts:170  installTriggerHistory
+PRAGMA table_info：当前 Sequelize 6 describeTable 遇表达式索引的 null 列名会抛错，已由真实升级回归复现；保留兼容旧库的字段检查。
+
+back/cron/schema.ts:185  installTriggerHistory
+PRAGMA table_info：当前 Sequelize 6 describeTable 遇表达式索引的 null 列名会抛错，已由真实升级回归复现；保留兼容旧库的字段检查。
+
+back/cron/schema.ts:195  installTriggerHistory
+复合主键 + WITHOUT ROWID 表重建；Sequelize 建表接口不能完整表达该存储布局。
+
+back/cron/schema.ts:196  installTriggerHistory
+历史冲突表通过 INSERT…SELECT…UNION 去重并迁移双向证据，避免逐行搬运或改变去重规则。
+
+back/cron/schema.ts:206  installTriggerHistory
+PRAGMA table_info：当前 Sequelize 6 describeTable 遇表达式索引的 null 列名会抛错，已由真实升级回归复现；保留兼容旧库的字段检查。
+
+back/cron/schema.ts:219  installTriggerHistory
+PRAGMA table_info：当前 Sequelize 6 describeTable 遇表达式索引的 null 列名会抛错，已由真实升级回归复现；保留兼容旧库的字段检查。
+
+back/cron/schema.ts:232  installTriggerHistory
+PRAGMA table_info：当前 Sequelize 6 describeTable 遇表达式索引的 null 列名会抛错，已由真实升级回归复现；保留兼容旧库的字段检查。
+
+back/cron/schema.ts:263  installTriggerHistory
+PRAGMA table_info：当前 Sequelize 6 describeTable 遇表达式索引的 null 列名会抛错，已由真实升级回归复现；保留兼容旧库的字段检查。
+
+back/cron/schema.ts:294  installTriggerHistory
+数据库 AFTER UPDATE 触发器在 counted 变更时原子删除退出观察；不能换为仅在当前 Node 进程生效的 ORM hook。
+
+back/cron/schema.ts:301  installTriggerHistory
+表达式 + 条件索引 + IF NOT EXISTS；保留原表达式及并发升级幂等性。
+
+back/cron/schema.ts:305  installTriggerHistory
+条件索引/条件唯一索引，CREATE INDEX IF NOT EXISTS 原子幂等；Sequelize 6 addIndex 无等价 IF NOT EXISTS 支持，避免先查索引再创建。
+
+back/cron/schema.ts:309  installTriggerHistory
+条件索引/条件唯一索引，CREATE INDEX IF NOT EXISTS 原子幂等；Sequelize 6 addIndex 无等价 IF NOT EXISTS 支持，避免先查索引再创建。
+
+back/cron/settlement/cronStatistics.ts:30  recordCronResult
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/cronStatistics.ts:35  recordCronResult
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/cronStatistics.ts:42  recordCronResult
+证据读取组合相关 EXISTS/NOT EXISTS 和条件投影；必须同一数据库快照判断是否可恢复、可结算或可删除凭证，普通 ORM 拆查不等价。
+
+back/cron/settlement/cronStatistics.ts:62  recordCronResult
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/settlement/cronStatistics.ts:84  addDailyExit
+每日统计在 UPSERT 冲突分支累加计数/耗时并维护 MAX；必须防止并发覆盖、重复计数和保留水位回退。
+
+back/cron/settlement/legacyDailyStatistics.ts:51  readDailyResults
+CTE/UNION/窗口函数或物化统计快照；Sequelize 6 无等价完整查询 API，改为 JS 聚合会增加历史行读取、内存及查询次数。
+
+back/cron/settlement/legacyDailyStatistics.ts:93  repairLegacyDailyStatistics
+CTE/UNION/窗口函数或物化统计快照；Sequelize 6 无等价完整查询 API，改为 JS 聚合会增加历史行读取、内存及查询次数。
+
+back/cron/settlement/legacyDailyStatistics.ts:118  repairLegacyDailyStatistics
+CTE/UNION/窗口函数或物化统计快照；Sequelize 6 无等价完整查询 API，改为 JS 聚合会增加历史行读取、内存及查询次数。
+
+back/cron/settlement/legacyDailyStatistics.ts:137  repairLegacyDailyStatistics
+CTE/UNION/窗口函数或物化统计快照；Sequelize 6 无等价完整查询 API，改为 JS 聚合会增加历史行读取、内存及查询次数。
+
+back/cron/settlement/legacyDailyStatistics.ts:221  repairLegacyDailyStatistics
+每日统计在 UPSERT 冲突分支累加计数/耗时并维护 MAX；必须防止并发覆盖、重复计数和保留水位回退。
+
+back/cron/settlement/triggerSettlement.ts:119  completeCommandExit
+证据读取组合相关 EXISTS/NOT EXISTS 和条件投影；必须同一数据库快照判断是否可恢复、可结算或可删除凭证，普通 ORM 拆查不等价。
+
+back/cron/settlement/triggerSettlement.ts:171  completeCommandExit
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:179  completeCommandExit
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:204  completeCommandExit
+INSERT…SELECT 将源行/保留水位/回执证据检查与写入合为一条语句；避免先查后写、额外锁持有及结果搬运。
+
+back/cron/settlement/triggerSettlement.ts:249  completeCommandExit
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:260  completeCommandExit
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:324  completeCommandExit
+INSERT…SELECT 将源行/保留水位/回执证据检查与写入合为一条语句；避免先查后写、额外锁持有及结果搬运。
+
+back/cron/settlement/triggerSettlement.ts:336  completeCommandExit
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:341  completeCommandExit
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:401  withdrawBooking
+撤销旧统计同时重算相关记录最大耗时；算术扣减与相关 MAX 子查询必须作为一条更新提交。
+
+back/cron/settlement/triggerSettlement.ts:437  invalidateBookedTrigger
+单条状态机更新使用 CASE 从同一旧行计算多个字段；保留 SQL 表达式避免多次更新、ORM 预读或拆散状态转换条件。
+
+back/cron/settlement/triggerSettlement.ts:503  bookPrunedExit
+带统计保留水位子查询的 UPSERT，在修订回执时同步重绑定统计行；ORM upsert 无等价表达。
+
+back/cron/settlement/triggerSettlement.ts:658  retireReceiptAfterCommit
+证据读取组合相关 EXISTS/NOT EXISTS 和条件投影；必须同一数据库快照判断是否可恢复、可结算或可删除凭证，普通 ORM 拆查不等价。
+
+back/cron/settlement/triggerSettlement.ts:781  pendingExit
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:831  saveExitObservation
+插入退出观察前在同一语句限制历史观察数量，并按复合键忽略重复；不能替换为 count 后 create。
+
+back/cron/settlement/triggerSettlement.ts:861  deferExit
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/settlement/triggerSettlement.ts:872  retryPendingExits
+证据读取组合相关 EXISTS/NOT EXISTS 和条件投影；必须同一数据库快照判断是否可恢复、可结算或可删除凭证，普通 ORM 拆查不等价。
+
+back/cron/settlement/triggerSettlement.ts:900  retryPendingExits
+json_each 输入集与五张证据表执行相关存在性筛选；保持单次批量快照，避免按文件逐一查询。
+
+back/cron/settlement/triggerSettlement.ts:1019  completeInTransaction
+单条状态机更新使用 CASE 从同一旧行计算多个字段；保留 SQL 表达式避免多次更新、ORM 预读或拆散状态转换条件。
+
+back/cron/settlement/triggerSettlement.ts:1049  completeInTransaction
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:1061  completeInTransaction
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/cron/settlement/triggerSettlement.ts:1187  saveScriptSample
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:1196  settleInstance
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:1204  settleInstance
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:1208  settleInstance
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:1221  settleInstance
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:1240  settleInstance
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:1259  settleInstance
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:1268  settleInstance
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/cron/settlement/triggerSettlement.ts:1277  settleInstance
+性能例外：退出回执、实例结算和幂等记账。保留本方法原有参数绑定和事务/状态条件；依据上述分组与微基准，不将该局部收益夸大为单条语句的整批收益。
+
+back/data/schemaMigrations.ts:66  migrateSchema
+PRAGMA table_info：当前 Sequelize 6 describeTable 遇表达式索引的 null 列名会抛错，已由真实升级回归复现；保留兼容旧库的字段检查。
+
+back/data/schemaMigrations.ts:109  migrateSchema
+INSERT…SELECT 将源行/保留水位/回执证据检查与写入合为一条语句；避免先查后写、额外锁持有及结果搬运。
+
+back/data/schemaMigrations.ts:142  migrateSchema
+INSERT…SELECT 将源行/保留水位/回执证据检查与写入合为一条语句；避免先查后写、额外锁持有及结果搬运。
+
+back/data/schemaMigrations.ts:157  migrateSchema
+旧 Envs.labels 可能含无效 JSON；使用 json_valid 守卫 json_type 在数据库内修复，避免 ORM 解析损坏值失败。
+
+back/services/retention.ts:152  cleanup
+清理水位采用 MAX(existing, excluded) 单调 UPSERT；Sequelize upsert 不能直接表达冲突分支累进条件。
+
+back/services/retention.ts:157  cleanup
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/services/retention.ts:175  cleanup
+更新/删除条件或赋值含相关子查询；Sequelize 6 无原生子查询构造器，拆成预读再修改会扩大竞争窗口或数据库往返。
+
+back/services/retention.ts:200  cleanup
+VACUUM 是 SQLite 维护命令，ORM 无对应模型操作。
+
+构建与证据
+最终构建 SHA256：63042852818b92834ce33f084032c1931e53ba02de6f1bb11fc09c3e0d3b9fce
+基准源、分组定义、增量补丁、原始逐轮日志/资源采样、脚本、各类回归日志与指标重算程序随证据包保存。

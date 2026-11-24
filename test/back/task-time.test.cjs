@@ -27,6 +27,7 @@ function run(t, body) {
       '-ec',
       source +
         `
+unset EPOCHREALTIME EPOCHSECONDS
 is_macos=0
 mtime_format='%Y-%m-%d %H:%M:%S.%3N'
 time_format='%Y-%m-%d %H:%M:%S'

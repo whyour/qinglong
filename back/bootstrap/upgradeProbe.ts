@@ -43,17 +43,26 @@ async function probeUpgrade() {
   try {
     await loadDatabase();
     // Exercise an actual on-disk transaction as well as schema initialization.
+    const { DataTypes } = await import('sequelize');
+    const probe = sequelize.define<
+      import('sequelize').Model<{ value: number }>
+    >(
+      'UpgradeProbe',
+      { value: DataTypes.INTEGER },
+      { tableName: 'upgrade_probe', timestamps: false },
+    );
+    probe.removeAttribute('id');
     await sequelize.transaction(async (transaction) => {
-      await sequelize.query('CREATE TABLE upgrade_probe (value INTEGER)', {
-        transaction,
-      });
-      await sequelize.query('INSERT INTO upgrade_probe VALUES (42)', {
-        transaction,
-      });
-      const [rows] = await sequelize.query('SELECT value FROM upgrade_probe', {
-        transaction,
-      });
-      if ((rows[0] as { value: number })?.value !== 42)
+      await sequelize
+        .getQueryInterface()
+        .createTable(
+          'upgrade_probe',
+          { value: DataTypes.INTEGER },
+          { transaction },
+        );
+      await probe.create({ value: 42 }, { transaction });
+      const row = await probe.findOne({ attributes: ['value'], transaction });
+      if (row?.get('value') !== 42)
         throw new Error('Upgrade database readback failed');
     });
     inject();

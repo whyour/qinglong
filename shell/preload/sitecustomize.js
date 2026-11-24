@@ -4,10 +4,25 @@ const path = require('path');
 const client = require('./client.js');
 require(`./env.js`);
 
-// 注册 ESM loader，使全局安装的包也可通过 import 导入
+// Node 22.15+ can resolve ESM on the current thread, without a loader worker.
+// CommonJS keeps preferGlobalNodeModules and its panel-dependency isolation.
 try {
-  Module.register(new URL('esm-loader.mjs', `file://${__dirname}/`).href);
-} catch (_) {}
+  if (typeof Module.registerHooks !== 'function') {
+    throw new Error('Synchronous module hooks unavailable');
+  }
+  const { resolve } = require('./esm-loader.mjs');
+  Module.registerHooks({
+    resolve(specifier, context, nextResolve) {
+      return context.conditions.includes('require')
+        ? nextResolve(specifier, context)
+        : resolve(specifier, context, nextResolve);
+    },
+  });
+} catch (_) {
+  try {
+    Module.register(new URL('esm-loader.mjs', `file://${__dirname}/`).href);
+  } catch (_) {}
+}
 
 function preferGlobalNodeModules() {
   const { QL_NODE_GLOBAL_PATH } = process.env;
@@ -78,14 +93,15 @@ function run() {
       `${dir_scripts}/`,
       '',
     );
-    const tempFile = `/tmp/env_${process.pid}.json`;
+    const tempFile = `/tmp/env_${process.pid}.data`;
 
     // Pass paths as arguments: shell syntax in a filename must stay literal.
     const command = `file="$1"; output="$2"; inline="$3"; shift 3
 source "$file" "$@" &&
 { if [ -n "$inline" ]; then eval "$inline"; fi; } &&
 printf '%s\\n' '__sitecustomize__' &&
-node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify(process.env))' "$output"`;
+{ command env -0 > "$output" 2>/dev/null ||
+node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify(process.env))' "$output"; }`;
 
     if (task_before) {
       console.log(
@@ -113,7 +129,19 @@ node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify(process.env
 
     try {
       const envStr = require('fs').readFileSync(tempFile, 'utf-8');
-      const newEnvObject = JSON.parse(envStr);
+      // NUL separates environment entries without escaping Unicode, newlines
+      // or '=' in values. Keep JSON for env implementations without -0.
+      const newEnvObject = envStr.includes('\0')
+        ? Object.fromEntries(
+            envStr
+              .split('\0')
+              .filter(Boolean)
+              .map((entry) => {
+                const separator = entry.indexOf('=');
+                return [entry.slice(0, separator), entry.slice(separator + 1)];
+              }),
+          )
+        : JSON.parse(envStr);
       if (typeof newEnvObject === 'object' && newEnvObject !== null) {
         for (const key in newEnvObject) {
           if (

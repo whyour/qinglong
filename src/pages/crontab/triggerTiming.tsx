@@ -26,7 +26,11 @@ export function QueueReason({
     <div className="queue-reason">
       <strong>
         {intl.get(
-          admission.queue === 'manual' ? '手动执行队列' : '定时执行队列',
+          admission.queue === 'global'
+            ? '全局执行队列'
+            : admission.queue === 'manual'
+            ? '手动执行队列'
+            : '定时执行队列',
         )}
       </strong>
       {' · '}

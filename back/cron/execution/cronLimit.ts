@@ -2,10 +2,7 @@ import { EventEmitter } from 'events';
 import PQueue, { QueueAddOptions } from 'p-queue-cjs';
 import os from 'os';
 import type { Sequelize } from 'sequelize';
-import {
-  QueueOccupants,
-  recordQueueAdmission,
-} from '../queries/queueDiagnostics';
+import { QueueOccupants } from '../queries/queueDiagnostics';
 import { CronWaitQueue, CronQueueOptions } from './cronWaitQueue';
 import { AuthDataType, SystemModel } from '../../data/system';
 import Logger from '../../loaders/logger';
@@ -15,6 +12,7 @@ import config from '../../config';
 import { credentials } from '@grpc/grpc-js';
 import { ApiClient } from '../../protos/api';
 import { getGrpcCerts } from '../../config/grpcCerts';
+import { globalCronBudget } from './globalCronBudget';
 
 // One scheduler/manual queue owner per process; services and execution share it.
 class CronLimit {
@@ -192,43 +190,62 @@ class CronLimit {
       return;
     }
     this.queuedCrons.set(cron.id, result);
+    const dispatch = (job: () => Promise<T | void>) => {
+      if (!waitingSignal) return this.cronLimit.add(job, options);
+      return new Promise<T | void>((resolve, reject) => {
+        this.cronLimit
+          .add(job, {
+            ...options,
+            waitingSignal,
+            onRemoved: () => {
+              this.scheduledOccupants.forget(triggerId);
+              resolve();
+            },
+          })
+          .then(resolve, reject);
+      });
+    };
     const run = this.trackAdmission(
       this.scheduledOccupants,
-      this.cronLimit.concurrency,
       fn,
       { id: triggerId, name: cron.name || cron.id },
       db,
+      isCurrent,
+      waitingSignal,
+      triggerId && db ? dispatch : undefined,
     );
-    if (!waitingSignal) return this.cronLimit.add(run, options);
-    return new Promise<T | void>((resolve, reject) => {
-      this.cronLimit
-        .add(run, {
-          ...options,
-          waitingSignal,
-          onRemoved: () => {
-            this.scheduledOccupants.forget(triggerId);
-            resolve();
-          },
-        })
-        .then(resolve, reject);
-    });
+    // Durable requests are scheduled together by the global budget. A local
+    // FIFO in front of it hides short jobs behind long-running tasks.
+    if (triggerId && db) return run();
+    return dispatch(run);
   }
 
   private trackAdmission<T>(
     pool: QueueOccupants,
-    limit: number,
     fn: () => Promise<T>,
     occupant: { id?: string; name: string },
     db?: Sequelize,
+    current?: () => boolean,
+    signal?: EventEmitter,
+    dispatch?: (job: () => Promise<T>) => Promise<T | void>,
   ) {
-    const admission = pool.admission(limit);
-    if (occupant.id && admission && db) {
-      pool.watch(occupant.id, db);
-      void recordQueueAdmission(db, occupant.id, admission).catch((error) =>
-        Logger.warn('[queue] Failed to record wait reason: %s', error.message),
-      );
-    }
-    return pool.track(fn, occupant, db);
+    // Durable wait diagnostics come from the shared budget, before local
+    // dispatch. Local occupancy cannot see other workers or a fresh batch.
+    const tracked = pool.track(fn, occupant, db);
+    return async () => {
+      try {
+        return occupant.id && db
+          ? await globalCronBudget(db).run(
+              occupant.id,
+              () => (dispatch ? dispatch(tracked) : tracked()),
+              current,
+              signal,
+            )
+          : await tracked();
+      } finally {
+        pool.forget(occupant.id);
+      }
+    };
   }
 
   public async manualRunWithCronLimit<T>(
@@ -237,16 +254,18 @@ class CronLimit {
     occupant: { id?: string; name: string } = { name: '—' },
     db?: Sequelize,
   ): Promise<T | void> {
-    return this.manualCronoLimit.add(
-      this.trackAdmission(
-        this.manualOccupants,
-        this.manualCronoLimit.concurrency,
-        fn,
-        occupant,
-        db,
-      ),
-      options,
+    const run = this.trackAdmission(
+      this.manualOccupants,
+      fn,
+      occupant,
+      db,
+      undefined,
+      undefined,
+      occupant.id && db
+        ? (job) => this.manualCronoLimit.add(job, options)
+        : undefined,
     );
+    return occupant.id && db ? run() : this.manualCronoLimit.add(run, options);
   }
 }
 

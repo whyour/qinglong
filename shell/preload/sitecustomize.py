@@ -46,7 +46,7 @@ def run():
         file_name = sys.argv[0].replace(f"{os.getenv('dir_scripts')}/", "")
         
         # 创建临时文件路径
-        temp_file = f"/tmp/env_{os.getpid()}.json"
+        temp_file = f"/tmp/env_{os.getpid()}.data"
         
         if task_before:
             print("Executing before command\n" if os.environ.get("QL_LANG") == "en" else "执行前置命令\n")
@@ -55,7 +55,8 @@ def run():
 source "$file" "$@" &&
 { if [ -n "$inline" ]; then eval "$inline"; fi; } &&
 printf '%s\\n' '__sitecustomize__' &&
-python3 -c 'import os,json,sys; f=open(sys.argv[1],"w"); json.dump(dict(os.environ),f); f.close()' "$output"
+{ command env -0 > "$output" 2>/dev/null ||
+python3 -c 'import os,json,sys; f=open(sys.argv[1],"w"); json.dump(dict(os.environ),f); f.close()' "$output"; }
 """
         res = subprocess.check_output(
             ["/bin/bash", "-c", command, "ql-before", os.environ["file_task_before"],
@@ -65,8 +66,12 @@ python3 -c 'import os,json,sys; f=open(sys.argv[1],"w"); json.dump(dict(os.envir
         output = res.split(split_str)[0]
 
         try:
-            with open(temp_file, 'r') as f:
-                env_json = json.loads(f.read())
+            with open(temp_file, 'rb') as f:
+                data = f.read()
+            # fsdecode retains undecodable Unix environment bytes, as os.environ does.
+            env_json = (dict((os.fsdecode(key), os.fsdecode(value))
+                            for key, _, value in (entry.partition(b'=') for entry in data.split(b'\0') if entry))
+                        if b'\0' in data else json.loads(data))
 
             for key, value in env_json.items():
                 os.environ[key] = value

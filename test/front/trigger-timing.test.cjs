@@ -243,3 +243,19 @@ test('a live queue shows the resampled holders and preserves the measured dequeu
     /排队等待 <b>210 ms/,
   );
 });
+
+test('shared budget occupancy is labelled as the global queue', () => {
+  const { details } = render({
+    state: 'queued',
+    queued_at: base,
+    queue_live_context: JSON.stringify({
+      queue: 'global',
+      limit: 1,
+      occupied: 1,
+      holders: [{ id: 'foreign-worker-run', name: '另一个 worker 的任务' }],
+    }),
+  });
+  assert.match(details, /全局执行队列/);
+  assert.match(details, /另一个 worker 的任务/);
+  assert.doesNotMatch(details, /定时执行队列|手动执行队列/);
+});

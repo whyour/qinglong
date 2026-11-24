@@ -39,8 +39,12 @@ export function resolveFileAccess(
     while (!fs.existsSync(existing)) {
       // existsSync is false for a dangling symlink; never treat one as absent.
       try {
-        fs.lstatSync(existing);
-        return '';
+        const entry = fs.lstatSync(existing);
+        if (entry.isSymbolicLink()) return '';
+        // Another task may have created this directory after existsSync.
+        // Canonicalize the now-existing entry below, with the same root and
+        // blacklist checks, rather than rejecting a legitimate concurrent run.
+        break;
       } catch (error: any) {
         if (error.code !== 'ENOENT') return '';
       }

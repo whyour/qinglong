@@ -8,6 +8,7 @@ import { slotId } from '../cron/history';
 import { runCron } from '../cron/execution/runCron';
 import Logger from '../loaders/logger';
 import { t, tf } from '../shared/i18n';
+import { resumeAcceptedCrons } from '../cron/scheduling/resumeAcceptedCrons';
 
 // Validate the entire batch before replacing any existing jobs.
 const isValidCronField = (cron: string): boolean => {
@@ -77,6 +78,11 @@ const addCron = (
       const jobs: CronJob[] = [];
       definitions.set(jobs, signature);
       prepared.set(item.id, jobs);
+      if (call.request.replace && savePlan) {
+        recoveries.push(() =>
+          resumeAcceptedCrons(item, () => scheduleStacks.get(item.id) === jobs),
+        );
+      }
       for (const [ruleIndex, schedule] of [
         item.schedule,
         ...(item.extra_schedules || []).map((x) => x.schedule),

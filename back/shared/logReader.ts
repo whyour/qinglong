@@ -1,11 +1,43 @@
 import fs from 'fs/promises';
 import { createHash } from 'crypto';
+import type { BigIntStats } from 'fs';
 
 export const DEFAULT_LOG_CHUNK_BYTES = 256 * 1024;
 export const MAX_LOG_CHUNK_BYTES = 1024 * 1024;
 
 // The viewer retains at most one Mi UTF-16 code units.
 const CURSOR_WINDOW_BYTES = 4 * MAX_LOG_CHUNK_BYTES;
+
+// Cache only a server-verified EOF, never client-supplied file metadata or log
+// contents. Bound both the number of viewers retained and verification lifetime.
+const EOF_CACHE_LIMIT = 256;
+const EOF_CACHE_TTL_MS = 30_000;
+const EOF_CACHE_SETTLE_MS = 2_000;
+const verifiedEnds = new Map<
+  string,
+  { version: string; cursor: string; offset: number; verifiedAt: number }
+>();
+
+function fileVersion(stat: BigIntStats) {
+  return `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}:${stat.birthtimeNs}`;
+}
+
+function rememberEnd(
+  filePath: string,
+  version: string,
+  cursor: string,
+  offset: number,
+) {
+  verifiedEnds.delete(filePath);
+  verifiedEnds.set(filePath, {
+    version,
+    cursor,
+    offset,
+    verifiedAt: Date.now(),
+  });
+  if (verifiedEnds.size > EOF_CACHE_LIMIT)
+    verifiedEnds.delete(verifiedEnds.keys().next().value!);
+}
 
 export interface LogReadOptions {
   offset?: number;
@@ -68,6 +100,15 @@ export async function readLogChunk(
     const stat = await handle.stat({ bigint: true });
     const total = Number(stat.size);
     const identity = `${stat.dev}:${stat.ino}`;
+    const version = fileVersion(stat);
+    const observedAt = Date.now();
+    // Even nanosecond stat fields can repeat across writes within a filesystem
+    // clock tick. Never cache content read while that timestamp is still fresh.
+    const metadataSettled =
+      Number(stat.mtimeMs) > 0 &&
+      Number(stat.ctimeMs) > 0 &&
+      observedAt - Number(stat.mtimeMs) >= EOF_CACHE_SETTLE_MS &&
+      observedAt - Number(stat.ctimeMs) >= EOF_CACHE_SETTLE_MS;
     const limit = normalizeLimit(options.limit);
     const requestedOffset = Number.isFinite(options.offset)
       ? Math.max(0, Math.trunc(options.offset!))
@@ -78,6 +119,30 @@ export async function readLogChunk(
         : Math.min(requestedOffset, total);
     const resume =
       options.cursor && !options.tail && requestedOffset !== undefined;
+    const verified = verifiedEnds.get(filePath);
+    if (
+      resume &&
+      verified?.version === version &&
+      verified.cursor === options.cursor &&
+      verified.offset === requestedOffset &&
+      requestedOffset === total &&
+      observedAt >= verified.verifiedAt &&
+      observedAt - verified.verifiedAt < EOF_CACHE_TTL_MS
+    ) {
+      // A cache hit does not extend the deadline: even an unchanged file is
+      // periodically verified again. Keep the entry recent without retaining bytes.
+      verifiedEnds.delete(filePath);
+      verifiedEnds.set(filePath, verified);
+      return {
+        content: '',
+        offset: total,
+        nextOffset: total,
+        total,
+        truncated: total > 0,
+        cursor: options.cursor,
+        reset: false,
+      };
+    }
     const [fromText, digest] = resume ? options.cursor!.split('.') : [];
     let from = resume ? Number(fromText) : start;
     let reset = Boolean(
@@ -136,6 +201,13 @@ export async function readLogChunk(
             )}`;
     }
 
+    if (cursor && nextOffset === total && metadataSettled) {
+      // Do not trust an EOF read that raced with append, truncate or overwrite.
+      // ctime also detects rewrites that restore mtime; inode detects replacement.
+      if (fileVersion(await handle.stat({ bigint: true })) === version)
+        rememberEnd(filePath, version, cursor, nextOffset);
+    }
+
     return {
       ...(cursor && { cursor, reset }),
       content: buffer.subarray(leadingBytes, contentEnd).toString('utf8'),
@@ -146,6 +218,7 @@ export async function readLogChunk(
     };
   } catch (error: any) {
     if (error?.code === 'ENOENT') {
+      verifiedEnds.delete(filePath);
       return {
         content: '',
         offset: 0,
